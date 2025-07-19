@@ -7,6 +7,8 @@ import {
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type Delivery, type InsertDelivery
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, lt, and, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -85,271 +87,259 @@ export interface IStorage {
   deleteDelivery(id: number): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User> = new Map();
-  private storageLocations: Map<number, StorageLocation> = new Map();
-  private ingredients: Map<number, Ingredient> = new Map();
-  private recipes: Map<number, Recipe> = new Map();
-  private recipeIngredients: Map<number, RecipeIngredient> = new Map();
-  private productions: Map<number, Production> = new Map();
-  private orders: Map<number, Order> = new Map();
-  private orderItems: Map<number, OrderItem> = new Map();
-  private deliveries: Map<number, Delivery> = new Map();
-  private currentId = 1;
+export class DatabaseStorage implements IStorage {
+  async initializeSampleData() {
+    try {
+      // Check if data already exists
+      const existingUsers = await db.select().from(users).limit(1);
+      if (existingUsers.length > 0) {
+        return; // Data already initialized
+      }
 
-  constructor() {
-    this.initializeData();
-  }
+      // Create default storage locations
+      await db.insert(storageLocations).values([
+        {
+          name: "Frigo A",
+          temperature: "2.00",
+          capacity: "1000.00",
+          unit: "kg"
+        },
+        {
+          name: "Congélateur",
+          temperature: "-18.00",
+          capacity: "500.00",
+          unit: "kg"
+        }
+      ]);
 
-  private getNextId(): number {
-    return this.currentId++;
-  }
+      // Create default admin user
+      await db.insert(users).values({
+        username: "admin",
+        password: "admin123",
+        email: "admin@patisslab.com",
+        firstName: "Jean",
+        lastName: "Dupont",
+        role: "admin",
+        active: true
+      });
 
-  private initializeData() {
-    // Create default storage locations
-    const frigo = this.createStorageLocation({
-      name: "Frigo A",
-      temperature: "2.00",
-      capacity: "1000.00",
-      unit: "kg"
-    });
-
-    const congelateur = this.createStorageLocation({
-      name: "Congélateur",
-      temperature: "-18.00",
-      capacity: "500.00",
-      unit: "kg"
-    });
-
-    // Create default admin user
-    this.createUser({
-      username: "admin",
-      password: "admin123",
-      email: "admin@patisslab.com",
-      firstName: "Jean",
-      lastName: "Dupont",
-      role: "admin",
-      active: true
-    });
-
-    // Create sample ingredients
-    this.createIngredient({
-      name: "Farine T55",
-      unit: "kg",
-      currentStock: "2.5",
-      minStock: "5.0",
-      maxStock: "50.0",
-      costPerUnit: "1.20",
-      storageLocationId: 1
-    });
-
-    this.createIngredient({
-      name: "Œufs frais",
-      unit: "piece",
-      currentStock: "12",
-      minStock: "24",
-      maxStock: "120",
-      costPerUnit: "0.25",
-      storageLocationId: 1
-    });
-
-    this.createIngredient({
-      name: "Beurre doux",
-      unit: "kg",
-      currentStock: "0.8",
-      minStock: "2.0",
-      maxStock: "10.0",
-      costPerUnit: "6.50",
-      storageLocationId: 1
-    });
+      // Create sample ingredients
+      await db.insert(ingredients).values([
+        {
+          name: "Farine T55",
+          unit: "kg",
+          currentStock: "2.5",
+          minStock: "5.0",
+          maxStock: "50.0",
+          costPerUnit: "1.20",
+          storageLocationId: 1
+        },
+        {
+          name: "Œufs frais",
+          unit: "piece",
+          currentStock: "12",
+          minStock: "24",
+          maxStock: "120",
+          costPerUnit: "0.25",
+          storageLocationId: 1
+        },
+        {
+          name: "Beurre doux",
+          unit: "kg",
+          currentStock: "0.8",
+          minStock: "2.0",
+          maxStock: "10.0",
+          costPerUnit: "6.50",
+          storageLocationId: 1
+        }
+      ]);
+    } catch (error) {
+      console.log("Sample data initialization skipped (data may already exist):", error);
+    }
   }
 
   // Users
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
-    return Array.from(this.users.values()).filter(user => user.role === role);
+    return await db.select().from(users).where(eq(users.role, role));
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const id = this.getNextId();
-    const newUser: User = { ...user, id };
-    this.users.set(id, newUser);
-    return newUser;
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
   }
 
-  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
-    const existing = this.users.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...user };
-    this.users.set(id, updated);
-    return updated;
+  async updateUser(id: number, updateData: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set(updateData)
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
   }
 
   async deleteUser(id: number): Promise<boolean> {
-    return this.users.delete(id);
+    const result = await db.delete(users).where(eq(users.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+    return await db.select().from(users);
   }
 
   // Storage Locations
   async getStorageLocation(id: number): Promise<StorageLocation | undefined> {
-    return this.storageLocations.get(id);
+    const [location] = await db.select().from(storageLocations).where(eq(storageLocations.id, id));
+    return location || undefined;
   }
 
   async getAllStorageLocations(): Promise<StorageLocation[]> {
-    return Array.from(this.storageLocations.values());
+    return await db.select().from(storageLocations);
   }
 
-  async createStorageLocation(location: InsertStorageLocation): Promise<StorageLocation> {
-    const id = this.getNextId();
-    const newLocation: StorageLocation = { ...location, id };
-    this.storageLocations.set(id, newLocation);
-    return newLocation;
+  async createStorageLocation(insertLocation: InsertStorageLocation): Promise<StorageLocation> {
+    const [location] = await db.insert(storageLocations).values(insertLocation).returning();
+    return location;
   }
 
-  async updateStorageLocation(id: number, location: Partial<InsertStorageLocation>): Promise<StorageLocation | undefined> {
-    const existing = this.storageLocations.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...location };
-    this.storageLocations.set(id, updated);
-    return updated;
+  async updateStorageLocation(id: number, updateData: Partial<InsertStorageLocation>): Promise<StorageLocation | undefined> {
+    const [location] = await db.update(storageLocations)
+      .set(updateData)
+      .where(eq(storageLocations.id, id))
+      .returning();
+    return location || undefined;
   }
 
   async deleteStorageLocation(id: number): Promise<boolean> {
-    return this.storageLocations.delete(id);
+    const result = await db.delete(storageLocations).where(eq(storageLocations.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Ingredients
   async getIngredient(id: number): Promise<Ingredient | undefined> {
-    return this.ingredients.get(id);
+    const [ingredient] = await db.select().from(ingredients).where(eq(ingredients.id, id));
+    return ingredient || undefined;
   }
 
   async getAllIngredients(): Promise<Ingredient[]> {
-    return Array.from(this.ingredients.values());
+    return await db.select().from(ingredients);
   }
 
   async getLowStockIngredients(): Promise<Ingredient[]> {
-    return Array.from(this.ingredients.values()).filter(
-      ingredient => parseFloat(ingredient.currentStock || "0") <= parseFloat(ingredient.minStock || "0")
+    const allIngredients = await db.select().from(ingredients);
+    return allIngredients.filter(ingredient => 
+      parseFloat(ingredient.currentStock || "0") <= parseFloat(ingredient.minStock || "0")
     );
   }
 
-  async createIngredient(ingredient: InsertIngredient): Promise<Ingredient> {
-    const id = this.getNextId();
-    const newIngredient: Ingredient = { ...ingredient, id };
-    this.ingredients.set(id, newIngredient);
-    return newIngredient;
+  async createIngredient(insertIngredient: InsertIngredient): Promise<Ingredient> {
+    const [ingredient] = await db.insert(ingredients).values(insertIngredient).returning();
+    return ingredient;
   }
 
-  async updateIngredient(id: number, ingredient: Partial<InsertIngredient>): Promise<Ingredient | undefined> {
-    const existing = this.ingredients.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...ingredient };
-    this.ingredients.set(id, updated);
-    return updated;
+  async updateIngredient(id: number, updateData: Partial<InsertIngredient>): Promise<Ingredient | undefined> {
+    const [ingredient] = await db.update(ingredients)
+      .set(updateData)
+      .where(eq(ingredients.id, id))
+      .returning();
+    return ingredient || undefined;
   }
 
   async deleteIngredient(id: number): Promise<boolean> {
-    return this.ingredients.delete(id);
+    const result = await db.delete(ingredients).where(eq(ingredients.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async updateIngredientStock(id: number, quantity: number): Promise<Ingredient | undefined> {
-    const ingredient = this.ingredients.get(id);
+    const ingredient = await this.getIngredient(id);
     if (!ingredient) return undefined;
     
     const currentStock = parseFloat(ingredient.currentStock || "0");
     const newStock = Math.max(0, currentStock + quantity);
     
-    const updated = { ...ingredient, currentStock: newStock.toString() };
-    this.ingredients.set(id, updated);
-    return updated;
+    return await this.updateIngredient(id, { currentStock: newStock.toString() });
   }
 
   // Recipes
   async getRecipe(id: number): Promise<Recipe | undefined> {
-    return this.recipes.get(id);
+    const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
+    return recipe || undefined;
   }
 
   async getAllRecipes(): Promise<Recipe[]> {
-    return Array.from(this.recipes.values());
+    return await db.select().from(recipes);
   }
 
   async getActiveRecipes(): Promise<Recipe[]> {
-    return Array.from(this.recipes.values()).filter(recipe => recipe.active);
+    return await db.select().from(recipes).where(eq(recipes.active, true));
   }
 
-  async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
-    const id = this.getNextId();
-    const newRecipe: Recipe = { ...recipe, id };
-    this.recipes.set(id, newRecipe);
-    return newRecipe;
+  async createRecipe(insertRecipe: InsertRecipe): Promise<Recipe> {
+    const [recipe] = await db.insert(recipes).values(insertRecipe).returning();
+    return recipe;
   }
 
-  async updateRecipe(id: number, recipe: Partial<InsertRecipe>): Promise<Recipe | undefined> {
-    const existing = this.recipes.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...recipe };
-    this.recipes.set(id, updated);
-    return updated;
+  async updateRecipe(id: number, updateData: Partial<InsertRecipe>): Promise<Recipe | undefined> {
+    const [recipe] = await db.update(recipes)
+      .set(updateData)
+      .where(eq(recipes.id, id))
+      .returning();
+    return recipe || undefined;
   }
 
   async deleteRecipe(id: number): Promise<boolean> {
-    return this.recipes.delete(id);
+    const result = await db.delete(recipes).where(eq(recipes.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Recipe Ingredients
   async getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]> {
-    return Array.from(this.recipeIngredients.values()).filter(ri => ri.recipeId === recipeId);
+    return await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
   }
 
-  async createRecipeIngredient(recipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
-    const id = this.getNextId();
-    const newRecipeIngredient: RecipeIngredient = { ...recipeIngredient, id };
-    this.recipeIngredients.set(id, newRecipeIngredient);
-    return newRecipeIngredient;
+  async createRecipeIngredient(insertRecipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
+    const [recipeIngredient] = await db.insert(recipeIngredients).values(insertRecipeIngredient).returning();
+    return recipeIngredient;
   }
 
-  async updateRecipeIngredient(id: number, recipeIngredient: Partial<InsertRecipeIngredient>): Promise<RecipeIngredient | undefined> {
-    const existing = this.recipeIngredients.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...recipeIngredient };
-    this.recipeIngredients.set(id, updated);
-    return updated;
+  async updateRecipeIngredient(id: number, updateData: Partial<InsertRecipeIngredient>): Promise<RecipeIngredient | undefined> {
+    const [recipeIngredient] = await db.update(recipeIngredients)
+      .set(updateData)
+      .where(eq(recipeIngredients.id, id))
+      .returning();
+    return recipeIngredient || undefined;
   }
 
   async deleteRecipeIngredient(id: number): Promise<boolean> {
-    return this.recipeIngredients.delete(id);
+    const result = await db.delete(recipeIngredients).where(eq(recipeIngredients.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async deleteRecipeIngredientsByRecipe(recipeId: number): Promise<boolean> {
-    const toDelete = Array.from(this.recipeIngredients.entries())
-      .filter(([_, ri]) => ri.recipeId === recipeId)
-      .map(([id, _]) => id);
-    
-    toDelete.forEach(id => this.recipeIngredients.delete(id));
-    return true;
+    const result = await db.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+    return (result.rowCount || 0) >= 0;
   }
 
   // Productions
   async getProduction(id: number): Promise<Production | undefined> {
-    return this.productions.get(id);
+    const [production] = await db.select().from(productions).where(eq(productions.id, id));
+    return production || undefined;
   }
 
   async getAllProductions(): Promise<Production[]> {
-    return Array.from(this.productions.values());
+    return await db.select().from(productions);
   }
 
   async getProductionsByStatus(status: string): Promise<Production[]> {
-    return Array.from(this.productions.values()).filter(p => p.status === status);
+    return await db.select().from(productions).where(eq(productions.status, status));
   }
 
   async getTodayProductions(): Promise<Production[]> {
@@ -358,141 +348,142 @@ export class MemStorage implements IStorage {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return Array.from(this.productions.values()).filter(p => {
-      const scheduledTime = new Date(p.scheduledTime);
-      return scheduledTime >= today && scheduledTime < tomorrow;
-    });
+    return await db.select().from(productions)
+      .where(
+        and(
+          gte(productions.scheduledTime, today),
+          lt(productions.scheduledTime, tomorrow)
+        )
+      );
   }
 
-  async createProduction(production: InsertProduction): Promise<Production> {
-    const id = this.getNextId();
-    const newProduction: Production = { ...production, id };
-    this.productions.set(id, newProduction);
-    return newProduction;
+  async createProduction(insertProduction: InsertProduction): Promise<Production> {
+    const [production] = await db.insert(productions).values(insertProduction).returning();
+    return production;
   }
 
-  async updateProduction(id: number, production: Partial<InsertProduction>): Promise<Production | undefined> {
-    const existing = this.productions.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...production };
-    this.productions.set(id, updated);
-    return updated;
+  async updateProduction(id: number, updateData: Partial<InsertProduction>): Promise<Production | undefined> {
+    const [production] = await db.update(productions)
+      .set(updateData)
+      .where(eq(productions.id, id))
+      .returning();
+    return production || undefined;
   }
 
   async deleteProduction(id: number): Promise<boolean> {
-    return this.productions.delete(id);
+    const result = await db.delete(productions).where(eq(productions.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Orders
   async getOrder(id: number): Promise<Order | undefined> {
-    return this.orders.get(id);
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order || undefined;
   }
 
   async getAllOrders(): Promise<Order[]> {
-    return Array.from(this.orders.values());
+    return await db.select().from(orders);
   }
 
   async getOrdersByStatus(status: string): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(o => o.status === status);
+    return await db.select().from(orders).where(eq(orders.status, status));
   }
 
   async getOrdersByCustomer(customerId: number): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(o => o.customerId === customerId);
+    return await db.select().from(orders).where(eq(orders.customerId, customerId));
   }
 
   async getRecentOrders(limit: number): Promise<Order[]> {
-    return Array.from(this.orders.values())
-      .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())
-      .slice(0, limit);
+    return await db.select().from(orders)
+      .orderBy(desc(orders.createdAt))
+      .limit(limit);
   }
 
-  async createOrder(order: InsertOrder): Promise<Order> {
-    const id = this.getNextId();
-    const newOrder: Order = { ...order, id };
-    this.orders.set(id, newOrder);
-    return newOrder;
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const [order] = await db.insert(orders).values(insertOrder).returning();
+    return order;
   }
 
-  async updateOrder(id: number, order: Partial<InsertOrder>): Promise<Order | undefined> {
-    const existing = this.orders.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...order };
-    this.orders.set(id, updated);
-    return updated;
+  async updateOrder(id: number, updateData: Partial<InsertOrder>): Promise<Order | undefined> {
+    const [order] = await db.update(orders)
+      .set(updateData)
+      .where(eq(orders.id, id))
+      .returning();
+    return order || undefined;
   }
 
   async deleteOrder(id: number): Promise<boolean> {
-    return this.orders.delete(id);
+    const result = await db.delete(orders).where(eq(orders.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Order Items
   async getOrderItems(orderId: number): Promise<OrderItem[]> {
-    return Array.from(this.orderItems.values()).filter(oi => oi.orderId === orderId);
+    return await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
   }
 
-  async createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem> {
-    const id = this.getNextId();
-    const newOrderItem: OrderItem = { ...orderItem, id };
-    this.orderItems.set(id, newOrderItem);
-    return newOrderItem;
+  async createOrderItem(insertOrderItem: InsertOrderItem): Promise<OrderItem> {
+    const [orderItem] = await db.insert(orderItems).values(insertOrderItem).returning();
+    return orderItem;
   }
 
-  async updateOrderItem(id: number, orderItem: Partial<InsertOrderItem>): Promise<OrderItem | undefined> {
-    const existing = this.orderItems.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...orderItem };
-    this.orderItems.set(id, updated);
-    return updated;
+  async updateOrderItem(id: number, updateData: Partial<InsertOrderItem>): Promise<OrderItem | undefined> {
+    const [orderItem] = await db.update(orderItems)
+      .set(updateData)
+      .where(eq(orderItems.id, id))
+      .returning();
+    return orderItem || undefined;
   }
 
   async deleteOrderItem(id: number): Promise<boolean> {
-    return this.orderItems.delete(id);
+    const result = await db.delete(orderItems).where(eq(orderItems.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   async deleteOrderItemsByOrder(orderId: number): Promise<boolean> {
-    const toDelete = Array.from(this.orderItems.entries())
-      .filter(([_, oi]) => oi.orderId === orderId)
-      .map(([id, _]) => id);
-    
-    toDelete.forEach(id => this.orderItems.delete(id));
-    return true;
+    const result = await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    return (result.rowCount || 0) >= 0;
   }
 
   // Deliveries
   async getDelivery(id: number): Promise<Delivery | undefined> {
-    return this.deliveries.get(id);
+    const [delivery] = await db.select().from(deliveries).where(eq(deliveries.id, id));
+    return delivery || undefined;
   }
 
   async getAllDeliveries(): Promise<Delivery[]> {
-    return Array.from(this.deliveries.values());
+    return await db.select().from(deliveries);
   }
 
   async getDeliveriesByDeliverer(delivererId: number): Promise<Delivery[]> {
-    return Array.from(this.deliveries.values()).filter(d => d.delivererId === delivererId);
+    return await db.select().from(deliveries).where(eq(deliveries.delivererId, delivererId));
   }
 
   async getDeliveriesByStatus(status: string): Promise<Delivery[]> {
-    return Array.from(this.deliveries.values()).filter(d => d.status === status);
+    return await db.select().from(deliveries).where(eq(deliveries.status, status));
   }
 
-  async createDelivery(delivery: InsertDelivery): Promise<Delivery> {
-    const id = this.getNextId();
-    const newDelivery: Delivery = { ...delivery, id };
-    this.deliveries.set(id, newDelivery);
-    return newDelivery;
+  async createDelivery(insertDelivery: InsertDelivery): Promise<Delivery> {
+    const [delivery] = await db.insert(deliveries).values(insertDelivery).returning();
+    return delivery;
   }
 
-  async updateDelivery(id: number, delivery: Partial<InsertDelivery>): Promise<Delivery | undefined> {
-    const existing = this.deliveries.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...delivery };
-    this.deliveries.set(id, updated);
-    return updated;
+  async updateDelivery(id: number, updateData: Partial<InsertDelivery>): Promise<Delivery | undefined> {
+    const [delivery] = await db.update(deliveries)
+      .set(updateData)
+      .where(eq(deliveries.id, id))
+      .returning();
+    return delivery || undefined;
   }
 
   async deleteDelivery(id: number): Promise<boolean> {
-    return this.deliveries.delete(id);
+    const result = await db.delete(deliveries).where(eq(deliveries.id, id));
+    return (result.rowCount || 0) > 0;
   }
 }
 
-export const storage = new MemStorage();
+// Create and initialize the storage
+export const storage = new DatabaseStorage();
+
+// Initialize sample data when the module is loaded
+storage.initializeSampleData().catch(console.error);

@@ -22,8 +22,9 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript
 - **Runtime**: Node.js with ES modules
 - **Database ORM**: Drizzle ORM
-- **Database**: PostgreSQL (configured via Neon serverless)
+- **Database**: PostgreSQL with persistent storage (migrated from in-memory storage)
 - **Session Management**: connect-pg-simple for PostgreSQL session storage
+- **Storage**: DatabaseStorage class implementing persistent data operations
 
 ### Project Structure
 - `client/` - React frontend application
@@ -66,15 +67,22 @@ The application uses a comprehensive schema with the following main entities:
 
 ### Database Operations
 - Drizzle ORM for type-safe database queries
-- PostgreSQL as the primary database
+- PostgreSQL as the primary database with persistent storage
 - Database schema defined in `shared/schema.ts`
-- Migration system using drizzle-kit
+- Migration system using drizzle-kit (`npm run db:push`)
+- DatabaseStorage class provides complete CRUD operations for all entities
 
 ### State Management
 - Server state managed by TanStack Query
 - Local component state using React hooks
 - Authentication state managed via React Context
 - Form state handled locally or with react-hook-form
+
+### Recent Changes
+- **Database Migration Completed (January 2025)**: Successfully migrated from in-memory MemStorage to PostgreSQL database with DatabaseStorage implementation
+- **Visual Components Added**: IngredientImage and RecipeImage components with auto-generated SVG icons
+- **Multi-role Authentication**: Complete role-based access control system
+- **Sample Data Initialization**: Automatic setup of default admin user and sample ingredients on first run
 
 ## External Dependencies
 
