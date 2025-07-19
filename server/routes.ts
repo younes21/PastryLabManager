@@ -405,8 +405,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Orders routes
   app.get("/api/orders", async (req, res) => {
     try {
-      const orders = await storage.getAllOrders();
-      res.json(orders);
+      const customerId = req.query.customerId ? parseInt(req.query.customerId as string) : undefined;
+      
+      if (customerId) {
+        // Get orders for specific customer
+        const orders = await storage.getOrdersByCustomer(customerId);
+        res.json(orders);
+      } else {
+        // Get all orders
+        const orders = await storage.getAllOrders();
+        res.json(orders);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch orders" });
     }
@@ -473,20 +482,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Deliveries routes
   app.get("/api/deliveries", async (req, res) => {
     try {
-      const deliveries = await storage.getAllDeliveries();
-      res.json(deliveries);
+      const delivererId = req.query.delivererId ? parseInt(req.query.delivererId as string) : undefined;
+      const available = req.query.available === 'true';
+      const status = req.query.status as string;
+      
+      let deliveries;
+      
+      if (delivererId) {
+        deliveries = await storage.getDeliveriesByDeliverer(delivererId);
+      } else if (available && status === 'assigned') {
+        deliveries = await storage.getAvailableDeliveries();
+      } else {
+        deliveries = await storage.getAllDeliveries();
+      }
+      
+      // Get full order details for each delivery
+      const deliveriesWithDetails = await Promise.all(
+        deliveries.map(async (delivery: any) => {
+          const order = await storage.getOrder(delivery.orderId!);
+          return {
+            ...delivery,
+            order
+          };
+        })
+      );
+
+      res.json(deliveriesWithDetails);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch deliveries" });
-    }
-  });
-
-  app.get("/api/deliveries/deliverer/:delivererId", async (req, res) => {
-    try {
-      const delivererId = parseInt(req.params.delivererId);
-      const deliveries = await storage.getDeliveriesByDeliverer(delivererId);
-      res.json(deliveries);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch deliverer's deliveries" });
     }
   });
 
@@ -500,7 +523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/deliveries/:id", async (req, res) => {
+  app.patch("/api/deliveries/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const deliveryData = req.body;

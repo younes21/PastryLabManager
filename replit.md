@@ -79,10 +79,16 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **Client & Delivery Admin Panels (January 2025)**: Created specialized dashboards for clients and delivery personnel
+  - Client dashboard with catalog browsing, order management, debt tracking, and shopping cart
+  - Delivery dashboard with route assignment, status tracking, and completion management
+  - Role-based routing redirects users to appropriate dashboards
+- **Enhanced API Routes**: Added specialized endpoints for client orders and delivery management
+- **UI Components Expansion**: Added Tabs, Badge, and Textarea components for improved interface
+- **Sample Users Created**: Test accounts for client (client1/client123) and delivery (livreur1/livreur123) roles
 - **Database Migration Completed (January 2025)**: Successfully migrated from in-memory MemStorage to PostgreSQL database with DatabaseStorage implementation
 - **Visual Components Added**: IngredientImage and RecipeImage components with auto-generated SVG icons
 - **Multi-role Authentication**: Complete role-based access control system
-- **Sample Data Initialization**: Automatic setup of default admin user and sample ingredients on first run
 
 ## External Dependencies
 

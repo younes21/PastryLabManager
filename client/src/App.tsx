@@ -14,6 +14,8 @@ import Orders from "@/pages/orders";
 import Delivery from "@/pages/delivery";
 import Users from "@/pages/users";
 import ClientCatalog from "@/pages/client-catalog";
+import ClientDashboard from "@/pages/client-dashboard";
+import DeliveryDashboard from "@/pages/delivery-dashboard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +100,27 @@ function LoginPage() {
 function ProtectedRouter() {
   const { user } = useAuth();
 
+  // Route based on user role
+  if (user?.role === "client") {
+    return (
+      <Switch>
+        <Route path="/" component={ClientDashboard} />
+        <Route path="/catalog" component={ClientCatalog} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  if (user?.role === "livreur") {
+    return (
+      <Switch>
+        <Route path="/" component={DeliveryDashboard} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  // Default routes for admin, preparateur, gerant
   return (
     <Switch>
       <Route path="/" component={Dashboard} />

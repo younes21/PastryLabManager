@@ -8,7 +8,7 @@ import {
   type Delivery, type InsertDelivery
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, gte, lte } from "drizzle-orm";
+import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -81,6 +81,7 @@ export interface IStorage {
   getDelivery(id: number): Promise<Delivery | undefined>;
   getAllDeliveries(): Promise<Delivery[]>;
   getDeliveriesByDeliverer(delivererId: number): Promise<Delivery[]>;
+  getAvailableDeliveries(): Promise<Delivery[]>;
   getDeliveriesByStatus(status: string): Promise<Delivery[]>;
   createDelivery(delivery: InsertDelivery): Promise<Delivery>;
   updateDelivery(id: number, delivery: Partial<InsertDelivery>): Promise<Delivery | undefined>;
@@ -113,15 +114,35 @@ export class DatabaseStorage implements IStorage {
       ]);
 
       // Create default admin user
-      await db.insert(users).values({
-        username: "admin",
-        password: "admin123",
-        email: "admin@patisslab.com",
-        firstName: "Jean",
-        lastName: "Dupont",
-        role: "admin",
-        active: true
-      });
+      await db.insert(users).values([
+        {
+          username: "admin",
+          password: "admin123",
+          email: "admin@patisslab.com",
+          firstName: "Jean",
+          lastName: "Dupont",
+          role: "admin",
+          active: true
+        },
+        {
+          username: "client1",
+          password: "client123",
+          email: "marie@example.com",
+          firstName: "Marie",
+          lastName: "Martin",
+          role: "client",
+          active: true
+        },
+        {
+          username: "livreur1",
+          password: "livreur123",
+          email: "paul@example.com",
+          firstName: "Paul",
+          lastName: "Durand",
+          role: "livreur",
+          active: true
+        }
+      ]);
 
       // Create sample ingredients
       await db.insert(ingredients).values([
@@ -461,6 +482,11 @@ export class DatabaseStorage implements IStorage {
 
   async getDeliveriesByStatus(status: string): Promise<Delivery[]> {
     return await db.select().from(deliveries).where(eq(deliveries.status, status));
+  }
+
+  async getAvailableDeliveries(): Promise<Delivery[]> {
+    // Return deliveries that are not assigned to any deliverer yet
+    return await db.select().from(deliveries).where(isNull(deliveries.delivererId));
   }
 
   async createDelivery(insertDelivery: InsertDelivery): Promise<Delivery> {
