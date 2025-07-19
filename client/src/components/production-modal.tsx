@@ -80,7 +80,7 @@ export function ProductionModal({ isOpen, onClose }: ProductionModalProps) {
       preparerId: parseInt(formData.preparerId),
       quantity: parseInt(formData.quantity),
       scheduledTime: scheduledDateTime.toISOString(),
-      status: "scheduled"
+      status: "en_attente"
     });
   };
 

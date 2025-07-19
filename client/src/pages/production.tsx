@@ -17,31 +17,23 @@ export default function Production() {
     queryKey: ["/api/productions"],
   });
 
-  const startProductionMutation = useMutation({
-    mutationFn: async (productionId: number) => {
-      const response = await apiRequest("POST", `/api/productions/${productionId}/start`, {});
+  const updateProductionStatusMutation = useMutation({
+    mutationFn: async ({ productionId, status }: { productionId: number; status: string }) => {
+      const response = await apiRequest("PATCH", `/api/productions/${productionId}`, { status });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/productions"] });
-      toast({
-        title: "Production démarrée",
-        description: "La production a été démarrée avec succès.",
-      });
-    },
-  });
-
-  const completeProductionMutation = useMutation({
-    mutationFn: async (productionId: number) => {
-      const response = await apiRequest("POST", `/api/productions/${productionId}/complete`, {});
-      return response.json();
-    },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/productions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      const statusLabels = {
+        en_production: "Production démarrée",
+        termine: "Production terminée",
+        a_refaire: "Production marquée à refaire",
+        en_attente: "Production remise en attente"
+      };
       toast({
-        title: "Production terminée",
-        description: "La production a été terminée et le stock a été mis à jour.",
+        title: statusLabels[variables.status as keyof typeof statusLabels],
+        description: "Le statut de la production a été mis à jour.",
       });
     },
   });
@@ -61,13 +53,13 @@ export default function Production() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      scheduled: { label: "Programmé", variant: "secondary" as const },
-      in_progress: { label: "En cours", variant: "default" as const },
-      completed: { label: "Terminé", variant: "outline" as const },
-      cancelled: { label: "Annulé", variant: "destructive" as const },
+      en_attente: { label: "En attente", variant: "secondary" as const },
+      en_production: { label: "En production", variant: "default" as const },
+      termine: { label: "Terminé", variant: "outline" as const },
+      a_refaire: { label: "À refaire", variant: "destructive" as const },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.en_attente;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
@@ -184,36 +176,74 @@ export default function Production() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-2">
-                            {production.status === "scheduled" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => startProductionMutation.mutate(production.id)}
-                                disabled={startProductionMutation.isPending}
-                              >
-                                <i className="fas fa-play mr-1"></i>
-                                Démarrer
-                              </Button>
+                            {production.status === "en_attente" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateProductionStatusMutation.mutate({ productionId: production.id, status: "en_production" })}
+                                  disabled={updateProductionStatusMutation.isPending}
+                                >
+                                  <i className="fas fa-play mr-1"></i>
+                                  Démarrer
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => deleteProductionMutation.mutate(production.id)}
+                                  disabled={deleteProductionMutation.isPending}
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </Button>
+                              </>
                             )}
-                            {production.status === "in_progress" && (
-                              <Button
-                                size="sm"
-                                onClick={() => completeProductionMutation.mutate(production.id)}
-                                disabled={completeProductionMutation.isPending}
-                              >
-                                <i className="fas fa-check mr-1"></i>
-                                Terminer
-                              </Button>
+                            {production.status === "en_production" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateProductionStatusMutation.mutate({ productionId: production.id, status: "termine" })}
+                                  disabled={updateProductionStatusMutation.isPending}
+                                >
+                                  <i className="fas fa-check mr-1"></i>
+                                  Terminer
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => updateProductionStatusMutation.mutate({ productionId: production.id, status: "a_refaire" })}
+                                  disabled={updateProductionStatusMutation.isPending}
+                                >
+                                  <i className="fas fa-redo mr-1"></i>
+                                  À refaire
+                                </Button>
+                              </>
                             )}
-                            {(production.status === "scheduled" || production.status === "cancelled") && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => deleteProductionMutation.mutate(production.id)}
-                                disabled={deleteProductionMutation.isPending}
-                              >
-                                <i className="fas fa-trash"></i>
-                              </Button>
+                            {production.status === "a_refaire" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateProductionStatusMutation.mutate({ productionId: production.id, status: "en_production" })}
+                                  disabled={updateProductionStatusMutation.isPending}
+                                >
+                                  <i className="fas fa-play mr-1"></i>
+                                  Reprendre
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => deleteProductionMutation.mutate(production.id)}
+                                  disabled={deleteProductionMutation.isPending}
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </Button>
+                              </>
+                            )}
+                            {production.status === "termine" && (
+                              <Badge variant="outline" className="text-green-600">
+                                <i className="fas fa-check-circle mr-1"></i>
+                                Terminé
+                              </Badge>
                             )}
                           </div>
                         </td>

@@ -335,6 +335,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/productions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      
+      const updateData: any = { status };
+      
+      // Add timestamps based on status transitions
+      if (status === "en_production") {
+        updateData.startTime = new Date();
+      } else if (status === "termine") {
+        updateData.endTime = new Date();
+        
+        // Update ingredient stocks when completed
+        const production = await storage.getProduction(id);
+        if (production) {
+          const recipeIngredients = await storage.getRecipeIngredients(production.recipeId!);
+          for (const ri of recipeIngredients) {
+            const quantityUsed = parseFloat(ri.quantity) * production.quantity;
+            await storage.updateIngredientStock(ri.ingredientId!, -quantityUsed);
+          }
+        }
+      }
+      
+      const production = await storage.updateProduction(id, updateData);
+      
+      if (!production) {
+        return res.status(404).json({ message: "Production not found" });
+      }
+
+      res.json(production);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update production status" });
+    }
+  });
+
   app.put("/api/productions/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -348,53 +384,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(production);
     } catch (error) {
       res.status(400).json({ message: "Failed to update production" });
-    }
-  });
-
-  app.post("/api/productions/:id/start", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const production = await storage.updateProduction(id, {
-        status: "in_progress",
-        startTime: new Date()
-      });
-      
-      if (!production) {
-        return res.status(404).json({ message: "Production not found" });
-      }
-
-      res.json(production);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to start production" });
-    }
-  });
-
-  app.post("/api/productions/:id/complete", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const production = await storage.getProduction(id);
-      
-      if (!production) {
-        return res.status(404).json({ message: "Production not found" });
-      }
-
-      // Update ingredient stocks
-      const recipeIngredients = await storage.getRecipeIngredients(production.recipeId!);
-      
-      for (const ri of recipeIngredients) {
-        const quantityUsed = parseFloat(ri.quantity) * production.quantity;
-        await storage.updateIngredientStock(ri.ingredientId!, -quantityUsed);
-      }
-
-      // Mark production as completed
-      const updatedProduction = await storage.updateProduction(id, {
-        status: "completed",
-        endTime: new Date()
-      });
-
-      res.json(updatedProduction);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to complete production" });
     }
   });
 

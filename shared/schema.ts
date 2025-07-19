@@ -58,7 +58,7 @@ export const productions = pgTable("productions", {
   scheduledTime: timestamp("scheduled_time").notNull(),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
-  status: text("status").notNull(), // 'scheduled', 'in_progress', 'completed', 'cancelled'
+  status: text("status").notNull(), // 'en_attente', 'en_production', 'termine', 'a_refaire'
 });
 
 export const orders = pgTable("orders", {
