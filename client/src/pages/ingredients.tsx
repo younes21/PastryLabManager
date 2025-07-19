@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { IngredientImage } from "@/components/ingredient-image";
 
 export default function Ingredients() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -231,7 +232,10 @@ export default function Ingredients() {
                     return (
                       <tr key={ingredient.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {ingredient.name}
+                          <div className="flex items-center">
+                            <IngredientImage ingredientName={ingredient.name} className="w-8 h-8 mr-3" />
+                            {ingredient.name}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {ingredient.unit}

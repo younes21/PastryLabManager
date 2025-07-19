@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
+import { RecipeImage } from "@/components/recipe-image";
 
 export default function ClientCatalog() {
   const [cart, setCart] = useState<any[]>([]);
@@ -195,9 +196,7 @@ export default function ClientCatalog() {
               {recipes && recipes.length > 0 ? (
                 recipes.map((recipe: any) => (
                   <Card key={recipe.id} className="overflow-hidden">
-                    <div className="h-48 bg-gradient-to-br from-amber-100 to-orange-200 flex items-center justify-center">
-                      <i className="fas fa-birthday-cake text-4xl text-amber-600"></i>
-                    </div>
+                    <RecipeImage recipeName={recipe.name} />
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start">
                         <CardTitle className="text-lg">{recipe.name}</CardTitle>

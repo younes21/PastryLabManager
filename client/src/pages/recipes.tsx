@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { RecipeImage } from "@/components/recipe-image";
 
 export default function Recipes() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -252,10 +253,13 @@ export default function Recipes() {
                       }`}
                       onClick={() => setSelectedRecipe(recipe)}
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-900">{recipe.name}</h3>
-                        <div className="flex space-x-1">
-                          <Button
+                      <div className="flex items-start mb-2 space-x-3">
+                        <RecipeImage recipeName={recipe.name} className="w-16 h-16 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-medium text-gray-900">{recipe.name}</h3>
+                            <div className="flex space-x-1">
+                              <Button
                             size="sm"
                             variant="outline"
                             onClick={(e) => {
@@ -275,6 +279,8 @@ export default function Recipes() {
                           >
                             <i className="fas fa-trash"></i>
                           </Button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                       
