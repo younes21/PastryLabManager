@@ -1,11 +1,12 @@
 import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
-  productions, orders, orderItems, deliveries,
+  productions, orders, orderItems, deliveries, productStock, labels,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
-  type Delivery, type InsertDelivery
+  type Delivery, type InsertDelivery, type ProductStock, type InsertProductStock,
+  type Label, type InsertLabel
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -86,6 +87,26 @@ export interface IStorage {
   createDelivery(delivery: InsertDelivery): Promise<Delivery>;
   updateDelivery(id: number, delivery: Partial<InsertDelivery>): Promise<Delivery | undefined>;
   deleteDelivery(id: number): Promise<boolean>;
+
+  // Product Stock
+  getProductStock(id: number): Promise<ProductStock | undefined>;
+  getAllProductStock(): Promise<ProductStock[]>;
+  getProductStockByOrder(orderId: number): Promise<ProductStock[]>;
+  getProductStockByStatus(status: string): Promise<ProductStock[]>;
+  getProductStockByLocation(locationId: number): Promise<ProductStock[]>;
+  createProductStock(productStock: InsertProductStock): Promise<ProductStock>;
+  updateProductStock(id: number, productStock: Partial<InsertProductStock>): Promise<ProductStock | undefined>;
+  deleteProductStock(id: number): Promise<boolean>;
+
+  // Labels
+  getLabel(id: number): Promise<Label | undefined>;
+  getAllLabels(): Promise<Label[]>;
+  getLabelsByProductStock(productStockId: number): Promise<Label[]>;
+  getUnprintedLabels(): Promise<Label[]>;
+  createLabel(label: InsertLabel): Promise<Label>;
+  updateLabel(id: number, label: Partial<InsertLabel>): Promise<Label | undefined>;
+  deleteLabel(id: number): Promise<boolean>;
+  markLabelAsPrinted(id: number): Promise<Label | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -505,6 +526,90 @@ export class DatabaseStorage implements IStorage {
   async deleteDelivery(id: number): Promise<boolean> {
     const result = await db.delete(deliveries).where(eq(deliveries.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Product Stock methods
+  async getProductStock(id: number): Promise<ProductStock | undefined> {
+    const [productStock] = await db.select().from(productStock).where(eq(productStock.id, id));
+    return productStock || undefined;
+  }
+
+  async getAllProductStock(): Promise<ProductStock[]> {
+    return await db.select().from(productStock).orderBy(desc(productStock.productionDate));
+  }
+
+  async getProductStockByOrder(orderId: number): Promise<ProductStock[]> {
+    return await db.select().from(productStock).where(eq(productStock.orderId, orderId));
+  }
+
+  async getProductStockByStatus(status: string): Promise<ProductStock[]> {
+    return await db.select().from(productStock).where(eq(productStock.status, status));
+  }
+
+  async getProductStockByLocation(locationId: number): Promise<ProductStock[]> {
+    return await db.select().from(productStock).where(eq(productStock.storageLocationId, locationId));
+  }
+
+  async createProductStock(insertProductStock: InsertProductStock): Promise<ProductStock> {
+    const [product] = await db.insert(productStock).values(insertProductStock).returning();
+    return product;
+  }
+
+  async updateProductStock(id: number, updateData: Partial<InsertProductStock>): Promise<ProductStock | undefined> {
+    const [product] = await db.update(productStock)
+      .set(updateData)
+      .where(eq(productStock.id, id))
+      .returning();
+    return product || undefined;
+  }
+
+  async deleteProductStock(id: number): Promise<boolean> {
+    const result = await db.delete(productStock).where(eq(productStock.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Labels methods
+  async getLabel(id: number): Promise<Label | undefined> {
+    const [label] = await db.select().from(labels).where(eq(labels.id, id));
+    return label || undefined;
+  }
+
+  async getAllLabels(): Promise<Label[]> {
+    return await db.select().from(labels).orderBy(desc(labels.productionDate));
+  }
+
+  async getLabelsByProductStock(productStockId: number): Promise<Label[]> {
+    return await db.select().from(labels).where(eq(labels.productStockId, productStockId));
+  }
+
+  async getUnprintedLabels(): Promise<Label[]> {
+    return await db.select().from(labels).where(eq(labels.printed, false));
+  }
+
+  async createLabel(insertLabel: InsertLabel): Promise<Label> {
+    const [label] = await db.insert(labels).values(insertLabel).returning();
+    return label;
+  }
+
+  async updateLabel(id: number, updateData: Partial<InsertLabel>): Promise<Label | undefined> {
+    const [label] = await db.update(labels)
+      .set(updateData)
+      .where(eq(labels.id, id))
+      .returning();
+    return label || undefined;
+  }
+
+  async deleteLabel(id: number): Promise<boolean> {
+    const result = await db.delete(labels).where(eq(labels.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async markLabelAsPrinted(id: number): Promise<Label | undefined> {
+    const [label] = await db.update(labels)
+      .set({ printed: true, printedAt: new Date() })
+      .where(eq(labels.id, id))
+      .returning();
+    return label || undefined;
   }
 }
 

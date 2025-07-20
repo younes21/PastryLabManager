@@ -97,6 +97,35 @@ export const deliveries = pgTable("deliveries", {
   paymentReceived: decimal("payment_received", { precision: 10, scale: 2 }),
 });
 
+export const productStock = pgTable("product_stock", {
+  id: serial("id").primaryKey(),
+  productionId: integer("production_id").references(() => productions.id),
+  recipeId: integer("recipe_id").references(() => recipes.id),
+  orderId: integer("order_id").references(() => orders.id),
+  customerName: text("customer_name"),
+  quantity: integer("quantity").notNull(),
+  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
+  productionDate: timestamp("production_date").defaultNow(),
+  expirationDate: timestamp("expiration_date").notNull(),
+  barcode: text("barcode").unique(),
+  status: text("status").notNull().default("available"), // 'available', 'reserved', 'delivered', 'expired'
+  preparerId: integer("preparer_id").references(() => users.id),
+});
+
+export const labels = pgTable("labels", {
+  id: serial("id").primaryKey(),
+  productStockId: integer("product_stock_id").references(() => productStock.id),
+  barcode: text("barcode").notNull(),
+  productName: text("product_name").notNull(),
+  customerName: text("customer_name"),
+  productionDate: timestamp("production_date").notNull(),
+  expirationDate: timestamp("expiration_date").notNull(),
+  preparerName: text("preparer_name"),
+  quantity: integer("quantity").notNull(),
+  printed: boolean("printed").default(false),
+  printedAt: timestamp("printed_at"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
@@ -107,6 +136,8 @@ export const insertProductionSchema = createInsertSchema(productions).omit({ id:
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true });
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true });
 export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true });
+export const insertProductStockSchema = createInsertSchema(productStock).omit({ id: true });
+export const insertLabelSchema = createInsertSchema(labels).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -127,3 +158,7 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type Delivery = typeof deliveries.$inferSelect;
 export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
+export type ProductStock = typeof productStock.$inferSelect;
+export type InsertProductStock = z.infer<typeof insertProductStockSchema>;
+export type Label = typeof labels.$inferSelect;
+export type InsertLabel = z.infer<typeof insertLabelSchema>;

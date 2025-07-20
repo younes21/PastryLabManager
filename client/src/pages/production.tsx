@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { ProductionModal } from "@/components/production-modal";
+import StorageCompletionModal from "@/components/storage-completion-modal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Warehouse } from "lucide-react";
 
 export default function Production() {
   const [isProductionModalOpen, setIsProductionModalOpen] = useState(false);
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+  const [selectedProduction, setSelectedProduction] = useState(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -201,11 +205,24 @@ export default function Production() {
                               <>
                                 <Button
                                   size="sm"
+                                  onClick={() => {
+                                    setSelectedProduction(production);
+                                    setIsStorageModalOpen(true);
+                                  }}
+                                  disabled={updateProductionStatusMutation.isPending}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <Warehouse className="w-4 h-4 mr-1" />
+                                  Finaliser
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => updateProductionStatusMutation.mutate({ productionId: production.id, status: "termine" })}
                                   disabled={updateProductionStatusMutation.isPending}
                                 >
                                   <i className="fas fa-check mr-1"></i>
-                                  Terminer
+                                  Terminer simple
                                 </Button>
                                 <Button
                                   size="sm"
@@ -269,6 +286,15 @@ export default function Production() {
         <ProductionModal 
           isOpen={isProductionModalOpen} 
           onClose={() => setIsProductionModalOpen(false)} 
+        />
+        
+        <StorageCompletionModal
+          production={selectedProduction}
+          isOpen={isStorageModalOpen}
+          onClose={() => {
+            setIsStorageModalOpen(false);
+            setSelectedProduction(null);
+          }}
         />
       </div>
     </Layout>

@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { 
   insertUserSchema, insertStorageLocationSchema, insertIngredientSchema,
   insertRecipeSchema, insertRecipeIngredientSchema, insertProductionSchema,
-  insertOrderSchema, insertOrderItemSchema, insertDeliverySchema
+  insertOrderSchema, insertOrderItemSchema, insertDeliverySchema,
+  insertProductStockSchema, insertLabelSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -569,6 +570,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(delivery);
     } catch (error) {
       res.status(400).json({ message: "Failed to update delivery" });
+    }
+  });
+
+  // Product Stock routes
+  app.get("/api/product-stock", async (req, res) => {
+    try {
+      const productStock = await storage.getAllProductStock();
+      res.json(productStock);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product stock" });
+    }
+  });
+
+  app.get("/api/product-stock/order/:orderId", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.orderId);
+      const productStock = await storage.getProductStockByOrder(orderId);
+      res.json(productStock);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch product stock for order" });
+    }
+  });
+
+  app.post("/api/product-stock", async (req, res) => {
+    try {
+      // Generate unique barcode
+      const barcode = `PST${Date.now()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      
+      const productStockData = {
+        ...req.body,
+        barcode
+      };
+      
+      const productStock = await storage.createProductStock(productStockData);
+      res.status(201).json(productStock);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid product stock data" });
+    }
+  });
+
+  // Labels routes
+  app.get("/api/labels", async (req, res) => {
+    try {
+      const labels = await storage.getAllLabels();
+      res.json(labels);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch labels" });
+    }
+  });
+
+  app.get("/api/labels/unprinted", async (req, res) => {
+    try {
+      const labels = await storage.getUnprintedLabels();
+      res.json(labels);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch unprinted labels" });
+    }
+  });
+
+  app.post("/api/labels", async (req, res) => {
+    try {
+      // Generate unique barcode if not provided
+      const barcode = req.body.barcode || `LBL${Date.now()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      
+      const labelData = {
+        ...req.body,
+        barcode
+      };
+      
+      const label = await storage.createLabel(labelData);
+      res.status(201).json(label);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid label data" });
+    }
+  });
+
+  app.patch("/api/labels/:id/print", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const label = await storage.markLabelAsPrinted(id);
+      
+      if (!label) {
+        return res.status(404).json({ message: "Label not found" });
+      }
+
+      res.json(label);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark label as printed" });
+    }
+  });
+
+  // Complete production with storage and labeling
+  app.post("/api/productions/:id/complete-with-storage", async (req, res) => {
+    try {
+      const productionId = parseInt(req.params.id);
+      const { storageLocationId, expirationDate, customerName, orderId } = req.body;
+
+      // Get production details
+      const production = await storage.getProduction(productionId);
+      if (!production) {
+        return res.status(404).json({ message: "Production not found" });
+      }
+
+      // Get recipe details
+      const recipe = await storage.getRecipe(production.recipeId!);
+      if (!recipe) {
+        return res.status(404).json({ message: "Recipe not found" });
+      }
+
+      // Get preparer details
+      const preparer = await storage.getUser(production.preparerId!);
+
+      // Complete the production
+      await storage.updateProduction(productionId, { 
+        status: "termine", 
+        endTime: new Date() 
+      });
+
+      // Create product stock entry
+      const productStock = await storage.createProductStock({
+        productionId,
+        recipeId: production.recipeId!,
+        orderId: orderId || null,
+        customerName: customerName || "Stock général",
+        quantity: production.quantity,
+        storageLocationId,
+        expirationDate: new Date(expirationDate),
+        preparerId: production.preparerId!,
+        status: "available"
+      });
+
+      // Create label for the product
+      const label = await storage.createLabel({
+        productStockId: productStock.id,
+        barcode: productStock.barcode!,
+        productName: recipe.name,
+        customerName: customerName || "Stock général",
+        productionDate: new Date(),
+        expirationDate: new Date(expirationDate),
+        preparerName: preparer ? `${preparer.firstName} ${preparer.lastName}` : "Inconnu",
+        quantity: production.quantity
+      });
+
+      // Update ingredient stocks
+      const recipeIngredients = await storage.getRecipeIngredients(production.recipeId!);
+      for (const ri of recipeIngredients) {
+        const quantityUsed = parseFloat(ri.quantity) * production.quantity;
+        await storage.updateIngredientStock(ri.ingredientId!, -quantityUsed);
+      }
+
+      res.json({
+        production,
+        productStock,
+        label,
+        message: "Production completed and stored successfully"
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to complete production with storage" });
     }
   });
 

@@ -10,6 +10,7 @@ import Inventory from "@/pages/inventory";
 import Ingredients from "@/pages/ingredients";
 import Recipes from "@/pages/recipes";
 import Production from "@/pages/production";
+import Stock from "@/pages/stock";
 import Orders from "@/pages/orders";
 import Delivery from "@/pages/delivery";
 import Users from "@/pages/users";
@@ -128,6 +129,7 @@ function ProtectedRouter() {
       <Route path="/ingredients" component={Ingredients} />
       <Route path="/recipes" component={Recipes} />
       <Route path="/production" component={Production} />
+      <Route path="/stock" component={Stock} />
       <Route path="/orders" component={Orders} />
       <Route path="/delivery" component={Delivery} />
       <Route path="/users" component={Users} />
