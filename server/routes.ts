@@ -453,12 +453,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/order-items", async (req, res) => {
+    try {
+      const orderItemData = insertOrderItemSchema.parse(req.body);
+      const orderItem = await storage.createOrderItem(orderItemData);
+      res.status(201).json(orderItem);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid order item data" });
+    }
+  });
+
   app.post("/api/orders", async (req, res) => {
     try {
-      const orderData = insertOrderSchema.parse(req.body);
+      const { items, ...orderData } = req.body;
+      
+      // Create the order first
       const order = await storage.createOrder(orderData);
+      
+      // Create order items if provided
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await storage.createOrderItem({
+            orderId: order.id,
+            recipeId: item.recipeId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice
+          });
+        }
+      }
+      
       res.status(201).json(order);
     } catch (error) {
+      console.error("Order creation error:", error);
       res.status(400).json({ message: "Invalid order data" });
     }
   });

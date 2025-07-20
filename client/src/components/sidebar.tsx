@@ -44,9 +44,9 @@ export function Sidebar() {
     
     switch (user.role) {
       case "client":
-        return ["/catalog"].includes(item.path);
+        return ["/"].includes(item.path); // Only dashboard for clients
       case "livreur":
-        return ["/", "/delivery"].includes(item.path);
+        return ["/"].includes(item.path); // Only dashboard for deliverers
       case "preparateur":
         return !["/users"].includes(item.path);
       default:
@@ -88,16 +88,16 @@ export function Sidebar() {
         <nav className="mt-6 flex-1 px-2 space-y-1">
           {filteredNavItems.map((item) => (
             <Link key={item.path} href={item.path}>
-              <a
+              <div
                 className={`${
                   isActive(item.path)
-                    ? "bg-primary/10 border-r-4 border-primary text-primary-foreground group flex items-center px-2 py-2 text-sm font-medium rounded-l-md"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+                    ? "bg-primary/10 border-r-4 border-primary text-primary-foreground group flex items-center px-2 py-2 text-sm font-medium rounded-l-md cursor-pointer"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer"
                 }`}
               >
                 <i className={`${item.icon} mr-3 ${isActive(item.path) ? "text-primary" : ""}`}></i>
                 {item.label}
-              </a>
+              </div>
             </Link>
           ))}
         </nav>

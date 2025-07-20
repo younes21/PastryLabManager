@@ -99,14 +99,19 @@ export default function ClientDashboard() {
       };
     });
 
-    createOrderMutation.mutate({
+    // Create the order with items
+    const orderData = {
       customerId: user?.id,
       customerName: `${user?.firstName} ${user?.lastName}`,
       customerEmail: user?.email,
+      customerPhone: user?.phone || "",
       totalAmount: getTotalAmount().toFixed(2),
       status: "pending",
+      deliveryAddress: "Adresse non spécifiée",
       items: orderItems
-    });
+    };
+
+    createOrderMutation.mutate(orderData);
   };
 
   const getStatusBadge = (status: string) => {
