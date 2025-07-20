@@ -1,5 +1,6 @@
 import { Sidebar } from "./sidebar";
 import { useAuth } from "@/lib/auth";
+import { Menu, Bell } from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,7 +24,7 @@ export function Layout({ children, title = "Tableau de bord" }: LayoutProps) {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <button className="lg:hidden -mr-2 p-2 text-gray-400 hover:text-gray-600">
-                <i className="fas fa-bars text-xl"></i>
+                <Menu className="h-6 w-6" />
               </button>
               <h2 className="ml-4 text-lg font-semibold text-gray-900">{title}</h2>
             </div>
@@ -31,7 +32,7 @@ export function Layout({ children, title = "Tableau de bord" }: LayoutProps) {
             <div className="flex items-center space-x-4">
               {/* Notifications */}
               <button className="relative p-2 text-gray-400 hover:text-gray-600">
-                <i className="fas fa-bell text-xl"></i>
+                <Bell className="h-6 w-6" />
                 <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400"></span>
               </button>
               

@@ -1,6 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
+import { 
+  LayoutDashboard, 
+  Package, 
+  ChefHat, 
+  BookOpen, 
+  Factory, 
+  ShoppingCart, 
+  Truck, 
+  Users, 
+  Cake,
+  LogOut,
+  CheckCircle
+} from "lucide-react";
 
 interface StorageLocationStatus {
   id: number;
@@ -28,14 +41,14 @@ export function Sidebar() {
   };
 
   const navItems = [
-    { path: "/", label: "Tableau de bord", icon: "fas fa-tachometer-alt" },
-    { path: "/inventory", label: "Gestion de Stock", icon: "fas fa-boxes" },
-    { path: "/ingredients", label: "Ingrédients", icon: "fas fa-seedling" },
-    { path: "/recipes", label: "Recettes", icon: "fas fa-book-open" },
-    { path: "/production", label: "Production", icon: "fas fa-industry" },
-    { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart" },
-    { path: "/delivery", label: "Livraisons", icon: "fas fa-truck" },
-    { path: "/users", label: "Utilisateurs", icon: "fas fa-users" },
+    { path: "/", label: "Tableau de bord", icon: "fas fa-tachometer-alt", lucideIcon: LayoutDashboard },
+    { path: "/inventory", label: "Gestion de Stock", icon: "fas fa-boxes", lucideIcon: Package },
+    { path: "/ingredients", label: "Ingrédients", icon: "fas fa-seedling", lucideIcon: ChefHat },
+    { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
+    { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
+    { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
+    { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
+    { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
   ];
 
   // Filter navigation based on user role
@@ -59,7 +72,7 @@ export function Sidebar() {
       <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-white border-r border-gray-200">
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
-          <i className="fas fa-birthday-cake text-primary text-2xl mr-3"></i>
+          <Cake className="text-primary h-8 w-8 mr-3" />
           <h1 className="text-xl font-bold text-gray-900">PâtissLab</h1>
         </div>
         
@@ -95,7 +108,7 @@ export function Sidebar() {
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer"
                 }`}
               >
-                <i className={`${item.icon} mr-3 ${isActive(item.path) ? "text-primary" : ""}`}></i>
+                <item.lucideIcon className={`h-5 w-5 mr-3 ${isActive(item.path) ? "text-primary" : ""}`} />
                 {item.label}
               </div>
             </Link>
@@ -113,7 +126,7 @@ export function Sidebar() {
                     {location.name} ({location.temperature}°C)
                   </span>
                   <span className="text-green-600">
-                    <i className="fas fa-check-circle"></i>
+                    <CheckCircle className="h-4 w-4" />
                   </span>
                 </div>
               ))}
@@ -123,9 +136,9 @@ export function Sidebar() {
           {/* Logout button */}
           <button
             onClick={logout}
-            className="mt-4 w-full text-left text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded"
+            className="mt-4 w-full text-left text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded flex items-center"
           >
-            <i className="fas fa-sign-out-alt mr-2"></i>
+            <LogOut className="h-4 w-4 mr-2" />
             Déconnexion
           </button>
         </div>
