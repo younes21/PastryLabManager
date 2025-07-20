@@ -54,10 +54,11 @@ export const productions = pgTable("productions", {
   id: serial("id").primaryKey(),
   recipeId: integer("recipe_id").references(() => recipes.id),
   preparerId: integer("preparer_id").references(() => users.id),
+  orderId: integer("order_id").references(() => orders.id), // Link to order if production is from order
   quantity: integer("quantity").notNull(),
-  scheduledTime: timestamp("scheduled_time").notNull(),
-  startTime: timestamp("start_time"),
-  endTime: timestamp("end_time"),
+  scheduledTime: timestamp("scheduled_time", { mode: 'string' }).notNull(),
+  startTime: timestamp("start_time", { mode: 'string' }),
+  endTime: timestamp("end_time", { mode: 'string' }),
   status: text("status").notNull(), // 'en_attente', 'en_production', 'termine', 'a_refaire'
 });
 

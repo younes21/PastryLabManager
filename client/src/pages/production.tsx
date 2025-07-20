@@ -21,6 +21,32 @@ export default function Production() {
     queryKey: ["/api/productions"],
   });
 
+  const { data: confirmedOrders = [] } = useQuery({
+    queryKey: ["/api/orders"],
+    select: (data) => data.filter((order: any) => order.status === "confirmed"),
+  });
+
+  // Get order items for confirmed orders
+  const confirmedOrderIds = confirmedOrders.map((order: any) => order.id);
+  const { data: allOrderItems = [] } = useQuery({
+    queryKey: ["/api/order-items", confirmedOrderIds],
+    queryFn: async () => {
+      if (confirmedOrderIds.length === 0) return [];
+      const items = [];
+      for (const orderId of confirmedOrderIds) {
+        const response = await fetch(`/api/orders/${orderId}/items`);
+        const orderItems = await response.json();
+        items.push(...orderItems.map((item: any) => ({ ...item, orderId })));
+      }
+      return items;
+    },
+    enabled: confirmedOrderIds.length > 0,
+  });
+
+  const { data: recipes = [] } = useQuery({
+    queryKey: ["/api/recipes"],
+  });
+
   const updateProductionStatusMutation = useMutation({
     mutationFn: async ({ productionId, status }: { productionId: number; status: string }) => {
       const response = await apiRequest("PATCH", `/api/productions/${productionId}`, { status });
@@ -51,6 +77,25 @@ export default function Production() {
       toast({
         title: "Production supprimée",
         description: "La production a été supprimée du planning.",
+      });
+    },
+  });
+
+  const createProductionFromOrderMutation = useMutation({
+    mutationFn: async ({ orderId, recipeId, quantity }: { orderId: number; recipeId: number; quantity: number }) => {
+      return apiRequest("POST", "/api/productions", {
+        recipeId,
+        quantity,
+        scheduledTime: new Date().toISOString(),
+        status: "en_attente",
+        orderId, // Link to the order
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/productions"] });
+      toast({
+        title: "Production programmée",
+        description: "La production a été ajoutée au planning.",
       });
     },
   });
@@ -104,6 +149,72 @@ export default function Production() {
             Nouvelle Production
           </Button>
         </div>
+
+        {/* Section des commandes confirmées */}
+        {confirmedOrders.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Commandes confirmées en attente de production
+              </h2>
+              <div className="space-y-4">
+                {confirmedOrders.map((order: any) => {
+                  const orderItems = allOrderItems.filter((item: any) => item.orderId === order.id);
+                  return (
+                    <div key={order.id} className="border rounded-lg p-4 bg-yellow-50">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            Commande #{order.id} - {order.customerName}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Livrée le: {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString('fr-FR') : 'Non définie'}
+                          </p>
+                        </div>
+                        <Badge variant="default">Confirmée</Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {orderItems.map((item: any) => {
+                          const recipe = recipes.find((r: any) => r.id === item.recipeId);
+                          const existingProduction = productions?.find((p: any) => 
+                            p.recipeId === item.recipeId && p.orderId === order.id
+                          );
+                          
+                          return (
+                            <div key={`${item.orderId}-${item.recipeId}`} className="flex justify-between items-center bg-white p-3 rounded border">
+                              <div>
+                                <span className="font-medium">{recipe?.name || 'Produit inconnu'}</span>
+                                <span className="text-gray-600 ml-2">x{item.quantity}</span>
+                              </div>
+                              {existingProduction ? (
+                                <Badge variant="outline">
+                                  Production programmée
+                                </Badge>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => createProductionFromOrderMutation.mutate({
+                                    orderId: order.id,
+                                    recipeId: item.recipeId,
+                                    quantity: item.quantity
+                                  })}
+                                  disabled={createProductionFromOrderMutation.isPending}
+                                >
+                                  Programmer Production
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardContent className="p-6">
