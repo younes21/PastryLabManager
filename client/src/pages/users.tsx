@@ -335,9 +335,9 @@ export default function Users() {
               
               <div>
                 <Label htmlFor="role">Rôle *</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})}>
+                <Select value={formData.role || undefined} onValueChange={(value) => setFormData({...formData, role: value})}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Sélectionner un rôle" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Administrateur</SelectItem>

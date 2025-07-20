@@ -55,6 +55,13 @@ export default function Production() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/productions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      
+      if (variables.status === "termine") {
+        // Open storage modal for completed production
+        setSelectedProduction(data);
+        setIsStorageModalOpen(true);
+      }
+      
       const statusLabels = {
         en_production: "Production démarrée",
         termine: "Production terminée",

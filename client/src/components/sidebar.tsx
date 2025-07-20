@@ -63,7 +63,7 @@ export function Sidebar() {
       case "livreur":
         return ["/"].includes(item.path); // Only dashboard for deliverers
       case "preparateur":
-        return !["/users"].includes(item.path);
+        return ["/production", "/orders"].includes(item.path);
       default:
         return true; // admin, gerant have access to everything
     }

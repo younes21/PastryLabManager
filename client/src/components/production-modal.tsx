@@ -95,7 +95,7 @@ export function ProductionModal({ isOpen, onClose }: ProductionModalProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="recipe">Produit</Label>
-              <Select value={formData.recipeId} onValueChange={(value) => setFormData({...formData, recipeId: value})}>
+              <Select value={formData.recipeId || undefined} onValueChange={(value) => setFormData({...formData, recipeId: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un produit" />
                 </SelectTrigger>
@@ -132,7 +132,7 @@ export function ProductionModal({ isOpen, onClose }: ProductionModalProps) {
             
             <div>
               <Label htmlFor="preparer">Préparateur</Label>
-              <Select value={formData.preparerId} onValueChange={(value) => setFormData({...formData, preparerId: value})}>
+              <Select value={formData.preparerId || undefined} onValueChange={(value) => setFormData({...formData, preparerId: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un préparateur" />
                 </SelectTrigger>

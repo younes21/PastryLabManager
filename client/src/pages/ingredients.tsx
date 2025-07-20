@@ -314,9 +314,9 @@ export default function Ingredients() {
                 
                 <div>
                   <Label htmlFor="unit">Unité *</Label>
-                  <Select value={formData.unit} onValueChange={(value) => setFormData({...formData, unit: value})}>
+                  <Select value={formData.unit || undefined} onValueChange={(value) => setFormData({...formData, unit: value})}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Sélectionner une unité" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="g">Grammes (g)</SelectItem>
@@ -376,7 +376,7 @@ export default function Ingredients() {
               <div>
                 <Label htmlFor="storageLocation">Emplacement de stockage</Label>
                 <Select 
-                  value={formData.storageLocationId} 
+                  value={formData.storageLocationId || undefined} 
                   onValueChange={(value) => setFormData({...formData, storageLocationId: value})}
                 >
                   <SelectTrigger>

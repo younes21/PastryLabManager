@@ -421,9 +421,9 @@ export default function Recipes() {
                 
                 <div>
                   <Label htmlFor="difficulty">Difficulté</Label>
-                  <Select value={formData.difficulty} onValueChange={(value) => setFormData({...formData, difficulty: value})}>
+                  <Select value={formData.difficulty || undefined} onValueChange={(value) => setFormData({...formData, difficulty: value})}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Sélectionner la difficulté" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="easy">Facile</SelectItem>
