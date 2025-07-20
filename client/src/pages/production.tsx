@@ -194,11 +194,14 @@ export default function Production() {
                               ) : (
                                 <Button
                                   size="sm"
-                                  onClick={() => createProductionFromOrderMutation.mutate({
-                                    orderId: order.id,
-                                    recipeId: item.recipeId,
-                                    quantity: item.quantity
-                                  })}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    createProductionFromOrderMutation.mutate({
+                                      orderId: order.id,
+                                      recipeId: item.recipeId,
+                                      quantity: item.quantity
+                                    });
+                                  }}
                                   disabled={createProductionFromOrderMutation.isPending}
                                 >
                                   Programmer Production

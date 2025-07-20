@@ -328,17 +328,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/productions", async (req, res) => {
     try {
-      // Convert scheduledTime string to Date object before validation
-      const requestData = {
-        ...req.body,
-        scheduledTime: new Date(req.body.scheduledTime)
-      };
+      console.log("Production creation request:", req.body);
       
-      const productionData = insertProductionSchema.parse(requestData);
+      // Don't convert dates anymore since schema uses string mode
+      const productionData = insertProductionSchema.parse(req.body);
       const production = await storage.createProduction(productionData);
       res.status(201).json(production);
     } catch (error) {
-      res.status(400).json({ message: "Invalid production data" });
+      console.error("Production creation error:", error);
+      if (error.issues) {
+        console.error("Validation issues:", error.issues);
+      }
+      res.status(400).json({ message: "Invalid production data", error: error.message });
     }
   });
 
