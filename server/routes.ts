@@ -327,7 +327,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/productions", async (req, res) => {
     try {
-      const productionData = insertProductionSchema.parse(req.body);
+      // Convert scheduledTime string to Date object before validation
+      const requestData = {
+        ...req.body,
+        scheduledTime: new Date(req.body.scheduledTime)
+      };
+      
+      const productionData = insertProductionSchema.parse(requestData);
       const production = await storage.createProduction(productionData);
       res.status(201).json(production);
     } catch (error) {
