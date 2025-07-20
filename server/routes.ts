@@ -474,8 +474,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { items, ...orderData } = req.body;
       
+      // Convert string dates to Date objects if needed
+      const processedOrderData = { ...orderData };
+      if (processedOrderData.deliveryDate && typeof processedOrderData.deliveryDate === 'string') {
+        processedOrderData.deliveryDate = new Date(processedOrderData.deliveryDate);
+      }
+      
+      // Don't send createdAt and updatedAt from client - let database handle them
+      delete processedOrderData.createdAt;
+      delete processedOrderData.updatedAt;
+      
       // Create the order first
-      const order = await storage.createOrder(orderData);
+      const order = await storage.createOrder(processedOrderData);
       
       // Create order items if provided
       if (items && Array.isArray(items)) {
@@ -501,6 +511,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const orderData = req.body;
+      
+      // Don't update createdAt from client
+      delete orderData.createdAt;
+      
       const order = await storage.updateOrder(id, orderData);
       
       if (!order) {

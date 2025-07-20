@@ -69,9 +69,9 @@ export const orders = pgTable("orders", {
   customerPhone: text("customer_phone"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull(), // 'pending', 'confirmed', 'preparation', 'ready', 'in_delivery', 'delivered', 'cancelled'
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
   deliveryAddress: text("delivery_address"),
-  deliveryDate: timestamp("delivery_date"),
+  deliveryDate: timestamp("delivery_date", { mode: 'string' }),
   deliveryTime: text("delivery_time"),
   delivererId: integer("deliverer_id").references(() => users.id),
   notes: text("notes"),
@@ -91,8 +91,8 @@ export const deliveries = pgTable("deliveries", {
   orderId: integer("order_id").references(() => orders.id),
   delivererId: integer("deliverer_id").references(() => users.id),
   status: text("status").notNull(), // 'assigned', 'in_transit', 'delivered', 'failed'
-  assignedAt: timestamp("assigned_at").defaultNow(),
-  deliveredAt: timestamp("delivered_at"),
+  assignedAt: timestamp("assigned_at", { mode: 'string' }).defaultNow(),
+  deliveredAt: timestamp("delivered_at", { mode: 'string' }),
   notes: text("notes"),
   paymentReceived: decimal("payment_received", { precision: 10, scale: 2 }),
 });
@@ -105,8 +105,8 @@ export const productStock = pgTable("product_stock", {
   customerName: text("customer_name"),
   quantity: integer("quantity").notNull(),
   storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
-  productionDate: timestamp("production_date").defaultNow(),
-  expirationDate: timestamp("expiration_date").notNull(),
+  productionDate: timestamp("production_date", { mode: 'string' }).defaultNow(),
+  expirationDate: timestamp("expiration_date", { mode: 'string' }).notNull(),
   barcode: text("barcode").unique(),
   status: text("status").notNull().default("available"), // 'available', 'reserved', 'delivered', 'expired'
   preparerId: integer("preparer_id").references(() => users.id),
@@ -118,12 +118,12 @@ export const labels = pgTable("labels", {
   barcode: text("barcode").notNull(),
   productName: text("product_name").notNull(),
   customerName: text("customer_name"),
-  productionDate: timestamp("production_date").notNull(),
-  expirationDate: timestamp("expiration_date").notNull(),
+  productionDate: timestamp("production_date", { mode: 'string' }).notNull(),
+  expirationDate: timestamp("expiration_date", { mode: 'string' }).notNull(),
   preparerName: text("preparer_name"),
   quantity: integer("quantity").notNull(),
   printed: boolean("printed").default(false),
-  printedAt: timestamp("printed_at"),
+  printedAt: timestamp("printed_at", { mode: 'string' }),
 });
 
 // Insert schemas

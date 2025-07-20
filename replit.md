@@ -79,11 +79,18 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **Dual Stock Management System (July 2025)**: Implemented comprehensive product stock management alongside ingredient stock
+  - New ProductStock and Labels schemas for finished product tracking
+  - Stock page with dual view (ingredient stock + product stock) and expiration tracking
+  - Production finalization workflow with automatic storage assignment and labeling
+  - Barcode generation and label creation for full product traceability
+- **Production Workflow Enhancement**: Added "Finaliser" button allowing preparers to complete productions with storage location selection, expiration date setting, and automatic label generation
+- **Order Creation Bug Fix**: Resolved timestamp conversion issues in order creation by updating schema to use string mode for dates
 - **Client & Delivery Admin Panels (January 2025)**: Created specialized dashboards for clients and delivery personnel
   - Client dashboard with catalog browsing, order management, debt tracking, and shopping cart
   - Delivery dashboard with route assignment, status tracking, and completion management
   - Role-based routing redirects users to appropriate dashboards
-- **Enhanced API Routes**: Added specialized endpoints for client orders and delivery management
+- **Enhanced API Routes**: Added specialized endpoints for client orders, delivery management, product stock, and labels
 - **UI Components Expansion**: Added Tabs, Badge, and Textarea components for improved interface
 - **Sample Users Created**: Test accounts for client (client1/client123) and delivery (livreur1/livreur123) roles
 - **Database Migration Completed (January 2025)**: Successfully migrated from in-memory MemStorage to PostgreSQL database with DatabaseStorage implementation
