@@ -352,9 +352,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Add timestamps based on status transitions
       if (status === "en_production") {
-        updateData.startTime = new Date();
+        updateData.startTime = new Date().toISOString();
       } else if (status === "termine") {
-        updateData.endTime = new Date();
+        updateData.endTime = new Date().toISOString();
         
         // Update ingredient stocks when completed
         const production = await storage.getProduction(id);
@@ -391,7 +391,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(production);
     } catch (error) {
-      res.status(400).json({ message: "Failed to update production" });
+      console.error("Production update error:", error);
+      res.status(400).json({ message: "Failed to update production", error: error.message });
     }
   });
 
