@@ -87,7 +87,7 @@ export const products = pgTable("products", {
   perishable: boolean("perishable").default(false),
   conservationDuration: integer("conservation_duration"), // Durée en jours
   conservationTemperature: decimal("conservation_temperature", { precision: 5, scale: 2 }), // Température en °C
-  dlc: timestamp("dlc", { mode: 'string' }), // Date limite de consommation
+  dlc: text("dlc"), // Date limite de consommation (format date string)
   
   // Classification
   categoryId: integer("category_id").references(() => articleCategories.id),

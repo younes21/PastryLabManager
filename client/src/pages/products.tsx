@@ -38,17 +38,17 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
     defaultValues: {
       designation: product?.designation || "",
       description: product?.description || "",
-      managedInStock: product?.managedInStock ?? true,
-      active: product?.active ?? true,
+      managedInStock: Boolean(product?.managedInStock ?? true),
+      active: Boolean(product?.active ?? true),
       stockTracking: product?.stockTracking || "unit",
       managementUnit: product?.managementUnit || "pièce",
       storageZoneId: product?.storageZoneId || undefined,
       stockAlertThreshold: product?.stockAlertThreshold || "0",
-      allowedForSale: product?.allowedForSale ?? true,
+      allowedForSale: Boolean(product?.allowedForSale ?? true),
       vatRate: product?.vatRate || "0",
       salePrice: product?.salePrice || "0",
       saleUnit: product?.saleUnit || "pièce",
-      perishable: product?.perishable ?? false,
+      perishable: Boolean(product?.perishable ?? false),
       conservationDuration: product?.conservationDuration || undefined,
       conservationTemperature: product?.conservationTemperature || undefined,
       dlc: product?.dlc || "",
@@ -96,7 +96,12 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
     if (!data.perishable) {
       data.conservationDuration = undefined;
       data.conservationTemperature = undefined;
-      data.dlc = "";
+      data.dlc = undefined;
+    } else {
+      // Si périssable mais DLC vide, mettre undefined au lieu de chaîne vide
+      if (data.dlc === "") {
+        data.dlc = undefined;
+      }
     }
     
     if (isEditing) {
@@ -165,7 +170,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                       <SelectItem value="none">Aucune catégorie</SelectItem>
                       {categories?.map((category) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
-                          {category.name}
+                          {category.designation}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -189,7 +194,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   <FormItem>
                     <FormControl>
                       <Switch
-                        checked={field.value}
+                        checked={Boolean(field.value)}
                         onCheckedChange={field.onChange}
                         data-testid="switch-active"
                       />
@@ -215,7 +220,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   <FormItem>
                     <FormControl>
                       <Switch
-                        checked={field.value}
+                        checked={Boolean(field.value)}
                         onCheckedChange={field.onChange}
                         data-testid="switch-managed-in-stock"
                       />
@@ -283,7 +288,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   <FormItem>
                     <FormLabel>Seuil d'alerte stock</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0" data-testid="input-stock-alert" />
+                      <Input {...field} type="number" step="0.01" placeholder="0" value={field.value || ""} data-testid="input-stock-alert" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -336,7 +341,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   <FormItem>
                     <FormControl>
                       <Switch
-                        checked={field.value}
+                        checked={Boolean(field.value)}
                         onCheckedChange={field.onChange}
                         data-testid="switch-allowed-for-sale"
                       />
@@ -393,7 +398,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   <FormItem>
                     <FormLabel>Taux TVA (%)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-vat-rate" />
+                      <Input {...field} type="number" step="0.01" placeholder="0.00" value={field.value || ""} data-testid="input-vat-rate" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -417,7 +422,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   <FormItem>
                     <FormControl>
                       <Switch
-                        checked={field.value}
+                        checked={Boolean(field.value)}
                         onCheckedChange={field.onChange}
                         data-testid="switch-perishable"
                       />
@@ -473,7 +478,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                     <FormItem>
                       <FormLabel>Date limite de consommation</FormLabel>
                       <FormControl>
-                        <Input {...field} type="date" data-testid="input-dlc" />
+                        <Input {...field} type="date" value={field.value || ""} data-testid="input-dlc" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
