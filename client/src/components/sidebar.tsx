@@ -23,7 +23,8 @@ import {
   BookIcon,
   Calculator,
   Building,
-  Settings
+  Settings,
+  Mail
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -66,6 +67,7 @@ export function Sidebar() {
     { path: "/accounting-accounts", label: "Comptes Comptables", icon: "fas fa-calculator", lucideIcon: Calculator },
     { path: "/storage-zones", label: "Zones de Stockage", icon: "fas fa-building", lucideIcon: Building },
     { path: "/work-stations", label: "Postes de Travail", icon: "fas fa-cogs", lucideIcon: Settings },
+    { path: "/email-config", label: "Configuration Email", icon: "fas fa-envelope", lucideIcon: Mail },
   ];
 
   // Filter navigation based on user role
@@ -79,8 +81,12 @@ export function Sidebar() {
         return ["/"].includes(item.path); // Only dashboard for deliverers
       case "preparateur":
         return ["/production", "/orders"].includes(item.path);
+      case "admin":
+        return true; // admin has access to everything
+      case "gerant":
+        return !["/email-config"].includes(item.path); // gerant doesn't have access to email config
       default:
-        return true; // admin, gerant have access to everything
+        return false;
     }
   });
 

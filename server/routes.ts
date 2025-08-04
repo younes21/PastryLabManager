@@ -1527,6 +1527,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== EMAIL ROUTES =====
+  // Test de configuration email
+  app.post("/api/email/test", async (req, res) => {
+    try {
+      const { emailService } = await import('./email/service');
+      const result = await emailService.testEmailConfiguration();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Erreur lors du test de configuration' 
+      });
+    }
+  });
+
+  // Statut de la queue d'emails
+  app.get("/api/email/queue/status", async (req, res) => {
+    try {
+      const { emailService } = await import('./email/service');
+      const status = emailService.getQueueStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ message: 'Erreur lors de la récupération du statut' });
+    }
+  });
+
+  // Envoi d'email de test
+  app.post("/api/email/send-test", async (req, res) => {
+    try {
+      const { to, subject, message } = req.body;
+      
+      if (!to || !subject || !message) {
+        return res.status(400).json({ 
+          message: 'Les champs to, subject et message sont requis' 
+        });
+      }
+
+      const { emailService } = await import('./email/service');
+      const success = await emailService.sendEmail({
+        to,
+        subject,
+        html: `<h3>${subject}</h3><p>${message}</p>`,
+        text: `${subject}\n\n${message}`
+      });
+
+      res.json({ success, message: success ? 'Email envoyé' : 'Échec d\'envoi' });
+    } catch (error) {
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'email' });
+    }
+  });
+
+  // Notification de commande confirmée
+  app.post("/api/email/notify/order-confirmed", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ message: 'orderId est requis' });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: 'Commande non trouvée' });
+      }
+
+      const customer = await storage.getUser(order.customerId);
+      if (!customer || !customer.email) {
+        return res.status(404).json({ message: 'Client non trouvé ou email manquant' });
+      }
+
+      const { emailService } = await import('./email/service');
+      const success = await emailService.sendOrderConfirmation(order, customer);
+      res.json({ success, message: success ? 'Notification envoyée' : 'Échec d\'envoi' });
+    } catch (error) {
+      console.error('Erreur notification commande:', error);
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de la notification' });
+    }
+  });
+
+  // Alerte stock faible
+  app.post("/api/email/notify/low-stock", async (req, res) => {
+    try {
+      const lowStockIngredients = await storage.getLowStockIngredients();
+      
+      if (lowStockIngredients.length === 0) {
+        return res.json({ success: true, message: 'Aucun stock faible détecté' });
+      }
+
+      // Récupérer les gérants et admins
+      const allUsers = await storage.getAllUsers();
+      const recipients = allUsers.filter(user => 
+        (user.role === 'gerant' || user.role === 'admin') && user.email
+      );
+
+      if (recipients.length === 0) {
+        return res.status(404).json({ message: 'Aucun gestionnaire avec email trouvé' });
+      }
+
+      const { emailService } = await import('./email/service');
+      const success = await emailService.sendLowStockAlert(lowStockIngredients, recipients);
+      res.json({ 
+        success, 
+        message: success ? `Alerte envoyée à ${recipients.length} destinataires` : 'Échec d\'envoi',
+        ingredientsCount: lowStockIngredients.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'alerte' });
+    }
+  });
+
+  // Notification système personnalisée
+  app.post("/api/email/notify/system", async (req, res) => {
+    try {
+      const { title, message, type, roles } = req.body;
+      
+      if (!title || !message) {
+        return res.status(400).json({ message: 'title et message sont requis' });
+      }
+
+      const allUsers = await storage.getAllUsers();
+      let recipients = [];
+      
+      if (roles && Array.isArray(roles)) {
+        recipients = allUsers.filter(user => 
+          roles.includes(user.role) && user.email
+        );
+      } else {
+        // Par défaut, envoyer aux admins et gérants
+        recipients = allUsers.filter(user => 
+          (user.role === 'admin' || user.role === 'gerant') && user.email
+        );
+      }
+
+      if (recipients.length === 0) {
+        return res.status(404).json({ message: 'Aucun destinataire trouvé' });
+      }
+
+      const { emailService } = await import('./email/service');
+      const success = await emailService.sendSystemNotification(
+        { title, message, type: type || 'info' },
+        recipients
+      );
+
+      res.json({ 
+        success, 
+        message: success ? `Notification envoyée à ${recipients.length} destinataires` : 'Échec d\'envoi',
+        recipientsCount: recipients.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de la notification' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
