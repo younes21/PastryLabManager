@@ -780,10 +780,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/recipes", async (req, res) => {
     try {
+      console.log("🔥 CREATE RECIPE - Request body:", JSON.stringify(req.body, null, 2));
       const newRecipe = await storage.createRecipe(req.body);
+      console.log("✅ CREATE RECIPE - Success:", JSON.stringify(newRecipe, null, 2));
       res.status(201).json(newRecipe);
     } catch (error) {
-      console.error("Error creating recipe:", error);
+      console.error("❌ CREATE RECIPE - Error:", error);
       res.status(500).json({ message: "Failed to create recipe" });
     }
   });
