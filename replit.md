@@ -31,7 +31,13 @@ Preferred communication style: Simple, everyday language.
    - Use only essential test data (2-3 records maximum per entity)
    - Avoid saturating database with excessive test data over time
 2. **Always test all API calls (CRUD) through the graphical interface** to ensure complete functionality
-3. **Interfaces must be adapted for POS (Point of Sale)** systems with:
+3. **Navigation must be through lateral menu** - all pages should be accessible via sidebar navigation
+4. **Test execution of every CRUD function from frontend interface**:
+   - Test creation, modification, and deletion functions from the UI
+   - Add detailed logs to track function execution and results
+   - Launch functions from frontend and verify proper execution
+   - Verify results before providing final implementation to eliminate manual fixes
+5. **Interfaces must be adapted for POS (Point of Sale)** systems with:
    - Large, touch-friendly buttons and inputs
    - Clear typography and high contrast
    - Efficient workflows for commercial use
