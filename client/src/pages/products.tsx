@@ -60,7 +60,7 @@ const productSchema = insertArticleSchema.extend({
   maxStock: z.string().optional(),
   isPerishable: z.boolean().optional(),
   shelfLife: z.string().optional(),
-  storageTemperature: z.string().optional(),
+  storageConditions: z.string().optional(),
 });
 
 type ProductForm = z.infer<typeof productSchema>;
@@ -183,7 +183,7 @@ export default function Products() {
                 <TableHead>Nom</TableHead>
                 <TableHead>Conservation</TableHead>
                 <TableHead>D.L.C</TableHead>
-                <TableHead>Température</TableHead>
+                <TableHead>Conditions</TableHead>
                 <TableHead>Prix</TableHead>
                 <TableHead>Zone stockage</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -238,9 +238,9 @@ export default function Products() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {product.isPerishable && product.storageTemperature ? (
+                      {product.isPerishable && product.storageConditions ? (
                         <span className="text-sm font-medium">
-                          {product.storageTemperature}°C
+                          {product.storageConditions}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-sm">-</span>
@@ -318,7 +318,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       maxStock: product?.maxStock ? product.maxStock.toString() : "",
       isPerishable: Boolean(product?.isPerishable ?? false),
       shelfLife: product?.shelfLife ? product.shelfLife.toString() : "",
-      storageTemperature: product?.storageTemperature ? product.storageTemperature.toString() : "",
+      storageConditions: product?.storageConditions || "",
       active: Boolean(product?.active ?? true),
       photo: product?.photo || "",
     },
@@ -645,12 +645,12 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
 
                   <FormField
                     control={form.control}
-                    name="storageTemperature"
+                    name="storageConditions"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Température (°C)</FormLabel>
+                        <FormLabel>Conditions de conservation</FormLabel>
                         <FormControl>
-                          <Input {...field} type="number" step="0.1" placeholder="-18.0" data-testid="input-storage-temperature" />
+                          <Input {...field} placeholder="froid -18°" data-testid="input-storage-conditions" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

@@ -167,8 +167,8 @@ export const articles = pgTable("articles", {
   // Champs pour les produits périssables
   isPerishable: boolean("is_perishable").default(false), // Produit périssable
   shelfLife: integer("shelf_life"), // Durée de conservation en jours
-  storageTemperature: decimal("storage_temperature", { precision: 5, scale: 2 }), // Température de conservation en °C
-  temperatureUnit: text("temperature_unit").default("°C"), // Unité de température
+  storageConditions: text("storage_conditions"), // Conditions de conservation (ex: "froid -18°")
+  temperatureUnit: text("temperature_unit").default("°C"), // Unité de température (garde compatibilité)
   
   // Champs pour les produits/recettes
   preparationTime: integer("preparation_time"), // minutes
@@ -221,7 +221,7 @@ export const insertArticleSchema = createInsertSchema(articles).omit({ id: true,
   maxStock: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
   salePrice: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
   shelfLife: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseInt(String(val)) : undefined),
-  storageTemperature: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
+  storageConditions: z.string().optional(),
 });
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
 export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
