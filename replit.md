@@ -26,6 +26,15 @@ This is a comprehensive bakery laboratory management system (ERP) built with Rea
 
 Preferred communication style: Simple, everyday language.
 
+### Development Rules (Critical)
+1. **Always test generated code with mock data and fix errors** to avoid manual fixes after generation
+2. **Interfaces must be adapted for POS (Point of Sale)** systems with:
+   - Large, touch-friendly buttons and inputs
+   - Clear typography and high contrast
+   - Efficient workflows for commercial use
+   - Quick search and filtering capabilities
+   - Visual feedback and status indicators
+
 ## System Architecture
 
 ### Frontend Architecture

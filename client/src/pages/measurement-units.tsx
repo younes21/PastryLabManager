@@ -21,6 +21,7 @@ export default function MeasurementUnitsPage() {
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<MeasurementCategory | null>(null);
   const [editingUnit, setEditingUnit] = useState<MeasurementUnit | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -204,38 +205,81 @@ export default function MeasurementUnitsPage() {
     }
   };
 
-  const filteredUnits = selectedCategory
-    ? units.filter(unit => unit.categoryId === selectedCategory)
-    : units;
+  const filteredUnits = units.filter(unit => {
+    const matchesCategory = selectedCategory ? unit.categoryId === selectedCategory : true;
+    const matchesSearch = searchTerm 
+      ? unit.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        unit.abbreviation.toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+    return matchesCategory && matchesSearch;
+  });
+
+  const filteredCategories = categories.filter(category =>
+    searchTerm 
+      ? category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      : true
+  );
 
   return (
     <div className="space-y-6" data-testid="page-measurement-units">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">
-            Gestion des Unités de Mesure
+          <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
+            Unités de Mesure
           </h1>
-          <p className="text-gray-600">
-            Gérez les catégories et unités de mesure pour votre laboratoire
+          <p className="text-lg text-gray-600">
+            Configuration des unités pour le laboratoire
           </p>
         </div>
-        <Scale className="h-8 w-8 text-blue-600" />
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Input
+              placeholder="Rechercher..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-64 pl-10 text-lg h-12"
+              data-testid="input-search"
+            />
+            <svg
+              className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          <Scale className="h-10 w-10 text-blue-600" />
+        </div>
       </div>
 
-      <Tabs defaultValue="categories" className="space-y-4">
-        <TabsList data-testid="tabs-list">
-          <TabsTrigger value="categories" data-testid="tab-categories">Catégories</TabsTrigger>
-          <TabsTrigger value="units" data-testid="tab-units">Unités</TabsTrigger>
+      <Tabs defaultValue="categories" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 h-12" data-testid="tabs-list">
+          <TabsTrigger value="categories" className="text-lg font-medium" data-testid="tab-categories">
+            Catégories ({categories.length})
+          </TabsTrigger>
+          <TabsTrigger value="units" className="text-lg font-medium" data-testid="tab-units">
+            Unités ({filteredUnits.length})
+          </TabsTrigger>
         </TabsList>
 
         {/* Categories Tab */}
         <TabsContent value="categories" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold">Catégories de Mesure</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Catégories de Mesure</h2>
             <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={resetCategoryForm} data-testid="button-add-category">
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button 
+                  onClick={resetCategoryForm} 
+                  className="h-12 px-6 text-lg font-medium"
+                  data-testid="button-add-category"
+                >
+                  <Plus className="h-5 w-5 mr-3" />
                   Nouvelle Catégorie
                 </Button>
               </DialogTrigger>
@@ -267,7 +311,7 @@ export default function MeasurementUnitsPage() {
                     <Label htmlFor="category-description">Description</Label>
                     <Textarea
                       id="category-description"
-                      value={categoryForm.description}
+                      value={categoryForm.description ?? ""}
                       onChange={(e) => setCategoryForm({...categoryForm, description: e.target.value})}
                       placeholder="Description de la catégorie"
                       data-testid="textarea-category-description"
@@ -276,7 +320,7 @@ export default function MeasurementUnitsPage() {
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="category-active"
-                      checked={categoryForm.active}
+                      checked={categoryForm.active ?? true}
                       onCheckedChange={(checked) => setCategoryForm({...categoryForm, active: checked})}
                       data-testid="switch-category-active"
                     />
@@ -292,43 +336,56 @@ export default function MeasurementUnitsPage() {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((category) => (
-              <Card key={category.id} data-testid={`card-category-${category.id}`}>
-                <CardHeader className="pb-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCategories.map((category) => (
+              <Card 
+                key={category.id} 
+                className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
+                data-testid={`card-category-${category.id}`}
+              >
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{category.name}</CardTitle>
-                    <div className="flex space-x-1">
+                    <CardTitle className="text-xl font-semibold text-gray-800">
+                      {category.name}
+                    </CardTitle>
+                    <div className="flex space-x-2">
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="h-10 w-10"
                         onClick={() => handleEditCategory(category)}
                         data-testid={`button-edit-category-${category.id}`}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-5 w-5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="h-10 w-10"
                         onClick={() => deleteCategoryMutation.mutate(category.id)}
                         data-testid={`button-delete-category-${category.id}`}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-5 w-5 text-red-500" />
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={category.active ? "default" : "secondary"}>
+                  <div className="flex items-center justify-between mt-3">
+                    <Badge 
+                      variant={category.active ? "default" : "secondary"}
+                      className="px-3 py-1 text-sm font-medium"
+                    >
                       {category.active ? "Active" : "Inactive"}
                     </Badge>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-lg font-bold text-blue-600">
                       {units.filter(u => u.categoryId === category.id).length} unités
                     </span>
                   </div>
                 </CardHeader>
                 {category.description && (
-                  <CardContent>
-                    <CardDescription>{category.description}</CardDescription>
+                  <CardContent className="pt-0">
+                    <CardDescription className="text-base text-gray-600">
+                      {category.description}
+                    </CardDescription>
                   </CardContent>
                 )}
               </Card>
@@ -339,19 +396,22 @@ export default function MeasurementUnitsPage() {
         {/* Units Tab */}
         <TabsContent value="units" className="space-y-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-lg font-semibold">Unités de Mesure</h2>
-              <Select value={selectedCategory?.toString() || "all"} onValueChange={(value) => {
-                setSelectedCategory(value === "all" ? null : parseInt(value));
-              }}>
-                <SelectTrigger className="w-48" data-testid="select-category-filter">
+            <div className="flex items-center space-x-6">
+              <h2 className="text-xl font-semibold text-gray-800">Unités de Mesure</h2>
+              <Select 
+                value={selectedCategory?.toString() || "all"} 
+                onValueChange={(value) => {
+                  setSelectedCategory(value === "all" ? null : parseInt(value));
+                }}
+              >
+                <SelectTrigger className="w-64 h-12 text-lg" data-testid="select-category-filter">
                   <SelectValue placeholder="Filtrer par catégorie" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Toutes les catégories</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id.toString()}>
-                      {category.name}
+                      {category.name} ({units.filter(u => u.categoryId === category.id).length})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -359,8 +419,12 @@ export default function MeasurementUnitsPage() {
             </div>
             <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={resetUnitForm} data-testid="button-add-unit">
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button 
+                  onClick={resetUnitForm} 
+                  className="h-12 px-6 text-lg font-medium"
+                  data-testid="button-add-unit"
+                >
+                  <Plus className="h-5 w-5 mr-3" />
                   Nouvelle Unité
                 </Button>
               </DialogTrigger>
@@ -454,7 +518,7 @@ export default function MeasurementUnitsPage() {
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="unit-active"
-                      checked={unitForm.active}
+                      checked={unitForm.active ?? true}
                       onCheckedChange={(checked) => setUnitForm({...unitForm, active: checked})}
                       data-testid="switch-unit-active"
                     />
@@ -470,52 +534,74 @@ export default function MeasurementUnitsPage() {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredUnits.map((unit) => {
               const category = categories.find(c => c.id === unit.categoryId);
               return (
-                <Card key={unit.id} data-testid={`card-unit-${unit.id}`}>
-                  <CardHeader className="pb-2">
+                <Card 
+                  key={unit.id} 
+                  className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
+                  data-testid={`card-unit-${unit.id}`}
+                >
+                  <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">
-                          {unit.label} ({unit.abbreviation})
+                      <div className="flex-1">
+                        <CardTitle className="text-xl font-semibold text-gray-800">
+                          {unit.label}
                         </CardTitle>
-                        <p className="text-sm text-gray-600">{category?.name}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="text-lg font-bold text-blue-600">
+                            ({unit.abbreviation})
+                          </span>
+                          <span className="text-base text-gray-500">
+                            {category?.name}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-10 w-10"
                           onClick={() => handleEditUnit(unit)}
                           data-testid={`button-edit-unit-${unit.id}`}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-5 w-5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-10 w-10"
                           onClick={() => deleteUnitMutation.mutate(unit.id)}
                           data-testid={`button-delete-unit-${unit.id}`}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-5 w-5 text-red-500" />
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Badge className={getTypeColor(unit.type)}>
+                        <Badge 
+                          className={`${getTypeColor(unit.type)} px-3 py-1 text-sm font-medium`}
+                        >
                           {getTypeName(unit.type)}
                         </Badge>
-                        <Badge variant={unit.active ? "default" : "secondary"}>
+                        <Badge 
+                          variant={unit.active ? "default" : "secondary"}
+                          className="px-3 py-1 text-sm font-medium"
+                        >
                           {unit.active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        Facteur: {parseFloat(unit.factor).toFixed(6)}
-                      </p>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <p className="text-base font-medium text-gray-700">
+                          Facteur: <span className="font-bold text-green-600">
+                            {parseFloat(unit.factor).toFixed(6)}
+                          </span>
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
