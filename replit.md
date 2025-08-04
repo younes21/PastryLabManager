@@ -79,6 +79,12 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **UI Improvements (January 2025)**:
+  - Fixed Select.Item validation errors by replacing empty string values with undefined across all components
+  - Updated admin panel logo with modern gradient SVG chef hat design
+  - Restricted preparateur navigation to only Production and Commands sections
+  - Enhanced production workflow with automatic storage completion modal
+  - Improved error handling and logging throughout the application
 - **Dual Stock Management System (July 2025)**: Implemented comprehensive product stock management alongside ingredient stock
   - New ProductStock and Labels schemas for finished product tracking
   - Stock page with dual view (ingredient stock + product stock) and expiration tracking

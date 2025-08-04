@@ -74,8 +74,29 @@ export function Sidebar() {
       <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-white border-r border-gray-200">
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
-          <Cake className="text-primary h-8 w-8 mr-3" />
-          <h1 className="text-xl font-bold text-gray-900">PâtissLab</h1>
+          <div className="mr-3">
+            <svg width="32" height="32" viewBox="0 0 32 32" className="text-primary">
+              <defs>
+                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#ec4899" />
+                  <stop offset="50%" stopColor="#f97316" />
+                  <stop offset="100%" stopColor="#eab308" />
+                </linearGradient>
+              </defs>
+              {/* Chef hat */}
+              <path d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z" fill="url(#logoGradient)" />
+              {/* Chef hat band */}
+              <rect x="8" y="18" width="16" height="2" fill="white" opacity="0.8" rx="1" />
+              {/* Decorative dots */}
+              <circle cx="12" cy="12" r="1" fill="white" opacity="0.6" />
+              <circle cx="17" cy="10" r="1" fill="white" opacity="0.6" />
+              <circle cx="22" cy="12" r="1" fill="white" opacity="0.6" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">PâtissLab</h1>
+            <p className="text-xs text-gray-500 font-medium">Gestion Pro</p>
+          </div>
         </div>
         
         {/* User Info */}
