@@ -122,6 +122,83 @@ sqlite.exec(`
     active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS clients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE,
+    type TEXT NOT NULL DEFAULT 'particulier',
+    raison_sociale TEXT,
+    nom TEXT,
+    prenom TEXT,
+    telephone TEXT,
+    email TEXT,
+    adresse TEXT,
+    wilaya TEXT,
+    commune TEXT,
+    code_postal TEXT,
+    rc TEXT,
+    na TEXT,
+    mf TEXT,
+    nis TEXT,
+    tarif_special REAL,
+    prix_list_id INTEGER,
+    user_id INTEGER,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS suppliers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE,
+    name TEXT NOT NULL,
+    contact_person TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    description TEXT,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS price_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    designation TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL DEFAULT 'standard',
+    description TEXT,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS delivery_methods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    designation TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    cost REAL DEFAULT 0,
+    description TEXT,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS work_stations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    designation TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    description TEXT,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS currencies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    designation TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    symbol TEXT NOT NULL,
+    exchange_rate REAL DEFAULT 1.0,
+    is_default INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Insertion des données de test
