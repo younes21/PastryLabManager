@@ -1722,16 +1722,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/suppliers/:id", async (req, res) => {
+  app.patch("/api/suppliers/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const supplierData = req.body;
+      const supplierData = insertSupplierSchema.parse(req.body);
+      console.log("Updating supplier:", id, supplierData);
       const supplier = await storage.updateSupplier(id, supplierData);
       if (!supplier) {
         return res.status(404).json({ message: "Supplier not found" });
       }
+      console.log("Updated supplier:", supplier);
       res.json(supplier);
     } catch (error) {
+      console.error("Error updating supplier:", error);
       res.status(400).json({ message: "Failed to update supplier" });
     }
   });

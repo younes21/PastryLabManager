@@ -500,6 +500,8 @@ export default function SuppliersPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof supplierFormSchema> }) => {
+      console.log("Updating supplier:", id, data);
+      
       const response = await fetch(`/api/suppliers/${id}`, {
         method: "PATCH",
         headers: {
@@ -510,10 +512,13 @@ export default function SuppliersPage() {
       
       if (!response.ok) {
         const error = await response.text();
+        console.error("Update error:", error);
         throw new Error(error || "Erreur lors de la mise à jour");
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log("Update success:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -590,21 +595,21 @@ export default function SuppliersPage() {
     setSelectedSupplier(supplier);
     form.reset({
       type: supplier.type,
-      companyType: supplier.companyType || undefined,
-      firstName: supplier.firstName || undefined,
-      lastName: supplier.lastName || undefined,
-      companyName: supplier.companyName || undefined,
-      phone: supplier.phone || undefined,
-      mobile: supplier.mobile || undefined,
-      email: supplier.email || undefined,
-      contactName: supplier.contactName || undefined,
-      address: supplier.address || undefined,
-      city: supplier.city || undefined,
-      postalCode: supplier.postalCode || undefined,
-      country: supplier.country || undefined,
-      taxId: supplier.taxId || undefined,
-      commercialRegister: supplier.commercialRegister || undefined,
-      photo: supplier.photo || undefined,
+      companyType: supplier.companyType || "",
+      firstName: supplier.firstName || "",
+      lastName: supplier.lastName || "",
+      companyName: supplier.companyName || "",
+      phone: supplier.phone || "",
+      mobile: supplier.mobile || "",
+      email: supplier.email || "",
+      contactName: supplier.contactName || "",
+      address: supplier.address || "",
+      city: supplier.city || "",
+      postalCode: supplier.postalCode || "",
+      country: supplier.country || "",
+      taxId: supplier.taxId || "",
+      commercialRegister: supplier.commercialRegister || "",
+      photo: supplier.photo || "",
       active: supplier.active,
     });
     setActiveTab("general");
@@ -613,7 +618,10 @@ export default function SuppliersPage() {
 
   const handleUpdate = useCallback((data: z.infer<typeof supplierFormSchema>) => {
     if (selectedSupplier) {
+      console.log("Form data for update:", data);
       updateMutation.mutate({ id: selectedSupplier.id, data });
+    } else {
+      console.error("No supplier selected for update");
     }
   }, [selectedSupplier, updateMutation]);
 
