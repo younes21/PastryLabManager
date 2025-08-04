@@ -127,26 +127,45 @@ export const articleCategories = pgTable("article_categories", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
-// Articles unifiés (produits, ingrédients, services) - structure adaptée à la DB existante
+// Articles unifiés (produits, ingrédients, services) - structure selon spécifications
 export const articles = pgTable("articles", {
   id: serial("id").primaryKey(),
+  code: text("code").unique(), // Auto-generated: ING-000001, PRD-000001, SRV-000001
   name: text("name").notNull(), // Désignation
   type: text("type").notNull(), // 'product', 'ingredient', 'service'
-  categoryId: integer("category_id"), // Catégorie
   description: text("description"), // Description
-  unit: text("unit"), // Unité de mesure (kg, g, l, ml, etc.)
-  price: decimal("price", { precision: 10, scale: 2 }), // Prix de vente
+  
+  // Gestion de stock
+  managedInStock: boolean("managed_in_stock").default(true), // Gérer en stock ?
+  storageLocationId: integer("storage_location_id"), // Zone de stockage
+  categoryId: integer("category_id"), // Catégorie
+  unit: text("unit"), // Unité de mesure
+  
+  // Paramètres de vente
+  allowSale: boolean("allow_sale").default(false), // Autoriser à la vente ?
+  saleCategoryId: integer("sale_category_id"), // Catégorie de vente
+  saleUnit: text("sale_unit"), // Unité de vente
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }), // Prix de vente
+  taxId: integer("tax_id"), // TVA
+  
+  // Stock et prix
   costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }), // PMP - Prix Moyen Pondéré
-  currentStock: decimal("current_stock", { precision: 10, scale: 2 }), // Stock actuel
+  currentStock: decimal("current_stock", { precision: 10, scale: 2 }), // Stock actuel (géré par opérations d'inventaire)
   minStock: decimal("min_stock", { precision: 10, scale: 2 }), // Stock minimum
   maxStock: decimal("max_stock", { precision: 10, scale: 2 }), // Stock maximum
-  storageLocationId: integer("storage_location_id"), // Zone de stockage
+  
+  // Photo et métadonnées
+  photo: text("photo"), // Photo
+  
+  // Champs pour les produits/recettes
   preparationTime: integer("preparation_time"), // minutes
   difficulty: text("difficulty"), // 'easy', 'medium', 'hard'
   servings: integer("servings"),
+  price: decimal("price", { precision: 10, scale: 2 }), // Ancien champ prix (compatibilité)
+  
+  // Champs communs
   active: boolean("active").default(true), // Est actif
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-  code: text("code").unique(), // Auto-generated: ING-000001, PRD-000001, SRV-000001
 });
 
 // Price Lists

@@ -32,12 +32,12 @@ import EmailConfig from "@/pages/email-config";
 import Suppliers from "@/pages/suppliers";
 import Clients from "@/pages/clients-new";
 import Products from "@/pages/products";
-import Ingredients from "@/pages/ingredients";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, lazy } from "react";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -164,7 +164,7 @@ function ProtectedRouter() {
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/clients" component={Clients} />
       <Route path="/products" component={Products} />
-      <Route path="/ingredients" component={Ingredients} />
+      <Route path="/ingredients" component={lazy(() => import("./pages/ingredients-new"))} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>

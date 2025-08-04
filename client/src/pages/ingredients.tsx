@@ -18,19 +18,20 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Article } from "@shared/schema";
 
-// Schema pour les ingrédients (basé sur les articles)
+// Schema pour les ingrédients selon spécifications
 const ingredientSchema = z.object({
-  name: z.string().min(1, "Le nom est requis"),
+  name: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
-  categoryId: z.number().optional(),
-  unit: z.string().min(1, "L'unité est requise"),
-  currentStock: z.number().min(0, "Le stock doit être positif").default(0),
-  minStock: z.number().min(0, "Le stock minimum doit être positif").default(0),
-  maxStock: z.number().min(0, "Le stock maximum doit être positif").optional(),
-  price: z.number().min(0, "Le prix doit être positif").default(0),
-  costPerUnit: z.number().min(0, "Le coût doit être positif").default(0),
+  managedInStock: z.boolean().default(true),
   storageLocationId: z.number().optional(),
-  active: z.boolean().default(true),
+  categoryId: z.number().optional(),
+  unit: z.string().min(1, "L'unité de mesure est requise"),
+  allowSale: z.boolean().default(false),
+  saleCategoryId: z.number().optional(),
+  saleUnit: z.string().optional(),
+  salePrice: z.number().min(0, "Le prix de vente doit être positif").optional(),
+  taxId: z.number().optional(),
+  photo: z.string().optional(),
 });
 
 type IngredientFormData = z.infer<typeof ingredientSchema>;
@@ -54,18 +55,19 @@ export default function IngredientsPage() {
     queryKey: ["/api/storage-locations"],
   });
 
+  const { data: taxes } = useQuery({
+    queryKey: ["/api/taxes"],
+  });
+
   const form = useForm<IngredientFormData>({
     resolver: zodResolver(ingredientSchema),
     defaultValues: {
       name: "",
       description: "",
+      managedInStock: true,
       unit: "kg",
-      currentStock: 0,
-      minStock: 0,
-      maxStock: 0,
-      price: 0,
-      costPerUnit: 0,
-      active: true,
+      allowSale: false,
+      saleUnit: "kg",
     },
   });
 
@@ -224,13 +226,11 @@ export default function IngredientsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Actif</TableHead>
                 <TableHead>Code</TableHead>
-                <TableHead>Nom</TableHead>
-                <TableHead>Unité</TableHead>
-                <TableHead>Stock Actuel</TableHead>
-                <TableHead>Stock Min</TableHead>
-                <TableHead>Prix Achat</TableHead>
-                <TableHead>Statut</TableHead>
+                <TableHead>Catégorie</TableHead>
+                <TableHead>Désignation</TableHead>
+                <TableHead>PMP</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -239,15 +239,15 @@ export default function IngredientsPage() {
                 const stockStatus = getStockStatus(ingredient);
                 return (
                   <TableRow key={ingredient.id} data-testid={`row-ingredient-${ingredient.id}`}>
-                    <TableCell className="font-mono text-sm">{ingredient.code}</TableCell>
-                    <TableCell className="font-medium">{ingredient.name}</TableCell>
-                    <TableCell>{ingredient.unit || "kg"}</TableCell>
-                    <TableCell>{Number(ingredient.currentStock) || 0}</TableCell>
-                    <TableCell>{Number(ingredient.minStock) || 0}</TableCell>
-                    <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
                     <TableCell>
-                      <Badge variant={stockStatus.variant}>{stockStatus.label}</Badge>
+                      <Badge variant={ingredient.active ? "default" : "secondary"}>
+                        {ingredient.active ? "Actif" : "Inactif"}
+                      </Badge>
                     </TableCell>
+                    <TableCell className="font-mono text-sm">{ingredient.code}</TableCell>
+                    <TableCell>{ingredient.categoryId ? (categories as any[])?.find((c: any) => c.id === ingredient.categoryId)?.designation || "Sans catégorie" : "Sans catégorie"}</TableCell>
+                    <TableCell className="font-medium">{ingredient.name}</TableCell>
+                    <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
