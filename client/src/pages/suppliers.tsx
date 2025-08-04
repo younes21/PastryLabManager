@@ -218,10 +218,13 @@ export default function SuppliersPage() {
   const SupplierForm = ({ onSubmit, isLoading: submitting }: { 
     onSubmit: (data: z.infer<typeof supplierFormSchema>) => void;
     isLoading: boolean;
-  }) => (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Tabs defaultValue="general" className="w-full">
+  }) => {
+    const [activeTab, setActiveTab] = useState("general");
+    
+    return (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -570,6 +573,7 @@ export default function SuppliersPage() {
       </form>
     </Form>
   );
+};
 
   return (
     <Layout title="Gestion des Fournisseurs">
