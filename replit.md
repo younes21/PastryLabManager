@@ -117,10 +117,15 @@ The application uses a comprehensive schema with the following main entities:
   - Automatic code generation (PRD-000001, etc.) and product-specific validation
   - Integration with storage zones and article categories for complete product management
   - Added products navigation to sidebar and routing for admin/manager access
+- **Ingredients CRUD Module Completed According to Specifications (August 2025)**:
+  - Implemented complete ingredients management using unified articles table with type="ingredient"
+  - Added all required fields per specifications: code (auto-generated), designation, description, managed_in_stock, storage_location, category, unit, allow_sale, sale_category, sale_unit, sale_price, tax, photo
+  - Created tabbed interface (General, Stock, Vente, Photo) optimized for POS systems
+  - Display columns exactly as specified: Actif, Code, Catégorie, Désignation, PMP (Prix Moyen Pondéré)
+  - Stock management handled by inventory operations as specified
+  - Full CRUD operations with proper validation and error handling
 - **Modules Legacy Removed (August 2025)**:
   - Completely removed recipes, productions, orders, deliveries modules (database tables, API routes, UI components)
-  - Removed ingredients table and API routes - using unified articles table with type="ingredient" filtering
-  - Cleaned up all references in storage.ts, routes.ts, App.tsx, sidebar navigation
   - System uses only articles table for products, ingredients, and services
   - Currency system with DA, EUR, USD symbols fully operational
   - System ready for new business rules implementation
