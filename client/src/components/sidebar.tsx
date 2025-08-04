@@ -90,7 +90,8 @@ export function Sidebar() {
       case "admin":
         return true; // admin has access to everything
       case "gerant":
-        return !["/email-config"].includes(item.path); // gerant doesn't have access to email config
+        // gerant has access to most features except email config
+        return !["/email-config"].includes(item.path);
       default:
         return false;
     }
