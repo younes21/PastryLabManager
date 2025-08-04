@@ -189,22 +189,43 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
 
               <FormField
                 control={form.control}
-                name="active"
+                name="photo"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                      <FormLabel>Ingrédient actif</FormLabel>
-                      <FormDescription>
-                        Cet ingrédient peut être utilisé
-                      </FormDescription>
-                    </div>
+                  <FormItem>
+                    <FormLabel>Photo</FormLabel>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-active" />
+                      <Input
+                        {...field}
+                        placeholder="URL de la photo"
+                        data-testid="input-photo"
+                      />
                     </FormControl>
+                    <FormDescription>
+                      URL ou chemin vers la photo de l'ingrédient
+                    </FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="active"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Ingrédient actif</FormLabel>
+                    <FormDescription>
+                      Cet ingrédient peut être utilisé
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-active" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
           </TabsContent>
 
           <TabsContent value="stock" className="space-y-4">
@@ -253,21 +274,16 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                   )}
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="currentStock"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Stock actuel</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-current-stock" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"} {getUnitName(form.watch("unitId"))}
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Le stock actuel sera modifié via les opérations d'inventaire initial ou d'ajustement
+                  </p>
+                </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="minStock"
@@ -277,6 +293,9 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                         <FormControl>
                           <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-min-stock" />
                         </FormControl>
+                        <FormDescription>
+                          Seuil d'alerte de stock bas
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -291,6 +310,9 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                         <FormControl>
                           <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-max-stock" />
                         </FormControl>
+                        <FormDescription>
+                          Limite maximale de stock
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -435,22 +457,9 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
           </TabsContent>
 
           <TabsContent value="other" className="space-y-4">
-            <FormField
-              control={form.control}
-              name="photo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Photo (URL)</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="https://exemple.com/photo.jpg" data-testid="input-photo" />
-                  </FormControl>
-                  <FormDescription>
-                    URL de la photo de l'ingrédient
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="text-center text-gray-500 py-8">
+              <p>Aucun champ supplémentaire pour le moment</p>
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -498,7 +507,7 @@ export default function IngredientsPage() {
 
   // Requêtes
   const { data: ingredients = [], isLoading } = useQuery({
-    queryKey: ["/api/articles/ingredients"],
+    queryKey: ["/api/ingredients"],
   });
 
   const { data: categories = [] } = useQuery({
@@ -512,6 +521,12 @@ export default function IngredientsPage() {
   const { data: measurementUnits = [] } = useQuery({
     queryKey: ["/api/measurement-units"],
   });
+
+  const { data: taxes = [] } = useQuery({
+    queryKey: ["/api/taxes"],
+  });
+
+
 
   // Mutations
   const createMutation = useMutation({
@@ -532,7 +547,7 @@ export default function IngredientsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/articles/ingredients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       setIsCreateDialogOpen(false);
       form.reset({
         name: "",
@@ -579,7 +594,7 @@ export default function IngredientsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/articles/ingredients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       setIsEditDialogOpen(false);
       form.reset({
         name: "",
@@ -622,7 +637,7 @@ export default function IngredientsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/articles/ingredients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       toast({
         title: "Succès",
         description: "Ingrédient supprimé avec succès",

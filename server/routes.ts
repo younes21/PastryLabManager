@@ -121,7 +121,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ingredients routes
+  // Articles routes
+  app.get("/api/articles/ingredients", async (req, res) => {
+    try {
+      const ingredients = await storage.getAllIngredients();
+      res.json(ingredients);
+    } catch (error) {
+      console.error("Error fetching ingredients:", error);
+      res.status(500).json({ message: "Failed to fetch ingredients" });
+    }
+  });
+
+  // Ingredients routes (legacy)
   app.get("/api/ingredients", async (req, res) => {
     try {
       const ingredients = await storage.getAllIngredients();
@@ -338,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const productionData = insertProductionSchema.parse(req.body);
       const production = await storage.createProduction(productionData);
       res.status(201).json(production);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Production creation error:", error);
       if (error.issues) {
         console.error("Validation issues:", error.issues);
@@ -705,7 +716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Complete the production
       await storage.updateProduction(productionId, { 
         status: "termine", 
-        endTime: new Date() 
+        endTime: new Date().toISOString() 
       });
 
       // Create product stock entry
@@ -716,7 +727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: customerName || "Stock général",
         quantity: production.quantity,
         storageLocationId,
-        expirationDate: new Date(expirationDate),
+        expirationDate: new Date(expirationDate).toISOString(),
         preparerId: production.preparerId!,
         status: "available"
       });
@@ -727,8 +738,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         barcode: productStock.barcode!,
         productName: recipe.name,
         customerName: customerName || "Stock général",
-        productionDate: new Date(),
-        expirationDate: new Date(expirationDate),
+        productionDate: new Date().toISOString(),
+        expirationDate: new Date(expirationDate).toISOString(),
         preparerName: preparer ? `${preparer.firstName} ${preparer.lastName}` : "Inconnu",
         quantity: production.quantity
       });

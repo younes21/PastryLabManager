@@ -287,34 +287,49 @@ export class DatabaseStorage implements IStorage {
         }
       ]);
 
-      // Create sample ingredients
-      await db.insert(ingredients).values([
+      // Create sample articles (ingredients)
+      await db.insert(articles).values([
         {
+          code: "ING-000001",
           name: "Farine T55",
-          unit: "kg",
+          type: "ingredient",
+          unitId: 2,
           currentStock: "2.5",
           minStock: "5.0",
           maxStock: "50.0",
           costPerUnit: "1.20",
-          storageLocationId: 1
+          storageLocationId: 1,
+          managedInStock: true,
+          allowSale: false,
+          active: true
         },
         {
+          code: "ING-000002",
           name: "Œufs frais",
-          unit: "piece",
+          type: "ingredient",
+          unitId: 6,
           currentStock: "12",
           minStock: "24",
           maxStock: "120",
           costPerUnit: "0.25",
-          storageLocationId: 1
+          storageLocationId: 1,
+          managedInStock: true,
+          allowSale: false,
+          active: true
         },
         {
+          code: "ING-000003",
           name: "Beurre doux",
-          unit: "kg",
+          type: "ingredient",
+          unitId: 2,
           currentStock: "0.8",
           minStock: "2.0",
           maxStock: "10.0",
           costPerUnit: "6.50",
-          storageLocationId: 1
+          storageLocationId: 1,
+          managedInStock: true,
+          allowSale: false,
+          active: true
         }
       ]);
 
@@ -439,6 +454,7 @@ export class DatabaseStorage implements IStorage {
       // Create sample suppliers
       await db.insert(suppliers).values([
         {
+          code: "FRN-000001",
           type: "societe",
           companyType: "SARL",
           companyName: "Fournisseur Général",
@@ -456,6 +472,7 @@ export class DatabaseStorage implements IStorage {
           active: true
         },
         {
+          code: "FRN-000002", 
           type: "particulier",
           firstName: "Omar",
           lastName: "Khelifi",
@@ -671,8 +688,8 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(productions)
       .where(
         and(
-          gte(productions.scheduledTime, today),
-          lt(productions.scheduledTime, tomorrow)
+          gte(productions.scheduledTime, today.toISOString()),
+          lt(productions.scheduledTime, tomorrow.toISOString())
         )
       );
   }
@@ -808,8 +825,8 @@ export class DatabaseStorage implements IStorage {
 
   // Product Stock methods
   async getProductStock(id: number): Promise<ProductStock | undefined> {
-    const [productStock] = await db.select().from(productStock).where(eq(productStock.id, id));
-    return productStock || undefined;
+    const [productStockItem] = await db.select().from(productStock).where(eq(productStock.id, id));
+    return productStockItem || undefined;
   }
 
   async getAllProductStock(): Promise<ProductStock[]> {
