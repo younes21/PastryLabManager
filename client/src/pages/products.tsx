@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Package, DollarSign, Search, Filter, MoreHorizontal, ChefHat } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, DollarSign, Search, Filter, MoreHorizontal, ChefHat, Clock, Shield, Warehouse } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -58,6 +58,9 @@ const productSchema = insertArticleSchema.extend({
   type: z.literal("product"),
   minStock: z.string().optional(),
   maxStock: z.string().optional(),
+  isPerishable: z.boolean().optional(),
+  shelfLife: z.string().optional(),
+  storageTemperature: z.string().optional(),
 });
 
 type ProductForm = z.infer<typeof productSchema>;
@@ -79,6 +82,11 @@ export default function Products() {
       console.log("🔥 PRODUCTS - Produits filtrés:", products);
       return products;
     }
+  });
+
+  // Récupération des zones de stockage
+  const { data: storageZones = [] } = useQuery<StorageZone[]>({
+    queryKey: ["/api/storage-zones"]
   });
 
   // Filtrage des produits selon le terme de recherche
@@ -172,12 +180,12 @@ export default function Products() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Code</TableHead>
                 <TableHead>Nom</TableHead>
-                <TableHead>Catégorie</TableHead>
+                <TableHead>Conservation</TableHead>
+                <TableHead>D.L.C</TableHead>
+                <TableHead>Température</TableHead>
                 <TableHead>Prix</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Statut</TableHead>
+                <TableHead>Zone stockage</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -200,31 +208,58 @@ export default function Products() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredProducts.map((product) => (
+                filteredProducts.map((product) => {
+                  // Récupérer les données des zones de stockage
+                  const storageZone = storageZones?.find((zone: StorageZone) => zone.id === product.storageLocationId);
+                  
+                  return (
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                    <TableCell className="font-mono text-sm">
-                      {product.code || `PRD-${product.id.toString().padStart(6, '0')}`}
-                    </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
-                      {product.categoryId ? "Catégorie définie" : "Non catégorisé"}
-                    </TableCell>
-                    <TableCell>
-                      {product.salePrice ? `${product.salePrice} DA` : "Non défini"}
-                    </TableCell>
-                    <TableCell>
-                      {product.managedInStock ? (
-                        <span className="text-sm">
-                          {product.currentStock || "0"} {product.unit || "unités"}
-                        </span>
+                      {product.isPerishable ? (
+                        <Badge variant="destructive" className="bg-orange-500">
+                          <Clock className="w-3 h-3 mr-1" />
+                          Périssable
+                        </Badge>
                       ) : (
-                        <Badge variant="secondary">Non géré</Badge>
+                        <Badge variant="secondary">
+                          <Shield className="w-3 h-3 mr-1" />
+                          Non périssable
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={product.active ? "default" : "secondary"}>
-                        {product.active ? "Actif" : "Inactif"}
-                      </Badge>
+                      {product.isPerishable && product.shelfLife ? (
+                        <span className="text-sm font-medium">
+                          {product.shelfLife} jours
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {product.isPerishable && product.storageTemperature ? (
+                        <span className="text-sm font-medium">
+                          {product.storageTemperature}°C
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">
+                        {product.salePrice || product.price ? `${product.salePrice || product.price} DA` : "Non défini"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {storageZone ? (
+                        <Badge variant="outline">
+                          <Warehouse className="w-3 h-3 mr-1" />
+                          {storageZone.designation}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Non assignée</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -247,7 +282,8 @@ export default function Products() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -280,6 +316,9 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       taxId: product?.taxId || undefined,
       minStock: product?.minStock ? product.minStock.toString() : "",
       maxStock: product?.maxStock ? product.maxStock.toString() : "",
+      isPerishable: Boolean(product?.isPerishable ?? false),
+      shelfLife: product?.shelfLife ? product.shelfLife.toString() : "",
+      storageTemperature: product?.storageTemperature ? product.storageTemperature.toString() : "",
       active: Boolean(product?.active ?? true),
       photo: product?.photo || "",
     },
@@ -329,8 +368,18 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     },
   });
 
-  const onSubmit = (data: ProductForm) => {
-    console.log("🔥 PRODUCT FORM - Soumission des données:", data);
+  const onSubmit = (formData: ProductForm) => {
+    console.log("🔥 PRODUCT FORM - Soumission des données:", formData);
+    
+    const data = {
+      ...formData,
+      minStock: formData.minStock ? parseFloat(formData.minStock) : undefined,
+      maxStock: formData.maxStock ? parseFloat(formData.maxStock) : undefined,
+      salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined,
+      shelfLife: formData.shelfLife ? parseInt(formData.shelfLife) : undefined,
+      storageTemperature: formData.storageTemperature ? parseFloat(formData.storageTemperature) : undefined,
+    };
+    
     if (isEditing) {
       updateMutation.mutate(data);
     } else {
@@ -556,6 +605,67 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Section Conservation */}
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-lg font-medium">Conservation</h3>
+              
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base">Produit périssable</FormLabel>
+                  <p className="text-sm text-muted-foreground">
+                    Le produit nécessite une gestion de conservation
+                  </p>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="isPerishable"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          checked={Boolean(field.value)}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-is-perishable"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {form.watch("isPerishable") && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="shelfLife"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>D.L.C (jours)</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" placeholder="30" data-testid="input-shelf-life" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="storageTemperature"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Température (°C)</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="number" step="0.1" placeholder="-18.0" data-testid="input-storage-temperature" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
             </div>
           </TabsContent>
 

@@ -164,6 +164,12 @@ export const articles = pgTable("articles", {
   // Photo et métadonnées
   photo: text("photo"), // Photo
   
+  // Champs pour les produits périssables
+  isPerishable: boolean("is_perishable").default(false), // Produit périssable
+  shelfLife: integer("shelf_life"), // Durée de conservation en jours
+  storageTemperature: decimal("storage_temperature", { precision: 5, scale: 2 }), // Température de conservation en °C
+  temperatureUnit: text("temperature_unit").default("°C"), // Unité de température
+  
   // Champs pour les produits/recettes
   preparationTime: integer("preparation_time"), // minutes
   difficulty: text("difficulty"), // 'easy', 'medium', 'hard'
