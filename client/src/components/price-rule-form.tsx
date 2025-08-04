@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Article, ArticleCategory, PriceRule } from "@shared/schema";
 
 interface PriceRuleFormProps {
@@ -71,13 +72,16 @@ export function PriceRuleForm({
   const salesCategories = categories.filter(cat => cat.forSale);
 
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle>
+    <div className="w-full">
+      <DialogHeader>
+        <DialogTitle>
           {editingRule ? "Modifier la règle de prix" : "Nouvelle règle de prix"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </DialogTitle>
+        <DialogDescription>
+          {editingRule ? "Modifiez les paramètres de cette règle de prix" : "Créez une nouvelle règle de prix pour cette liste"}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="mt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Appliquer à */}
           <div className="space-y-3">
@@ -303,7 +307,7 @@ export function PriceRuleForm({
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trash2, Plus, Edit, Euro, DollarSign } from "lucide-react";
-import type { PriceList, InsertPriceList, PriceRule, InsertPriceRule } from "@shared/schema";
+import type { PriceList, InsertPriceList, PriceRule, InsertPriceRule, Article, ArticleCategory } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PriceRuleForm } from "@/components/price-rule-form";
@@ -30,11 +30,11 @@ export default function PriceListsPage() {
   });
 
   // Fetch articles and categories for rules
-  const { data: articles = [] } = useQuery({
+  const { data: articles = [] } = useQuery<Article[]>({
     queryKey: ["/api/articles"],
   });
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<ArticleCategory[]>({
     queryKey: ["/api/article-categories"],
   });
 
@@ -310,14 +310,29 @@ export default function PriceListsPage() {
                             <Badge variant={rule.active ? "default" : "secondary"}>
                               {rule.active ? "Active" : "Inactive"}
                             </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingRule(rule)}
-                              data-testid={`button-edit-rule-${rule.id}`}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <Dialog open={editingRule?.id === rule.id} onOpenChange={(open) => !open && setEditingRule(null)}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setEditingRule(rule)}
+                                  data-testid={`button-edit-rule-${rule.id}`}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                <PriceRuleForm
+                                  priceListId={selectedPriceListId}
+                                  articles={articles}
+                                  categories={categories}
+                                  editingRule={rule}
+                                  onSubmit={(data) => updateRuleMutation.mutate({ id: rule.id, data })}
+                                  onCancel={() => setEditingRule(null)}
+                                  isLoading={updateRuleMutation.isPending}
+                                />
+                              </DialogContent>
+                            </Dialog>
                             <Button
                               variant="ghost"
                               size="sm"
