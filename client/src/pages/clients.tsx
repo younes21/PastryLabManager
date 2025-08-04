@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient, type PriceList, type User as UserType } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ClientLayout } from "@/components/client-layout";
 
 function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => void }) {
   const { toast } = useToast();
@@ -48,6 +49,9 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
       userId: client?.userId || undefined,
     },
   });
+
+  const watchType = form.watch("type");
+  const watchTarifParticulier = form.watch("tarifParticulier");
 
   // Fetch price lists for tariff selection
   const { data: priceLists } = useQuery<PriceList[]>({
@@ -84,6 +88,16 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
   });
 
   const onSubmit = (data: InsertClient) => {
+    // Pour les sociétés, vider les champs nom/prénom non utilisés
+    if (data.type === "societe") {
+      data.prenom = "";
+    }
+    
+    // Si tarif particulier activé, vider l'offre tarifaire
+    if (data.tarifParticulier) {
+      data.priceListId = undefined;
+    }
+    
     if (isEditing) {
       updateMutation.mutate(data);
     } else {
@@ -143,50 +157,68 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="raisonSociale"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Raison sociale</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="EURL, SARL, SNC..." data-testid="input-raison-sociale" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {watchType === "societe" && (
+                <FormField
+                  control={form.control}
+                  name="raisonSociale"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Raison sociale *</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="EURL, SARL, SNC..." data-testid="input-raison-sociale" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {watchType === "particulier" ? (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="nom"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nom *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Nom du client" data-testid="input-nom" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="prenom"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prénom</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ""} placeholder="Prénom du client" data-testid="input-prenom" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : (
               <FormField
                 control={form.control}
                 name="nom"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nom *</FormLabel>
+                    <FormLabel>Nom de l'entreprise *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Nom du client" data-testid="input-nom" />
+                      <Input {...field} placeholder="Nom de l'entreprise" data-testid="input-nom" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="prenom"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Prénom</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="Prénom du client" data-testid="input-prenom" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="contact" className="space-y-4">
@@ -429,34 +461,36 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="priceListId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Offre tarifaire</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
-                    value={field.value?.toString() || "none"}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-price-list">
-                        <SelectValue placeholder="Sélectionner une offre tarifaire" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Aucune offre spécifique</SelectItem>
-                      {priceLists?.map((priceList) => (
-                        <SelectItem key={priceList.id} value={priceList.id.toString()}>
-                          {priceList.designation}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!watchTarifParticulier && (
+              <FormField
+                control={form.control}
+                name="priceListId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Offre tarifaire *</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                      value={field.value?.toString() || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-price-list">
+                          <SelectValue placeholder="Sélectionner une offre tarifaire" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune offre spécifique</SelectItem>
+                        {priceLists?.map((priceList) => (
+                          <SelectItem key={priceList.id} value={priceList.id.toString()}>
+                            {priceList.designation}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
@@ -750,11 +784,16 @@ export default function Clients() {
   };
 
   if (isLoading) {
-    return <div className="p-6">Chargement...</div>;
+    return (
+      <ClientLayout>
+        <div className="p-6">Chargement...</div>
+      </ClientLayout>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <ClientLayout title="Gestion des Clients">
+      <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Gestion des Clients</h1>
@@ -876,6 +915,7 @@ export default function Clients() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ClientLayout>
   );
 }
