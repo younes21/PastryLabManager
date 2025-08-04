@@ -646,6 +646,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/ingredients/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log("PATCH /api/ingredients/:id called with:", { id, body: req.body });
+      const updatedIngredient = await storage.updateIngredient(id, req.body);
+      if (!updatedIngredient) {
+        return res.status(404).json({ message: "Ingredient not found" });
+      }
+      console.log("Updated ingredient:", updatedIngredient);
+      res.json(updatedIngredient);
+    } catch (error) {
+      console.error("Error updating ingredient:", error);
+      res.status(500).json({ message: "Failed to update ingredient" });
+    }
+  });
+
   app.delete("/api/ingredients/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
