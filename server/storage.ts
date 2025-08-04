@@ -162,6 +162,14 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<boolean>;
+
+  // Ingredients (filtrage articles par type="ingredient")
+  getAllIngredients(): Promise<Article[]>;
+  getIngredient(id: number): Promise<Article | undefined>;
+  createIngredient(ingredient: Omit<InsertArticle, 'type'>): Promise<Article>;
+  updateIngredient(id: number, ingredient: Partial<Omit<InsertArticle, 'type'>>): Promise<Article | undefined>;
+  deleteIngredient(id: number): Promise<boolean>;
+  getLowStockIngredients(): Promise<Article[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -230,7 +238,56 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Méthodes ingrédients supprimées - utiliser articles avec type="ingredient"
+  // Ingredients (filtrage des articles par type="ingredient")
+  async getAllIngredients(): Promise<Article[]> {
+    return await db.select().from(articles).where(eq(articles.type, "ingredient")).orderBy(articles.name);
+  }
+
+  async getIngredient(id: number): Promise<Article | undefined> {
+    const [article] = await db.select().from(articles).where(and(eq(articles.id, id), eq(articles.type, "ingredient")));
+    return article || undefined;
+  }
+
+  async createIngredient(insertArticle: Omit<InsertArticle, 'type'>): Promise<Article> {
+    // Générer un code automatique pour les ingrédients
+    const existingIngredients = await this.getAllIngredients();
+    const nextNumber = existingIngredients.length + 1;
+    const code = `ING-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const articleData = {
+      ...insertArticle,
+      type: "ingredient" as const,
+      code,
+    };
+    
+    const [article] = await db.insert(articles).values([articleData]).returning();
+    return article;
+  }
+
+  async updateIngredient(id: number, updateData: Partial<Omit<InsertArticle, 'type'>>): Promise<Article | undefined> {
+    // Vérifier que c'est bien un ingrédient
+    const ingredient = await this.getIngredient(id);
+    if (!ingredient) return undefined;
+    
+    return this.updateArticle(id, updateData);
+  }
+
+  async deleteIngredient(id: number): Promise<boolean> {
+    // Vérifier que c'est bien un ingrédient avant suppression
+    const ingredient = await this.getIngredient(id);
+    if (!ingredient) return false;
+    return this.deleteArticle(id);
+  }
+
+  async getLowStockIngredients(): Promise<Article[]> {
+    return await db.select().from(articles)
+      .where(and(
+        eq(articles.type, "ingredient"),
+        eq(articles.active, true),
+        lt(articles.currentStock, articles.minStock)
+      ))
+      .orderBy(articles.name);
+  }
 
   // Measurement Categories
   async getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined> {
@@ -347,7 +404,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
-    const [article] = await db.insert(articles).values(insertArticle).returning();
+    const [article] = await db.insert(articles).values([insertArticle]).returning();
     return article;
   }
 

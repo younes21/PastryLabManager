@@ -24,7 +24,8 @@ import {
   Calculator,
   Building,
   Settings,
-  Mail
+  Mail,
+  Leaf
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -72,6 +73,7 @@ export function Sidebar() {
     { path: "/suppliers", label: "Fournisseurs", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/clients", label: "Clients", icon: "fas fa-users", lucideIcon: Users },
     { path: "/products", label: "Produits", icon: "fas fa-box", lucideIcon: Package },
+    { path: "/ingredients", label: "Ingrédients", icon: "fas fa-leaf", lucideIcon: Leaf },
   ];
 
   // Filter navigation based on user role
