@@ -122,7 +122,7 @@ export default function IngredientsPage() {
       storageLocationId: ingredient.storageLocationId || undefined,
       categoryId: ingredient.categoryId || undefined,
       unit: ingredient.unit || "kg",
-      minStock: (ingredient as any).minStock || 0,
+      minStock: Number((ingredient as any).minStock) || 0,
       allowSale: (ingredient as any).allowSale ?? false,
       saleCategoryId: (ingredient as any).saleCategoryId || undefined,
       saleUnit: (ingredient as any).saleUnit || "kg",
