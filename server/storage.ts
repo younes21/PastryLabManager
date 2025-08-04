@@ -14,7 +14,7 @@ import {
   type Supplier, type InsertSupplier, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation
 } from "@shared/schema";
-import { db } from "./db";
+import { db, sqlite } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
 
 export interface IStorage {
@@ -176,6 +176,156 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private sqlite: Database.Database;
+
+  constructor() {
+    // Get the same SQLite instance from db.ts
+    this.sqlite = sqlite;
+  }
+
+  // Méthodes simplifiées utilisant SQLite direct
+  async getAllStorageLocations(): Promise<StorageLocation[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM storage_locations WHERE active = 1 ORDER BY name');
+      return stmt.all() as StorageLocation[];
+    } catch (error) {
+      console.error('Error fetching storage locations:', error);
+      return [];
+    }
+  }
+
+  async getAllMeasurementCategories(): Promise<MeasurementCategory[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM measurement_categories WHERE active = 1 ORDER BY designation');
+      return stmt.all() as MeasurementCategory[];
+    } catch (error) {
+      console.error('Error fetching measurement categories:', error);
+      return [];
+    }
+  }
+
+  async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
+    return this.getAllMeasurementCategories();
+  }
+
+  async getAllMeasurementUnits(): Promise<MeasurementUnit[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM measurement_units WHERE active = 1 ORDER BY label');
+      return stmt.all() as MeasurementUnit[];
+    } catch (error) {
+      console.error('Error fetching measurement units:', error);
+      return [];
+    }
+  }
+
+  async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
+    return this.getAllMeasurementUnits();
+  }
+
+  async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM measurement_units WHERE category_id = ? AND active = 1 ORDER BY label');
+      return stmt.all(categoryId) as MeasurementUnit[];
+    } catch (error) {
+      console.error('Error fetching measurement units by category:', error);
+      return [];
+    }
+  }
+
+  async getAllArticleCategories(): Promise<ArticleCategory[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM article_categories WHERE active = 1 ORDER BY designation');
+      return stmt.all() as ArticleCategory[];
+    } catch (error) {
+      console.error('Error fetching article categories:', error);
+      return [];
+    }
+  }
+
+  async getActiveArticleCategories(): Promise<ArticleCategory[]> {
+    return this.getAllArticleCategories();
+  }
+
+  async getAllPriceLists(): Promise<PriceList[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM price_lists WHERE active = 1 ORDER BY designation');
+      return stmt.all() as PriceList[];
+    } catch (error) {
+      console.error('Error fetching price lists:', error);
+      return [];
+    }
+  }
+
+  async getAllCurrencies(): Promise<Currency[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM currencies WHERE active = 1 ORDER BY designation');
+      return stmt.all() as Currency[];
+    } catch (error) {
+      console.error('Error fetching currencies:', error);
+      return [];
+    }
+  }
+
+  async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM delivery_methods WHERE active = 1 ORDER BY designation');
+      return stmt.all() as DeliveryMethod[];
+    } catch (error) {
+      console.error('Error fetching delivery methods:', error);
+      return [];
+    }
+  }
+
+  async getAllWorkStations(): Promise<WorkStation[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM work_stations WHERE active = 1 ORDER BY designation');
+      return stmt.all() as WorkStation[];
+    } catch (error) {
+      console.error('Error fetching work stations:', error);
+      return [];
+    }
+  }
+
+  async getAllSuppliers(): Promise<Supplier[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM suppliers WHERE active = 1 ORDER BY name');
+      return stmt.all() as Supplier[];
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      return [];
+    }
+  }
+
+  async getAllClients(): Promise<Client[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM clients WHERE active = 1 ORDER BY nom, raison_sociale');
+      return stmt.all() as Client[];
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+      return [];
+    }
+  }
+
+  async getAllTaxes(): Promise<Tax[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM taxes WHERE active = 1 ORDER BY designation');
+      return stmt.all() as Tax[];
+    } catch (error) {
+      console.error('Error fetching taxes:', error);
+      return [];
+    }
+  }
+
+  async getAllStorageZones(): Promise<StorageZone[]> {
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM storage_zones WHERE active = 1 ORDER BY designation');
+      return stmt.all() as StorageZone[];
+    } catch (error) {
+      console.error('Error fetching storage zones:', error);
+      return [];
+    }
+  }
+
   // Users
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -219,9 +369,7 @@ export class DatabaseStorage implements IStorage {
     return location || undefined;
   }
 
-  async getAllStorageLocations(): Promise<StorageLocation[]> {
-    return await db.select().from(storageLocations);
-  }
+  // Cette méthode est maintenant définie plus haut avec SQLite direct
 
   async createStorageLocation(insertLocation: InsertStorageLocation): Promise<StorageLocation> {
     const [location] = await db.insert(storageLocations).values(insertLocation).returning();

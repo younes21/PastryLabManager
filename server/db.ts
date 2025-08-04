@@ -5,6 +5,7 @@ import * as schema from "@shared/schema";
 // Utilisation temporaire de SQLite en attendant la résolution du problème PostgreSQL
 const sqlite = new Database(':memory:');
 export const db = drizzle(sqlite, { schema });
+export { sqlite };
 
 // Création des tables SQLite
 sqlite.exec(`
