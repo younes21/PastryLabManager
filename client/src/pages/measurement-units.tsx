@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -221,8 +222,9 @@ export default function MeasurementUnitsPage() {
   );
 
   return (
-    <div className="space-y-6" data-testid="page-measurement-units">
-      <div className="flex items-center justify-between">
+    <Layout>
+      <div className="space-y-6" data-testid="page-measurement-units">
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
             Unités de Mesure
@@ -256,9 +258,9 @@ export default function MeasurementUnitsPage() {
           </div>
           <Scale className="h-10 w-10 text-blue-600" />
         </div>
-      </div>
+        </div>
 
-      <Tabs defaultValue="categories" className="space-y-6">
+        <Tabs defaultValue="categories" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 h-12" data-testid="tabs-list">
           <TabsTrigger value="categories" className="text-lg font-medium" data-testid="tab-categories">
             Catégories ({categories.length})
@@ -609,7 +611,8 @@ export default function MeasurementUnitsPage() {
             })}
           </div>
         </TabsContent>
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
+    </Layout>
   );
 }
