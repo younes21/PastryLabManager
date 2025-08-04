@@ -28,18 +28,20 @@ export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // CLI-000001
   type: text("type").notNull(), // 'particulier' ou 'societe'
-  raisonSociale: text("raison_sociale"), // EURL, SARL, etc.
-  nom: text("nom").notNull(),
-  prenom: text("prenom"),
-  telephone: text("telephone"),
+  companyType: text("company_type"), // 'eurl', 'sarl', 'spa', 'snc', etc.
+  // Informations personnelles/société
+  firstName: text("first_name"), // Pour particulier
+  lastName: text("last_name"), // Pour particulier
+  companyName: text("company_name"), // Pour société (nom de l'entreprise)
+  phone: text("phone"),
   mobile: text("mobile"),
   email: text("email"),
   
   // Adresse
   contactName: text("contact_name"), // Nom du contact
-  adresse: text("adresse"),
-  ville: text("ville"),
-  codePostal: text("code_postal"),
+  address: text("address"),
+  city: text("city"),
+  postalCode: text("postal_code"),
   wilaya: text("wilaya"),
   
   // Informations légales

@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChefHat } from "lucide-react";
+import { ChefHat, Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -25,6 +27,14 @@ export function ClientLayout({ children, title = "Espace Client" }: ClientLayout
                 </h1>
                 <p className="text-sm text-gray-500">{title}</p>
               </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Link href="/">
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Home className="w-4 h-4" />
+                  Retour au menu principal
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

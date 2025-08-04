@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient, type PriceList, type User as UserType } from "@shared/schema";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ClientLayout } from "@/components/client-layout";
@@ -27,16 +28,17 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
       type: client?.type || "particulier",
-      raisonSociale: client?.raisonSociale || "",
-      nom: client?.nom || "",
-      prenom: client?.prenom || "",
-      telephone: client?.telephone || "",
+      companyType: client?.companyType || "",
+      firstName: client?.firstName || "",
+      lastName: client?.lastName || "",
+      companyName: client?.companyName || "",
+      phone: client?.phone || "",
       mobile: client?.mobile || "",
       email: client?.email || "",
       contactName: client?.contactName || "",
-      adresse: client?.adresse || "",
-      ville: client?.ville || "",
-      codePostal: client?.codePostal || "",
+      address: client?.address || "",
+      city: client?.city || "",
+      postalCode: client?.postalCode || "",
       wilaya: client?.wilaya || "",
       rc: client?.rc || "",
       na: client?.na || "",
@@ -90,11 +92,16 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
   const onSubmit = (data: InsertClient) => {
     // Pour les sociétés, vider les champs nom/prénom non utilisés
     if (data.type === "societe") {
-      data.prenom = "";
+      data.firstName = "";
+      data.lastName = "";
+    } else {
+      // Pour les particuliers, vider les champs société
+      data.companyType = "";
+      data.companyName = "";
     }
     
     // Si tarif particulier activé, vider l'offre tarifaire
-    if (data.tarifParticulier) {
+    if (!data.tarifParticulier) {
       data.priceListId = undefined;
     }
     
@@ -160,13 +167,25 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
               {watchType === "societe" && (
                 <FormField
                   control={form.control}
-                  name="raisonSociale"
+                  name="companyType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Raison sociale *</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="EURL, SARL, SNC..." data-testid="input-raison-sociale" />
-                      </FormControl>
+                      <FormLabel>Type d'entreprise *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-company-type">
+                            <SelectValue placeholder="Sélectionner le type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="eurl">EURL - Entreprise Unipersonnelle à Responsabilité Limitée</SelectItem>
+                          <SelectItem value="sarl">SARL - Société à Responsabilité Limitée</SelectItem>
+                          <SelectItem value="spa">SPA - Société Par Actions</SelectItem>
+                          <SelectItem value="snc">SNC - Société en Nom Collectif</SelectItem>
+                          <SelectItem value="scs">SCS - Société en Commandite Simple</SelectItem>
+                          <SelectItem value="autre">Autre</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -178,12 +197,12 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="nom"
+                  name="lastName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Nom *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Nom du client" data-testid="input-nom" />
+                        <Input {...field} placeholder="Nom du client" data-testid="input-lastname" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -192,12 +211,12 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
 
                 <FormField
                   control={form.control}
-                  name="prenom"
+                  name="firstName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prénom</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="Prénom du client" data-testid="input-prenom" />
+                        <Input {...field} value={field.value || ""} placeholder="Prénom du client" data-testid="input-firstname" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -207,12 +226,12 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
             ) : (
               <FormField
                 control={form.control}
-                name="nom"
+                name="companyName"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nom de l'entreprise *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Nom de l'entreprise" data-testid="input-nom" />
+                      <Input {...field} placeholder="Nom de l'entreprise" data-testid="input-company-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -461,7 +480,7 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
               />
             </div>
 
-            {!watchTarifParticulier && (
+            {watchTarifParticulier && (
               <FormField
                 control={form.control}
                 name="priceListId"
