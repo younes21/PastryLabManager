@@ -42,7 +42,7 @@ export default function IngredientsPage() {
   const queryClient = useQueryClient();
 
   // Récupération des données
-  const { data: ingredients, isLoading } = useQuery<Article[]>({
+  const { data: ingredients, isLoading, error } = useQuery<Article[]>({
     queryKey: ["/api/ingredients"],
   });
 
@@ -123,7 +123,7 @@ export default function IngredientsPage() {
       name: ingredient.name,
       description: ingredient.description || "",
       categoryId: ingredient.categoryId || undefined,
-      unit: "kg", // Default unit for articles
+      unit: ingredient.unit || "kg",
       currentStock: Number(ingredient.currentStock) || 0,
       minStock: Number(ingredient.minStock) || 0,
       maxStock: Number(ingredient.maxStock) || 0,
@@ -241,7 +241,7 @@ export default function IngredientsPage() {
                   <TableRow key={ingredient.id} data-testid={`row-ingredient-${ingredient.id}`}>
                     <TableCell className="font-mono text-sm">{ingredient.code}</TableCell>
                     <TableCell className="font-medium">{ingredient.name}</TableCell>
-                    <TableCell>kg</TableCell>
+                    <TableCell>{ingredient.unit || "kg"}</TableCell>
                     <TableCell>{Number(ingredient.currentStock) || 0}</TableCell>
                     <TableCell>{Number(ingredient.minStock) || 0}</TableCell>
                     <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
@@ -454,8 +454,8 @@ export default function IngredientsPage() {
                     <FormItem>
                       <FormLabel>Catégorie</FormLabel>
                       <Select 
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
-                        defaultValue={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(value === "no-category" ? undefined : parseInt(value))} 
+                        defaultValue={field.value?.toString() || "no-category"}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-ingredient-category">
@@ -463,7 +463,7 @@ export default function IngredientsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Aucune catégorie</SelectItem>
+                          <SelectItem value="no-category">Aucune catégorie</SelectItem>
                           {(categories as any[])?.map((category: any) => (
                             <SelectItem key={category.id} value={category.id.toString()}>
                               {category.designation}
@@ -483,8 +483,8 @@ export default function IngredientsPage() {
                     <FormItem>
                       <FormLabel>Zone de Stockage</FormLabel>
                       <Select 
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
-                        defaultValue={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(value === "no-zone" ? undefined : parseInt(value))} 
+                        defaultValue={field.value?.toString() || "no-zone"}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-ingredient-storage">
@@ -492,7 +492,7 @@ export default function IngredientsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Aucune zone</SelectItem>
+                          <SelectItem value="no-zone">Aucune zone</SelectItem>
                           {(storageLocations as any[])?.map((location: any) => (
                             <SelectItem key={location.id} value={location.id.toString()}>
                               {location.name}

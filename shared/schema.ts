@@ -127,42 +127,26 @@ export const articleCategories = pgTable("article_categories", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
-// Articles unifiés (produits, ingrédients, services)
+// Articles unifiés (produits, ingrédients, services) - structure adaptée à la DB existante
 export const articles = pgTable("articles", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // Auto-generated: ING-000001, PRD-000001, SRV-000001
   name: text("name").notNull(), // Désignation
   type: text("type").notNull(), // 'product', 'ingredient', 'service'
+  categoryId: integer("category_id"), // Catégorie
   description: text("description"), // Description
-  
-  // Catégories et unités
-  categoryId: integer("category_id").references(() => articleCategories.id), // Catégorie
-  unitId: integer("unit_id").references(() => measurementUnits.id), // Unité de mesure
-  
-  // Gestion de stock (pour ingrédients)
-  managedInStock: boolean("managed_in_stock").default(true), // Gérer en stock ?
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id), // Zone de stockage
-  currentStock: decimal("current_stock", { precision: 10, scale: 2 }).default("0"),
-  minStock: decimal("min_stock", { precision: 10, scale: 2 }).default("0"),
-  maxStock: decimal("max_stock", { precision: 10, scale: 2 }).default("0"),
-  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).default("0"), // PMP - Prix Moyen Pondéré
-  
-  // Paramètres de vente (pour ingrédients vendables)
-  allowSale: boolean("allow_sale").default(false), // Autoriser à la vente ?
-  saleCategoryId: integer("sale_category_id").references(() => articleCategories.id), // Catégorie de vente
-  saleUnitId: integer("sale_unit_id").references(() => measurementUnits.id), // Unité de vente
-  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).default("0"), // Prix de vente
-  taxId: integer("tax_id").references(() => taxes.id), // TVA
-  
-  // Champs pour les produits/recettes
+  unit: text("unit"), // Unité de mesure (kg, g, l, ml, etc.)
+  price: decimal("price", { precision: 10, scale: 2 }), // Prix de vente
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }), // PMP - Prix Moyen Pondéré
+  currentStock: decimal("current_stock", { precision: 10, scale: 2 }), // Stock actuel
+  minStock: decimal("min_stock", { precision: 10, scale: 2 }), // Stock minimum
+  maxStock: decimal("max_stock", { precision: 10, scale: 2 }), // Stock maximum
+  storageLocationId: integer("storage_location_id"), // Zone de stockage
   preparationTime: integer("preparation_time"), // minutes
   difficulty: text("difficulty"), // 'easy', 'medium', 'hard'
-  servings: integer("servings").default(1),
-  
-  // Champs communs
-  photo: text("photo"), // Photo
+  servings: integer("servings"),
   active: boolean("active").default(true), // Est actif
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  code: text("code").unique(), // Auto-generated: ING-000001, PRD-000001, SRV-000001
 });
 
 // Price Lists
