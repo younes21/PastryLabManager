@@ -143,13 +143,19 @@ The application uses a comprehensive schema with the following main entities:
 - **Enhanced API Routes**: Added specialized endpoints for client orders, delivery management, product stock, and labels
 - **UI Components Expansion**: Added Tabs, Badge, and Textarea components for improved interface
 - **Sample Users Created**: Test accounts for client (client1/client123) and delivery (livreur1/livreur123) roles
-- **Ingredients CRUD Module Completed (August 2025)**: 
-  - Full ingredients management system with automatic code generation (ING-000001, etc.)
-  - Dynamic unit display throughout the interface (stock quantities, pricing per unit)
-  - Unified articles table architecture with type="ingredient" filtering
-  - Comprehensive form validation with nullable fields for optional data
-  - Three-tab interface (General, Stock, Vente) optimized for POS usage
-  - Real-time unit updates based on selected measurement unit
+- **Clients CRUD Module Completed (August 2025)**:
+  - Complete client management system with automatic code generation (CLI-000001, etc.)
+  - Support for both particulier and société client types with specific fields
+  - Comprehensive contact and address management with Algerian wilayas
+  - Legal information fields (RC, NA, MF, NIS) for business compliance
+  - Pricing configuration with special tariffs and price list linking
+  - User account linking for client portal access
+  - Four-tab interface (General, Contact, Legal, Configuration) optimized for POS
+  - Full CRUD operations with detailed view, edit, and delete functionality
+- **Legacy Modules Completely Removed (August 2025)**:
+  - Ingredients table and all related components removed (using articles with type filtering)
+  - All ingredient-specific routes, storage methods, and UI components cleaned up
+  - System fully migrated to unified articles table architecture
 - **Database Migration Completed (January 2025)**: Successfully migrated from in-memory MemStorage to PostgreSQL database with DatabaseStorage implementation
 - **Visual Components Added**: IngredientImage and RecipeImage components with auto-generated SVG icons
 - **Multi-role Authentication**: Complete role-based access control system

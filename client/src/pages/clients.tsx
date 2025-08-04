@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,8 +41,8 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
       na: client?.na || "",
       mf: client?.mf || "",
       nis: client?.nis || "",
-      active: client?.active !== null ? client.active : true,
-      tarifParticulier: client?.tarifParticulier !== null ? client.tarifParticulier : true,
+      active: client?.active ?? true,
+      tarifParticulier: client?.tarifParticulier ?? true,
       priceListId: client?.priceListId || undefined,
       photo: client?.photo || "",
       userId: client?.userId || undefined,
@@ -436,8 +436,8 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
                 <FormItem>
                   <FormLabel>Offre tarifaire</FormLabel>
                   <Select 
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
-                    value={field.value?.toString() || ""}
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                    value={field.value?.toString() || "none"}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-price-list">
@@ -445,7 +445,7 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Aucune offre spécifique</SelectItem>
+                      <SelectItem value="none">Aucune offre spécifique</SelectItem>
                       {priceLists?.map((priceList) => (
                         <SelectItem key={priceList.id} value={priceList.id.toString()}>
                           {priceList.designation}
@@ -465,8 +465,8 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
                 <FormItem>
                   <FormLabel>Compte utilisateur lié</FormLabel>
                   <Select 
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
-                    value={field.value?.toString() || ""}
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                    value={field.value?.toString() || "none"}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-user">
@@ -474,7 +474,7 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Aucun compte lié</SelectItem>
+                      <SelectItem value="none">Aucun compte lié</SelectItem>
                       {users?.filter(user => user.role === "client").map((user) => (
                         <SelectItem key={user.id} value={user.id.toString()}>
                           {user.username} ({user.firstName} {user.lastName})
@@ -779,6 +779,14 @@ export default function Clients() {
                     : "Nouveau client"
                 }
               </DialogTitle>
+              <DialogDescription>
+                {viewMode === "view" 
+                  ? "Consultation des informations détaillées du client" 
+                  : selectedClient 
+                    ? "Modification des informations du client existant" 
+                    : "Création d'un nouveau client dans le système"
+                }
+              </DialogDescription>
             </DialogHeader>
             {viewMode === "view" && selectedClient ? (
               <ClientDetails client={selectedClient} />
