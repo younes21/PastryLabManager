@@ -677,7 +677,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Products CRUD supprimé - utiliser /api/articles avec type="product"
+  // Articles routes (unified for products, ingredients, services)
+  app.get("/api/articles", async (req, res) => {
+    try {
+      const articles = await storage.getAllArticles();
+      res.json(articles);
+    } catch (error) {
+      console.error("Error fetching articles:", error);
+      res.status(500).json({ message: "Failed to fetch articles" });
+    }
+  });
+
+  app.get("/api/articles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const article = await storage.getArticle(id);
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      res.json(article);
+    } catch (error) {
+      console.error("Error fetching article:", error);
+      res.status(500).json({ message: "Failed to fetch article" });
+    }
+  });
+
+  app.post("/api/articles", async (req, res) => {
+    try {
+      console.log("🔥 CREATE ARTICLE - Request body:", JSON.stringify(req.body, null, 2));
+      const articleData = insertArticleSchema.parse(req.body);
+      
+      // Generate automatic code based on type
+      let code = "";
+      if (articleData.type === "product") {
+        const existingProducts = await storage.getAllArticles();
+        const productCount = existingProducts.filter(a => a.type === "product").length;
+        code = `PRD-${String(productCount + 1).padStart(6, '0')}`;
+      } else if (articleData.type === "ingredient") {
+        const existingIngredients = await storage.getAllArticles();
+        const ingredientCount = existingIngredients.filter(a => a.type === "ingredient").length;
+        code = `ING-${String(ingredientCount + 1).padStart(6, '0')}`;
+      } else if (articleData.type === "service") {
+        const existingServices = await storage.getAllArticles();
+        const serviceCount = existingServices.filter(a => a.type === "service").length;
+        code = `SRV-${String(serviceCount + 1).padStart(6, '0')}`;
+      }
+      
+      const articleWithCode = { ...articleData, code };
+      const article = await storage.createArticle(articleWithCode);
+      console.log("✅ CREATE ARTICLE - Success:", JSON.stringify(article, null, 2));
+      res.status(201).json(article);
+    } catch (error) {
+      console.error("❌ CREATE ARTICLE - Error:", error);
+      res.status(500).json({ message: "Failed to create article" });
+    }
+  });
+
+  app.put("/api/articles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log("🔥 UPDATE ARTICLE - ID:", id, "Data:", JSON.stringify(req.body, null, 2));
+      const articleData = insertArticleSchema.parse(req.body);
+      const article = await storage.updateArticle(id, articleData);
+      
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      console.log("✅ UPDATE ARTICLE - Success:", JSON.stringify(article, null, 2));
+      res.json(article);
+    } catch (error) {
+      console.error("❌ UPDATE ARTICLE - Error:", error);
+      res.status(500).json({ message: "Failed to update article" });
+    }
+  });
+
+  app.delete("/api/articles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log("🔥 DELETE ARTICLE - ID:", id);
+      const deleted = await storage.deleteArticle(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      console.log("✅ DELETE ARTICLE - Success");
+      res.json({ message: "Article deleted successfully" });
+    } catch (error) {
+      console.error("❌ DELETE ARTICLE - Error:", error);
+      res.status(500).json({ message: "Failed to delete article" });
+    }
+  });
 
   // Recipes routes (attached to articles with type="product")
   app.get("/api/recipes", async (req, res) => {
