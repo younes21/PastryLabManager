@@ -971,6 +971,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route spécifique pour les ingrédients (articles de type "ingredient")
+  app.get("/api/articles/ingredients", async (req, res) => {
+    try {
+      const ingredients = await storage.getArticlesByType("ingredient");
+      res.json(ingredients);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ingredients" });
+    }
+  });
+
   app.post("/api/articles", async (req, res) => {
     try {
       const validatedData = insertArticleSchema.parse(req.body);
@@ -978,6 +988,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(article);
     } catch (error) {
       res.status(400).json({ message: "Invalid data" });
+    }
+  });
+
+  app.patch("/api/articles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      const article = await storage.updateArticle(id, updateData);
+      
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+
+      res.json(article);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update article" });
+    }
+  });
+
+  app.delete("/api/articles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteArticle(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+
+      res.json({ message: "Article deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete article" });
     }
   });
 

@@ -1,5 +1,5 @@
 import {
-  users, storageLocations, ingredients, recipes, recipeIngredients,
+  users, storageLocations, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, suppliers,
@@ -36,7 +36,7 @@ export interface IStorage {
   updateStorageLocation(id: number, location: Partial<InsertStorageLocation>): Promise<StorageLocation | undefined>;
   deleteStorageLocation(id: number): Promise<boolean>;
 
-  // Ingredients
+  // Ingredients (articles de type "ingredient")
   getIngredient(id: number): Promise<Ingredient | undefined>;
   getAllIngredients(): Promise<Ingredient[]>;
   getLowStockIngredients(): Promise<Ingredient[]>;
@@ -540,38 +540,41 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Ingredients
+  // Ingredients (articles de type "ingredient")
   async getIngredient(id: number): Promise<Ingredient | undefined> {
-    const [ingredient] = await db.select().from(ingredients).where(eq(ingredients.id, id));
+    const [ingredient] = await db.select().from(articles)
+      .where(and(eq(articles.id, id), eq(articles.type, "ingredient")));
     return ingredient || undefined;
   }
 
   async getAllIngredients(): Promise<Ingredient[]> {
-    return await db.select().from(ingredients);
+    return await db.select().from(articles).where(eq(articles.type, "ingredient"));
   }
 
   async getLowStockIngredients(): Promise<Ingredient[]> {
-    const allIngredients = await db.select().from(ingredients);
+    const allIngredients = await db.select().from(articles).where(eq(articles.type, "ingredient"));
     return allIngredients.filter(ingredient => 
+      ingredient.managedInStock && 
       parseFloat(ingredient.currentStock || "0") <= parseFloat(ingredient.minStock || "0")
     );
   }
 
   async createIngredient(insertIngredient: InsertIngredient): Promise<Ingredient> {
-    const [ingredient] = await db.insert(ingredients).values(insertIngredient).returning();
-    return ingredient;
+    // Utiliser la méthode createArticle avec type "ingredient"
+    return await this.createArticle({ ...insertIngredient, type: "ingredient" });
   }
 
   async updateIngredient(id: number, updateData: Partial<InsertIngredient>): Promise<Ingredient | undefined> {
-    const [ingredient] = await db.update(ingredients)
+    const [ingredient] = await db.update(articles)
       .set(updateData)
-      .where(eq(ingredients.id, id))
+      .where(and(eq(articles.id, id), eq(articles.type, "ingredient")))
       .returning();
     return ingredient || undefined;
   }
 
   async deleteIngredient(id: number): Promise<boolean> {
-    const result = await db.delete(ingredients).where(eq(ingredients.id, id));
+    const result = await db.delete(articles)
+      .where(and(eq(articles.id, id), eq(articles.type, "ingredient")));
     return (result.rowCount || 0) > 0;
   }
 
@@ -1035,7 +1038,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
-    const [article] = await db.insert(articles).values(insertArticle).returning();
+    // Générer un code unique automatiquement selon le type
+    const allArticlesOfType = await db.select().from(articles).where(eq(articles.type, insertArticle.type));
+    
+    let prefix = "ART";
+    switch (insertArticle.type) {
+      case "ingredient":
+        prefix = "ING";
+        break;
+      case "product":
+        prefix = "PRD";
+        break;
+      case "service":
+        prefix = "SRV";
+        break;
+    }
+    
+    const code = `${prefix}-${String(allArticlesOfType.length + 1).padStart(6, '0')}`;
+    
+    const [article] = await db.insert(articles).values({
+      ...insertArticle,
+      code
+    }).returning();
     return article;
   }
 

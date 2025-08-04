@@ -23,13 +23,28 @@ export const storageLocations = pgTable("storage_locations", {
 
 export const ingredients = pgTable("ingredients", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  unit: text("unit").notNull(), // 'g', 'kg', 'ml', 'l', 'piece'
+  code: text("code").notNull().unique(), // ING-000001
+  name: text("name").notNull(), // Désignation
+  description: text("description"), // Description
+  managedInStock: boolean("managed_in_stock").default(true), // Gérer en stock ?
+  storageLocationId: integer("storage_location_id").references(() => storageLocations.id), // Zone de stockage
+  categoryId: integer("category_id").references(() => articleCategories.id), // Catégorie
+  unitId: integer("unit_id").references(() => measurementUnits.id), // Unité de mesure
+  allowSale: boolean("allow_sale").default(false), // Autoriser à la vente ?
+  saleCategoryId: integer("sale_category_id").references(() => articleCategories.id), // Catégorie de vente
+  saleUnitId: integer("sale_unit_id").references(() => measurementUnits.id), // Unité de vente
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).default("0"), // Prix de vente
+  taxId: integer("tax_id").references(() => taxes.id), // TVA
+  photo: text("photo"), // Photo
+  active: boolean("active").default(true), // Est actif
+  
+  // Champs existants pour la gestion de stock
   currentStock: decimal("current_stock", { precision: 10, scale: 2 }).default("0"),
   minStock: decimal("min_stock", { precision: 10, scale: 2 }).default("0"),
   maxStock: decimal("max_stock", { precision: 10, scale: 2 }).default("0"),
-  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).default("0"),
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).default("0"), // PMP - Prix Moyen Pondéré
+  
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
 export const recipes = pgTable("recipes", {
@@ -156,23 +171,38 @@ export const articleCategories = pgTable("article_categories", {
 // Articles unifiés (produits, ingrédients, services)
 export const articles = pgTable("articles", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  code: text("code").notNull().unique(), // Auto-generated: ING-000001, PRD-000001, SRV-000001
+  name: text("name").notNull(), // Désignation
   type: text("type").notNull(), // 'product', 'ingredient', 'service'
-  categoryId: integer("category_id").references(() => articleCategories.id),
-  description: text("description"),
-  unit: text("unit").notNull(), // 'g', 'kg', 'ml', 'l', 'piece', 'hour'
-  price: decimal("price", { precision: 10, scale: 2 }).default("0"),
-  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).default("0"),
-  // Champs pour les ingrédients
+  description: text("description"), // Description
+  
+  // Catégories et unités
+  categoryId: integer("category_id").references(() => articleCategories.id), // Catégorie
+  unitId: integer("unit_id").references(() => measurementUnits.id), // Unité de mesure
+  
+  // Gestion de stock (pour ingrédients)
+  managedInStock: boolean("managed_in_stock").default(true), // Gérer en stock ?
+  storageLocationId: integer("storage_location_id").references(() => storageLocations.id), // Zone de stockage
   currentStock: decimal("current_stock", { precision: 10, scale: 2 }).default("0"),
   minStock: decimal("min_stock", { precision: 10, scale: 2 }).default("0"),
   maxStock: decimal("max_stock", { precision: 10, scale: 2 }).default("0"),
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).default("0"), // PMP - Prix Moyen Pondéré
+  
+  // Paramètres de vente (pour ingrédients vendables)
+  allowSale: boolean("allow_sale").default(false), // Autoriser à la vente ?
+  saleCategoryId: integer("sale_category_id").references(() => articleCategories.id), // Catégorie de vente
+  saleUnitId: integer("sale_unit_id").references(() => measurementUnits.id), // Unité de vente
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).default("0"), // Prix de vente
+  taxId: integer("tax_id").references(() => taxes.id), // TVA
+  
   // Champs pour les produits/recettes
   preparationTime: integer("preparation_time"), // minutes
   difficulty: text("difficulty"), // 'easy', 'medium', 'hard'
   servings: integer("servings").default(1),
-  active: boolean("active").default(true),
+  
+  // Champs communs
+  photo: text("photo"), // Photo
+  active: boolean("active").default(true), // Est actif
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
@@ -206,7 +236,7 @@ export const priceRules = pgTable("price_rules", {
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
-export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true });
+export const insertIngredientSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true });
 export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
 export const insertProductionSchema = createInsertSchema(productions).omit({ id: true });
@@ -218,7 +248,7 @@ export const insertLabelSchema = createInsertSchema(labels).omit({ id: true });
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
-export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, createdAt: true });
+export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true });
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
 export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
 
@@ -227,7 +257,7 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type StorageLocation = typeof storageLocations.$inferSelect;
 export type InsertStorageLocation = z.infer<typeof insertStorageLocationSchema>;
-export type Ingredient = typeof ingredients.$inferSelect;
+export type Ingredient = typeof articles.$inferSelect;
 export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
 export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
