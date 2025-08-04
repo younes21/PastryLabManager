@@ -543,7 +543,7 @@ export default function IngredientsPage() {
         <CardHeader>
           <CardTitle>Liste des Ingrédients</CardTitle>
           <CardDescription>
-            Colonnes: Actif, Code, Catégorie, Désignation, PMP (Prix Moyen Pondéré)
+            Colonnes: Actif, Code, Catégorie, Désignation, PMP (Prix Moyen Pondéré), Stock Min
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -555,6 +555,7 @@ export default function IngredientsPage() {
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Désignation</TableHead>
                 <TableHead>PMP</TableHead>
+                <TableHead>Stock Min</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -575,6 +576,7 @@ export default function IngredientsPage() {
                   </TableCell>
                   <TableCell className="font-medium">{ingredient.name}</TableCell>
                   <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
+                  <TableCell>{Number(ingredient.minStock) || 0}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
