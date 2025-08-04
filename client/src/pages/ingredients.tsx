@@ -40,6 +40,7 @@ type Ingredient = {
   minStock: string;
   maxStock: string;
   costPerUnit: string; // PMP
+  unit?: string; // Unité de mesure
   createdAt: string;
 };
 
@@ -52,6 +53,7 @@ const ingredientFormSchema = insertArticleSchema.extend({
   storageLocationId: z.number().optional(),
   categoryId: z.number().optional(),
   unitId: z.number().optional(),
+  unit: z.string().optional(),
   allowSale: z.boolean().default(false),
   saleCategoryId: z.number().optional(),
   saleUnitId: z.number().optional(),
@@ -93,6 +95,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
 
   const managedInStock = form.watch("managedInStock");
   const allowSale = form.watch("allowSale");
+  const currentUnit = form.watch("unit") || 'unité';
 
   return (
     <Form {...form}>
@@ -164,11 +167,11 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="unitId"
+                name="unit"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unité de mesure</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} value={field.value?.toString()}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-unit">
                           <SelectValue placeholder="Sélectionnez une unité" />
@@ -176,7 +179,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                       </FormControl>
                       <SelectContent>
                         {(measurementUnits as any[]).map((unit: any) => (
-                          <SelectItem key={unit.id} value={unit.id.toString()}>
+                          <SelectItem key={unit.id} value={unit.abbreviation}>
                             {unit.label} ({unit.abbreviation})
                           </SelectItem>
                         ))}
@@ -276,7 +279,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
 
                 <div className="col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
-                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"} {form.watch("unit") || 'kg'}
+                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"} {currentUnit}
                   </p>
                   <p className="text-xs text-yellow-600 mt-1">
                     Le stock actuel sera modifié via les opérations d'inventaire initial ou d'ajustement
@@ -293,7 +296,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                         <FormControl>
                           <div className="flex items-center">
                             <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-min-stock" className="flex-1" />
-                            <span className="ml-2 text-sm text-gray-500">{form.watch("unit") || 'kg'}</span>
+                            <span className="ml-2 text-sm text-gray-500">{currentUnit}</span>
                           </div>
                         </FormControl>
                         <FormDescription>
@@ -313,7 +316,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                         <FormControl>
                           <div className="flex items-center">
                             <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-max-stock" className="flex-1" />
-                            <span className="ml-2 text-sm text-gray-500">{form.watch("unit") || 'kg'}</span>
+                            <span className="ml-2 text-sm text-gray-500">{currentUnit}</span>
                           </div>
                         </FormControl>
                         <FormDescription>
@@ -334,7 +337,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                       <FormControl>
                         <div className="flex items-center">
                           <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-cost-per-unit" className="flex-1" />
-                          <span className="ml-2 text-sm text-gray-500">DA/{form.watch("unit") || 'kg'}</span>
+                          <span className="ml-2 text-sm text-gray-500">DA/{currentUnit}</span>
                         </div>
                       </FormControl>
                       <FormDescription>
@@ -429,7 +432,10 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                       <FormItem>
                         <FormLabel>Prix de vente</FormLabel>
                         <FormControl>
-                          <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-sale-price" />
+                          <div className="flex items-center">
+                            <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-sale-price" className="flex-1" />
+                            <span className="ml-2 text-sm text-gray-500">DA/{currentUnit}</span>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -663,7 +669,16 @@ export default function IngredientsPage() {
 
   // Handlers stables
   const handleCreate = useCallback((data: z.infer<typeof ingredientFormSchema>) => {
-    createMutation.mutate(data);
+    console.log("Creating ingredient with data:", data);
+    const submissionData = {
+      ...data,
+      type: 'ingredient',
+      managedInStock: data.managedInStock ?? true,
+      allowSale: data.allowSale ?? false,
+      active: data.active ?? true,
+      unit: data.unit || 'kg'
+    };
+    createMutation.mutate(submissionData);
   }, [createMutation]);
 
   const handleEdit = useCallback((ingredient: Ingredient) => {
@@ -693,7 +708,16 @@ export default function IngredientsPage() {
 
   const handleUpdate = useCallback((data: z.infer<typeof ingredientFormSchema>) => {
     if (selectedIngredient) {
-      updateMutation.mutate({ id: selectedIngredient.id, data });
+      console.log("Updating ingredient with data:", data);
+      const submissionData = {
+        ...data,
+        type: 'ingredient',
+        managedInStock: data.managedInStock ?? true,
+        allowSale: data.allowSale ?? false,
+        active: data.active ?? true,
+        unit: data.unit || selectedIngredient.unit || 'kg'
+      };
+      updateMutation.mutate({ id: selectedIngredient.id, data: submissionData });
     }
   }, [selectedIngredient, updateMutation]);
 
