@@ -48,6 +48,7 @@ import {
   insertArticleSchema,
   ArticleCategory,
   StorageZone,
+  MeasurementUnit,
   type Recipe 
 } from "@shared/schema";
 import { RecipeDisplay } from "@/components/recipe-display";
@@ -292,6 +293,10 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     queryKey: ["/api/storage-zones"],
   });
 
+  const { data: measurementUnits } = useQuery<MeasurementUnit[]>({
+    queryKey: ["/api/measurement-units"],
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: ProductForm) => {
       console.log("🔥 CREATE PRODUCT - Données envoyées:", data);
@@ -473,9 +478,21 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unité de mesure</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="Ex: pièce, kg, litre" data-testid="input-unit" />
-                    </FormControl>
+                    <Select onValueChange={(value) => field.onChange(value === "none" ? "" : value)} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-unit">
+                          <SelectValue placeholder="Sélectionner une unité" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune unité</SelectItem>
+                        {measurementUnits?.map((unit) => (
+                          <SelectItem key={unit.id} value={unit.label}>
+                            {unit.label} ({unit.abbreviation})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -574,9 +591,21 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unité de vente</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="Ex: pièce, portion" data-testid="input-sale-unit" />
-                    </FormControl>
+                    <Select onValueChange={(value) => field.onChange(value === "none" ? "" : value)} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-sale-unit">
+                          <SelectValue placeholder="Sélectionner une unité" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune unité</SelectItem>
+                        {measurementUnits?.map((unit) => (
+                          <SelectItem key={unit.id} value={unit.label}>
+                            {unit.label} ({unit.abbreviation})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
