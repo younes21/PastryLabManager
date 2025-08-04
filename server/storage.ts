@@ -14,7 +14,7 @@ import {
   type Supplier, type InsertSupplier, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation
 } from "@shared/schema";
-import { db, sqlite } from "./db";
+import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
 
 export interface IStorage {
@@ -176,32 +176,14 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  private sqlite: Database.Database;
 
-  constructor() {
-    // Get the same SQLite instance from db.ts
-    this.sqlite = sqlite;
-  }
-
-  // Méthodes simplifiées utilisant SQLite direct
+  // Méthodes simplifiées utilisant Drizzle avec PostgreSQL
   async getAllStorageLocations(): Promise<StorageLocation[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM storage_locations WHERE active = 1 ORDER BY name');
-      return stmt.all() as StorageLocation[];
-    } catch (error) {
-      console.error('Error fetching storage locations:', error);
-      return [];
-    }
+    return await db.select().from(storageLocations).where(eq(storageLocations.active, true)).orderBy(storageLocations.name);
   }
 
   async getAllMeasurementCategories(): Promise<MeasurementCategory[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM measurement_categories WHERE active = 1 ORDER BY designation');
-      return stmt.all() as MeasurementCategory[];
-    } catch (error) {
-      console.error('Error fetching measurement categories:', error);
-      return [];
-    }
+    return await db.select().from(measurementCategories).where(eq(measurementCategories.active, true)).orderBy(measurementCategories.designation);
   }
 
   async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
@@ -209,13 +191,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllMeasurementUnits(): Promise<MeasurementUnit[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM measurement_units WHERE active = 1 ORDER BY label');
-      return stmt.all() as MeasurementUnit[];
-    } catch (error) {
-      console.error('Error fetching measurement units:', error);
-      return [];
-    }
+    return await db.select().from(measurementUnits).where(eq(measurementUnits.active, true)).orderBy(measurementUnits.label);
   }
 
   async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
@@ -223,23 +199,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM measurement_units WHERE category_id = ? AND active = 1 ORDER BY label');
-      return stmt.all(categoryId) as MeasurementUnit[];
-    } catch (error) {
-      console.error('Error fetching measurement units by category:', error);
-      return [];
-    }
+    return await db.select().from(measurementUnits)
+      .where(and(eq(measurementUnits.categoryId, categoryId), eq(measurementUnits.active, true)))
+      .orderBy(measurementUnits.label);
   }
 
   async getAllArticleCategories(): Promise<ArticleCategory[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM article_categories WHERE active = 1 ORDER BY designation');
-      return stmt.all() as ArticleCategory[];
-    } catch (error) {
-      console.error('Error fetching article categories:', error);
-      return [];
-    }
+    return await db.select().from(articleCategories).where(eq(articleCategories.active, true)).orderBy(articleCategories.designation);
   }
 
   async getActiveArticleCategories(): Promise<ArticleCategory[]> {
@@ -247,83 +213,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllPriceLists(): Promise<PriceList[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM price_lists WHERE active = 1 ORDER BY designation');
-      return stmt.all() as PriceList[];
-    } catch (error) {
-      console.error('Error fetching price lists:', error);
-      return [];
-    }
+    return await db.select().from(priceLists).where(eq(priceLists.active, true)).orderBy(priceLists.designation);
   }
 
   async getAllCurrencies(): Promise<Currency[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM currencies WHERE active = 1 ORDER BY designation');
-      return stmt.all() as Currency[];
-    } catch (error) {
-      console.error('Error fetching currencies:', error);
-      return [];
-    }
+    return await db.select().from(currencies).where(eq(currencies.active, true)).orderBy(currencies.designation);
   }
 
   async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM delivery_methods WHERE active = 1 ORDER BY designation');
-      return stmt.all() as DeliveryMethod[];
-    } catch (error) {
-      console.error('Error fetching delivery methods:', error);
-      return [];
-    }
+    return await db.select().from(deliveryMethods).where(eq(deliveryMethods.active, true)).orderBy(deliveryMethods.designation);
   }
 
   async getAllWorkStations(): Promise<WorkStation[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM work_stations WHERE active = 1 ORDER BY designation');
-      return stmt.all() as WorkStation[];
-    } catch (error) {
-      console.error('Error fetching work stations:', error);
-      return [];
-    }
+    return await db.select().from(workStations).where(eq(workStations.active, true)).orderBy(workStations.designation);
   }
 
   async getAllSuppliers(): Promise<Supplier[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM suppliers WHERE active = 1 ORDER BY name');
-      return stmt.all() as Supplier[];
-    } catch (error) {
-      console.error('Error fetching suppliers:', error);
-      return [];
-    }
+    return await db.select().from(suppliers).where(eq(suppliers.active, true)).orderBy(suppliers.name);
   }
 
   async getAllClients(): Promise<Client[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM clients WHERE active = 1 ORDER BY nom, raison_sociale');
-      return stmt.all() as Client[];
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      return [];
-    }
+    return await db.select().from(clients).where(eq(clients.active, true)).orderBy(clients.nom);
   }
 
   async getAllTaxes(): Promise<Tax[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM taxes WHERE active = 1 ORDER BY designation');
-      return stmt.all() as Tax[];
-    } catch (error) {
-      console.error('Error fetching taxes:', error);
-      return [];
-    }
+    return await db.select().from(taxes).where(eq(taxes.active, true)).orderBy(taxes.designation);
   }
 
   async getAllStorageZones(): Promise<StorageZone[]> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM storage_zones WHERE active = 1 ORDER BY designation');
-      return stmt.all() as StorageZone[];
-    } catch (error) {
-      console.error('Error fetching storage zones:', error);
-      return [];
-    }
+    return await db.select().from(storageZones).where(eq(storageZones.active, true)).orderBy(storageZones.designation);
   }
 
   // Users
@@ -442,14 +360,8 @@ export class DatabaseStorage implements IStorage {
 
   // Measurement Categories
   async getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM measurement_categories WHERE id = ?');
-      const result = stmt.get(id) as MeasurementCategory | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching measurement category:', error);
-      return undefined;
-    }
+    const [category] = await db.select().from(measurementCategories).where(eq(measurementCategories.id, id));
+    return category || undefined;
   }
 
   async createMeasurementCategory(insertCategory: InsertMeasurementCategory): Promise<MeasurementCategory> {
@@ -472,14 +384,8 @@ export class DatabaseStorage implements IStorage {
 
   // Measurement Units
   async getMeasurementUnit(id: number): Promise<MeasurementUnit | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM measurement_units WHERE id = ?');
-      const result = stmt.get(id) as MeasurementUnit | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching measurement unit:', error);
-      return undefined;
-    }
+    const [unit] = await db.select().from(measurementUnits).where(eq(measurementUnits.id, id));
+    return unit || undefined;
   }
 
   async createMeasurementUnit(insertUnit: InsertMeasurementUnit): Promise<MeasurementUnit> {
