@@ -54,7 +54,7 @@ export function Sidebar() {
     { path: "/inventory", label: "Gestion de Stock", icon: "fas fa-boxes", lucideIcon: Package },
     // Ingrédients supprimés - utiliser Articles avec filtrage
     // Modules temporairement supprimés - à réimplémenter
-    // { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
+    { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
     // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
     // { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
     // { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },

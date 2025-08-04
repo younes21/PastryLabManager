@@ -9,7 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
 // import Ingredients supprimé - utiliser Articles avec filtrage
 // Modules supprimés - à réimplémenter
-// import Recipes from "@/pages/recipes";
+import Recipes from "@/pages/recipes";
 // import Production from "@/pages/production";
 // import Orders from "@/pages/orders";
 // import Delivery from "@/pages/delivery";
@@ -146,7 +146,7 @@ function ProtectedRouter() {
       <Route path="/inventory" component={Inventory} />
       {/* Route ingredients supprimée - utiliser Articles avec filtrage */}
       {/* Routes supprimées - à réimplémenter */}
-      {/* <Route path="/recipes" component={Recipes} /> */}
+      <Route path="/recipes" component={Recipes} />
       {/* <Route path="/production" component={Production} /> */}
       {/* <Route path="/orders" component={Orders} /> */}
       {/* <Route path="/delivery" component={Delivery} /> */}
