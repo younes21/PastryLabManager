@@ -276,7 +276,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
 
                 <div className="col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
-                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"}
+                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"} {form.watch("unit") || 'kg'}
                   </p>
                   <p className="text-xs text-yellow-600 mt-1">
                     Le stock actuel sera modifié via les opérations d'inventaire initial ou d'ajustement
@@ -291,7 +291,10 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                       <FormItem>
                         <FormLabel>Stock minimum</FormLabel>
                         <FormControl>
-                          <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-min-stock" />
+                          <div className="flex items-center">
+                            <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-min-stock" className="flex-1" />
+                            <span className="ml-2 text-sm text-gray-500">{form.watch("unit") || 'kg'}</span>
+                          </div>
                         </FormControl>
                         <FormDescription>
                           Seuil d'alerte de stock bas
@@ -308,7 +311,10 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                       <FormItem>
                         <FormLabel>Stock maximum</FormLabel>
                         <FormControl>
-                          <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-max-stock" />
+                          <div className="flex items-center">
+                            <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-max-stock" className="flex-1" />
+                            <span className="ml-2 text-sm text-gray-500">{form.watch("unit") || 'kg'}</span>
+                          </div>
                         </FormControl>
                         <FormDescription>
                           Limite maximale de stock
@@ -326,7 +332,10 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
                     <FormItem>
                       <FormLabel>Prix Moyen Pondéré (PMP)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-cost-per-unit" />
+                        <div className="flex items-center">
+                          <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-cost-per-unit" className="flex-1" />
+                          <span className="ml-2 text-sm text-gray-500">DA/{form.watch("unit") || 'kg'}</span>
+                        </div>
                       </FormControl>
                       <FormDescription>
                         Prix moyen pondéré par unité de mesure
@@ -924,7 +933,7 @@ export default function IngredientsPage() {
                             <div className="flex items-center">
                               <Euro className="h-4 w-4 text-gray-400 mr-1" />
                               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {parseFloat(ingredient.costPerUnit || "0").toFixed(2)} DA
+                                {parseFloat(ingredient.costPerUnit || "0").toFixed(2)} DA/{ingredient.unit || 'kg'}
                               </span>
                             </div>
                           </td>
@@ -933,7 +942,7 @@ export default function IngredientsPage() {
                               <div className={`w-2 h-2 rounded-full ${stockStatus.color} mr-2`}></div>
                               <div>
                                 <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {parseFloat(ingredient.currentStock || "0").toFixed(2)} {getUnitName(ingredient.unitId)}
+                                  {parseFloat(ingredient.currentStock || "0").toFixed(2)} {ingredient.unit || 'kg'}
                                 </div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
                                   {stockStatus.status}
