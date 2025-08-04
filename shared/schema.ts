@@ -364,10 +364,10 @@ export const workStations = pgTable("work_stations", {
 });
 
 // Insert schemas for new tables
-export const insertTaxSchema = createInsertSchema(taxes).omit({ id: true, createdAt: true });
+export const insertTaxSchema = createInsertSchema(taxes).omit({ id: true, code: true, createdAt: true });
 export const insertCurrencySchema = createInsertSchema(currencies).omit({ id: true, createdAt: true });
-export const insertDeliveryMethodSchema = createInsertSchema(deliveryMethods).omit({ id: true, createdAt: true });
-export const insertAccountingJournalSchema = createInsertSchema(accountingJournals).omit({ id: true, createdAt: true });
+export const insertDeliveryMethodSchema = createInsertSchema(deliveryMethods).omit({ id: true, code: true, createdAt: true });
+export const insertAccountingJournalSchema = createInsertSchema(accountingJournals).omit({ id: true, code: true, createdAt: true });
 export const insertAccountingAccountSchema = createInsertSchema(accountingAccounts).omit({ id: true, createdAt: true });
-export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ id: true, createdAt: true });
-export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, createdAt: true });
+export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ id: true, code: true, createdAt: true });
+export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, code: true, createdAt: true });
