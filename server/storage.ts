@@ -176,74 +176,6 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-
-  // Méthodes simplifiées utilisant Drizzle avec PostgreSQL
-  async getAllStorageLocations(): Promise<StorageLocation[]> {
-    return await db.select().from(storageLocations).where(eq(storageLocations.active, true)).orderBy(storageLocations.name);
-  }
-
-  async getAllMeasurementCategories(): Promise<MeasurementCategory[]> {
-    return await db.select().from(measurementCategories).where(eq(measurementCategories.active, true)).orderBy(measurementCategories.designation);
-  }
-
-  async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
-    return this.getAllMeasurementCategories();
-  }
-
-  async getAllMeasurementUnits(): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits).where(eq(measurementUnits.active, true)).orderBy(measurementUnits.label);
-  }
-
-  async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
-    return this.getAllMeasurementUnits();
-  }
-
-  async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits)
-      .where(and(eq(measurementUnits.categoryId, categoryId), eq(measurementUnits.active, true)))
-      .orderBy(measurementUnits.label);
-  }
-
-  async getAllArticleCategories(): Promise<ArticleCategory[]> {
-    return await db.select().from(articleCategories).where(eq(articleCategories.active, true)).orderBy(articleCategories.designation);
-  }
-
-  async getActiveArticleCategories(): Promise<ArticleCategory[]> {
-    return this.getAllArticleCategories();
-  }
-
-  async getAllPriceLists(): Promise<PriceList[]> {
-    return await db.select().from(priceLists).where(eq(priceLists.active, true)).orderBy(priceLists.designation);
-  }
-
-  async getAllCurrencies(): Promise<Currency[]> {
-    return await db.select().from(currencies).where(eq(currencies.active, true)).orderBy(currencies.designation);
-  }
-
-  async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
-    return await db.select().from(deliveryMethods).where(eq(deliveryMethods.active, true)).orderBy(deliveryMethods.designation);
-  }
-
-  async getAllWorkStations(): Promise<WorkStation[]> {
-    return await db.select().from(workStations).where(eq(workStations.active, true)).orderBy(workStations.designation);
-  }
-
-  async getAllSuppliers(): Promise<Supplier[]> {
-    return await db.select().from(suppliers).where(eq(suppliers.active, true)).orderBy(suppliers.name);
-  }
-
-  async getAllClients(): Promise<Client[]> {
-    return await db.select().from(clients).where(eq(clients.active, true)).orderBy(clients.nom);
-  }
-
-  async getAllTaxes(): Promise<Tax[]> {
-    return await db.select().from(taxes).where(eq(taxes.active, true)).orderBy(taxes.designation);
-  }
-
-  async getAllStorageZones(): Promise<StorageZone[]> {
-    return await db.select().from(storageZones).where(eq(storageZones.active, true)).orderBy(storageZones.designation);
-  }
-
   // Users
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -287,7 +219,9 @@ export class DatabaseStorage implements IStorage {
     return location || undefined;
   }
 
-  // Cette méthode est maintenant définie plus haut avec SQLite direct
+  async getAllStorageLocations(): Promise<StorageLocation[]> {
+    return await db.select().from(storageLocations);
+  }
 
   async createStorageLocation(insertLocation: InsertStorageLocation): Promise<StorageLocation> {
     const [location] = await db.insert(storageLocations).values(insertLocation).returning();
@@ -364,6 +298,14 @@ export class DatabaseStorage implements IStorage {
     return category || undefined;
   }
 
+  async getAllMeasurementCategories(): Promise<MeasurementCategory[]> {
+    return await db.select().from(measurementCategories);
+  }
+
+  async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
+    return await db.select().from(measurementCategories).where(eq(measurementCategories.active, true));
+  }
+
   async createMeasurementCategory(insertCategory: InsertMeasurementCategory): Promise<MeasurementCategory> {
     const [category] = await db.insert(measurementCategories).values(insertCategory).returning();
     return category;
@@ -388,6 +330,18 @@ export class DatabaseStorage implements IStorage {
     return unit || undefined;
   }
 
+  async getAllMeasurementUnits(): Promise<MeasurementUnit[]> {
+    return await db.select().from(measurementUnits);
+  }
+
+  async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
+    return await db.select().from(measurementUnits).where(eq(measurementUnits.categoryId, categoryId));
+  }
+
+  async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
+    return await db.select().from(measurementUnits).where(eq(measurementUnits.active, true));
+  }
+
   async createMeasurementUnit(insertUnit: InsertMeasurementUnit): Promise<MeasurementUnit> {
     const [unit] = await db.insert(measurementUnits).values(insertUnit).returning();
     return unit;
@@ -408,14 +362,16 @@ export class DatabaseStorage implements IStorage {
 
   // Article Categories
   async getArticleCategory(id: number): Promise<ArticleCategory | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM article_categories WHERE id = ?');
-      const result = stmt.get(id) as ArticleCategory | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching article category:', error);
-      return undefined;
-    }
+    const [category] = await db.select().from(articleCategories).where(eq(articleCategories.id, id));
+    return category || undefined;
+  }
+
+  async getAllArticleCategories(): Promise<ArticleCategory[]> {
+    return await db.select().from(articleCategories);
+  }
+
+  async getActiveArticleCategories(): Promise<ArticleCategory[]> {
+    return await db.select().from(articleCategories).where(eq(articleCategories.active, true));
   }
 
   async createArticleCategory(insertCategory: InsertArticleCategory): Promise<ArticleCategory> {
@@ -470,18 +426,16 @@ export class DatabaseStorage implements IStorage {
 
   // Price Lists
   async getPriceList(id: number): Promise<PriceList | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM price_lists WHERE id = ?');
-      const result = stmt.get(id) as PriceList | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching price list:', error);
-      return undefined;
-    }
+    const [priceList] = await db.select().from(priceLists).where(eq(priceLists.id, id));
+    return priceList || undefined;
+  }
+
+  async getAllPriceLists(): Promise<PriceList[]> {
+    return await db.select().from(priceLists);
   }
 
   async getActivePriceLists(): Promise<PriceList[]> {
-    return this.getAllPriceLists();
+    return await db.select().from(priceLists).where(eq(priceLists.active, true));
   }
 
   async createPriceList(insertPriceList: InsertPriceList): Promise<PriceList> {
@@ -576,16 +530,14 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Currencies overrides SQLite direct
+  // Currencies
+  async getAllCurrencies(): Promise<Currency[]> {
+    return await db.select().from(currencies);
+  }
+
   async getCurrency(id: number): Promise<Currency | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM currencies WHERE id = ?');
-      const result = stmt.get(id) as Currency | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching currency:', error);
-      return undefined;
-    }
+    const [currency] = await db.select().from(currencies).where(eq(currencies.id, id));
+    return currency || undefined;
   }
 
   async getBaseCurrency(): Promise<Currency | undefined> {
@@ -623,16 +575,14 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Delivery Methods overrides SQLite direct
+  // Delivery Methods
+  async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
+    return await db.select().from(deliveryMethods);
+  }
+
   async getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM delivery_methods WHERE id = ?');
-      const result = stmt.get(id) as DeliveryMethod | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching delivery method:', error);
-      return undefined;
-    }
+    const [deliveryMethod] = await db.select().from(deliveryMethods).where(eq(deliveryMethods.id, id));
+    return deliveryMethod || undefined;
   }
 
   async createDeliveryMethod(insertDeliveryMethod: InsertDeliveryMethod): Promise<DeliveryMethod> {
@@ -771,16 +721,14 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Work Stations overrides SQLite direct
+  // Work Stations
+  async getAllWorkStations(): Promise<WorkStation[]> {
+    return await db.select().from(workStations);
+  }
+
   async getWorkStation(id: number): Promise<WorkStation | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM work_stations WHERE id = ?');
-      const result = stmt.get(id) as WorkStation | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching work station:', error);
-      return undefined;
-    }
+    const [workStation] = await db.select().from(workStations).where(eq(workStations.id, id));
+    return workStation || undefined;
   }
 
   async createWorkStation(insertWorkStation: InsertWorkStation): Promise<WorkStation> {
@@ -913,16 +861,14 @@ export class DatabaseStorage implements IStorage {
     return success;
   }
 
-  // Suppliers overrides SQLite direct
+  // Suppliers
+  async getAllSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliers);
+  }
+
   async getSupplier(id: number): Promise<Supplier | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM suppliers WHERE id = ?');
-      const result = stmt.get(id) as Supplier | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching supplier:', error);
-      return undefined;
-    }
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier || undefined;
   }
 
   async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
@@ -953,16 +899,14 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Clients overrides SQLite direct
+  // Clients
+  async getAllClients(): Promise<Client[]> {
+    return await db.select().from(clients);
+  }
+
   async getClient(id: number): Promise<Client | undefined> {
-    try {
-      const stmt = this.sqlite.prepare('SELECT * FROM clients WHERE id = ?');
-      const result = stmt.get(id) as Client | undefined;
-      return result;
-    } catch (error) {
-      console.error('Error fetching client:', error);
-      return undefined;
-    }
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client || undefined;
   }
 
   async createClient(insertClient: InsertClient): Promise<Client> {
