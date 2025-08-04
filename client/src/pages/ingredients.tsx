@@ -50,15 +50,15 @@ const ingredientFormSchema = z.object({
   type: z.literal("ingredient").default("ingredient"),
   description: z.string().optional(),
   managedInStock: z.boolean().default(true),
-  storageLocationId: z.number().optional(),
-  categoryId: z.number().optional(),
-  unitId: z.number().optional(),
+  storageLocationId: z.number().optional().nullable(),
+  categoryId: z.number().optional().nullable(),
+  unitId: z.number().optional().nullable(),
   unit: z.string().optional(),
   allowSale: z.boolean().default(false),
-  saleCategoryId: z.number().optional(),
-  saleUnitId: z.number().optional(),
+  saleCategoryId: z.number().optional().nullable(),
+  saleUnitId: z.number().optional().nullable(),
   salePrice: z.string().optional(),
-  taxId: z.number().optional(),
+  taxId: z.number().optional().nullable(),
   photo: z.string().optional(),
   active: z.boolean().default(true),
   currentStock: z.string().optional(),
@@ -109,11 +109,10 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="stock">Stock</TabsTrigger>
             <TabsTrigger value="sale">Vente</TabsTrigger>
-            <TabsTrigger value="other">Autres</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -479,11 +478,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
             )}
           </TabsContent>
 
-          <TabsContent value="other" className="space-y-4">
-            <div className="text-center text-gray-500 py-8">
-              <p>Aucun champ supplémentaire pour le moment</p>
-            </div>
-          </TabsContent>
+
         </Tabs>
 
         <div className="flex justify-end gap-3">
