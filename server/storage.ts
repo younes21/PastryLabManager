@@ -442,16 +442,14 @@ export class DatabaseStorage implements IStorage {
 
   // Measurement Categories
   async getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined> {
-    const [category] = await db.select().from(measurementCategories).where(eq(measurementCategories.id, id));
-    return category || undefined;
-  }
-
-  async getAllMeasurementCategories(): Promise<MeasurementCategory[]> {
-    return await db.select().from(measurementCategories);
-  }
-
-  async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
-    return await db.select().from(measurementCategories).where(eq(measurementCategories.active, true));
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM measurement_categories WHERE id = ?');
+      const result = stmt.get(id) as MeasurementCategory | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching measurement category:', error);
+      return undefined;
+    }
   }
 
   async createMeasurementCategory(insertCategory: InsertMeasurementCategory): Promise<MeasurementCategory> {
@@ -474,20 +472,14 @@ export class DatabaseStorage implements IStorage {
 
   // Measurement Units
   async getMeasurementUnit(id: number): Promise<MeasurementUnit | undefined> {
-    const [unit] = await db.select().from(measurementUnits).where(eq(measurementUnits.id, id));
-    return unit || undefined;
-  }
-
-  async getAllMeasurementUnits(): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits);
-  }
-
-  async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits).where(eq(measurementUnits.categoryId, categoryId));
-  }
-
-  async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits).where(eq(measurementUnits.active, true));
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM measurement_units WHERE id = ?');
+      const result = stmt.get(id) as MeasurementUnit | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching measurement unit:', error);
+      return undefined;
+    }
   }
 
   async createMeasurementUnit(insertUnit: InsertMeasurementUnit): Promise<MeasurementUnit> {
@@ -510,16 +502,14 @@ export class DatabaseStorage implements IStorage {
 
   // Article Categories
   async getArticleCategory(id: number): Promise<ArticleCategory | undefined> {
-    const [category] = await db.select().from(articleCategories).where(eq(articleCategories.id, id));
-    return category || undefined;
-  }
-
-  async getAllArticleCategories(): Promise<ArticleCategory[]> {
-    return await db.select().from(articleCategories);
-  }
-
-  async getActiveArticleCategories(): Promise<ArticleCategory[]> {
-    return await db.select().from(articleCategories).where(eq(articleCategories.active, true));
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM article_categories WHERE id = ?');
+      const result = stmt.get(id) as ArticleCategory | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching article category:', error);
+      return undefined;
+    }
   }
 
   async createArticleCategory(insertCategory: InsertArticleCategory): Promise<ArticleCategory> {
@@ -574,16 +564,18 @@ export class DatabaseStorage implements IStorage {
 
   // Price Lists
   async getPriceList(id: number): Promise<PriceList | undefined> {
-    const [priceList] = await db.select().from(priceLists).where(eq(priceLists.id, id));
-    return priceList || undefined;
-  }
-
-  async getAllPriceLists(): Promise<PriceList[]> {
-    return await db.select().from(priceLists);
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM price_lists WHERE id = ?');
+      const result = stmt.get(id) as PriceList | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching price list:', error);
+      return undefined;
+    }
   }
 
   async getActivePriceLists(): Promise<PriceList[]> {
-    return await db.select().from(priceLists).where(eq(priceLists.active, true));
+    return this.getAllPriceLists();
   }
 
   async createPriceList(insertPriceList: InsertPriceList): Promise<PriceList> {
@@ -678,14 +670,16 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Currencies
-  async getAllCurrencies(): Promise<Currency[]> {
-    return await db.select().from(currencies);
-  }
-
+  // Currencies overrides SQLite direct
   async getCurrency(id: number): Promise<Currency | undefined> {
-    const [currency] = await db.select().from(currencies).where(eq(currencies.id, id));
-    return currency || undefined;
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM currencies WHERE id = ?');
+      const result = stmt.get(id) as Currency | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching currency:', error);
+      return undefined;
+    }
   }
 
   async getBaseCurrency(): Promise<Currency | undefined> {
@@ -723,14 +717,16 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Delivery Methods
-  async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
-    return await db.select().from(deliveryMethods);
-  }
-
+  // Delivery Methods overrides SQLite direct
   async getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined> {
-    const [deliveryMethod] = await db.select().from(deliveryMethods).where(eq(deliveryMethods.id, id));
-    return deliveryMethod || undefined;
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM delivery_methods WHERE id = ?');
+      const result = stmt.get(id) as DeliveryMethod | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching delivery method:', error);
+      return undefined;
+    }
   }
 
   async createDeliveryMethod(insertDeliveryMethod: InsertDeliveryMethod): Promise<DeliveryMethod> {
@@ -869,14 +865,16 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Work Stations
-  async getAllWorkStations(): Promise<WorkStation[]> {
-    return await db.select().from(workStations);
-  }
-
+  // Work Stations overrides SQLite direct
   async getWorkStation(id: number): Promise<WorkStation | undefined> {
-    const [workStation] = await db.select().from(workStations).where(eq(workStations.id, id));
-    return workStation || undefined;
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM work_stations WHERE id = ?');
+      const result = stmt.get(id) as WorkStation | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching work station:', error);
+      return undefined;
+    }
   }
 
   async createWorkStation(insertWorkStation: InsertWorkStation): Promise<WorkStation> {
@@ -1009,14 +1007,16 @@ export class DatabaseStorage implements IStorage {
     return success;
   }
 
-  // Suppliers
-  async getAllSuppliers(): Promise<Supplier[]> {
-    return await db.select().from(suppliers);
-  }
-
+  // Suppliers overrides SQLite direct
   async getSupplier(id: number): Promise<Supplier | undefined> {
-    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
-    return supplier || undefined;
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM suppliers WHERE id = ?');
+      const result = stmt.get(id) as Supplier | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching supplier:', error);
+      return undefined;
+    }
   }
 
   async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
@@ -1047,14 +1047,16 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Clients
-  async getAllClients(): Promise<Client[]> {
-    return await db.select().from(clients);
-  }
-
+  // Clients overrides SQLite direct
   async getClient(id: number): Promise<Client | undefined> {
-    const [client] = await db.select().from(clients).where(eq(clients.id, id));
-    return client || undefined;
+    try {
+      const stmt = this.sqlite.prepare('SELECT * FROM clients WHERE id = ?');
+      const result = stmt.get(id) as Client | undefined;
+      return result;
+    } catch (error) {
+      console.error('Error fetching client:', error);
+      return undefined;
+    }
   }
 
   async createClient(insertClient: InsertClient): Promise<Client> {
