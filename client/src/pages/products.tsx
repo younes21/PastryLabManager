@@ -52,11 +52,9 @@ import {
 } from "@shared/schema";
 import { RecipeDisplay } from "@/components/recipe-display";
 
-// Schéma de validation pour les produits avec tous les champs
+// Schéma de validation pour les produits
 const productSchema = insertArticleSchema.extend({
   type: z.literal("product"),
-  costPerUnit: z.string().optional(),
-  currentStock: z.string().optional(),
   minStock: z.string().optional(),
   maxStock: z.string().optional(),
 });
@@ -279,13 +277,8 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       saleUnit: product?.saleUnit || "pièce",
       salePrice: product?.salePrice ? product.salePrice.toString() : "",
       taxId: product?.taxId || undefined,
-      costPerUnit: product?.costPerUnit ? product.costPerUnit.toString() : "",
-      currentStock: product?.currentStock ? product.currentStock.toString() : "",
       minStock: product?.minStock ? product.minStock.toString() : "",
       maxStock: product?.maxStock ? product.maxStock.toString() : "",
-      preparationTime: product?.preparationTime || undefined,
-      difficulty: product?.difficulty || "easy",
-      servings: product?.servings || undefined,
       active: Boolean(product?.active ?? true),
       photo: product?.photo || "",
     },
@@ -409,72 +402,19 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
               )}
             />
 
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="preparationTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Temps de préparation (min)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
-                        value={field.value || ""} 
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                        placeholder="30" 
-                        data-testid="input-preparation-time" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="difficulty"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Difficulté</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "easy"}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-difficulty">
-                          <SelectValue placeholder="Sélectionner" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="easy">Facile</SelectItem>
-                        <SelectItem value="medium">Moyenne</SelectItem>
-                        <SelectItem value="hard">Difficile</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="servings"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre de portions</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
-                        value={field.value || ""} 
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                        placeholder="8" 
-                        data-testid="input-servings" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="photo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Photo</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="URL de la photo" data-testid="input-photo" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">
@@ -532,7 +472,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 name="unit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Unité de gestion</FormLabel>
+                    <FormLabel>Unité de mesure</FormLabel>
                     <FormControl>
                       <Input {...field} value={field.value || ""} placeholder="Ex: pièce, kg, litre" data-testid="input-unit" />
                     </FormControl>
@@ -571,21 +511,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="currentStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock actuel</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-current-stock" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="minStock"
@@ -614,20 +540,6 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="costPerUnit"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Prix Moyen Pondéré (PMP)</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-cost-per-unit" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </TabsContent>
 
           <TabsContent value="vente" className="space-y-4">
@@ -741,20 +653,6 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="photo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Photo</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ""} placeholder="URL de la photo" data-testid="input-photo" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </TabsContent>
 
           <TabsContent value="recipe" className="space-y-4">
