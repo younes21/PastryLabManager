@@ -32,6 +32,7 @@ import EmailConfig from "@/pages/email-config";
 import Suppliers from "@/pages/suppliers";
 import Clients from "@/pages/clients-new";
 import Products from "@/pages/products";
+import IngredientsNew from "@/pages/ingredients-new";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -164,7 +165,7 @@ function ProtectedRouter() {
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/clients" component={Clients} />
       <Route path="/products" component={Products} />
-      <Route path="/ingredients" component={lazy(() => import("./pages/ingredients-new"))} />
+      <Route path="/ingredients" component={IngredientsNew} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>
