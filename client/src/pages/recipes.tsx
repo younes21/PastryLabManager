@@ -155,7 +155,7 @@ export default function RecipesPage() {
     .filter((recipe) => {
       const matchesSearch = recipe.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            recipe.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesUnit = !filterUnit || recipe.unit === filterUnit;
+      const matchesUnit = !filterUnit || filterUnit === "all" || recipe.unit === filterUnit;
       return matchesSearch && matchesUnit;
     })
     .sort((a, b) => {
@@ -267,7 +267,7 @@ export default function RecipesPage() {
                 <SelectValue placeholder="Filtrer par unité" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Toutes les unités</SelectItem>
+                <SelectItem value="all">Toutes les unités</SelectItem>
                 {availableUnits.map((unit) => (
                   <SelectItem key={unit} value={unit}>
                     {unit}
