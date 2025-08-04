@@ -1201,11 +1201,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/taxes", async (req, res) => {
     try {
+      console.log("Tax data received:", req.body);
       const taxData = insertTaxSchema.parse(req.body);
+      console.log("Tax data parsed:", taxData);
       const tax = await storage.createTax(taxData);
       res.status(201).json(tax);
     } catch (error) {
-      res.status(400).json({ message: "Invalid tax data" });
+      console.error("Tax creation error:", error);
+      res.status(400).json({ message: "Invalid tax data", error: error.message });
     }
   });
 

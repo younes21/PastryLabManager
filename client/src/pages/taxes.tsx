@@ -15,9 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import type { Tax, InsertTax } from "@shared/schema";
 
 const taxFormSchema = z.object({
-  code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
-  rate: z.number().min(0, "Le taux doit être positif").max(100, "Le taux ne peut pas dépasser 100%"),
+  rate: z.string().min(1, "Le taux est requis"),
+  description: z.string().optional(),
   active: z.boolean().default(true),
 });
 
@@ -78,10 +78,15 @@ export default function TaxesPage() {
   });
 
   const onSubmit = (values: z.infer<typeof taxFormSchema>) => {
+    const taxData = {
+      ...values,
+      rate: parseFloat(values.rate).toString(), // Convert to decimal string
+    };
+    
     if (editingTax) {
-      updateTaxMutation.mutate({ id: editingTax.id, data: values });
+      updateTaxMutation.mutate({ id: editingTax.id, data: taxData });
     } else {
-      createTaxMutation.mutate(values);
+      createTaxMutation.mutate(taxData);
     }
   };
 
@@ -89,7 +94,8 @@ export default function TaxesPage() {
     setEditingTax(tax);
     form.reset({
       designation: tax.designation,
-      rate: parseFloat(tax.rate || '0'),
+      rate: tax.rate.toString(),
+      description: tax.description || "",
       active: tax.active || true,
     });
     setDialogOpen(true);
@@ -105,7 +111,8 @@ export default function TaxesPage() {
     setEditingTax(null);
     form.reset({
       designation: "",
-      rate: 0,
+      rate: "0",
+      description: "",
       active: true,
     });
     setDialogOpen(true);
@@ -186,8 +193,26 @@ export default function TaxesPage() {
                           max="100"
                           placeholder="19.5"
                           className="h-12 text-lg"
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           data-testid="input-tax-rate"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (optionnel)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Description de la taxe..."
+                          className="h-12 text-lg"
+                          data-testid="input-tax-description"
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -270,8 +295,11 @@ export default function TaxesPage() {
                     )}
                   </div>
                   <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mt-1">
-                    {tax.rate.toFixed(2)}%
+                    {parseFloat(tax.rate).toFixed(2)}%
                   </p>
+                  {tax.description && (
+                    <p className="text-sm text-gray-500 mt-1">{tax.description}</p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button
