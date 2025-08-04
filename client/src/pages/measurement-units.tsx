@@ -338,58 +338,60 @@ export default function MeasurementUnitsPage() {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="space-y-4">
             {filteredCategories.map((category) => (
               <Card 
                 key={category.id} 
                 className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
                 data-testid={`card-category-${category.id}`}
               >
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg font-semibold text-gray-800">
-                      {category.name}
-                    </CardTitle>
-                    <div className="flex space-x-1">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                        {category.name}
+                      </h3>
+                      {category.description && (
+                        <p className="text-sm text-gray-600 mb-2">
+                          {category.description}
+                        </p>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <Badge 
+                          variant={category.active ? "default" : "secondary"}
+                          className="px-2 py-0.5 text-xs font-medium"
+                        >
+                          {category.active ? "Active" : "Inactive"}
+                        </Badge>
+                        <span className="text-sm font-bold text-blue-600">
+                          {units.filter(u => u.categoryId === category.id).length} unités
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-8 w-8"
+                        className="h-10 px-4"
                         onClick={() => handleEditCategory(category)}
                         data-testid={`button-edit-category-${category.id}`}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-4 w-4 mr-1" />
+                        Modifier
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-8 w-8"
+                        className="h-10 px-4 text-red-600 border-red-200 hover:bg-red-50"
                         onClick={() => deleteCategoryMutation.mutate(category.id)}
                         data-testid={`button-delete-category-${category.id}`}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Supprimer
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <Badge 
-                      variant={category.active ? "default" : "secondary"}
-                      className="px-2 py-0.5 text-xs font-medium"
-                    >
-                      {category.active ? "Active" : "Inactive"}
-                    </Badge>
-                    <span className="text-sm font-bold text-blue-600">
-                      {units.filter(u => u.categoryId === category.id).length} unités
-                    </span>
-                  </div>
-                </CardHeader>
-                {category.description && (
-                  <CardContent className="pt-0">
-                    <CardDescription className="text-sm text-gray-600">
-                      {category.description}
-                    </CardDescription>
-                  </CardContent>
-                )}
+                </CardContent>
               </Card>
             ))}
           </div>
@@ -536,7 +538,7 @@ export default function MeasurementUnitsPage() {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="space-y-4">
             {filteredUnits.map((unit) => {
               const category = categories.find(c => c.id === unit.categoryId);
               return (
@@ -545,13 +547,13 @@ export default function MeasurementUnitsPage() {
                   className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
                   data-testid={`card-unit-${unit.id}`}
                 >
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <CardTitle className="text-lg font-semibold text-gray-800">
-                          {unit.label}
-                        </CardTitle>
-                        <div className="flex items-center space-x-2 mt-1">
+                        <div className="flex items-center space-x-3 mb-1">
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            {unit.label}
+                          </h3>
                           <span className="text-sm font-bold text-blue-600">
                             ({unit.abbreviation})
                           </span>
@@ -559,50 +561,50 @@ export default function MeasurementUnitsPage() {
                             {category?.name}
                           </span>
                         </div>
+                        <div className="flex items-center space-x-3 mb-2">
+                          <div className="bg-gray-50 px-3 py-1 rounded-lg">
+                            <span className="text-sm font-medium text-gray-700">
+                              Facteur: <span className="font-bold text-green-600">
+                                {parseFloat(unit.factor).toFixed(6)}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge 
+                            className={`${getTypeColor(unit.type)} px-2 py-0.5 text-xs font-medium`}
+                          >
+                            {getTypeName(unit.type)}
+                          </Badge>
+                          <Badge 
+                            variant={unit.active ? "default" : "secondary"}
+                            className="px-2 py-0.5 text-xs font-medium"
+                          >
+                            {unit.active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="flex space-x-1">
+                      <div className="flex items-center space-x-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-8 w-8"
+                          className="h-10 px-4"
                           onClick={() => handleEditUnit(unit)}
                           data-testid={`button-edit-unit-${unit.id}`}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-4 w-4 mr-1" />
+                          Modifier
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-8 w-8"
+                          className="h-10 px-4 text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => deleteUnitMutation.mutate(unit.id)}
                           data-testid={`button-delete-unit-${unit.id}`}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Supprimer
                         </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Badge 
-                          className={`${getTypeColor(unit.type)} px-2 py-0.5 text-xs font-medium`}
-                        >
-                          {getTypeName(unit.type)}
-                        </Badge>
-                        <Badge 
-                          variant={unit.active ? "default" : "secondary"}
-                          className="px-2 py-0.5 text-xs font-medium"
-                        >
-                          {unit.active ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                      <div className="bg-gray-50 p-2 rounded-lg">
-                        <p className="text-sm font-medium text-gray-700">
-                          Facteur: <span className="font-bold text-green-600">
-                            {parseFloat(unit.factor).toFixed(6)}
-                          </span>
-                        </p>
                       </div>
                     </div>
                   </CardContent>
