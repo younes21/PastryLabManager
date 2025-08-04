@@ -371,19 +371,11 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
   const onSubmit = (formData: ProductForm) => {
     console.log("🔥 PRODUCT FORM - Soumission des données:", formData);
     
-    const data = {
-      ...formData,
-      minStock: formData.minStock ? parseFloat(formData.minStock) : undefined,
-      maxStock: formData.maxStock ? parseFloat(formData.maxStock) : undefined,
-      salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined,
-      shelfLife: formData.shelfLife ? parseInt(formData.shelfLife) : undefined,
-      storageTemperature: formData.storageTemperature ? parseFloat(formData.storageTemperature) : undefined,
-    };
-    
+    // Plus de transformation nécessaire - le schéma côté serveur gère la conversion
     if (isEditing) {
-      updateMutation.mutate(data);
+      updateMutation.mutate(formData);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(formData);
     }
   };
 

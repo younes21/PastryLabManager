@@ -216,7 +216,13 @@ export const insertStorageLocationSchema = createInsertSchema(storageLocations).
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
-export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true });
+export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true }).extend({
+  minStock: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
+  maxStock: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
+  salePrice: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
+  shelfLife: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseInt(String(val)) : undefined),
+  storageTemperature: z.union([z.string(), z.number()]).optional().transform((val) => val ? parseFloat(String(val)) : undefined),
+});
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
 export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
