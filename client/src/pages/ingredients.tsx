@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertArticleSchema } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { formatPrice } from "@shared/currency-utils";
 
 // Types pour les ingrédients (articles de type "ingredient")
 type Ingredient = {
@@ -989,7 +990,7 @@ export default function IngredientsPage() {
                             <div className="flex items-center">
                               <Euro className="h-4 w-4 text-gray-400 mr-1" />
                               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {parseFloat(ingredient.costPerUnit || "0").toFixed(2)} DA/{ingredient.unit || 'kg'}
+                                {formatPrice(ingredient.costPerUnit)}/{ingredient.unit || 'kg'}
                               </span>
                             </div>
                           </td>

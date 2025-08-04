@@ -180,6 +180,7 @@ export interface IStorage {
   getAllCurrencies(): Promise<Currency[]>;
   getCurrency(id: number): Promise<Currency | undefined>;
   getBaseCurrency(): Promise<Currency | undefined>;
+  setBaseCurrency(id: number): Promise<Currency | undefined>;
   createCurrency(currency: InsertCurrency): Promise<Currency>;
   updateCurrency(id: number, currency: Partial<InsertCurrency>): Promise<Currency | undefined>;
   deleteCurrency(id: number): Promise<boolean>;
@@ -1236,6 +1237,18 @@ export class DatabaseStorage implements IStorage {
 
   async getBaseCurrency(): Promise<Currency | undefined> {
     const [currency] = await db.select().from(currencies).where(eq(currencies.isBase, true));
+    return currency || undefined;
+  }
+
+  async setBaseCurrency(id: number): Promise<Currency | undefined> {
+    // Retirer le statut de base de toutes les devises
+    await db.update(currencies).set({ isBase: false });
+    
+    // Définir la nouvelle devise de base
+    const [currency] = await db.update(currencies)
+      .set({ isBase: true })
+      .where(eq(currencies.id, id))
+      .returning();
     return currency || undefined;
   }
 

@@ -1516,6 +1516,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/currencies/base", async (req, res) => {
+    try {
+      const baseCurrency = await storage.getBaseCurrency();
+      if (!baseCurrency) {
+        return res.status(404).json({ message: "No base currency found" });
+      }
+      res.json(baseCurrency);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch base currency" });
+    }
+  });
+
+  app.put("/api/currencies/:id/set-base", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const currency = await storage.setBaseCurrency(id);
+      if (!currency) {
+        return res.status(404).json({ message: "Currency not found" });
+      }
+      res.json(currency);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to set base currency" });
+    }
+  });
+
   app.post("/api/currencies", async (req, res) => {
     try {
       const currencyData = insertCurrencySchema.parse(req.body);
