@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Calculator } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,12 +17,25 @@ import { useToast } from "@/hooks/use-toast";
 import type { AccountingAccount, InsertAccountingAccount } from "@shared/schema";
 
 const accountFormSchema = z.object({
-  code: z.string().min(1, "Le code est requis"),
+  code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
-  type: z.enum(["actif", "passif", "charge", "produit"]),
+  type: z.string().min(1, "Le type est requis"),
+  nature: z.string().min(1, "La nature est requise"),
   active: z.boolean().default(true),
 });
+
+const accountTypes = [
+  { value: "actif", label: "Actif" },
+  { value: "passif", label: "Passif" },
+  { value: "charge", label: "Charge" },
+  { value: "produit", label: "Produit" },
+];
+
+const accountNatures = [
+  { value: "debit", label: "Débit" },
+  { value: "credit", label: "Crédit" },
+];
 
 export default function AccountingAccountsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -33,11 +47,23 @@ export default function AccountingAccountsPage() {
     queryKey: ["/api/accounting-accounts"],
   });
 
+  const form = useForm<z.infer<typeof accountFormSchema>>({
+    resolver: zodResolver(accountFormSchema),
+    defaultValues: {
+      designation: "",
+      description: "",
+      type: "",
+      nature: "",
+      active: true,
+    },
+  });
+
   const createAccountMutation = useMutation({
     mutationFn: (data: InsertAccountingAccount) => apiRequest("/api/accounting-accounts", "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting-accounts"] });
       setDialogOpen(false);
+      form.reset();
       toast({
         title: "Succès",
         description: "Compte comptable créé avec succès",
@@ -52,6 +78,7 @@ export default function AccountingAccountsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting-accounts"] });
       setDialogOpen(false);
       setEditingAccount(null);
+      form.reset();
       toast({
         title: "Succès",
         description: "Compte comptable modifié avec succès",
@@ -70,124 +97,70 @@ export default function AccountingAccountsPage() {
     },
   });
 
-  const form = useForm<z.infer<typeof accountFormSchema>>({
-    resolver: zodResolver(accountFormSchema),
-    defaultValues: {
-      code: "",
-      designation: "",
-      description: "",
-      type: "actif",
-      active: true,
-    },
-  });
-
-  const onSubmit = (values: z.infer<typeof accountFormSchema>) => {
+  const onSubmit = (data: z.infer<typeof accountFormSchema>) => {
     if (editingAccount) {
-      updateAccountMutation.mutate({ id: editingAccount.id, data: values });
+      updateAccountMutation.mutate({ id: editingAccount.id, data });
     } else {
-      createAccountMutation.mutate(values);
+      createAccountMutation.mutate(data);
     }
   };
 
-  const handleEdit = (account: AccountingAccount) => {
+  const openEditDialog = (account: AccountingAccount) => {
     setEditingAccount(account);
     form.reset({
-      code: account.code,
       designation: account.designation,
       description: account.description || "",
-      type: account.type as "actif" | "passif" | "charge" | "produit",
-      active: account.active,
+      type: account.type,
+      nature: account.nature,
+      active: account.active !== false,
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce compte comptable ?")) {
-      deleteAccountMutation.mutate(id);
-    }
-  };
-
-  const handleNewAccount = () => {
+  const openCreateDialog = () => {
     setEditingAccount(null);
     form.reset({
-      code: "",
       designation: "",
       description: "",
-      type: "actif",
+      type: "",
+      nature: "",
       active: true,
     });
     setDialogOpen(true);
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "actif": return "bg-green-100 text-green-800";
-      case "passif": return "bg-blue-100 text-blue-800";
-      case "charge": return "bg-red-100 text-red-800";
-      case "produit": return "bg-purple-100 text-purple-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
   };
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <Layout title="Gestion des Comptes Comptables">
+        <div className="p-6">
+          <div className="text-center">Chargement...</div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Comptes Comptables
-        </h1>
+    <Layout title="Gestion des Comptes Comptables">
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Comptes Comptables
+          </h1>
+          <Button onClick={openCreateDialog} data-testid="button-create-account">
+            <Plus className="mr-2 h-4 w-4" />
+            Nouveau Compte
+          </Button>
+        </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={handleNewAccount}
-              className="h-12 px-6 text-lg"
-              data-testid="button-add-account"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Nouveau Compte
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingAccount ? "Modifier le Compte" : "Nouveau Compte"}
+                {editingAccount ? "Modifier le compte" : "Nouveau compte comptable"}
               </DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="411000"
-                          className="h-12 text-lg"
-                          data-testid="input-account-code"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="designation"
@@ -195,12 +168,21 @@ export default function AccountingAccountsPage() {
                     <FormItem>
                       <FormLabel>Désignation</FormLabel>
                       <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="Clients"
-                          className="h-12 text-lg"
-                          data-testid="input-account-designation"
-                        />
+                        <Input {...field} data-testid="input-designation" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-description" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -213,17 +195,18 @@ export default function AccountingAccountsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger className="h-12 text-lg" data-testid="select-account-type">
+                          <SelectTrigger data-testid="select-type">
                             <SelectValue placeholder="Sélectionner un type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="actif">Actif</SelectItem>
-                          <SelectItem value="passif">Passif</SelectItem>
-                          <SelectItem value="charge">Charge</SelectItem>
-                          <SelectItem value="produit">Produit</SelectItem>
+                          {accountTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -233,18 +216,24 @@ export default function AccountingAccountsPage() {
 
                 <FormField
                   control={form.control}
-                  name="description"
+                  name="nature"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          {...field} 
-                          placeholder="Description du compte comptable"
-                          className="resize-none"
-                          data-testid="input-account-description"
-                        />
-                      </FormControl>
+                      <FormLabel>Nature</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-nature">
+                            <SelectValue placeholder="Sélectionner une nature" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {accountNatures.map((nature) => (
+                            <SelectItem key={nature.value} value={nature.value}>
+                              {nature.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -256,36 +245,27 @@ export default function AccountingAccountsPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Actif
-                        </FormLabel>
+                        <FormLabel className="text-base">Actif</FormLabel>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          data-testid="switch-account-active"
+                          data-testid="switch-active"
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    className="flex-1 h-12 text-lg"
-                    data-testid="button-cancel-account-form"
-                  >
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 h-12 text-lg"
+                  <Button 
+                    type="submit" 
                     disabled={createAccountMutation.isPending || updateAccountMutation.isPending}
-                    data-testid="button-submit-account-form"
+                    data-testid="button-submit"
                   >
                     {editingAccount ? "Modifier" : "Créer"}
                   </Button>
@@ -294,71 +274,69 @@ export default function AccountingAccountsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
-      <div className="grid gap-4">
-        {accounts?.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">Aucun compte comptable configuré</p>
-            <p className="text-sm mt-2">Cliquez sur "Nouveau Compte" pour commencer</p>
-          </div>
-        ) : (
-          accounts?.map((account: AccountingAccount) => (
-            <div
-              key={account.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
-              data-testid={`card-account-${account.id}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Calculator className="h-5 w-5 text-gray-500" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {account.designation}
-                    </h3>
-                    <span className="text-sm text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                      {account.code}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded ${getTypeColor(account.type)}`}>
-                      {account.type}
-                    </span>
-                    {!account.active && (
-                      <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
-                        Inactif
-                      </span>
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.isArray(accounts) && accounts.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-gray-500">
+              Aucun compte comptable trouvé
+            </div>
+          ) : (
+            Array.isArray(accounts) && accounts.map((account: AccountingAccount) => (
+              <div
+                key={account.id}
+                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
+                data-testid={`card-account-${account.id}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                    {account.designation}
+                  </h3>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(account)}
+                      data-testid={`button-edit-${account.id}`}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteAccountMutation.mutate(account.id)}
+                      data-testid={`button-delete-${account.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Code:</span> {account.code}
+                  </p>
                   {account.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {account.description}
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <span className="font-medium">Description:</span> {account.description}
                     </p>
                   )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(account)}
-                    className="h-10 w-10"
-                    data-testid={`button-edit-account-${account.id}`}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(account.id)}
-                    className="h-10 w-10 text-red-600 hover:text-red-700"
-                    data-testid={`button-delete-account-${account.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Type:</span> {accountTypes.find(t => t.value === account.type)?.label || account.type}
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Nature:</span> {accountNatures.find(n => n.value === account.nature)?.label || account.nature}
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Statut:</span>{" "}
+                    <span className={account.active !== false ? "text-green-600" : "text-red-600"}>
+                      {account.active !== false ? "Actif" : "Inactif"}
+                    </span>
+                  </p>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

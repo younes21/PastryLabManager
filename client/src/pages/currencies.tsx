@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, Star } from "lucide-react";
+import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -137,7 +138,8 @@ export default function CurrenciesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <Layout title="Gestion des Devises">
+      <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           Gestion des Devises
@@ -370,6 +372,7 @@ export default function CurrenciesPage() {
           ))
         )}
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }

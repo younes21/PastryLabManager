@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, Truck } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -18,8 +19,8 @@ const deliveryMethodFormSchema = z.object({
   code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
-  cost: z.number().min(0, "Le coût doit être positif"),
-  duration: z.string().optional(),
+  cost: z.string().min(0, "Le coût doit être positif"),
+  estimatedDuration: z.string().optional(),
   active: z.boolean().default(true),
 });
 
@@ -29,8 +30,19 @@ export default function DeliveryMethodsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: methods, isLoading } = useQuery({
+  const { data: deliveryMethods, isLoading } = useQuery({
     queryKey: ["/api/delivery-methods"],
+  });
+
+  const form = useForm<z.infer<typeof deliveryMethodFormSchema>>({
+    resolver: zodResolver(deliveryMethodFormSchema),
+    defaultValues: {
+      designation: "",
+      description: "",
+      cost: "0",
+      estimatedDuration: "",
+      active: true,
+    },
   });
 
   const createMethodMutation = useMutation({
@@ -38,6 +50,7 @@ export default function DeliveryMethodsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/delivery-methods"] });
       setDialogOpen(false);
+      form.reset();
       toast({
         title: "Succès",
         description: "Méthode de livraison créée avec succès",
@@ -52,6 +65,7 @@ export default function DeliveryMethodsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/delivery-methods"] });
       setDialogOpen(false);
       setEditingMethod(null);
+      form.reset();
       toast({
         title: "Succès",
         description: "Méthode de livraison modifiée avec succès",
@@ -70,50 +84,38 @@ export default function DeliveryMethodsPage() {
     },
   });
 
-  const form = useForm<z.infer<typeof deliveryMethodFormSchema>>({
-    resolver: zodResolver(deliveryMethodFormSchema),
-    defaultValues: {
-      designation: "",
-      description: "",
-      cost: 0,
-      duration: "",
-      active: true,
-    },
-  });
+  const onSubmit = (data: z.infer<typeof deliveryMethodFormSchema>) => {
+    const formattedData = {
+      ...data,
+      cost: data.cost,
+    };
 
-  const onSubmit = (values: z.infer<typeof deliveryMethodFormSchema>) => {
     if (editingMethod) {
-      updateMethodMutation.mutate({ id: editingMethod.id, data: values });
+      updateMethodMutation.mutate({ id: editingMethod.id, data: formattedData });
     } else {
-      createMethodMutation.mutate(values);
+      createMethodMutation.mutate(formattedData);
     }
   };
 
-  const handleEdit = (method: DeliveryMethod) => {
+  const openEditDialog = (method: DeliveryMethod) => {
     setEditingMethod(method);
     form.reset({
       designation: method.designation,
       description: method.description || "",
-      cost: method.cost,
-      duration: method.duration || "",
-      active: method.active,
+      cost: method.cost || "0",
+      estimatedDuration: method.estimatedDuration || "",
+      active: method.active !== false,
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette méthode de livraison ?")) {
-      deleteMethodMutation.mutate(id);
-    }
-  };
-
-  const handleNewMethod = () => {
+  const openCreateDialog = () => {
     setEditingMethod(null);
     form.reset({
       designation: "",
       description: "",
-      cost: 0,
-      duration: "",
+      cost: "0",
+      estimatedDuration: "",
       active: true,
     });
     setDialogOpen(true);
@@ -121,40 +123,32 @@ export default function DeliveryMethodsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <Layout title="Gestion des Méthodes de Livraison">
+        <div className="p-6">
+          <div className="text-center">Chargement...</div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Méthodes de Livraison
-        </h1>
+    <Layout title="Gestion des Méthodes de Livraison">
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Méthodes de Livraison
+          </h1>
+          <Button onClick={openCreateDialog} data-testid="button-create-delivery-method">
+            <Plus className="mr-2 h-4 w-4" />
+            Nouvelle Méthode
+          </Button>
+        </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={handleNewMethod}
-              className="h-12 px-6 text-lg"
-              data-testid="button-add-delivery-method"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Nouvelle Méthode
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingMethod ? "Modifier la Méthode" : "Nouvelle Méthode"}
+                {editingMethod ? "Modifier la méthode" : "Nouvelle méthode de livraison"}
               </DialogTitle>
             </DialogHeader>
             <Form {...form}>
@@ -166,18 +160,13 @@ export default function DeliveryMethodsPage() {
                     <FormItem>
                       <FormLabel>Désignation</FormLabel>
                       <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="Express 24h"
-                          className="h-12 text-lg"
-                          data-testid="input-method-designation"
-                        />
+                        <Input {...field} data-testid="input-designation" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
+                
                 <FormField
                   control={form.control}
                   name="description"
@@ -185,12 +174,7 @@ export default function DeliveryMethodsPage() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          {...field} 
-                          placeholder="Description détaillée de la méthode de livraison"
-                          className="resize-none"
-                          data-testid="input-method-description"
-                        />
+                        <Textarea {...field} data-testid="input-description" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -204,16 +188,7 @@ export default function DeliveryMethodsPage() {
                     <FormItem>
                       <FormLabel>Coût (DA)</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          className="h-12 text-lg"
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                          data-testid="input-method-cost"
-                        />
+                        <Input {...field} type="text" data-testid="input-cost" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -222,17 +197,12 @@ export default function DeliveryMethodsPage() {
 
                 <FormField
                   control={form.control}
-                  name="duration"
+                  name="estimatedDuration"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Durée</FormLabel>
+                      <FormLabel>Durée Estimée</FormLabel>
                       <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="24h, 2-3 jours"
-                          className="h-12 text-lg"
-                          data-testid="input-method-duration"
-                        />
+                        <Input {...field} placeholder="Ex: 24-48h" data-testid="input-duration" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -245,36 +215,27 @@ export default function DeliveryMethodsPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Active
-                        </FormLabel>
+                        <FormLabel className="text-base">Actif</FormLabel>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          data-testid="switch-method-active"
+                          data-testid="switch-active"
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    className="flex-1 h-12 text-lg"
-                    data-testid="button-cancel-method-form"
-                  >
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 h-12 text-lg"
+                  <Button 
+                    type="submit" 
                     disabled={createMethodMutation.isPending || updateMethodMutation.isPending}
-                    data-testid="button-submit-method-form"
+                    data-testid="button-submit"
                   >
                     {editingMethod ? "Modifier" : "Créer"}
                   </Button>
@@ -283,78 +244,73 @@ export default function DeliveryMethodsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
-      <div className="grid gap-4">
-        {methods?.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">Aucune méthode de livraison configurée</p>
-            <p className="text-sm mt-2">Cliquez sur "Nouvelle Méthode" pour commencer</p>
-          </div>
-        ) : (
-          methods?.map((method: DeliveryMethod) => (
-            <div
-              key={method.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
-              data-testid={`card-method-${method.id}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Truck className="h-5 w-5 text-gray-500" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {method.designation}
-                    </h3>
-                    <span className="text-sm text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                      {method.code}
-                    </span>
-                    {!method.active && (
-                      <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
-                        Inactive
-                      </span>
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.isArray(deliveryMethods) && deliveryMethods.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-gray-500">
+              Aucune méthode de livraison trouvée
+            </div>
+          ) : (
+            Array.isArray(deliveryMethods) && deliveryMethods.map((method: DeliveryMethod) => (
+              <div
+                key={method.id}
+                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
+                data-testid={`card-delivery-method-${method.id}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                    {method.designation}
+                  </h3>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(method)}
+                      data-testid={`button-edit-${method.id}`}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteMethodMutation.mutate(method.id)}
+                      data-testid={`button-delete-${method.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Code:</span> {method.code}
+                  </p>
                   {method.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      {method.description}
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <span className="font-medium">Description:</span> {method.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="font-medium text-green-600">
-                      {method.cost.toFixed(2)} DA
+                  {method.cost && (
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <span className="font-medium">Coût:</span> {method.cost} DA
+                    </p>
+                  )}
+                  {method.estimatedDuration && (
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <span className="font-medium">Durée:</span> {method.estimatedDuration}
+                    </p>
+                  )}
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Statut:</span>{" "}
+                    <span className={method.active !== false ? "text-green-600" : "text-red-600"}>
+                      {method.active !== false ? "Actif" : "Inactif"}
                     </span>
-                    {method.duration && (
-                      <span className="text-gray-500">
-                        Durée: {method.duration}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(method)}
-                    className="h-10 w-10"
-                    data-testid={`button-edit-method-${method.id}`}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(method.id)}
-                    className="h-10 w-10 text-red-600 hover:text-red-700"
-                    data-testid={`button-delete-method-${method.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </p>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

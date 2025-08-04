@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, BookOpen } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,8 +20,17 @@ const journalFormSchema = z.object({
   code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
+  type: z.string().min(1, "Le type est requis"),
   active: z.boolean().default(true),
 });
+
+const journalTypes = [
+  { value: "ventes", label: "Ventes" },
+  { value: "achats", label: "Achats" },
+  { value: "banque", label: "Banque" },
+  { value: "caisse", label: "Caisse" },
+  { value: "operations_diverses", label: "Opérations Diverses" },
+];
 
 export default function AccountingJournalsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,11 +42,22 @@ export default function AccountingJournalsPage() {
     queryKey: ["/api/accounting-journals"],
   });
 
+  const form = useForm<z.infer<typeof journalFormSchema>>({
+    resolver: zodResolver(journalFormSchema),
+    defaultValues: {
+      designation: "",
+      description: "",
+      type: "",
+      active: true,
+    },
+  });
+
   const createJournalMutation = useMutation({
     mutationFn: (data: InsertAccountingJournal) => apiRequest("/api/accounting-journals", "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting-journals"] });
       setDialogOpen(false);
+      form.reset();
       toast({
         title: "Succès",
         description: "Journal comptable créé avec succès",
@@ -50,6 +72,7 @@ export default function AccountingJournalsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounting-journals"] });
       setDialogOpen(false);
       setEditingJournal(null);
+      form.reset();
       toast({
         title: "Succès",
         description: "Journal comptable modifié avec succès",
@@ -68,44 +91,31 @@ export default function AccountingJournalsPage() {
     },
   });
 
-  const form = useForm<z.infer<typeof journalFormSchema>>({
-    resolver: zodResolver(journalFormSchema),
-    defaultValues: {
-      designation: "",
-      description: "",
-      active: true,
-    },
-  });
-
-  const onSubmit = (values: z.infer<typeof journalFormSchema>) => {
+  const onSubmit = (data: z.infer<typeof journalFormSchema>) => {
     if (editingJournal) {
-      updateJournalMutation.mutate({ id: editingJournal.id, data: values });
+      updateJournalMutation.mutate({ id: editingJournal.id, data });
     } else {
-      createJournalMutation.mutate(values);
+      createJournalMutation.mutate(data);
     }
   };
 
-  const handleEdit = (journal: AccountingJournal) => {
+  const openEditDialog = (journal: AccountingJournal) => {
     setEditingJournal(journal);
     form.reset({
       designation: journal.designation,
       description: journal.description || "",
-      active: journal.active,
+      type: journal.type,
+      active: journal.active !== false,
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce journal comptable ?")) {
-      deleteJournalMutation.mutate(id);
-    }
-  };
-
-  const handleNewJournal = () => {
+  const openCreateDialog = () => {
     setEditingJournal(null);
     form.reset({
       designation: "",
       description: "",
+      type: "",
       active: true,
     });
     setDialogOpen(true);
@@ -113,40 +123,32 @@ export default function AccountingJournalsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+      <Layout title="Gestion des Journaux Comptables">
+        <div className="p-6">
+          <div className="text-center">Chargement...</div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Journaux Comptables
-        </h1>
+    <Layout title="Gestion des Journaux Comptables">
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Journaux Comptables
+          </h1>
+          <Button onClick={openCreateDialog} data-testid="button-create-journal">
+            <Plus className="mr-2 h-4 w-4" />
+            Nouveau Journal
+          </Button>
+        </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={handleNewJournal}
-              className="h-12 px-6 text-lg"
-              data-testid="button-add-journal"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Nouveau Journal
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingJournal ? "Modifier le Journal" : "Nouveau Journal"}
+                {editingJournal ? "Modifier le journal" : "Nouveau journal comptable"}
               </DialogTitle>
             </DialogHeader>
             <Form {...form}>
@@ -158,12 +160,21 @@ export default function AccountingJournalsPage() {
                     <FormItem>
                       <FormLabel>Désignation</FormLabel>
                       <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="Journal des Ventes"
-                          className="h-12 text-lg"
-                          data-testid="input-journal-designation"
-                        />
+                        <Input {...field} data-testid="input-designation" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-description" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -172,18 +183,24 @@ export default function AccountingJournalsPage() {
 
                 <FormField
                   control={form.control}
-                  name="description"
+                  name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          {...field} 
-                          placeholder="Description du journal comptable"
-                          className="resize-none"
-                          data-testid="input-journal-description"
-                        />
-                      </FormControl>
+                      <FormLabel>Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-type">
+                            <SelectValue placeholder="Sélectionner un type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {journalTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -195,36 +212,27 @@ export default function AccountingJournalsPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Actif
-                        </FormLabel>
+                        <FormLabel className="text-base">Actif</FormLabel>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          data-testid="switch-journal-active"
+                          data-testid="switch-active"
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    className="flex-1 h-12 text-lg"
-                    data-testid="button-cancel-journal-form"
-                  >
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 h-12 text-lg"
+                  <Button 
+                    type="submit" 
                     disabled={createJournalMutation.isPending || updateJournalMutation.isPending}
-                    data-testid="button-submit-journal-form"
+                    data-testid="button-submit"
                   >
                     {editingJournal ? "Modifier" : "Créer"}
                   </Button>
@@ -233,68 +241,66 @@ export default function AccountingJournalsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
-      <div className="grid gap-4">
-        {journals?.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">Aucun journal comptable configuré</p>
-            <p className="text-sm mt-2">Cliquez sur "Nouveau Journal" pour commencer</p>
-          </div>
-        ) : (
-          journals?.map((journal: AccountingJournal) => (
-            <div
-              key={journal.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
-              data-testid={`card-journal-${journal.id}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <BookOpen className="h-5 w-5 text-blue-500" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {journal.designation}
-                    </h3>
-                    <span className="text-sm text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                      {journal.code}
-                    </span>
-                    {!journal.active && (
-                      <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
-                        Inactif
-                      </span>
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.isArray(journals) && journals.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-gray-500">
+              Aucun journal comptable trouvé
+            </div>
+          ) : (
+            Array.isArray(journals) && journals.map((journal: AccountingJournal) => (
+              <div
+                key={journal.id}
+                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
+                data-testid={`card-journal-${journal.id}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                    {journal.designation}
+                  </h3>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(journal)}
+                      data-testid={`button-edit-${journal.id}`}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteJournalMutation.mutate(journal.id)}
+                      data-testid={`button-delete-${journal.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Code:</span> {journal.code}
+                  </p>
                   {journal.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {journal.description}
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <span className="font-medium">Description:</span> {journal.description}
                     </p>
                   )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(journal)}
-                    className="h-10 w-10"
-                    data-testid={`button-edit-journal-${journal.id}`}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(journal.id)}
-                    className="h-10 w-10 text-red-600 hover:text-red-700"
-                    data-testid={`button-delete-journal-${journal.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Type:</span> {journalTypes.find(t => t.value === journal.type)?.label || journal.type}
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Statut:</span>{" "}
+                    <span className={journal.active !== false ? "text-green-600" : "text-red-600"}>
+                      {journal.active !== false ? "Actif" : "Inactif"}
+                    </span>
+                  </p>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -16,7 +16,14 @@ import {
   CheckCircle,
   Scale,
   FolderTree,
-  DollarSign
+  DollarSign,
+  Receipt,
+  Coins,
+  TruckIcon,
+  BookIcon,
+  Calculator,
+  Building,
+  Settings
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -46,13 +53,19 @@ export function Sidebar() {
     { path: "/ingredients", label: "Ingrédients", icon: "fas fa-seedling", lucideIcon: ChefHat },
     { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
     { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
-    { path: "/stock", label: "Stock Produits", icon: "fas fa-warehouse", lucideIcon: Warehouse },
     { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
     { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
     { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
     { path: "/article-categories", label: "Catégories d'Articles", icon: "fas fa-folder-tree", lucideIcon: FolderTree },
     { path: "/price-lists", label: "Listes de Prix", icon: "fas fa-dollar-sign", lucideIcon: DollarSign },
+    { path: "/taxes", label: "Taxes", icon: "fas fa-receipt", lucideIcon: Receipt },
+    { path: "/currencies", label: "Devises", icon: "fas fa-coins", lucideIcon: Coins },
+    { path: "/delivery-methods", label: "Méthodes de Livraison", icon: "fas fa-shipping-fast", lucideIcon: TruckIcon },
+    { path: "/accounting-journals", label: "Journaux Comptables", icon: "fas fa-book", lucideIcon: BookIcon },
+    { path: "/accounting-accounts", label: "Comptes Comptables", icon: "fas fa-calculator", lucideIcon: Calculator },
+    { path: "/storage-zones", label: "Zones de Stockage", icon: "fas fa-building", lucideIcon: Building },
+    { path: "/work-stations", label: "Postes de Travail", icon: "fas fa-cogs", lucideIcon: Settings },
   ];
 
   // Filter navigation based on user role
