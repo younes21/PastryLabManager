@@ -113,6 +113,34 @@ export const recipes = pgTable("recipes", {
   updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
 });
 
+// Ingrédients de recette - liaison Many-to-Many entre recettes et articles (ingrédients/produits)
+export const recipeIngredients = pgTable("recipe_ingredients", {
+  id: serial("id").primaryKey(),
+  recipeId: integer("recipe_id").references(() => recipes.id).notNull(),
+  articleId: integer("article_id").references(() => articles.id).notNull(), // Ingrédient ou produit avec sous-recette
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(), // Quantité à consommer
+  unit: text("unit").notNull(), // Unité de mesure
+  notes: text("notes"), // Notes optionnelles
+  
+  // Audit
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Opérations de recette - étapes de préparation
+export const recipeOperations = pgTable("recipe_operations", {
+  id: serial("id").primaryKey(),
+  recipeId: integer("recipe_id").references(() => recipes.id).notNull(),
+  stepOrder: integer("step_order").notNull(), // Ordre d'exécution
+  description: text("description").notNull(), // Description de l'opération
+  duration: integer("duration").notNull(), // Durée en minutes
+  workStationId: integer("work_station_id").references(() => workStations.id), // Poste de travail requis
+  temperature: decimal("temperature", { precision: 5, scale: 2 }), // Température optionnelle
+  notes: text("notes"), // Notes complémentaires
+  
+  // Audit
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
 // Les tables productions, orders, deliveries et productStock ont été supprimées
 // Elles seront réimplémentées avec de nouvelles règles de gestion
 
@@ -222,6 +250,8 @@ export const insertArticleSchema = createInsertSchema(articles).omit({ id: true,
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
 export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true, createdAt: true });
+export const insertRecipeOperationSchema = createInsertSchema(recipeOperations).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -246,6 +276,10 @@ export type PriceRule = typeof priceRules.$inferSelect;
 export type InsertPriceRule = z.infer<typeof insertPriceRuleSchema>;
 export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
+export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
+export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
+export type RecipeOperation = typeof recipeOperations.$inferSelect;
+export type InsertRecipeOperation = z.infer<typeof insertRecipeOperationSchema>;
 export type Tax = typeof taxes.$inferSelect;
 export type InsertTax = z.infer<typeof insertTaxSchema>;
 export type Currency = typeof currencies.$inferSelect;

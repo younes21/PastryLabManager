@@ -2,7 +2,7 @@ import {
   users, storageLocations,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
-  suppliers, clients, products, recipes,
+  suppliers, clients, products, recipes, recipeIngredients, recipeOperations,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -11,7 +11,8 @@ import {
   type Tax, type InsertTax, type Currency, type InsertCurrency, type DeliveryMethod, type InsertDeliveryMethod,
   type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
   type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation,
-  type Supplier, type InsertSupplier, type Product, type InsertProduct, type Recipe, type InsertRecipe
+  type Supplier, type InsertSupplier, type Product, type InsertProduct, type Recipe, type InsertRecipe,
+  type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -841,6 +842,68 @@ export class DatabaseStorage implements IStorage {
   async deleteRecipeByProductId(productId: number): Promise<boolean> {
     const result = await db.delete(recipes).where(eq(recipes.productId, productId));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Recipe Ingredients
+  async getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]> {
+    return await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+  }
+
+  async createRecipeIngredient(insertRecipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
+    console.log("🔥 CREATE RECIPE INGREDIENT - Data:", JSON.stringify(insertRecipeIngredient, null, 2));
+    const [ingredient] = await db.insert(recipeIngredients).values(insertRecipeIngredient).returning();
+    console.log("✅ CREATE RECIPE INGREDIENT - Success:", JSON.stringify(ingredient, null, 2));
+    return ingredient;
+  }
+
+  async updateRecipeIngredient(id: number, updateData: Partial<InsertRecipeIngredient>): Promise<RecipeIngredient | undefined> {
+    console.log("🔥 UPDATE RECIPE INGREDIENT - ID:", id, "Data:", JSON.stringify(updateData, null, 2));
+    const [ingredient] = await db.update(recipeIngredients)
+      .set(updateData)
+      .where(eq(recipeIngredients.id, id))
+      .returning();
+    console.log("✅ UPDATE RECIPE INGREDIENT - Success:", JSON.stringify(ingredient, null, 2));
+    return ingredient || undefined;
+  }
+
+  async deleteRecipeIngredient(id: number): Promise<boolean> {
+    console.log("🔥 DELETE RECIPE INGREDIENT - ID:", id);
+    const result = await db.delete(recipeIngredients).where(eq(recipeIngredients.id, id));
+    const success = (result.rowCount || 0) > 0;
+    console.log("✅ DELETE RECIPE INGREDIENT - Success:", success);
+    return success;
+  }
+
+  // Recipe Operations
+  async getRecipeOperations(recipeId: number): Promise<RecipeOperation[]> {
+    return await db.select().from(recipeOperations)
+      .where(eq(recipeOperations.recipeId, recipeId))
+      .orderBy(recipeOperations.stepOrder);
+  }
+
+  async createRecipeOperation(insertRecipeOperation: InsertRecipeOperation): Promise<RecipeOperation> {
+    console.log("🔥 CREATE RECIPE OPERATION - Data:", JSON.stringify(insertRecipeOperation, null, 2));
+    const [operation] = await db.insert(recipeOperations).values(insertRecipeOperation).returning();
+    console.log("✅ CREATE RECIPE OPERATION - Success:", JSON.stringify(operation, null, 2));
+    return operation;
+  }
+
+  async updateRecipeOperation(id: number, updateData: Partial<InsertRecipeOperation>): Promise<RecipeOperation | undefined> {
+    console.log("🔥 UPDATE RECIPE OPERATION - ID:", id, "Data:", JSON.stringify(updateData, null, 2));
+    const [operation] = await db.update(recipeOperations)
+      .set(updateData)
+      .where(eq(recipeOperations.id, id))
+      .returning();
+    console.log("✅ UPDATE RECIPE OPERATION - Success:", JSON.stringify(operation, null, 2));
+    return operation || undefined;
+  }
+
+  async deleteRecipeOperation(id: number): Promise<boolean> {
+    console.log("🔥 DELETE RECIPE OPERATION - ID:", id);
+    const result = await db.delete(recipeOperations).where(eq(recipeOperations.id, id));
+    const success = (result.rowCount || 0) > 0;
+    console.log("✅ DELETE RECIPE OPERATION - Success:", success);
+    return success;
   }
 
   // Suppliers

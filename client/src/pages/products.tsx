@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertProductSchema, insertRecipeSchema, type Product, type InsertProduct, type Recipe, type InsertRecipe, type ArticleCategory, type StorageZone, type MeasurementUnit } from "@shared/schema";
+import { insertProductSchema, insertRecipeSchema, insertRecipeIngredientSchema, insertRecipeOperationSchema, type Product, type InsertProduct, type Recipe, type InsertRecipe, type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation, type Article, type WorkStation, type ArticleCategory, type StorageZone, type MeasurementUnit } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -116,6 +116,22 @@ function RecipeDisplay({ productId }: { productId: number }) {
           </Badge>
         </div>
       </div>
+
+      {/* Onglets pour gérer les ingrédients et opérations */}
+      <Tabs defaultValue="ingredients" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="ingredients" data-testid="tab-recipe-ingredients">Ingrédients</TabsTrigger>
+          <TabsTrigger value="operations" data-testid="tab-recipe-operations">Opérations</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="ingredients" className="space-y-4">
+          <RecipeIngredients recipeId={recipe.id} />
+        </TabsContent>
+        
+        <TabsContent value="operations" className="space-y-4">
+          <RecipeOperations recipeId={recipe.id} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -988,5 +1004,610 @@ export default function Products() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Composant pour gérer les ingrédients de recette
+function RecipeIngredients({ recipeId }: { recipeId: number }) {
+  const [ingredientDialogOpen, setIngredientDialogOpen] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<RecipeIngredient | null>(null);
+  const { toast } = useToast();
+
+  const { data: ingredients, isLoading } = useQuery<RecipeIngredient[]>({
+    queryKey: ["/api/recipes", recipeId, "ingredients"],
+  });
+
+  const { data: articles } = useQuery<Article[]>({
+    queryKey: ["/api/articles"],
+  });
+
+  const { data: measurementUnits } = useQuery<MeasurementUnit[]>({
+    queryKey: ["/api/measurement-units"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: InsertRecipeIngredient) => 
+      apiRequest(`/api/recipes/${recipeId}/ingredients`, "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes", recipeId, "ingredients"] });
+      toast({ title: "Ingrédient ajouté avec succès" });
+      setIngredientDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de l'ajout", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertRecipeIngredient> }) =>
+      apiRequest(`/api/recipe-ingredients/${id}`, "PUT", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes", recipeId, "ingredients"] });
+      toast({ title: "Ingrédient modifié avec succès" });
+      setEditingIngredient(null);
+      setIngredientDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/recipe-ingredients/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes", recipeId, "ingredients"] });
+      toast({ title: "Ingrédient supprimé avec succès" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (ingredient: RecipeIngredient) => {
+    setEditingIngredient(ingredient);
+    setIngredientDialogOpen(true);
+  };
+
+  const handleDelete = (ingredient: RecipeIngredient) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer cet ingrédient ?")) {
+      deleteMutation.mutate(ingredient.id);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-4">Chargement des ingrédients...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h4 className="text-lg font-semibold">Ingrédients de la recette</h4>
+        <Dialog open={ingredientDialogOpen} onOpenChange={setIngredientDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => { setEditingIngredient(null); }} data-testid="button-add-ingredient">
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter ingrédient
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {editingIngredient ? "Modifier l'ingrédient" : "Ajouter un ingrédient"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingIngredient 
+                  ? "Modifier les informations de cet ingrédient" 
+                  : "Ajouter un nouvel ingrédient à la recette"}
+              </DialogDescription>
+            </DialogHeader>
+            <RecipeIngredientForm
+              recipeId={recipeId}
+              ingredient={editingIngredient}
+              articles={articles || []}
+              measurementUnits={measurementUnits || []}
+              onSubmit={(data) => {
+                if (editingIngredient) {
+                  updateMutation.mutate({ id: editingIngredient.id, data });
+                } else {
+                  createMutation.mutate(data);
+                }
+              }}
+              isLoading={createMutation.isPending || updateMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {ingredients && ingredients.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Article</TableHead>
+              <TableHead>Quantité</TableHead>
+              <TableHead>Unité</TableHead>
+              <TableHead>Notes</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ingredients.map((ingredient) => {
+              const article = articles?.find(a => a.id === ingredient.articleId);
+              return (
+                <TableRow key={ingredient.id}>
+                  <TableCell>
+                    <div className="font-medium">{article?.designation || "Article inconnu"}</div>
+                    <div className="text-sm text-muted-foreground">{article?.code}</div>
+                  </TableCell>
+                  <TableCell>{ingredient.quantity}</TableCell>
+                  <TableCell>{ingredient.unit}</TableCell>
+                  <TableCell>{ingredient.notes || "-"}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(ingredient)}
+                        data-testid={`button-edit-ingredient-${ingredient.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(ingredient)}
+                        data-testid={`button-delete-ingredient-${ingredient.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          Aucun ingrédient ajouté. Commencez par ajouter des ingrédients à cette recette.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Formulaire pour ajouter/modifier un ingrédient de recette
+function RecipeIngredientForm({
+  recipeId,
+  ingredient,
+  articles,
+  measurementUnits,
+  onSubmit,
+  isLoading
+}: {
+  recipeId: number;
+  ingredient?: RecipeIngredient | null;
+  articles: Article[];
+  measurementUnits: MeasurementUnit[];
+  onSubmit: (data: InsertRecipeIngredient) => void;
+  isLoading: boolean;
+}) {
+  const form = useForm<InsertRecipeIngredient>({
+    resolver: zodResolver(insertRecipeIngredientSchema),
+    defaultValues: {
+      recipeId,
+      articleId: ingredient?.articleId || undefined,
+      quantity: ingredient?.quantity || "1",
+      unit: ingredient?.unit || "pièce",
+      notes: ingredient?.notes || "",
+    },
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="articleId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Article (Ingrédient/Produit) *</FormLabel>
+              <Select 
+                onValueChange={(value) => field.onChange(parseInt(value))} 
+                value={field.value?.toString()}
+              >
+                <FormControl>
+                  <SelectTrigger data-testid="select-ingredient-article">
+                    <SelectValue placeholder="Sélectionner un article" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {articles.map((article) => (
+                    <SelectItem key={article.id} value={article.id.toString()}>
+                      {article.designation} ({article.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="quantity"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quantité *</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" step="0.001" placeholder="1" data-testid="input-ingredient-quantity" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="unit"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Unité *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-ingredient-unit">
+                      <SelectValue placeholder="Sélectionner une unité" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {measurementUnits?.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.label}>
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes</FormLabel>
+              <FormControl>
+                <Textarea {...field} value={field.value || ""} placeholder="Notes optionnelles" data-testid="input-ingredient-notes" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="flex justify-end space-x-2">
+          <Button type="submit" disabled={isLoading} data-testid="button-submit-ingredient">
+            {isLoading ? "Enregistrement..." : ingredient ? "Modifier" : "Ajouter"}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
+
+// Composant pour gérer les opérations de recette
+function RecipeOperations({ recipeId }: { recipeId: number }) {
+  const [operationDialogOpen, setOperationDialogOpen] = useState(false);
+  const [editingOperation, setEditingOperation] = useState<RecipeOperation | null>(null);
+  const { toast } = useToast();
+
+  const { data: operations, isLoading } = useQuery<RecipeOperation[]>({
+    queryKey: ["/api/recipes", recipeId, "operations"],
+  });
+
+  const { data: workStations } = useQuery<WorkStation[]>({
+    queryKey: ["/api/work-stations"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: InsertRecipeOperation) => 
+      apiRequest(`/api/recipes/${recipeId}/operations`, "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes", recipeId, "operations"] });
+      toast({ title: "Opération ajoutée avec succès" });
+      setOperationDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de l'ajout", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertRecipeOperation> }) =>
+      apiRequest(`/api/recipe-operations/${id}`, "PUT", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes", recipeId, "operations"] });
+      toast({ title: "Opération modifiée avec succès" });
+      setEditingOperation(null);
+      setOperationDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/recipe-operations/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes", recipeId, "operations"] });
+      toast({ title: "Opération supprimée avec succès" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (operation: RecipeOperation) => {
+    setEditingOperation(operation);
+    setOperationDialogOpen(true);
+  };
+
+  const handleDelete = (operation: RecipeOperation) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer cette opération ?")) {
+      deleteMutation.mutate(operation.id);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-4">Chargement des opérations...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h4 className="text-lg font-semibold">Opérations de préparation</h4>
+        <Dialog open={operationDialogOpen} onOpenChange={setOperationDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => { setEditingOperation(null); }} data-testid="button-add-operation">
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter opération
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {editingOperation ? "Modifier l'opération" : "Ajouter une opération"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingOperation 
+                  ? "Modifier les informations de cette opération" 
+                  : "Ajouter une nouvelle opération à la recette"}
+              </DialogDescription>
+            </DialogHeader>
+            <RecipeOperationForm
+              recipeId={recipeId}
+              operation={editingOperation}
+              workStations={workStations || []}
+              nextStepOrder={(operations?.length || 0) + 1}
+              onSubmit={(data) => {
+                if (editingOperation) {
+                  updateMutation.mutate({ id: editingOperation.id, data });
+                } else {
+                  createMutation.mutate(data);
+                }
+              }}
+              isLoading={createMutation.isPending || updateMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {operations && operations.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Étape</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Durée</TableHead>
+              <TableHead>Poste de travail</TableHead>
+              <TableHead>Température</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {operations.map((operation) => {
+              const workStation = workStations?.find(ws => ws.id === operation.workStationId);
+              return (
+                <TableRow key={operation.id}>
+                  <TableCell>
+                    <Badge variant="outline">Étape {operation.stepOrder}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">{operation.description}</div>
+                    {operation.notes && (
+                      <div className="text-sm text-muted-foreground">{operation.notes}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>{operation.duration} min</TableCell>
+                  <TableCell>{workStation?.designation || "-"}</TableCell>
+                  <TableCell>
+                    {operation.temperature ? `${operation.temperature}°C` : "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(operation)}
+                        data-testid={`button-edit-operation-${operation.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(operation)}
+                        data-testid={`button-delete-operation-${operation.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          Aucune opération ajoutée. Commencez par ajouter des étapes de préparation à cette recette.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Formulaire pour ajouter/modifier une opération de recette
+function RecipeOperationForm({
+  recipeId,
+  operation,
+  workStations,
+  nextStepOrder,
+  onSubmit,
+  isLoading
+}: {
+  recipeId: number;
+  operation?: RecipeOperation | null;
+  workStations: WorkStation[];
+  nextStepOrder: number;
+  onSubmit: (data: InsertRecipeOperation) => void;
+  isLoading: boolean;
+}) {
+  const form = useForm<InsertRecipeOperation>({
+    resolver: zodResolver(insertRecipeOperationSchema),
+    defaultValues: {
+      recipeId,
+      stepOrder: operation?.stepOrder || nextStepOrder,
+      description: operation?.description || "",
+      duration: operation?.duration || 10,
+      workStationId: operation?.workStationId || undefined,
+      temperature: operation?.temperature || undefined,
+      notes: operation?.notes || "",
+    },
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="stepOrder"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Numéro d'étape *</FormLabel>
+              <FormControl>
+                <Input {...field} type="number" min="1" data-testid="input-operation-step" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description *</FormLabel>
+              <FormControl>
+                <Textarea {...field} placeholder="Description de l'opération" data-testid="input-operation-description" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="duration"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Durée (minutes) *</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" min="1" placeholder="10" data-testid="input-operation-duration" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="temperature"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Température (°C)</FormLabel>
+                <FormControl>
+                  <Input {...field} value={field.value || ""} type="number" step="0.1" placeholder="180" data-testid="input-operation-temperature" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="workStationId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Poste de travail</FormLabel>
+              <Select 
+                onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)} 
+                value={field.value?.toString()}
+              >
+                <FormControl>
+                  <SelectTrigger data-testid="select-operation-workstation">
+                    <SelectValue placeholder="Sélectionner un poste de travail" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {workStations.map((station) => (
+                    <SelectItem key={station.id} value={station.id.toString()}>
+                      {station.designation} ({station.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes</FormLabel>
+              <FormControl>
+                <Textarea {...field} value={field.value || ""} placeholder="Notes complémentaires" data-testid="input-operation-notes" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="flex justify-end space-x-2">
+          <Button type="submit" disabled={isLoading} data-testid="button-submit-operation">
+            {isLoading ? "Enregistrement..." : operation ? "Modifier" : "Ajouter"}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

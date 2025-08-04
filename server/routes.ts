@@ -8,7 +8,8 @@ import {
   insertArticleSchema, insertPriceListSchema, insertPriceRuleSchema, insertTaxSchema, 
   insertCurrencySchema, insertDeliveryMethodSchema, insertAccountingJournalSchema, 
   insertAccountingAccountSchema, insertStorageZoneSchema, insertWorkStationSchema, 
-  insertSupplierSchema, insertClientSchema
+  insertSupplierSchema, insertClientSchema, insertRecipeSchema, insertRecipeIngredientSchema, 
+  insertRecipeOperationSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -815,6 +816,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting recipe:", error);
       res.status(500).json({ message: "Failed to delete recipe" });
+    }
+  });
+
+  // Recipe Ingredients routes
+  app.get("/api/recipes/:recipeId/ingredients", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.recipeId);
+      const ingredients = await storage.getRecipeIngredients(recipeId);
+      res.json(ingredients);
+    } catch (error) {
+      console.error("Error fetching recipe ingredients:", error);
+      res.status(500).json({ message: "Failed to fetch recipe ingredients" });
+    }
+  });
+
+  app.post("/api/recipes/:recipeId/ingredients", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.recipeId);
+      const ingredientData = insertRecipeIngredientSchema.parse({ 
+        ...req.body, 
+        recipeId 
+      });
+      const ingredient = await storage.createRecipeIngredient(ingredientData);
+      res.status(201).json(ingredient);
+    } catch (error) {
+      console.error("Error creating recipe ingredient:", error);
+      res.status(500).json({ message: "Failed to create recipe ingredient" });
+    }
+  });
+
+  app.put("/api/recipe-ingredients/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      const ingredient = await storage.updateRecipeIngredient(id, updateData);
+      if (!ingredient) {
+        return res.status(404).json({ message: "Recipe ingredient not found" });
+      }
+      res.json(ingredient);
+    } catch (error) {
+      console.error("Error updating recipe ingredient:", error);
+      res.status(500).json({ message: "Failed to update recipe ingredient" });
+    }
+  });
+
+  app.delete("/api/recipe-ingredients/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteRecipeIngredient(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Recipe ingredient not found" });
+      }
+      res.json({ message: "Recipe ingredient deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting recipe ingredient:", error);
+      res.status(500).json({ message: "Failed to delete recipe ingredient" });
+    }
+  });
+
+  // Recipe Operations routes
+  app.get("/api/recipes/:recipeId/operations", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.recipeId);
+      const operations = await storage.getRecipeOperations(recipeId);
+      res.json(operations);
+    } catch (error) {
+      console.error("Error fetching recipe operations:", error);
+      res.status(500).json({ message: "Failed to fetch recipe operations" });
+    }
+  });
+
+  app.post("/api/recipes/:recipeId/operations", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.recipeId);
+      const operationData = insertRecipeOperationSchema.parse({ 
+        ...req.body, 
+        recipeId 
+      });
+      const operation = await storage.createRecipeOperation(operationData);
+      res.status(201).json(operation);
+    } catch (error) {
+      console.error("Error creating recipe operation:", error);
+      res.status(500).json({ message: "Failed to create recipe operation" });
+    }
+  });
+
+  app.put("/api/recipe-operations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      const operation = await storage.updateRecipeOperation(id, updateData);
+      if (!operation) {
+        return res.status(404).json({ message: "Recipe operation not found" });
+      }
+      res.json(operation);
+    } catch (error) {
+      console.error("Error updating recipe operation:", error);
+      res.status(500).json({ message: "Failed to update recipe operation" });
+    }
+  });
+
+  app.delete("/api/recipe-operations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteRecipeOperation(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Recipe operation not found" });
+      }
+      res.json({ message: "Recipe operation deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting recipe operation:", error);
+      res.status(500).json({ message: "Failed to delete recipe operation" });
     }
   });
 
