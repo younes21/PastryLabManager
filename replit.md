@@ -79,6 +79,13 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **Measurement Units Management System (January 2025)**:
+  - Implemented comprehensive measurement units system with categories and conversion factors
+  - Added measurement categories (Poids, Volume, Quantité, Température) with full CRUD operations
+  - Created measurement units with type classification (reference, larger, smaller) and conversion factors
+  - Built complete admin interface with tabbed navigation for categories and units management
+  - Integrated measurement system into navigation with dedicated page accessible to admins/managers
+  - Database schema extended with measurementCategories and measurementUnits tables
 - **UI Improvements (January 2025)**:
   - Fixed Select.Item validation errors by replacing empty string values with undefined across all components
   - Updated admin panel logo with modern gradient SVG chef hat design

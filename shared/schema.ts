@@ -127,6 +127,23 @@ export const labels = pgTable("labels", {
   printedAt: timestamp("printed_at", { mode: 'string' }),
 });
 
+export const measurementCategories = pgTable("measurement_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  active: boolean("active").default(true),
+});
+
+export const measurementUnits = pgTable("measurement_units", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").references(() => measurementCategories.id),
+  label: text("label").notNull(),
+  abbreviation: text("abbreviation").notNull(),
+  type: text("type").notNull(), // 'reference', 'larger', 'smaller'
+  factor: decimal("factor", { precision: 15, scale: 6 }).notNull(), // Conversion factor to reference unit
+  active: boolean("active").default(true),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
@@ -139,6 +156,8 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: t
 export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true });
 export const insertProductStockSchema = createInsertSchema(productStock).omit({ id: true });
 export const insertLabelSchema = createInsertSchema(labels).omit({ id: true });
+export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
+export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -163,3 +182,7 @@ export type ProductStock = typeof productStock.$inferSelect;
 export type InsertProductStock = z.infer<typeof insertProductStockSchema>;
 export type Label = typeof labels.$inferSelect;
 export type InsertLabel = z.infer<typeof insertLabelSchema>;
+export type MeasurementCategory = typeof measurementCategories.$inferSelect;
+export type InsertMeasurementCategory = z.infer<typeof insertMeasurementCategorySchema>;
+export type MeasurementUnit = typeof measurementUnits.$inferSelect;
+export type InsertMeasurementUnit = z.infer<typeof insertMeasurementUnitSchema>;

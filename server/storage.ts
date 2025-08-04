@@ -1,12 +1,14 @@
 import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
+  measurementCategories, measurementUnits,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type Delivery, type InsertDelivery, type ProductStock, type InsertProductStock,
-  type Label, type InsertLabel
+  type Label, type InsertLabel, type MeasurementCategory, type InsertMeasurementCategory,
+  type MeasurementUnit, type InsertMeasurementUnit
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -107,6 +109,24 @@ export interface IStorage {
   updateLabel(id: number, label: Partial<InsertLabel>): Promise<Label | undefined>;
   deleteLabel(id: number): Promise<boolean>;
   markLabelAsPrinted(id: number): Promise<Label | undefined>;
+
+  // Measurement Categories
+  getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined>;
+  getAllMeasurementCategories(): Promise<MeasurementCategory[]>;
+  getActiveMeasurementCategories(): Promise<MeasurementCategory[]>;
+  createMeasurementCategory(category: InsertMeasurementCategory): Promise<MeasurementCategory>;
+  updateMeasurementCategory(id: number, category: Partial<InsertMeasurementCategory>): Promise<MeasurementCategory | undefined>;
+  deleteMeasurementCategory(id: number): Promise<boolean>;
+
+  // Measurement Units
+  getMeasurementUnit(id: number): Promise<MeasurementUnit | undefined>;
+  getAllMeasurementUnits(): Promise<MeasurementUnit[]>;
+  getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]>;
+  getActiveMeasurementUnits(): Promise<MeasurementUnit[]>;
+  getReferenceUnit(categoryId: number): Promise<MeasurementUnit | undefined>;
+  createMeasurementUnit(unit: InsertMeasurementUnit): Promise<MeasurementUnit>;
+  updateMeasurementUnit(id: number, unit: Partial<InsertMeasurementUnit>): Promise<MeasurementUnit | undefined>;
+  deleteMeasurementUnit(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -193,6 +213,110 @@ export class DatabaseStorage implements IStorage {
           maxStock: "10.0",
           costPerUnit: "6.50",
           storageLocationId: 1
+        }
+      ]);
+
+      // Create default measurement categories
+      const categories = await db.insert(measurementCategories).values([
+        {
+          name: "Poids",
+          description: "Unités de mesure de poids et masse",
+          active: true
+        },
+        {
+          name: "Volume",
+          description: "Unités de mesure de volume et capacité",
+          active: true
+        },
+        {
+          name: "Quantité",
+          description: "Unités de mesure de quantité",
+          active: true
+        },
+        {
+          name: "Température",
+          description: "Unités de mesure de température",
+          active: true
+        }
+      ]).returning();
+
+      // Create measurement units for each category
+      await db.insert(measurementUnits).values([
+        // Poids category (assuming category ID 1)
+        {
+          categoryId: categories[0].id,
+          label: "Kilogramme",
+          abbreviation: "kg",
+          type: "reference",
+          factor: "1.000000",
+          active: true
+        },
+        {
+          categoryId: categories[0].id,
+          label: "Gramme",
+          abbreviation: "g",
+          type: "smaller",
+          factor: "0.001000",
+          active: true
+        },
+        {
+          categoryId: categories[0].id,
+          label: "Tonne",
+          abbreviation: "t",
+          type: "larger",
+          factor: "1000.000000",
+          active: true
+        },
+        // Volume category (assuming category ID 2)
+        {
+          categoryId: categories[1].id,
+          label: "Litre",
+          abbreviation: "l",
+          type: "reference",
+          factor: "1.000000",
+          active: true
+        },
+        {
+          categoryId: categories[1].id,
+          label: "Millilitre",
+          abbreviation: "ml",
+          type: "smaller",
+          factor: "0.001000",
+          active: true
+        },
+        {
+          categoryId: categories[1].id,
+          label: "Centilitre",
+          abbreviation: "cl",
+          type: "smaller",
+          factor: "0.010000",
+          active: true
+        },
+        // Quantité category (assuming category ID 3)
+        {
+          categoryId: categories[2].id,
+          label: "Pièce",
+          abbreviation: "pce",
+          type: "reference",
+          factor: "1.000000",
+          active: true
+        },
+        {
+          categoryId: categories[2].id,
+          label: "Douzaine",
+          abbreviation: "dz",
+          type: "larger",
+          factor: "12.000000",
+          active: true
+        },
+        // Température category (assuming category ID 4)
+        {
+          categoryId: categories[3].id,
+          label: "Celsius",
+          abbreviation: "°C",
+          type: "reference",
+          factor: "1.000000",
+          active: true
         }
       ]);
     } catch (error) {
@@ -606,10 +730,90 @@ export class DatabaseStorage implements IStorage {
 
   async markLabelAsPrinted(id: number): Promise<Label | undefined> {
     const [label] = await db.update(labels)
-      .set({ printed: true, printedAt: new Date() })
+      .set({ printed: true, printedAt: new Date().toISOString() })
       .where(eq(labels.id, id))
       .returning();
     return label || undefined;
+  }
+
+  // Measurement Categories methods
+  async getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined> {
+    const [category] = await db.select().from(measurementCategories).where(eq(measurementCategories.id, id));
+    return category || undefined;
+  }
+
+  async getAllMeasurementCategories(): Promise<MeasurementCategory[]> {
+    return await db.select().from(measurementCategories).orderBy(measurementCategories.name);
+  }
+
+  async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
+    return await db.select().from(measurementCategories)
+      .where(eq(measurementCategories.active, true))
+      .orderBy(measurementCategories.name);
+  }
+
+  async createMeasurementCategory(insertCategory: InsertMeasurementCategory): Promise<MeasurementCategory> {
+    const [category] = await db.insert(measurementCategories).values(insertCategory).returning();
+    return category;
+  }
+
+  async updateMeasurementCategory(id: number, updateData: Partial<InsertMeasurementCategory>): Promise<MeasurementCategory | undefined> {
+    const [category] = await db.update(measurementCategories)
+      .set(updateData)
+      .where(eq(measurementCategories.id, id))
+      .returning();
+    return category || undefined;
+  }
+
+  async deleteMeasurementCategory(id: number): Promise<boolean> {
+    const result = await db.delete(measurementCategories).where(eq(measurementCategories.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Measurement Units methods
+  async getMeasurementUnit(id: number): Promise<MeasurementUnit | undefined> {
+    const [unit] = await db.select().from(measurementUnits).where(eq(measurementUnits.id, id));
+    return unit || undefined;
+  }
+
+  async getAllMeasurementUnits(): Promise<MeasurementUnit[]> {
+    return await db.select().from(measurementUnits).orderBy(measurementUnits.categoryId, measurementUnits.label);
+  }
+
+  async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
+    return await db.select().from(measurementUnits)
+      .where(eq(measurementUnits.categoryId, categoryId))
+      .orderBy(measurementUnits.label);
+  }
+
+  async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
+    return await db.select().from(measurementUnits)
+      .where(eq(measurementUnits.active, true))
+      .orderBy(measurementUnits.categoryId, measurementUnits.label);
+  }
+
+  async getReferenceUnit(categoryId: number): Promise<MeasurementUnit | undefined> {
+    const [unit] = await db.select().from(measurementUnits)
+      .where(and(eq(measurementUnits.categoryId, categoryId), eq(measurementUnits.type, 'reference')));
+    return unit || undefined;
+  }
+
+  async createMeasurementUnit(insertUnit: InsertMeasurementUnit): Promise<MeasurementUnit> {
+    const [unit] = await db.insert(measurementUnits).values(insertUnit).returning();
+    return unit;
+  }
+
+  async updateMeasurementUnit(id: number, updateData: Partial<InsertMeasurementUnit>): Promise<MeasurementUnit | undefined> {
+    const [unit] = await db.update(measurementUnits)
+      .set(updateData)
+      .where(eq(measurementUnits.id, id))
+      .returning();
+    return unit || undefined;
+  }
+
+  async deleteMeasurementUnit(id: number): Promise<boolean> {
+    const result = await db.delete(measurementUnits).where(eq(measurementUnits.id, id));
+    return (result.rowCount || 0) > 0;
   }
 }
 

@@ -5,7 +5,8 @@ import {
   insertUserSchema, insertStorageLocationSchema, insertIngredientSchema,
   insertRecipeSchema, insertRecipeIngredientSchema, insertProductionSchema,
   insertOrderSchema, insertOrderItemSchema, insertDeliverySchema,
-  insertProductStockSchema, insertLabelSchema
+  insertProductStockSchema, insertLabelSchema, insertMeasurementCategorySchema,
+  insertMeasurementUnitSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -772,6 +773,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // Measurement Categories routes
+  app.get("/api/measurement-categories", async (req, res) => {
+    try {
+      const categories = await storage.getAllMeasurementCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch measurement categories" });
+    }
+  });
+
+  app.get("/api/measurement-categories/active", async (req, res) => {
+    try {
+      const categories = await storage.getActiveMeasurementCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active measurement categories" });
+    }
+  });
+
+  app.get("/api/measurement-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.getMeasurementCategory(id);
+      
+      if (!category) {
+        return res.status(404).json({ message: "Measurement category not found" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch measurement category" });
+    }
+  });
+
+  app.post("/api/measurement-categories", async (req, res) => {
+    try {
+      const categoryData = insertMeasurementCategorySchema.parse(req.body);
+      const category = await storage.createMeasurementCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid measurement category data" });
+    }
+  });
+
+  app.put("/api/measurement-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const categoryData = req.body;
+      const category = await storage.updateMeasurementCategory(id, categoryData);
+      
+      if (!category) {
+        return res.status(404).json({ message: "Measurement category not found" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update measurement category" });
+    }
+  });
+
+  app.delete("/api/measurement-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteMeasurementCategory(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Measurement category not found" });
+      }
+
+      res.json({ message: "Measurement category deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete measurement category" });
+    }
+  });
+
+  // Measurement Units routes
+  app.get("/api/measurement-units", async (req, res) => {
+    try {
+      const units = await storage.getAllMeasurementUnits();
+      res.json(units);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch measurement units" });
+    }
+  });
+
+  app.get("/api/measurement-units/active", async (req, res) => {
+    try {
+      const units = await storage.getActiveMeasurementUnits();
+      res.json(units);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active measurement units" });
+    }
+  });
+
+  app.get("/api/measurement-units/category/:categoryId", async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.categoryId);
+      const units = await storage.getMeasurementUnitsByCategory(categoryId);
+      res.json(units);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch measurement units by category" });
+    }
+  });
+
+  app.get("/api/measurement-units/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const unit = await storage.getMeasurementUnit(id);
+      
+      if (!unit) {
+        return res.status(404).json({ message: "Measurement unit not found" });
+      }
+
+      res.json(unit);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch measurement unit" });
+    }
+  });
+
+  app.post("/api/measurement-units", async (req, res) => {
+    try {
+      const unitData = insertMeasurementUnitSchema.parse(req.body);
+      const unit = await storage.createMeasurementUnit(unitData);
+      res.status(201).json(unit);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid measurement unit data" });
+    }
+  });
+
+  app.put("/api/measurement-units/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const unitData = req.body;
+      const unit = await storage.updateMeasurementUnit(id, unitData);
+      
+      if (!unit) {
+        return res.status(404).json({ message: "Measurement unit not found" });
+      }
+
+      res.json(unit);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update measurement unit" });
+    }
+  });
+
+  app.delete("/api/measurement-units/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteMeasurementUnit(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Measurement unit not found" });
+      }
+
+      res.json({ message: "Measurement unit deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete measurement unit" });
     }
   });
 

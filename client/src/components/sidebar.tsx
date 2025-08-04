@@ -13,7 +13,8 @@ import {
   Users, 
   Cake,
   LogOut,
-  CheckCircle
+  CheckCircle,
+  Scale
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -47,6 +48,7 @@ export function Sidebar() {
     { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
     { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
+    { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
   ];
 
   // Filter navigation based on user role
