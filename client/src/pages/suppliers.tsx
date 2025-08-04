@@ -420,6 +420,21 @@ export default function SuppliersPage() {
     defaultValues: {
       type: "societe",
       active: true,
+      firstName: "",
+      lastName: "",
+      companyName: "",
+      companyType: "",
+      phone: "",
+      mobile: "",
+      email: "",
+      contactName: "",
+      address: "",
+      city: "",
+      postalCode: "",
+      country: "",
+      taxId: "",
+      commercialRegister: "",
+      photo: "",
     },
   });
 
@@ -430,15 +445,44 @@ export default function SuppliersPage() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (data: z.infer<typeof supplierFormSchema>) =>
-      apiRequest("/api/suppliers", {
+    mutationFn: async (data: z.infer<typeof supplierFormSchema>) => {
+      const response = await fetch("/api/suppliers", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(data),
-      }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Erreur lors de la création");
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       setIsCreateDialogOpen(false);
-      form.reset({ type: "societe", active: true });
+      form.reset({
+        type: "societe",
+        active: true,
+        firstName: "",
+        lastName: "",
+        companyName: "",
+        companyType: "",
+        phone: "",
+        mobile: "",
+        email: "",
+        contactName: "",
+        address: "",
+        city: "",
+        postalCode: "",
+        country: "",
+        taxId: "",
+        commercialRegister: "",
+        photo: "",
+      });
       setActiveTab("general");
       toast({
         title: "Succès",
@@ -455,15 +499,44 @@ export default function SuppliersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: z.infer<typeof supplierFormSchema> }) =>
-      apiRequest(`/api/suppliers/${id}`, {
+    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof supplierFormSchema> }) => {
+      const response = await fetch(`/api/suppliers/${id}`, {
         method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(data),
-      }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Erreur lors de la mise à jour");
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       setIsEditDialogOpen(false);
-      form.reset({ type: "societe", active: true });
+      form.reset({
+        type: "societe",
+        active: true,
+        firstName: "",
+        lastName: "",
+        companyName: "",
+        companyType: "",
+        phone: "",
+        mobile: "",
+        email: "",
+        contactName: "",
+        address: "",
+        city: "",
+        postalCode: "",
+        country: "",
+        taxId: "",
+        commercialRegister: "",
+        photo: "",
+      });
       setActiveTab("general");
       toast({
         title: "Succès",
@@ -480,7 +553,18 @@ export default function SuppliersPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/suppliers/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/suppliers/${id}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Erreur lors de la suppression");
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       toast({
@@ -543,7 +627,25 @@ export default function SuppliersPage() {
     setIsCreateDialogOpen(false);
     setIsEditDialogOpen(false);
     setActiveTab("general");
-    form.reset({ type: "societe", active: true });
+    form.reset({
+      type: "societe",
+      active: true,
+      firstName: "",
+      lastName: "",
+      companyName: "",
+      companyType: "",
+      phone: "",
+      mobile: "",
+      email: "",
+      contactName: "",
+      address: "",
+      city: "",
+      postalCode: "",
+      country: "",
+      taxId: "",
+      commercialRegister: "",
+      photo: "",
+    });
   }, [form]);
 
   const getSupplierDisplayName = (supplier: Supplier) => {
@@ -554,7 +656,7 @@ export default function SuppliersPage() {
   };
 
   // Filtrage des fournisseurs
-  const filteredSuppliers = suppliers.filter((supplier: Supplier) => {
+  const filteredSuppliers = (suppliers as Supplier[]).filter((supplier: Supplier) => {
     const matchesSearch = searchTerm === "" || 
       supplier.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       getSupplierDisplayName(supplier).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -582,7 +684,25 @@ export default function SuppliersPage() {
             setIsCreateDialogOpen(open);
             if (open) {
               setActiveTab("general");
-              form.reset({ type: "societe", active: true });
+              form.reset({
+                type: "societe",
+                active: true,
+                firstName: "",
+                lastName: "",
+                companyName: "",
+                companyType: "",
+                phone: "",
+                mobile: "",
+                email: "",
+                contactName: "",
+                address: "",
+                city: "",
+                postalCode: "",
+                country: "",
+                taxId: "",
+                commercialRegister: "",
+                photo: "",
+              });
             }
           }}>
             <DialogTrigger asChild>
@@ -649,7 +769,7 @@ export default function SuppliersPage() {
               <p className="text-gray-500">Aucun fournisseur trouvé</p>
             </div>
           ) : (
-            filteredSuppliers.map((supplier: Supplier) => (
+            filteredSuppliers.map((supplier) => (
               <Card key={supplier.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
