@@ -223,7 +223,7 @@ export default function MeasurementUnitsPage() {
 
   return (
     <Layout>
-      <div className="space-y-6" data-testid="page-measurement-units">
+      <div className="p-8 space-y-8" data-testid="page-measurement-units">
         <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
@@ -260,7 +260,7 @@ export default function MeasurementUnitsPage() {
         </div>
         </div>
 
-        <Tabs defaultValue="categories" className="space-y-6">
+        <Tabs defaultValue="categories" className="space-y-8">
         <TabsList className="grid w-full grid-cols-2 h-12" data-testid="tabs-list">
           <TabsTrigger value="categories" className="text-lg font-medium" data-testid="tab-categories">
             Catégories ({categories.length})
@@ -271,7 +271,7 @@ export default function MeasurementUnitsPage() {
         </TabsList>
 
         {/* Categories Tab */}
-        <TabsContent value="categories" className="space-y-4">
+        <TabsContent value="categories" className="space-y-8">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-800">Catégories de Mesure</h2>
             <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
@@ -338,7 +338,7 @@ export default function MeasurementUnitsPage() {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredCategories.map((category) => (
               <Card 
                 key={category.id} 
@@ -396,7 +396,7 @@ export default function MeasurementUnitsPage() {
         </TabsContent>
 
         {/* Units Tab */}
-        <TabsContent value="units" className="space-y-4">
+        <TabsContent value="units" className="space-y-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-6">
               <h2 className="text-xl font-semibold text-gray-800">Unités de Mesure</h2>
@@ -536,7 +536,7 @@ export default function MeasurementUnitsPage() {
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredUnits.map((unit) => {
               const category = categories.find(c => c.id === unit.categoryId);
               return (
