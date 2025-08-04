@@ -206,8 +206,11 @@ sqlite.exec(`
   INSERT OR IGNORE INTO users (id, username, email, password, role, first_name, last_name) VALUES 
     (1, 'admin', 'admin@bakery.com', 'admin123', 'admin', 'Administrateur', 'Principal');
 
-  INSERT OR IGNORE INTO storage_locations (id, name, temperature, description, active) VALUES 
-    (1, 'Frigo A', 4.0, 'Réfrigérateur principal', 1);
+  INSERT OR IGNORE INTO storage_locations (id, name, temperature, humidity, capacity, description, active) VALUES 
+    (1, 'Réfrigérateur Principal', 4.0, 80.0, 150.0, 'Réfrigérateur principal pour produits frais', 1),
+    (2, 'Congélateur', -18.0, 70.0, 80.0, 'Congélateur pour produits surgelés', 1),
+    (3, 'Réserve Sèche', 20.0, 60.0, 200.0, 'Stockage température ambiante pour ingrédients secs', 1),
+    (4, 'Cave à Vin', 12.0, 75.0, 50.0, 'Cave pour conservation des alcools et vins de cuisine', 1);
 
   INSERT OR IGNORE INTO measurement_categories (id, designation, code, description, active) VALUES 
     (1, 'Poids', 'PDS', 'Unités de mesure de poids', 1),
@@ -216,17 +219,35 @@ sqlite.exec(`
   INSERT OR IGNORE INTO measurement_units (id, category_id, label, abbreviation, type, conversion_factor, active) VALUES 
     (1, 1, 'Gramme', 'g', 'reference', 1.0, 1),
     (2, 1, 'Kilogramme', 'kg', 'larger', 1000.0, 1),
-    (3, 2, 'Litre', 'l', 'reference', 1.0, 1),
-    (4, 1, 'Pièce', 'pièce', 'reference', 1.0, 1);
+    (3, 1, 'Tonne', 't', 'larger', 1000000.0, 1),
+    (4, 1, 'Milligramme', 'mg', 'smaller', 0.001, 1),
+    (5, 2, 'Litre', 'l', 'reference', 1.0, 1),
+    (6, 2, 'Millilitre', 'ml', 'smaller', 0.001, 1),
+    (7, 2, 'Centilitre', 'cl', 'smaller', 0.01, 1),
+    (8, 2, 'Décilitre', 'dl', 'smaller', 0.1, 1),
+    (9, 1, 'Pièce', 'pièce', 'reference', 1.0, 1),
+    (10, 1, 'Douzaine', 'dz', 'larger', 12.0, 1),
+    (11, 1, 'Centaine', 'cent', 'larger', 100.0, 1),
+    (12, 1, 'Sachet', 'sachet', 'reference', 1.0, 1),
+    (13, 1, 'Boîte', 'boîte', 'reference', 1.0, 1),
+    (14, 1, 'Paquet', 'paquet', 'reference', 1.0, 1);
 
   INSERT OR IGNORE INTO article_categories (id, designation, description, active) VALUES 
-    (1, 'Pâtisseries', 'Produits de pâtisserie', 1),
+    (1, 'Pâtisseries', 'Produits de pâtisserie fine et traditionnelle', 1),
     (2, 'Viennoiseries', 'Viennoiseries et pains spéciaux', 1),
-    (3, 'Ingrédients', 'Ingrédients de base', 1);
+    (3, 'Ingrédients', 'Ingrédients de base pour production', 1),
+    (4, 'Chocolaterie', 'Produits chocolatés et confiserie', 1),
+    (5, 'Glacerie', 'Glaces et sorbets artisanaux', 1),
+    (6, 'Boulangerie', 'Pains et produits de boulangerie', 1),
+    (7, 'Emballages', 'Matériaux d emballage et présentation', 1),
+    (8, 'Équipements', 'Équipements et ustensiles', 1);
 
-  INSERT OR IGNORE INTO storage_zones (id, designation, code, storage_location_id, description, active) VALUES 
-    (1, 'Zone Froide', 'ZON-000001', 1, 'Zone de stockage réfrigérée', 1),
-    (2, 'Zone Sèche', 'ZON-000002', null, 'Zone de stockage à température ambiante', 1);
+  INSERT OR IGNORE INTO storage_zones (id, designation, code, storage_location_id, description, capacity, unit, temperature, active) VALUES 
+    (1, 'Zone Froide', 'ZON-000001', 1, 'Zone de stockage réfrigérée principale', 50.0, 'm³', 4.0, 1),
+    (2, 'Zone Sèche', 'ZON-000002', null, 'Zone de stockage à température ambiante', 100.0, 'm³', 20.0, 1),
+    (3, 'Congélation', 'ZON-000003', 1, 'Zone de congélation -18°C', 25.0, 'm³', -18.0, 1),
+    (4, 'Réserve Ingrédients', 'ZON-000004', null, 'Stockage ingrédients secs', 75.0, 'm³', 18.0, 1),
+    (5, 'Zone Chambre Froide', 'ZON-000005', 1, 'Chambre froide positive', 30.0, 'm³', 2.0, 1);
 
   INSERT OR IGNORE INTO taxes (id, designation, code, rate, type, description, active) VALUES 
     (1, 'TVA Standard', 'TVA-19', 19.0, 'tva', 'TVA à 19% pour produits alimentaires', 1),
@@ -236,7 +257,34 @@ sqlite.exec(`
   INSERT OR IGNORE INTO sale_categories (id, designation, description, active) VALUES 
     (1, 'Vente au détail', 'Vente directe aux particuliers', 1),
     (2, 'Vente en gros', 'Vente aux professionnels et revendeurs', 1),
-    (3, 'Commandes spéciales', 'Commandes personnalisées et événements', 1);
+    (3, 'Commandes spéciales', 'Commandes personnalisées et événements', 1),
+    (4, 'Vente en ligne', 'Commandes via site web et applications', 1),
+    (5, 'Traiteur', 'Services de traiteur et buffets', 1),
+    (6, 'Export', 'Ventes à l exportation', 1);
+
+  INSERT OR IGNORE INTO currencies (id, designation, code, symbol, exchange_rate, is_default, active) VALUES 
+    (1, 'Dinar Algérien', 'DZD', 'DA', 1.0, 1, 1),
+    (2, 'Euro', 'EUR', '€', 0.0074, 0, 1),
+    (3, 'Dollar Américain', 'USD', '$', 0.0088, 0, 1);
+
+  INSERT OR IGNORE INTO price_lists (id, designation, code, type, description, active) VALUES 
+    (1, 'Tarif Standard', 'STD-001', 'standard', 'Tarif standard pour particuliers', 1),
+    (2, 'Tarif Professionnel', 'PRO-001', 'professionnel', 'Tarif réduit pour professionnels', 1),
+    (3, 'Tarif VIP', 'VIP-001', 'vip', 'Tarif préférentiel clients VIP', 1),
+    (4, 'Tarif Gros', 'GRO-001', 'gros', 'Tarif dégressif vente en gros', 1);
+
+  INSERT OR IGNORE INTO delivery_methods (id, designation, code, cost, description, active) VALUES 
+    (1, 'Retrait en magasin', 'RET-001', 0.0, 'Retrait gratuit en magasin', 1),
+    (2, 'Livraison locale', 'LIV-001', 250.0, 'Livraison dans un rayon de 10km', 1),
+    (3, 'Livraison express', 'EXP-001', 500.0, 'Livraison dans les 2 heures', 1),
+    (4, 'Livraison régionale', 'REG-001', 750.0, 'Livraison en région', 1);
+
+  INSERT OR IGNORE INTO work_stations (id, designation, code, description, active) VALUES 
+    (1, 'Poste Pâtisserie', 'PST-001', 'Station de travail pâtisserie fine', 1),
+    (2, 'Poste Viennoiserie', 'PST-002', 'Station de travail viennoiserie', 1),
+    (3, 'Poste Chocolaterie', 'PST-003', 'Station de travail chocolaterie', 1),
+    (4, 'Poste Glacerie', 'PST-004', 'Station de travail glaces et sorbets', 1),
+    (5, 'Poste Finition', 'PST-005', 'Station de finition et décoration', 1);
 
   INSERT OR IGNORE INTO articles (id, code, name, type, description, category_id, unit, cost_per_unit, current_stock, min_stock, max_stock, is_perishable, shelf_life, storage_conditions, price, active) VALUES 
     (1, 'ING-000001', 'Farine T55', 'ingredient', 'Farine de blé type 55 pour pâtisserie', 3, 'kg', 1.20, 50.00, 10.00, 100.00, 0, null, null, 0.00, 1),
@@ -248,5 +296,20 @@ sqlite.exec(`
     (7, 'PRD-000004', 'Éclair au chocolat', 'product', 'Éclair garni de crème pâtissière au chocolat', 1, 'pièce', 1.80, 0.00, 0.00, 0.00, 1, 2, 'froid +4°', 4.20, 1),
     (8, 'ING-000004', 'Chocolat noir 70%', 'ingredient', 'Chocolat de couverture noir 70% cacao', 3, 'kg', 12.30, 8.00, 3.00, 25.00, 0, null, 'sec température ambiante', 0.00, 1),
     (9, 'PRD-000005', 'Millefeuille vanille', 'product', 'Millefeuille traditionnel à la crème vanille', 1, 'pièce', 3.50, 0.00, 0.00, 0.00, 1, 1, 'froid +4°', 7.80, 1),
-    (10, 'SRV-000001', 'Décoration gâteau', 'service', 'Service de décoration personnalisée pour gâteaux', 3, 'heure', 0.00, 0.00, 0.00, 0.00, 0, null, null, 45.00, 1);
+    (10, 'SRV-000001', 'Décoration gâteau', 'service', 'Service de décoration personnalisée pour gâteaux', 3, 'heure', 0.00, 0.00, 0.00, 0.00, 0, null, null, 45.00, 1),
+    (11, 'ING-000005', 'Sucre cristallisé', 'ingredient', 'Sucre blanc cristallisé raffiné', 3, 'kg', 2.80, 25.00, 5.00, 75.00, 0, null, 'sec température ambiante', 0.00, 1),
+    (12, 'ING-000006', 'Levure fraîche', 'ingredient', 'Levure de boulanger fraîche', 3, 'kg', 8.90, 2.00, 1.00, 10.00, 1, 14, 'froid +4°', 0.00, 1),
+    (13, 'PRD-000006', 'Religieuse café', 'product', 'Religieuse au café avec crème au beurre', 1, 'pièce', 2.20, 0.00, 0.00, 0.00, 1, 2, 'froid +4°', 5.80, 1),
+    (14, 'ING-000007', 'Crème liquide 35%', 'ingredient', 'Crème fraîche liquide 35% matière grasse', 3, 'l', 4.50, 8.00, 3.00, 20.00, 1, 7, 'froid +4°', 0.00, 1),
+    (15, 'PRD-000007', 'Macaron assortis', 'product', 'Assortiment de 6 macarons parfums variés', 4, 'boîte', 4.80, 0.00, 0.00, 0.00, 1, 5, 'température ambiante', 12.00, 1);
+
+  INSERT OR IGNORE INTO clients (id, code, type, raison_sociale, nom, prenom, telephone, email, adresse, wilaya, active) VALUES 
+    (1, 'CLI-000001', 'particulier', null, 'Dubois', 'Marie', '0555123456', 'marie.dubois@email.com', '15 Rue de la Paix', 'Alger', 1),
+    (2, 'CLI-000002', 'société', 'Restaurant Le Gourmet SARL', 'Benali', 'Ahmed', '0555987654', 'contact@restaurant-gourmet.dz', '25 Boulevard Mohamed V', 'Oran', 1),
+    (3, 'CLI-000003', 'particulier', null, 'Martin', 'Jean', '0555456789', 'jean.martin@email.com', '8 Avenue des Martyrs', 'Constantine', 1);
+
+  INSERT OR IGNORE INTO suppliers (id, code, name, contact_person, phone, email, address, active) VALUES 
+    (1, 'FOU-000001', 'Moulin des Aurès', 'Karim Benali', '0555111222', 'commercial@moulin-aures.dz', 'Zone Industrielle Sétif', 1),
+    (2, 'FOU-000002', 'Laiterie du Tell', 'Fatima Bouregaa', '0555333444', 'ventes@laiterie-tell.dz', 'Route Nationale Blida', 1),
+    (3, 'FOU-000003', 'Épicerie Méditerranée', 'Mohamed Cherif', '0555555666', 'commandes@epicerie-med.dz', 'Marché Central Alger', 1);
 `);
