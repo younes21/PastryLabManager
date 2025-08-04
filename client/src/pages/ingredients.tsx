@@ -482,7 +482,16 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
           <Button type="button" variant="outline" onClick={onCancel}>
             Annuler
           </Button>
-          <Button type="submit" disabled={submitting} data-testid="button-submit-ingredient">
+          <Button 
+            type="submit" 
+            disabled={submitting} 
+            data-testid="button-submit-ingredient"
+            onClick={(e) => {
+              console.log("Button clicked!");
+              console.log("Form state:", form.formState);
+              // Le submit sera géré par onSubmit du form
+            }}
+          >
             {submitting ? "Enregistrement..." : "Enregistrer"}
           </Button>
         </div>
@@ -517,6 +526,8 @@ export default function IngredientsPage() {
       maxStock: "0",
       costPerUnit: "0",
       salePrice: "0",
+      unit: "kg",
+      type: "ingredient" as const,
     },
   });
 
@@ -672,6 +683,9 @@ export default function IngredientsPage() {
   // Handlers stables
   const handleCreate = useCallback((data: z.infer<typeof ingredientFormSchema>) => {
     console.log("Creating ingredient with data:", data);
+    console.log("Form errors:", form.formState.errors);
+    console.log("Form is valid:", form.formState.isValid);
+    
     const submissionData = {
       ...data,
       type: 'ingredient' as const,
@@ -680,8 +694,10 @@ export default function IngredientsPage() {
       active: data.active ?? true,
       unit: data.unit || 'kg'
     };
+    
+    console.log("Submitting:", submissionData);
     createMutation.mutate(submissionData);
-  }, [createMutation]);
+  }, [createMutation, form.formState.errors, form.formState.isValid]);
 
   const handleEdit = useCallback((ingredient: Ingredient) => {
     setSelectedIngredient(ingredient);
