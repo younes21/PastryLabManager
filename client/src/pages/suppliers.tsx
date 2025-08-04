@@ -221,6 +221,9 @@ export default function SuppliersPage() {
     onSubmit: (data: z.infer<typeof supplierFormSchema>) => void;
     isLoading: boolean;
   }) => {
+    // Obtenir le type actuel sans watcher pour éviter les re-renders
+    const [supplierType, setSupplierType] = useState<"particulier" | "societe">(form.getValues("type") || "societe");
+    
     return (
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -240,7 +243,10 @@ export default function SuppliersPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={(value: "particulier" | "societe") => {
+                      field.onChange(value);
+                      setSupplierType(value);
+                    }} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-supplier-type">
                           <SelectValue placeholder="Sélectionnez un type" />
@@ -256,7 +262,7 @@ export default function SuppliersPage() {
                 )}
               />
 
-              {form.watch("type") === "societe" && (
+              {supplierType === "societe" && (
                 <FormField
                   control={form.control}
                   name="companyType"
@@ -282,7 +288,7 @@ export default function SuppliersPage() {
               )}
             </div>
 
-            {form.watch("type") === "particulier" ? (
+            {supplierType === "particulier" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
