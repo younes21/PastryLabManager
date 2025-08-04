@@ -1442,11 +1442,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/storage-zones", async (req, res) => {
     try {
+      console.log("Storage zone data received:", req.body);
       const zoneData = insertStorageZoneSchema.parse(req.body);
+      console.log("Storage zone data parsed:", zoneData);
       const zone = await storage.createStorageZone(zoneData);
       res.status(201).json(zone);
     } catch (error) {
-      res.status(400).json({ message: "Invalid storage zone data" });
+      console.error("Storage zone creation error:", error);
+      res.status(400).json({ message: "Invalid storage zone data", error: error.message });
     }
   });
 

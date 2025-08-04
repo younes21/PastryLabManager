@@ -16,11 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import type { StorageZone, InsertStorageZone } from "@shared/schema";
 
 const storageZoneFormSchema = z.object({
-  code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
   temperature: z.string().optional(),
   capacity: z.string().optional(),
+  unit: z.string().optional(),
+  storageLocationId: z.number().optional(),
   active: z.boolean().default(true),
 });
 
@@ -41,6 +42,8 @@ export default function StorageZonesPage() {
       description: "",
       temperature: "",
       capacity: "",
+      unit: "",
+      storageLocationId: undefined,
       active: true,
     },
   });
