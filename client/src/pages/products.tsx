@@ -29,11 +29,9 @@ const commonUnits = [
   "pièce", "kg", "g", "l", "ml", "m", "cm", "m²", "m³", "boîte", "paquet", "sachet"
 ];
 
-function RecipeManagement({ productId }: { productId: number }) {
-  const [recipeForm, setRecipeForm] = useState<InsertRecipe | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const { toast } = useToast();
-
+function RecipeDisplay({ productId }: { productId: number }) {
+  const [recipeDialogOpen, setRecipeDialogOpen] = useState(false);
+  
   const { data: recipe, isLoading } = useQuery<Recipe>({
     queryKey: ["/api/products", productId, "recipe"],
     queryFn: () => fetch(`/api/products/${productId}/recipe`).then(res => {
@@ -43,6 +41,92 @@ function RecipeManagement({ productId }: { productId: number }) {
     }),
   });
 
+  if (isLoading) {
+    return <div className="p-4">Chargement de la recette...</div>;
+  }
+
+  if (!recipe) {
+    return (
+      <div className="text-center p-6">
+        <p className="text-muted-foreground mb-4">Aucune recette associée à ce produit</p>
+        <Dialog open={recipeDialogOpen} onOpenChange={setRecipeDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-recipe">
+              <Plus className="w-4 h-4 mr-2" />
+              Créer une recette
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Créer une recette</DialogTitle>
+              <DialogDescription>
+                Créer une nouvelle recette pour ce produit
+              </DialogDescription>
+            </DialogHeader>
+            <RecipeForm productId={productId} onSuccess={() => setRecipeDialogOpen(false)} />
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold">{recipe.designation}</h3>
+          {recipe.description && (
+            <p className="text-muted-foreground">{recipe.description}</p>
+          )}
+        </div>
+        <div className="flex space-x-2">
+          <Dialog open={recipeDialogOpen} onOpenChange={setRecipeDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-edit-recipe">
+                <Edit className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Modifier la recette</DialogTitle>
+                <DialogDescription>
+                  Modifier la recette de ce produit
+                </DialogDescription>
+              </DialogHeader>
+              <RecipeForm 
+                productId={productId} 
+                recipeData={recipe}
+                onSuccess={() => setRecipeDialogOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+        <div>
+          <span className="text-sm font-medium">Quantité/Parts:</span>
+          <p className="text-lg">{recipe.quantity} {recipe.unit}</p>
+        </div>
+        <div>
+          <span className="text-sm font-medium">Type:</span>
+          <Badge variant={recipe.isSubRecipe ? "secondary" : "default"}>
+            {recipe.isSubRecipe ? "Sous-recette" : "Recette principale"}
+          </Badge>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecipeForm({ productId, recipeData, onSuccess }: { 
+  productId: number; 
+  recipeData?: Recipe; 
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+
   const { data: measurementUnits } = useQuery<MeasurementUnit[]>({
     queryKey: ["/api/measurement-units"],
   });
@@ -51,11 +135,11 @@ function RecipeManagement({ productId }: { productId: number }) {
     resolver: zodResolver(insertRecipeSchema),
     defaultValues: {
       productId,
-      designation: recipe?.designation || "",
-      description: recipe?.description || "",
-      quantity: recipe?.quantity || "1",
-      unit: recipe?.unit || "pièce",
-      isSubRecipe: Boolean(recipe?.isSubRecipe ?? false),
+      designation: recipeData?.designation || "",
+      description: recipeData?.description || "",
+      quantity: recipeData?.quantity || "1",
+      unit: recipeData?.unit || "pièce",
+      isSubRecipe: Boolean(recipeData?.isSubRecipe ?? false),
     },
   });
 
@@ -64,7 +148,7 @@ function RecipeManagement({ productId }: { productId: number }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
       toast({ title: "Recette créée avec succès" });
-      setIsEditing(false);
+      onSuccess();
     },
     onError: () => {
       toast({ title: "Erreur lors de la création", variant: "destructive" });
@@ -72,110 +156,24 @@ function RecipeManagement({ productId }: { productId: number }) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: InsertRecipe) => apiRequest(`/api/recipes/${recipe!.id}`, "PUT", data),
+    mutationFn: (data: InsertRecipe) => apiRequest(`/api/recipes/${recipeData!.id}`, "PUT", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
       toast({ title: "Recette modifiée avec succès" });
-      setIsEditing(false);
+      onSuccess();
     },
     onError: () => {
       toast({ title: "Erreur lors de la modification", variant: "destructive" });
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/recipes/${recipe!.id}`, "DELETE"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
-      toast({ title: "Recette supprimée avec succès" });
-      setIsEditing(false);
-    },
-    onError: () => {
-      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
-    },
-  });
-
   const onSubmit = (data: InsertRecipe) => {
-    if (recipe) {
+    if (recipeData) {
       updateMutation.mutate(data);
     } else {
       createMutation.mutate(data);
     }
   };
-
-  const handleEdit = () => {
-    if (recipe) {
-      form.reset({
-        productId,
-        designation: recipe.designation,
-        description: recipe.description || "",
-        quantity: recipe.quantity,
-        unit: recipe.unit,
-        isSubRecipe: recipe.isSubRecipe,
-      });
-    }
-    setIsEditing(true);
-  };
-
-  const handleDelete = () => {
-    if (recipe && confirm('Êtes-vous sûr de vouloir supprimer cette recette ?')) {
-      deleteMutation.mutate();
-    }
-  };
-
-  if (isLoading) {
-    return <div className="p-4">Chargement de la recette...</div>;
-  }
-
-  if (!recipe && !isEditing) {
-    return (
-      <div className="text-center p-6">
-        <p className="text-muted-foreground mb-4">Aucune recette associée à ce produit</p>
-        <Button onClick={() => setIsEditing(true)} data-testid="button-create-recipe">
-          <Plus className="w-4 h-4 mr-2" />
-          Créer une recette
-        </Button>
-      </div>
-    );
-  }
-
-  if (recipe && !isEditing) {
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-start">
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">{recipe.designation}</h3>
-            {recipe.description && (
-              <p className="text-muted-foreground">{recipe.description}</p>
-            )}
-          </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={handleEdit} data-testid="button-edit-recipe">
-              <Edit className="w-4 h-4 mr-2" />
-              Modifier
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDelete} data-testid="button-delete-recipe">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Supprimer
-            </Button>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
-          <div>
-            <span className="text-sm font-medium">Quantité/Parts:</span>
-            <p className="text-lg">{recipe.quantity} {recipe.unit}</p>
-          </div>
-          <div>
-            <span className="text-sm font-medium">Type:</span>
-            <Badge variant={recipe.isSubRecipe ? "secondary" : "default"}>
-              {recipe.isSubRecipe ? "Sous-recette" : "Recette principale"}
-            </Badge>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Form {...form}>
@@ -236,9 +234,9 @@ function RecipeManagement({ productId }: { productId: number }) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {commonUnits.map((unit) => (
-                      <SelectItem key={unit} value={unit}>
-                        {unit}
+                    {measurementUnits?.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.label}>
+                        {unit.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -275,21 +273,13 @@ function RecipeManagement({ productId }: { productId: number }) {
 
         <div className="flex justify-end space-x-2">
           <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsEditing(false)}
-            data-testid="button-cancel-recipe"
-          >
-            Annuler
-          </Button>
-          <Button
             type="submit"
             disabled={createMutation.isPending || updateMutation.isPending}
             data-testid="button-submit-recipe"
           >
             {createMutation.isPending || updateMutation.isPending
               ? "Enregistrement..."
-              : recipe
+              : recipeData
               ? "Modifier"
               : "Créer"}
           </Button>
@@ -761,7 +751,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
 
           <TabsContent value="recipe" className="space-y-4">
             {isEditing && product ? (
-              <RecipeManagement productId={product.id} />
+              <RecipeDisplay productId={product.id} />
             ) : (
               <div className="text-center p-6 text-muted-foreground">
                 <p>La gestion des recettes est disponible après la création du produit</p>
