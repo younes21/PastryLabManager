@@ -30,6 +30,7 @@ import StorageZones from "@/pages/storage-zones";
 import WorkStations from "@/pages/work-stations";
 import EmailConfig from "@/pages/email-config";
 import Suppliers from "@/pages/suppliers";
+import Clients from "@/pages/clients";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,6 +160,7 @@ function ProtectedRouter() {
       <Route path="/work-stations" component={WorkStations} />
       <Route path="/email-config" component={EmailConfig} />
       <Route path="/suppliers" component={Suppliers} />
+      <Route path="/clients" component={Clients} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>

@@ -70,6 +70,7 @@ export function Sidebar() {
     { path: "/work-stations", label: "Postes de Travail", icon: "fas fa-cogs", lucideIcon: Settings },
     { path: "/email-config", label: "Configuration Email", icon: "fas fa-envelope", lucideIcon: Mail },
     { path: "/suppliers", label: "Fournisseurs", icon: "fas fa-truck", lucideIcon: Truck },
+    { path: "/clients", label: "Clients", icon: "fas fa-users", lucideIcon: Users },
   ];
 
   // Filter navigation based on user role

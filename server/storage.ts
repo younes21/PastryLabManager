@@ -2,8 +2,9 @@ import {
   users, storageLocations,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
-  suppliers,
+  suppliers, clients,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
+  type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
   type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
   type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule,
@@ -147,6 +148,13 @@ export interface IStorage {
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
   deleteSupplier(id: number): Promise<boolean>;
+
+  // Clients
+  getAllClients(): Promise<Client[]>;
+  getClient(id: number): Promise<Client | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -721,6 +729,44 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSupplier(id: number): Promise<boolean> {
     const result = await db.delete(suppliers).where(eq(suppliers.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Clients
+  async getAllClients(): Promise<Client[]> {
+    return await db.select().from(clients);
+  }
+
+  async getClient(id: number): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client || undefined;
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    // Generate automatic code
+    const existingClients = await this.getAllClients();
+    const nextNumber = existingClients.length + 1;
+    const code = `CLI-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const clientData = {
+      ...insertClient,
+      code,
+    };
+    
+    const [client] = await db.insert(clients).values(clientData).returning();
+    return client;
+  }
+
+  async updateClient(id: number, updateData: Partial<InsertClient>): Promise<Client | undefined> {
+    const [client] = await db.update(clients)
+      .set(updateData)
+      .where(eq(clients.id, id))
+      .returning();
+    return client || undefined;
+  }
+
+  async deleteClient(id: number): Promise<boolean> {
+    const result = await db.delete(clients).where(eq(clients.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

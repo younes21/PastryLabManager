@@ -23,6 +23,43 @@ export const storageLocations = pgTable("storage_locations", {
 
 // Table ingredients supprimée - utilisation de la table articles unifiée avec type="ingredient"
 
+// Clients
+export const clients = pgTable("clients", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // CLI-000001
+  type: text("type").notNull(), // 'particulier' ou 'societe'
+  raisonSociale: text("raison_sociale"), // EURL, SARL, etc.
+  nom: text("nom").notNull(),
+  prenom: text("prenom"),
+  telephone: text("telephone"),
+  mobile: text("mobile"),
+  email: text("email"),
+  
+  // Adresse
+  contactName: text("contact_name"), // Nom du contact
+  adresse: text("adresse"),
+  ville: text("ville"),
+  codePostal: text("code_postal"),
+  wilaya: text("wilaya"),
+  
+  // Informations légales
+  rc: text("rc"), // Registre de commerce
+  na: text("na"), // Numéro d'agrément
+  mf: text("mf"), // Matricule fiscal
+  nis: text("nis"), // Numéro d'identification statistique
+  
+  // Configuration
+  active: boolean("active").default(true),
+  tarifParticulier: boolean("tarif_particulier").default(true), // Tarif particulier ?
+  priceListId: integer("price_list_id").references(() => priceLists.id), // Offre tarifaire
+  photo: text("photo"), // Photo
+  
+  // Lien avec compte utilisateur
+  userId: integer("user_id").references(() => users.id), // Compte utilisateur lié
+  
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
 // Les tables recipes, productions, orders, deliveries et productStock ont été supprimées
 // Elles seront réimplémentées avec de nouvelles règles de gestion
 
@@ -296,7 +333,10 @@ export const insertAccountingAccountSchema = createInsertSchema(accountingAccoun
 export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ id: true, code: true, createdAt: true });
 export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, code: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, code: true, createdAt: true });
+export const insertClientSchema = createInsertSchema(clients).omit({ id: true, code: true, createdAt: true });
 
 // Types pour TypeScript
 export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = typeof insertSupplierSchema._type;
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = typeof insertClientSchema._type;

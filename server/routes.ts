@@ -8,7 +8,7 @@ import {
   insertArticleSchema, insertPriceListSchema, insertPriceRuleSchema, insertTaxSchema, 
   insertCurrencySchema, insertDeliveryMethodSchema, insertAccountingJournalSchema, 
   insertAccountingAccountSchema, insertStorageZoneSchema, insertWorkStationSchema, 
-  insertSupplierSchema
+  insertSupplierSchema, insertClientSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -518,6 +518,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(supplier);
     } catch (error) {
       res.status(400).json({ message: "Invalid supplier data" });
+    }
+  });
+
+  // Clients routes
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getAllClients();
+      res.json(clients);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch clients" });
+    }
+  });
+
+  app.get("/api/clients/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const client = await storage.getClient(id);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      res.json(client);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch client" });
+    }
+  });
+
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = insertClientSchema.parse(req.body);
+      const client = await storage.createClient(clientData);
+      res.status(201).json(client);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid client data" });
+    }
+  });
+
+  app.put("/api/clients/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const clientData = req.body;
+      const client = await storage.updateClient(id, clientData);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      res.json(client);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update client" });
+    }
+  });
+
+  app.delete("/api/clients/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteClient(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      res.json({ message: "Client deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete client" });
     }
   });
 
