@@ -7,7 +7,9 @@ import {
   insertOrderSchema, insertOrderItemSchema, insertDeliverySchema,
   insertProductStockSchema, insertLabelSchema, insertMeasurementCategorySchema,
   insertMeasurementUnitSchema, insertArticleCategorySchema, insertArticleSchema, insertPriceListSchema,
-  insertPriceRuleSchema
+  insertPriceRuleSchema, insertTaxSchema, insertCurrencySchema, insertDeliveryMethodSchema,
+  insertAccountingJournalSchema, insertAccountingAccountSchema, insertStorageZoneSchema,
+  insertWorkStationSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1184,6 +1186,335 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Price rule deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete price rule" });
+    }
+  });
+
+  // ===== TAXES ROUTES =====
+  app.get("/api/taxes", async (req, res) => {
+    try {
+      const taxes = await storage.getAllTaxes();
+      res.json(taxes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch taxes" });
+    }
+  });
+
+  app.post("/api/taxes", async (req, res) => {
+    try {
+      const taxData = insertTaxSchema.parse(req.body);
+      const tax = await storage.createTax(taxData);
+      res.status(201).json(tax);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid tax data" });
+    }
+  });
+
+  app.put("/api/taxes/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const taxData = req.body;
+      const tax = await storage.updateTax(id, taxData);
+      if (!tax) {
+        return res.status(404).json({ message: "Tax not found" });
+      }
+      res.json(tax);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update tax" });
+    }
+  });
+
+  app.delete("/api/taxes/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteTax(id);
+      if (!success) {
+        return res.status(404).json({ message: "Tax not found" });
+      }
+      res.json({ message: "Tax deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete tax" });
+    }
+  });
+
+  // ===== CURRENCIES ROUTES =====
+  app.get("/api/currencies", async (req, res) => {
+    try {
+      const currencies = await storage.getAllCurrencies();
+      res.json(currencies);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch currencies" });
+    }
+  });
+
+  app.post("/api/currencies", async (req, res) => {
+    try {
+      const currencyData = insertCurrencySchema.parse(req.body);
+      const currency = await storage.createCurrency(currencyData);
+      res.status(201).json(currency);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid currency data" });
+    }
+  });
+
+  app.put("/api/currencies/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const currencyData = req.body;
+      const currency = await storage.updateCurrency(id, currencyData);
+      if (!currency) {
+        return res.status(404).json({ message: "Currency not found" });
+      }
+      res.json(currency);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update currency" });
+    }
+  });
+
+  app.delete("/api/currencies/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteCurrency(id);
+      if (!success) {
+        return res.status(404).json({ message: "Currency not found" });
+      }
+      res.json({ message: "Currency deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete currency" });
+    }
+  });
+
+  // ===== DELIVERY METHODS ROUTES =====
+  app.get("/api/delivery-methods", async (req, res) => {
+    try {
+      const methods = await storage.getAllDeliveryMethods();
+      res.json(methods);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch delivery methods" });
+    }
+  });
+
+  app.post("/api/delivery-methods", async (req, res) => {
+    try {
+      const methodData = insertDeliveryMethodSchema.parse(req.body);
+      const method = await storage.createDeliveryMethod(methodData);
+      res.status(201).json(method);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid delivery method data" });
+    }
+  });
+
+  app.put("/api/delivery-methods/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const methodData = req.body;
+      const method = await storage.updateDeliveryMethod(id, methodData);
+      if (!method) {
+        return res.status(404).json({ message: "Delivery method not found" });
+      }
+      res.json(method);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update delivery method" });
+    }
+  });
+
+  app.delete("/api/delivery-methods/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteDeliveryMethod(id);
+      if (!success) {
+        return res.status(404).json({ message: "Delivery method not found" });
+      }
+      res.json({ message: "Delivery method deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete delivery method" });
+    }
+  });
+
+  // ===== ACCOUNTING JOURNALS ROUTES =====
+  app.get("/api/accounting-journals", async (req, res) => {
+    try {
+      const journals = await storage.getAllAccountingJournals();
+      res.json(journals);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch accounting journals" });
+    }
+  });
+
+  app.post("/api/accounting-journals", async (req, res) => {
+    try {
+      const journalData = insertAccountingJournalSchema.parse(req.body);
+      const journal = await storage.createAccountingJournal(journalData);
+      res.status(201).json(journal);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid accounting journal data" });
+    }
+  });
+
+  app.put("/api/accounting-journals/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const journalData = req.body;
+      const journal = await storage.updateAccountingJournal(id, journalData);
+      if (!journal) {
+        return res.status(404).json({ message: "Accounting journal not found" });
+      }
+      res.json(journal);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update accounting journal" });
+    }
+  });
+
+  app.delete("/api/accounting-journals/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteAccountingJournal(id);
+      if (!success) {
+        return res.status(404).json({ message: "Accounting journal not found" });
+      }
+      res.json({ message: "Accounting journal deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete accounting journal" });
+    }
+  });
+
+  // ===== ACCOUNTING ACCOUNTS ROUTES =====
+  app.get("/api/accounting-accounts", async (req, res) => {
+    try {
+      const accounts = await storage.getAllAccountingAccounts();
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch accounting accounts" });
+    }
+  });
+
+  app.post("/api/accounting-accounts", async (req, res) => {
+    try {
+      const accountData = insertAccountingAccountSchema.parse(req.body);
+      const account = await storage.createAccountingAccount(accountData);
+      res.status(201).json(account);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid accounting account data" });
+    }
+  });
+
+  app.put("/api/accounting-accounts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const accountData = req.body;
+      const account = await storage.updateAccountingAccount(id, accountData);
+      if (!account) {
+        return res.status(404).json({ message: "Accounting account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update accounting account" });
+    }
+  });
+
+  app.delete("/api/accounting-accounts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteAccountingAccount(id);
+      if (!success) {
+        return res.status(404).json({ message: "Accounting account not found" });
+      }
+      res.json({ message: "Accounting account deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete accounting account" });
+    }
+  });
+
+  // ===== STORAGE ZONES ROUTES =====
+  app.get("/api/storage-zones", async (req, res) => {
+    try {
+      const zones = await storage.getAllStorageZones();
+      res.json(zones);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch storage zones" });
+    }
+  });
+
+  app.post("/api/storage-zones", async (req, res) => {
+    try {
+      const zoneData = insertStorageZoneSchema.parse(req.body);
+      const zone = await storage.createStorageZone(zoneData);
+      res.status(201).json(zone);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid storage zone data" });
+    }
+  });
+
+  app.put("/api/storage-zones/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const zoneData = req.body;
+      const zone = await storage.updateStorageZone(id, zoneData);
+      if (!zone) {
+        return res.status(404).json({ message: "Storage zone not found" });
+      }
+      res.json(zone);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update storage zone" });
+    }
+  });
+
+  app.delete("/api/storage-zones/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteStorageZone(id);
+      if (!success) {
+        return res.status(404).json({ message: "Storage zone not found" });
+      }
+      res.json({ message: "Storage zone deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete storage zone" });
+    }
+  });
+
+  // ===== WORK STATIONS ROUTES =====
+  app.get("/api/work-stations", async (req, res) => {
+    try {
+      const stations = await storage.getAllWorkStations();
+      res.json(stations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch work stations" });
+    }
+  });
+
+  app.post("/api/work-stations", async (req, res) => {
+    try {
+      const stationData = insertWorkStationSchema.parse(req.body);
+      const station = await storage.createWorkStation(stationData);
+      res.status(201).json(station);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid work station data" });
+    }
+  });
+
+  app.put("/api/work-stations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const stationData = req.body;
+      const station = await storage.updateWorkStation(id, stationData);
+      if (!station) {
+        return res.status(404).json({ message: "Work station not found" });
+      }
+      res.json(station);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update work station" });
+    }
+  });
+
+  app.delete("/api/work-stations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteWorkStation(id);
+      if (!success) {
+        return res.status(404).json({ message: "Work station not found" });
+      }
+      res.json({ message: "Work station deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete work station" });
     }
   });
 

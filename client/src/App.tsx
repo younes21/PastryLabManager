@@ -20,6 +20,13 @@ import PriceLists from "@/pages/price-lists";
 import ClientCatalog from "@/pages/client-catalog";
 import ClientDashboard from "@/pages/client-dashboard";
 import DeliveryDashboard from "@/pages/delivery-dashboard";
+import Taxes from "@/pages/taxes";
+import Currencies from "@/pages/currencies";
+import DeliveryMethods from "@/pages/delivery-methods";
+import AccountingJournals from "@/pages/accounting-journals";
+import AccountingAccounts from "@/pages/accounting-accounts";
+import StorageZones from "@/pages/storage-zones";
+import WorkStations from "@/pages/work-stations";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,6 +146,13 @@ function ProtectedRouter() {
       <Route path="/measurement-units" component={MeasurementUnits} />
       <Route path="/article-categories" component={ArticleCategories} />
       <Route path="/price-lists" component={PriceLists} />
+      <Route path="/taxes" component={Taxes} />
+      <Route path="/currencies" component={Currencies} />
+      <Route path="/delivery-methods" component={DeliveryMethods} />
+      <Route path="/accounting-journals" component={AccountingJournals} />
+      <Route path="/accounting-accounts" component={AccountingAccounts} />
+      <Route path="/storage-zones" component={StorageZones} />
+      <Route path="/work-stations" component={WorkStations} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>

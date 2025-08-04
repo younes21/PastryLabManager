@@ -257,3 +257,146 @@ export type PriceList = typeof priceLists.$inferSelect;
 export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
 export type PriceRule = typeof priceRules.$inferSelect;
 export type InsertPriceRule = z.infer<typeof insertPriceRuleSchema>;
+
+// 7. Taxes des articles
+export const taxes = pgTable("taxes", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  code: text("code").notNull().unique(), // TAX-000001
+  rate: decimal("rate", { precision: 5, scale: 2 }).notNull(), // Taux en pourcentage
+  description: text("description"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// 8. Devises (Currencies)
+export const currencies = pgTable("currencies", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(), // Euro, Dollar US, Dinar Algérien
+  code: text("code").notNull().unique(), // EUR, USD, DZD
+  symbol: text("symbol").notNull(), // €, $, DA
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }).default("1.0000"), // Taux par rapport à la devise de base
+  isBase: boolean("is_base").default(false), // Une seule devise de base
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// 9. Modes de livraison
+export const deliveryMethods = pgTable("delivery_methods", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  code: text("code").notNull().unique(), // LIV-000001
+  description: text("description"),
+  cost: decimal("cost", { precision: 10, scale: 2 }).default("0"), // Coût de livraison
+  estimatedTime: text("estimated_time"), // "24h", "2-3 jours", etc.
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// 10. Journaux comptables
+export const accountingJournals = pgTable("accounting_journals", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  code: text("code").notNull().unique(), // JRN-000001
+  type: text("type").notNull(), // 'vente', 'achat', 'banque', 'caisse', 'operations_diverses'
+  description: text("description"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Comptes comptables
+export const accountingAccounts = pgTable("accounting_accounts", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  code: text("code").notNull().unique(), // Numéro de compte comptable
+  type: text("type").notNull(), // 'actif', 'passif', 'charge', 'produit'
+  parentId: integer("parent_id"), // Comptes hiérarchiques - référence ajoutée après
+  description: text("description"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// 11. Zones de stockage (extension de storage_locations existant)
+export const storageZones = pgTable("storage_zones", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  code: text("code").notNull().unique(), // ZON-000001
+  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
+  description: text("description"),
+  capacity: decimal("capacity", { precision: 10, scale: 2 }),
+  unit: text("unit"), // 'kg', 'l', 'm3', 'pieces'
+  temperature: decimal("temperature", { precision: 5, scale: 2 }),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// 12. Postes de travail (équipements)
+export const workStations = pgTable("work_stations", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  code: text("code").notNull().unique(), // PST-000001
+  type: text("type").notNull(), // 'four', 'mixeur', 'refrigerateur', 'plan_travail', 'machine_specialist'
+  brand: text("brand"), // Marque
+  model: text("model"), // Modèle
+  serialNumber: text("serial_number"), // Numéro de série
+  capacity: text("capacity"), // Capacité/dimension
+  power: text("power"), // Puissance
+  description: text("description"),
+  maintenanceDate: timestamp("maintenance_date", { mode: 'string' }), // Dernière maintenance
+  nextMaintenanceDate: timestamp("next_maintenance_date", { mode: 'string' }), // Prochaine maintenance
+  status: text("status").notNull().default("operationnel"), // 'operationnel', 'en_panne', 'maintenance', 'hors_service'
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Insert schemas pour les nouvelles tables
+export const insertTaxSchema = createInsertSchema(taxes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCurrencySchema = createInsertSchema(currencies).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDeliveryMethodSchema = createInsertSchema(deliveryMethods).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAccountingJournalSchema = createInsertSchema(accountingJournals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAccountingAccountSchema = createInsertSchema(accountingAccounts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkStationSchema = createInsertSchema(workStations).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types pour les nouvelles tables
+export type Tax = typeof taxes.$inferSelect;
+export type InsertTax = z.infer<typeof insertTaxSchema>;
+export type Currency = typeof currencies.$inferSelect;
+export type InsertCurrency = z.infer<typeof insertCurrencySchema>;
+export type DeliveryMethod = typeof deliveryMethods.$inferSelect;
+export type InsertDeliveryMethod = z.infer<typeof insertDeliveryMethodSchema>;
+export type AccountingJournal = typeof accountingJournals.$inferSelect;
+export type InsertAccountingJournal = z.infer<typeof insertAccountingJournalSchema>;
+export type AccountingAccount = typeof accountingAccounts.$inferSelect;
+export type InsertAccountingAccount = z.infer<typeof insertAccountingAccountSchema>;
+export type StorageZone = typeof storageZones.$inferSelect;
+export type InsertStorageZone = z.infer<typeof insertStorageZoneSchema>;
+export type WorkStation = typeof workStations.$inferSelect;
+export type InsertWorkStation = z.infer<typeof insertWorkStationSchema>;

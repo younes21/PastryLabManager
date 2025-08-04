@@ -2,6 +2,7 @@ import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
+  taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
@@ -9,7 +10,10 @@ import {
   type Delivery, type InsertDelivery, type ProductStock, type InsertProductStock,
   type Label, type InsertLabel, type MeasurementCategory, type InsertMeasurementCategory,
   type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
-  type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule
+  type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule,
+  type Tax, type InsertTax, type Currency, type InsertCurrency, type DeliveryMethod, type InsertDeliveryMethod,
+  type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
+  type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -163,6 +167,58 @@ export interface IStorage {
   createPriceRule(priceRule: InsertPriceRule): Promise<PriceRule>;
   updatePriceRule(id: number, priceRule: Partial<InsertPriceRule>): Promise<PriceRule | undefined>;
   deletePriceRule(id: number): Promise<boolean>;
+
+  // Taxes
+  getAllTaxes(): Promise<Tax[]>;
+  getTax(id: number): Promise<Tax | undefined>;
+  createTax(tax: InsertTax): Promise<Tax>;
+  updateTax(id: number, tax: Partial<InsertTax>): Promise<Tax | undefined>;
+  deleteTax(id: number): Promise<boolean>;
+
+  // Currencies
+  getAllCurrencies(): Promise<Currency[]>;
+  getCurrency(id: number): Promise<Currency | undefined>;
+  getBaseCurrency(): Promise<Currency | undefined>;
+  createCurrency(currency: InsertCurrency): Promise<Currency>;
+  updateCurrency(id: number, currency: Partial<InsertCurrency>): Promise<Currency | undefined>;
+  deleteCurrency(id: number): Promise<boolean>;
+
+  // Delivery Methods
+  getAllDeliveryMethods(): Promise<DeliveryMethod[]>;
+  getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined>;
+  createDeliveryMethod(deliveryMethod: InsertDeliveryMethod): Promise<DeliveryMethod>;
+  updateDeliveryMethod(id: number, deliveryMethod: Partial<InsertDeliveryMethod>): Promise<DeliveryMethod | undefined>;
+  deleteDeliveryMethod(id: number): Promise<boolean>;
+
+  // Accounting Journals
+  getAllAccountingJournals(): Promise<AccountingJournal[]>;
+  getAccountingJournal(id: number): Promise<AccountingJournal | undefined>;
+  createAccountingJournal(journal: InsertAccountingJournal): Promise<AccountingJournal>;
+  updateAccountingJournal(id: number, journal: Partial<InsertAccountingJournal>): Promise<AccountingJournal | undefined>;
+  deleteAccountingJournal(id: number): Promise<boolean>;
+
+  // Accounting Accounts
+  getAllAccountingAccounts(): Promise<AccountingAccount[]>;
+  getAccountingAccount(id: number): Promise<AccountingAccount | undefined>;
+  createAccountingAccount(account: InsertAccountingAccount): Promise<AccountingAccount>;
+  updateAccountingAccount(id: number, account: Partial<InsertAccountingAccount>): Promise<AccountingAccount | undefined>;
+  deleteAccountingAccount(id: number): Promise<boolean>;
+
+  // Storage Zones
+  getAllStorageZones(): Promise<StorageZone[]>;
+  getStorageZone(id: number): Promise<StorageZone | undefined>;
+  getStorageZonesByLocation(locationId: number): Promise<StorageZone[]>;
+  createStorageZone(zone: InsertStorageZone): Promise<StorageZone>;
+  updateStorageZone(id: number, zone: Partial<InsertStorageZone>): Promise<StorageZone | undefined>;
+  deleteStorageZone(id: number): Promise<boolean>;
+
+  // Work Stations
+  getAllWorkStations(): Promise<WorkStation[]>;
+  getWorkStation(id: number): Promise<WorkStation | undefined>;
+  getWorkStationsByType(type: string): Promise<WorkStation[]>;
+  createWorkStation(station: InsertWorkStation): Promise<WorkStation>;
+  updateWorkStation(id: number, station: Partial<InsertWorkStation>): Promise<WorkStation | undefined>;
+  deleteWorkStation(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1023,6 +1079,256 @@ export class DatabaseStorage implements IStorage {
 
   async deletePriceRule(id: number): Promise<boolean> {
     const result = await db.delete(priceRules).where(eq(priceRules.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== TAXES METHODS =====
+  async getAllTaxes(): Promise<Tax[]> {
+    return await db.select().from(taxes).orderBy(taxes.designation);
+  }
+
+  async getTax(id: number): Promise<Tax | undefined> {
+    const [tax] = await db.select().from(taxes).where(eq(taxes.id, id));
+    return tax || undefined;
+  }
+
+  async createTax(insertTax: InsertTax): Promise<Tax> {
+    // Generate unique code
+    const allTaxes = await db.select().from(taxes);
+    const code = `TAX-${String(allTaxes.length + 1).padStart(6, '0')}`;
+    
+    const [tax] = await db.insert(taxes).values({
+      ...insertTax,
+      code
+    }).returning();
+    return tax;
+  }
+
+  async updateTax(id: number, updateData: Partial<InsertTax>): Promise<Tax | undefined> {
+    const [tax] = await db.update(taxes)
+      .set(updateData)
+      .where(eq(taxes.id, id))
+      .returning();
+    return tax || undefined;
+  }
+
+  async deleteTax(id: number): Promise<boolean> {
+    const result = await db.delete(taxes).where(eq(taxes.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== CURRENCIES METHODS =====
+  async getAllCurrencies(): Promise<Currency[]> {
+    return await db.select().from(currencies).orderBy(currencies.designation);
+  }
+
+  async getCurrency(id: number): Promise<Currency | undefined> {
+    const [currency] = await db.select().from(currencies).where(eq(currencies.id, id));
+    return currency || undefined;
+  }
+
+  async getBaseCurrency(): Promise<Currency | undefined> {
+    const [currency] = await db.select().from(currencies).where(eq(currencies.isBase, true));
+    return currency || undefined;
+  }
+
+  async createCurrency(insertCurrency: InsertCurrency): Promise<Currency> {
+    const [currency] = await db.insert(currencies).values(insertCurrency).returning();
+    return currency;
+  }
+
+  async updateCurrency(id: number, updateData: Partial<InsertCurrency>): Promise<Currency | undefined> {
+    // If setting as base currency, unset all others first
+    if (updateData.isBase === true) {
+      await db.update(currencies).set({ isBase: false }).where(eq(currencies.isBase, true));
+    }
+    
+    const [currency] = await db.update(currencies)
+      .set(updateData)
+      .where(eq(currencies.id, id))
+      .returning();
+    return currency || undefined;
+  }
+
+  async deleteCurrency(id: number): Promise<boolean> {
+    const result = await db.delete(currencies).where(eq(currencies.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== DELIVERY METHODS =====
+  async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
+    return await db.select().from(deliveryMethods).orderBy(deliveryMethods.designation);
+  }
+
+  async getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined> {
+    const [method] = await db.select().from(deliveryMethods).where(eq(deliveryMethods.id, id));
+    return method || undefined;
+  }
+
+  async createDeliveryMethod(insertMethod: InsertDeliveryMethod): Promise<DeliveryMethod> {
+    // Generate unique code
+    const allMethods = await db.select().from(deliveryMethods);
+    const code = `LIV-${String(allMethods.length + 1).padStart(6, '0')}`;
+    
+    const [method] = await db.insert(deliveryMethods).values({
+      ...insertMethod,
+      code
+    }).returning();
+    return method;
+  }
+
+  async updateDeliveryMethod(id: number, updateData: Partial<InsertDeliveryMethod>): Promise<DeliveryMethod | undefined> {
+    const [method] = await db.update(deliveryMethods)
+      .set(updateData)
+      .where(eq(deliveryMethods.id, id))
+      .returning();
+    return method || undefined;
+  }
+
+  async deleteDeliveryMethod(id: number): Promise<boolean> {
+    const result = await db.delete(deliveryMethods).where(eq(deliveryMethods.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== ACCOUNTING JOURNALS =====
+  async getAllAccountingJournals(): Promise<AccountingJournal[]> {
+    return await db.select().from(accountingJournals).orderBy(accountingJournals.designation);
+  }
+
+  async getAccountingJournal(id: number): Promise<AccountingJournal | undefined> {
+    const [journal] = await db.select().from(accountingJournals).where(eq(accountingJournals.id, id));
+    return journal || undefined;
+  }
+
+  async createAccountingJournal(insertJournal: InsertAccountingJournal): Promise<AccountingJournal> {
+    const allJournals = await db.select().from(accountingJournals);
+    const code = `JRN-${String(allJournals.length + 1).padStart(6, '0')}`;
+    
+    const [journal] = await db.insert(accountingJournals).values({
+      ...insertJournal,
+      code
+    }).returning();
+    return journal;
+  }
+
+  async updateAccountingJournal(id: number, updateData: Partial<InsertAccountingJournal>): Promise<AccountingJournal | undefined> {
+    const [journal] = await db.update(accountingJournals)
+      .set(updateData)
+      .where(eq(accountingJournals.id, id))
+      .returning();
+    return journal || undefined;
+  }
+
+  async deleteAccountingJournal(id: number): Promise<boolean> {
+    const result = await db.delete(accountingJournals).where(eq(accountingJournals.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== ACCOUNTING ACCOUNTS =====
+  async getAllAccountingAccounts(): Promise<AccountingAccount[]> {
+    return await db.select().from(accountingAccounts).orderBy(accountingAccounts.code);
+  }
+
+  async getAccountingAccount(id: number): Promise<AccountingAccount | undefined> {
+    const [account] = await db.select().from(accountingAccounts).where(eq(accountingAccounts.id, id));
+    return account || undefined;
+  }
+
+  async createAccountingAccount(insertAccount: InsertAccountingAccount): Promise<AccountingAccount> {
+    const [account] = await db.insert(accountingAccounts).values(insertAccount).returning();
+    return account;
+  }
+
+  async updateAccountingAccount(id: number, updateData: Partial<InsertAccountingAccount>): Promise<AccountingAccount | undefined> {
+    const [account] = await db.update(accountingAccounts)
+      .set(updateData)
+      .where(eq(accountingAccounts.id, id))
+      .returning();
+    return account || undefined;
+  }
+
+  async deleteAccountingAccount(id: number): Promise<boolean> {
+    const result = await db.delete(accountingAccounts).where(eq(accountingAccounts.id, id));
+    return (result.rowCount || 0) > 0;  
+  }
+
+  // ===== STORAGE ZONES =====
+  async getAllStorageZones(): Promise<StorageZone[]> {
+    return await db.select().from(storageZones).orderBy(storageZones.designation);
+  }
+
+  async getStorageZone(id: number): Promise<StorageZone | undefined> {
+    const [zone] = await db.select().from(storageZones).where(eq(storageZones.id, id));
+    return zone || undefined;
+  }
+
+  async getStorageZonesByLocation(locationId: number): Promise<StorageZone[]> {
+    return await db.select().from(storageZones)
+      .where(eq(storageZones.storageLocationId, locationId))
+      .orderBy(storageZones.designation);
+  }
+
+  async createStorageZone(insertZone: InsertStorageZone): Promise<StorageZone> {
+    const allZones = await db.select().from(storageZones);
+    const code = `ZON-${String(allZones.length + 1).padStart(6, '0')}`;
+    
+    const [zone] = await db.insert(storageZones).values({
+      ...insertZone,
+      code
+    }).returning();
+    return zone;
+  }
+
+  async updateStorageZone(id: number, updateData: Partial<InsertStorageZone>): Promise<StorageZone | undefined> {
+    const [zone] = await db.update(storageZones)
+      .set(updateData)
+      .where(eq(storageZones.id, id))
+      .returning();
+    return zone || undefined;
+  }
+
+  async deleteStorageZone(id: number): Promise<boolean> {
+    const result = await db.delete(storageZones).where(eq(storageZones.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== WORK STATIONS =====
+  async getAllWorkStations(): Promise<WorkStation[]> {
+    return await db.select().from(workStations).orderBy(workStations.designation);
+  }
+
+  async getWorkStation(id: number): Promise<WorkStation | undefined> {
+    const [station] = await db.select().from(workStations).where(eq(workStations.id, id));
+    return station || undefined;
+  }
+
+  async getWorkStationsByType(type: string): Promise<WorkStation[]> {
+    return await db.select().from(workStations)
+      .where(eq(workStations.type, type))
+      .orderBy(workStations.designation);
+  }
+
+  async createWorkStation(insertStation: InsertWorkStation): Promise<WorkStation> {
+    const allStations = await db.select().from(workStations);
+    const code = `PST-${String(allStations.length + 1).padStart(6, '0')}`;
+    
+    const [station] = await db.insert(workStations).values({
+      ...insertStation,
+      code
+    }).returning();
+    return station;
+  }
+
+  async updateWorkStation(id: number, updateData: Partial<InsertWorkStation>): Promise<WorkStation | undefined> {
+    const [station] = await db.update(workStations)
+      .set(updateData)
+      .where(eq(workStations.id, id))
+      .returning();
+    return station || undefined;
+  }
+
+  async deleteWorkStation(id: number): Promise<boolean> {
+    const result = await db.delete(workStations).where(eq(workStations.id, id));
     return (result.rowCount || 0) > 0;
   }
 }
