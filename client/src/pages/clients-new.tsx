@@ -571,6 +571,10 @@ export default function Clients() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: priceLists } = useQuery<PriceList[]>({
+    queryKey: ["/api/price-lists"],
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/clients/${id}`, "DELETE"),
     onSuccess: () => {
@@ -675,6 +679,10 @@ export default function Clients() {
                     ? client.companyName || "Nom d'entreprise non défini"
                     : `${client.lastName || ""} ${client.firstName || ""}`.trim() || "Nom non défini";
                   
+                  const priceListName = client.priceListId 
+                    ? priceLists?.find(pl => pl.id === client.priceListId)?.designation || "Offre inconnue"
+                    : "-";
+                  
                   return (
                     <TableRow key={client.id}>
                       <TableCell className="font-medium">{client.code}</TableCell>
@@ -701,9 +709,7 @@ export default function Clients() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={client.tarifParticulier ? "outline" : "secondary"}>
-                          {client.tarifParticulier ? "Particulier" : "Professionnel"}
-                        </Badge>
+                        {priceListName}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end space-x-2">
