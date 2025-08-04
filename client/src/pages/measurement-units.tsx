@@ -278,10 +278,10 @@ export default function MeasurementUnitsPage() {
               <DialogTrigger asChild>
                 <Button 
                   onClick={resetCategoryForm} 
-                  className="h-12 px-6 text-lg font-medium"
+                  className="h-10 px-4 text-base font-medium"
                   data-testid="button-add-category"
                 >
-                  <Plus className="h-5 w-5 mr-3" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Nouvelle Catégorie
                 </Button>
               </DialogTrigger>
@@ -345,47 +345,47 @@ export default function MeasurementUnitsPage() {
                 className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
                 data-testid={`card-category-${category.id}`}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-xl font-semibold text-gray-800">
+                    <CardTitle className="text-lg font-semibold text-gray-800">
                       {category.name}
                     </CardTitle>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-10 w-10"
+                        className="h-8 w-8"
                         onClick={() => handleEditCategory(category)}
                         data-testid={`button-edit-category-${category.id}`}
                       >
-                        <Edit className="h-5 w-5" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-10 w-10"
+                        className="h-8 w-8"
                         onClick={() => deleteCategoryMutation.mutate(category.id)}
                         data-testid={`button-delete-category-${category.id}`}
                       >
-                        <Trash2 className="h-5 w-5 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-3">
+                  <div className="flex items-center justify-between mt-2">
                     <Badge 
                       variant={category.active ? "default" : "secondary"}
-                      className="px-3 py-1 text-sm font-medium"
+                      className="px-2 py-0.5 text-xs font-medium"
                     >
                       {category.active ? "Active" : "Inactive"}
                     </Badge>
-                    <span className="text-lg font-bold text-blue-600">
+                    <span className="text-sm font-bold text-blue-600">
                       {units.filter(u => u.categoryId === category.id).length} unités
                     </span>
                   </div>
                 </CardHeader>
                 {category.description && (
                   <CardContent className="pt-0">
-                    <CardDescription className="text-base text-gray-600">
+                    <CardDescription className="text-sm text-gray-600">
                       {category.description}
                     </CardDescription>
                   </CardContent>
@@ -423,10 +423,10 @@ export default function MeasurementUnitsPage() {
               <DialogTrigger asChild>
                 <Button 
                   onClick={resetUnitForm} 
-                  className="h-12 px-6 text-lg font-medium"
+                  className="h-10 px-4 text-base font-medium"
                   data-testid="button-add-unit"
                 >
-                  <Plus className="h-5 w-5 mr-3" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Nouvelle Unité
                 </Button>
               </DialogTrigger>
@@ -545,60 +545,60 @@ export default function MeasurementUnitsPage() {
                   className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
                   data-testid={`card-unit-${unit.id}`}
                 >
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <CardTitle className="text-xl font-semibold text-gray-800">
+                        <CardTitle className="text-lg font-semibold text-gray-800">
                           {unit.label}
                         </CardTitle>
                         <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-lg font-bold text-blue-600">
+                          <span className="text-sm font-bold text-blue-600">
                             ({unit.abbreviation})
                           </span>
-                          <span className="text-base text-gray-500">
+                          <span className="text-sm text-gray-500">
                             {category?.name}
                           </span>
                         </div>
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-10 w-10"
+                          className="h-8 w-8"
                           onClick={() => handleEditUnit(unit)}
                           data-testid={`button-edit-unit-${unit.id}`}
                         >
-                          <Edit className="h-5 w-5" />
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-10 w-10"
+                          className="h-8 w-8"
                           onClick={() => deleteUnitMutation.mutate(unit.id)}
                           data-testid={`button-delete-unit-${unit.id}`}
                         >
-                          <Trash2 className="h-5 w-5 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Badge 
-                          className={`${getTypeColor(unit.type)} px-3 py-1 text-sm font-medium`}
+                          className={`${getTypeColor(unit.type)} px-2 py-0.5 text-xs font-medium`}
                         >
                           {getTypeName(unit.type)}
                         </Badge>
                         <Badge 
                           variant={unit.active ? "default" : "secondary"}
-                          className="px-3 py-1 text-sm font-medium"
+                          className="px-2 py-0.5 text-xs font-medium"
                         >
                           {unit.active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-base font-medium text-gray-700">
+                      <div className="bg-gray-50 p-2 rounded-lg">
+                        <p className="text-sm font-medium text-gray-700">
                           Facteur: <span className="font-bold text-green-600">
                             {parseFloat(unit.factor).toFixed(6)}
                           </span>

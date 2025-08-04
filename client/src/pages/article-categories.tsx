@@ -221,10 +221,10 @@ export default function ArticleCategories() {
             <DialogTrigger asChild>
               <Button 
                 onClick={resetForm} 
-                className="h-12 px-6 text-lg font-medium"
+                className="h-10 px-4 text-base font-medium"
                 data-testid="button-add-category"
               >
-                <Plus className="h-5 w-5 mr-3" />
+                <Plus className="h-4 w-4 mr-2" />
                 Nouvelle Catégorie
               </Button>
             </DialogTrigger>
