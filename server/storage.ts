@@ -2,7 +2,7 @@ import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
-  taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
+  taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, suppliers,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
@@ -13,7 +13,8 @@ import {
   type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule,
   type Tax, type InsertTax, type Currency, type InsertCurrency, type DeliveryMethod, type InsertDeliveryMethod,
   type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
-  type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation
+  type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation,
+  type Supplier, type InsertSupplier
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -219,6 +220,15 @@ export interface IStorage {
   createWorkStation(station: InsertWorkStation): Promise<WorkStation>;
   updateWorkStation(id: number, station: Partial<InsertWorkStation>): Promise<WorkStation | undefined>;
   deleteWorkStation(id: number): Promise<boolean>;
+
+  // Suppliers
+  getAllSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: number): Promise<Supplier | undefined>;
+  getSuppliersByType(type: string): Promise<Supplier[]>;
+  getActiveSuppliers(): Promise<Supplier[]>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+  deleteSupplier(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -425,6 +435,40 @@ export class DatabaseStorage implements IStorage {
           active: true
         }
       ]).returning();
+
+      // Create sample suppliers
+      await db.insert(suppliers).values([
+        {
+          type: "societe",
+          companyType: "SARL",
+          companyName: "Fournisseur Général",
+          contactName: "Ahmed Benali",
+          phone: "021 45 67 89",
+          mobile: "0661 23 45 67",
+          email: "contact@fournisseur-general.dz",
+          address: "Zone industrielle, Lot 15",
+          city: "Alger",
+          postalCode: "16000",
+          wilaya: "Alger",
+          rc: "RC 16/00-0123456",
+          mf: "MF 1234567890123",
+          nis: "NIS 001234567890123",
+          active: true
+        },
+        {
+          type: "particulier",
+          firstName: "Omar",
+          lastName: "Khelifi",
+          phone: "021 98 76 54",
+          mobile: "0772 11 22 33",
+          email: "omar.khelifi@email.dz",
+          address: "Cité des 200 logements, Bt A, App 25",
+          city: "Oran",
+          postalCode: "31000",
+          wilaya: "Oran",
+          active: true
+        }
+      ]);
 
     } catch (error) {
       console.log("Sample data initialization skipped (data may already exist):", error);
@@ -1330,6 +1374,52 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWorkStation(id: number): Promise<boolean> {
     const result = await db.delete(workStations).where(eq(workStations.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ===== SUPPLIERS =====
+  async getAllSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliers).orderBy(suppliers.code);
+  }
+
+  async getSupplier(id: number): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier || undefined;
+  }
+
+  async getSuppliersByType(type: string): Promise<Supplier[]> {
+    return await db.select().from(suppliers)
+      .where(eq(suppliers.type, type))
+      .orderBy(suppliers.code);
+  }
+
+  async getActiveSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliers)
+      .where(eq(suppliers.active, true))
+      .orderBy(suppliers.code);
+  }
+
+  async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
+    const allSuppliers = await db.select().from(suppliers);
+    const code = `FRN-${String(allSuppliers.length + 1).padStart(6, '0')}`;
+    
+    const [supplier] = await db.insert(suppliers).values({
+      ...insertSupplier,
+      code
+    }).returning();
+    return supplier;
+  }
+
+  async updateSupplier(id: number, updateData: Partial<InsertSupplier>): Promise<Supplier | undefined> {
+    const [supplier] = await db.update(suppliers)
+      .set(updateData)
+      .where(eq(suppliers.id, id))
+      .returning();
+    return supplier || undefined;
+  }
+
+  async deleteSupplier(id: number): Promise<boolean> {
+    const result = await db.delete(suppliers).where(eq(suppliers.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

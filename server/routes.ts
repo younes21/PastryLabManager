@@ -9,7 +9,7 @@ import {
   insertMeasurementUnitSchema, insertArticleCategorySchema, insertArticleSchema, insertPriceListSchema,
   insertPriceRuleSchema, insertTaxSchema, insertCurrencySchema, insertDeliveryMethodSchema,
   insertAccountingJournalSchema, insertAccountingAccountSchema, insertStorageZoneSchema,
-  insertWorkStationSchema
+  insertWorkStationSchema, insertSupplierSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1677,6 +1677,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: 'Erreur lors de l\'envoi de la notification' });
+    }
+  });
+
+  // ===== SUPPLIERS ROUTES =====
+  app.get("/api/suppliers", async (req, res) => {
+    try {
+      const suppliers = await storage.getAllSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch suppliers" });
+    }
+  });
+
+  app.get("/api/suppliers/active", async (req, res) => {
+    try {
+      const suppliers = await storage.getActiveSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active suppliers" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const supplier = await storage.getSupplier(id);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch supplier" });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const supplierData = insertSupplierSchema.parse(req.body);
+      const supplier = await storage.createSupplier(supplierData);
+      res.status(201).json(supplier);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid supplier data" });
+    }
+  });
+
+  app.put("/api/suppliers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const supplierData = req.body;
+      const supplier = await storage.updateSupplier(id, supplierData);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update supplier" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteSupplier(id);
+      if (!success) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+      res.json({ message: "Supplier deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete supplier" });
     }
   });
 

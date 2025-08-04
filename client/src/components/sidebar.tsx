@@ -68,6 +68,7 @@ export function Sidebar() {
     { path: "/storage-zones", label: "Zones de Stockage", icon: "fas fa-building", lucideIcon: Building },
     { path: "/work-stations", label: "Postes de Travail", icon: "fas fa-cogs", lucideIcon: Settings },
     { path: "/email-config", label: "Configuration Email", icon: "fas fa-envelope", lucideIcon: Mail },
+    { path: "/suppliers", label: "Fournisseurs", icon: "fas fa-truck", lucideIcon: Truck },
   ];
 
   // Filter navigation based on user role

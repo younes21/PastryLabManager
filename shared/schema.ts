@@ -364,6 +364,36 @@ export const workStations = pgTable("work_stations", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
+// 13. Fournisseurs (Suppliers)
+export const suppliers = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // FRN-000001
+  type: text("type").notNull(), // 'particulier', 'societe'
+  companyType: text("company_type"), // 'eurl', 'sarl', 'spa', 'snc', etc.
+  // Informations personnelles/société
+  firstName: text("first_name"), // Pour particulier
+  lastName: text("last_name"), // Pour particulier
+  companyName: text("company_name"), // Pour société
+  phone: text("phone"),
+  mobile: text("mobile"),
+  email: text("email"),
+  // Adresse
+  contactName: text("contact_name"), // Nom du contact
+  address: text("address"),
+  city: text("city"),
+  postalCode: text("postal_code"),
+  wilaya: text("wilaya"), // Équivalent de région/état en Algérie
+  // Informations légales algériennes
+  rc: text("rc"), // Registre de Commerce
+  na: text("na"), // Numéro d'Agrément
+  mf: text("mf"), // Matricule Fiscale
+  nis: text("nis"), // Numéro d'Identification Statistique
+  // Autres
+  photo: text("photo"), // URL ou chemin vers la photo
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
 // Insert schemas for new tables
 export const insertTaxSchema = createInsertSchema(taxes).omit({ id: true, code: true, createdAt: true });
 export const insertCurrencySchema = createInsertSchema(currencies).omit({ id: true, createdAt: true });
@@ -372,3 +402,8 @@ export const insertAccountingJournalSchema = createInsertSchema(accountingJourna
 export const insertAccountingAccountSchema = createInsertSchema(accountingAccounts).omit({ id: true, createdAt: true });
 export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ id: true, code: true, createdAt: true });
 export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, code: true, createdAt: true });
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, code: true, createdAt: true });
+
+// Types pour TypeScript
+export type Supplier = typeof suppliers.$inferSelect;
+export type InsertSupplier = typeof insertSupplierSchema._type;
