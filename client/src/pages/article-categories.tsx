@@ -311,57 +311,59 @@ export default function ArticleCategories() {
               className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
               data-testid={`card-category-${category.id}`}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 flex items-center space-x-6">
                     <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-1">
                         {category.designation}
                       </h3>
-                      <div className="flex items-center space-x-1 text-sm text-gray-500 mb-3">
+                      <div className="flex items-center space-x-1 text-sm text-gray-500 mb-2">
                         <span>{buildCategoryPath(category, categories)}</span>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <Badge 
-                          variant={category.forSale ? "default" : "secondary"}
-                          className="px-3 py-1 text-sm font-medium"
-                        >
-                          {category.forSale ? "Pour vente" : "Usage interne"}
-                        </Badge>
+                      <div className="flex items-center space-x-2">
+                        {category.forSale && (
+                          <Badge 
+                            variant="default"
+                            className="px-2 py-0.5 text-xs font-medium"
+                          >
+                            Pour vente
+                          </Badge>
+                        )}
                         <Badge 
                           variant={category.active ? "default" : "secondary"}
-                          className="px-3 py-1 text-sm font-medium"
+                          className="px-2 py-0.5 text-xs font-medium"
                         >
                           {category.active ? "Active" : "Inactive"}
                         </Badge>
                         {category.parentId && (
-                          <div className="flex items-center text-blue-600 text-sm">
-                            <ChevronRight className="h-4 w-4 mr-1" />
+                          <div className="flex items-center text-blue-600 text-xs">
+                            <ChevronRight className="h-3 w-3 mr-1" />
                             <span>Sous-catégorie</span>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
-                      size="lg"
-                      className="h-12 px-6"
+                      size="sm"
+                      className="h-10 px-4"
                       onClick={() => handleEdit(category)}
                       data-testid={`button-edit-category-${category.id}`}
                     >
-                      <Edit className="h-5 w-5 mr-2" />
+                      <Edit className="h-4 w-4 mr-1" />
                       Modifier
                     </Button>
                     <Button
                       variant="outline"
-                      size="lg"
-                      className="h-12 px-6 text-red-600 border-red-200 hover:bg-red-50"
+                      size="sm"
+                      className="h-10 px-4 text-red-600 border-red-200 hover:bg-red-50"
                       onClick={() => deleteCategoryMutation.mutate(category.id)}
                       data-testid={`button-delete-category-${category.id}`}
                     >
-                      <Trash2 className="h-5 w-5 mr-2" />
+                      <Trash2 className="h-4 w-4 mr-1" />
                       Supprimer
                     </Button>
                   </div>
