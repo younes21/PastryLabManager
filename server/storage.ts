@@ -1,14 +1,15 @@
 import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
-  measurementCategories, measurementUnits, articleCategories,
+  measurementCategories, measurementUnits, articleCategories, priceLists, priceRules,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type Delivery, type InsertDelivery, type ProductStock, type InsertProductStock,
   type Label, type InsertLabel, type MeasurementCategory, type InsertMeasurementCategory,
-  type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory
+  type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
+  type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -135,6 +136,23 @@ export interface IStorage {
   createArticleCategory(category: InsertArticleCategory): Promise<ArticleCategory>;
   updateArticleCategory(id: number, category: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined>;
   deleteArticleCategory(id: number): Promise<boolean>;
+
+  // Price Lists
+  getPriceList(id: number): Promise<PriceList | undefined>;
+  getAllPriceLists(): Promise<PriceList[]>;
+  getActivePriceLists(): Promise<PriceList[]>;
+  createPriceList(priceList: InsertPriceList): Promise<PriceList>;
+  updatePriceList(id: number, priceList: Partial<InsertPriceList>): Promise<PriceList | undefined>;
+  deletePriceList(id: number): Promise<boolean>;
+
+  // Price Rules
+  getPriceRule(id: number): Promise<PriceRule | undefined>;
+  getAllPriceRules(): Promise<PriceRule[]>;
+  getPriceRulesByPriceList(priceListId: number): Promise<PriceRule[]>;
+  getActivePriceRules(): Promise<PriceRule[]>;
+  createPriceRule(priceRule: InsertPriceRule): Promise<PriceRule>;
+  updatePriceRule(id: number, priceRule: Partial<InsertPriceRule>): Promise<PriceRule | undefined>;
+  deletePriceRule(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -327,6 +345,21 @@ export class DatabaseStorage implements IStorage {
           active: true
         }
       ]);
+
+      // Create sample price lists
+      const priceListsData = await db.insert(priceLists).values([
+        {
+          designation: "Prix Standard",
+          currency: "DA",
+          active: true
+        },
+        {
+          designation: "Prix Gros",
+          currency: "DA",
+          active: true
+        }
+      ]).returning();
+
     } catch (error) {
       console.log("Sample data initialization skipped (data may already exist):", error);
     }
@@ -860,6 +893,80 @@ export class DatabaseStorage implements IStorage {
 
   async deleteArticleCategory(id: number): Promise<boolean> {
     const result = await db.delete(articleCategories).where(eq(articleCategories.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Price Lists methods
+  async getPriceList(id: number): Promise<PriceList | undefined> {
+    const [priceList] = await db.select().from(priceLists).where(eq(priceLists.id, id));
+    return priceList || undefined;
+  }
+
+  async getAllPriceLists(): Promise<PriceList[]> {
+    return await db.select().from(priceLists).orderBy(priceLists.designation);
+  }
+
+  async getActivePriceLists(): Promise<PriceList[]> {
+    return await db.select().from(priceLists)
+      .where(eq(priceLists.active, true))
+      .orderBy(priceLists.designation);
+  }
+
+  async createPriceList(insertPriceList: InsertPriceList): Promise<PriceList> {
+    const [priceList] = await db.insert(priceLists).values(insertPriceList).returning();
+    return priceList;
+  }
+
+  async updatePriceList(id: number, updateData: Partial<InsertPriceList>): Promise<PriceList | undefined> {
+    const [priceList] = await db.update(priceLists)
+      .set(updateData)
+      .where(eq(priceLists.id, id))
+      .returning();
+    return priceList || undefined;
+  }
+
+  async deletePriceList(id: number): Promise<boolean> {
+    const result = await db.delete(priceLists).where(eq(priceLists.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Price Rules methods
+  async getPriceRule(id: number): Promise<PriceRule | undefined> {
+    const [priceRule] = await db.select().from(priceRules).where(eq(priceRules.id, id));
+    return priceRule || undefined;
+  }
+
+  async getAllPriceRules(): Promise<PriceRule[]> {
+    return await db.select().from(priceRules).orderBy(priceRules.id);
+  }
+
+  async getPriceRulesByPriceList(priceListId: number): Promise<PriceRule[]> {
+    return await db.select().from(priceRules)
+      .where(eq(priceRules.priceListId, priceListId))
+      .orderBy(priceRules.id);
+  }
+
+  async getActivePriceRules(): Promise<PriceRule[]> {
+    return await db.select().from(priceRules)
+      .where(eq(priceRules.active, true))
+      .orderBy(priceRules.id);
+  }
+
+  async createPriceRule(insertPriceRule: InsertPriceRule): Promise<PriceRule> {
+    const [priceRule] = await db.insert(priceRules).values(insertPriceRule).returning();
+    return priceRule;
+  }
+
+  async updatePriceRule(id: number, updateData: Partial<InsertPriceRule>): Promise<PriceRule | undefined> {
+    const [priceRule] = await db.update(priceRules)
+      .set(updateData)
+      .where(eq(priceRules.id, id))
+      .returning();
+    return priceRule || undefined;
+  }
+
+  async deletePriceRule(id: number): Promise<boolean> {
+    const result = await db.delete(priceRules).where(eq(priceRules.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

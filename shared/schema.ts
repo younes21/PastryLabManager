@@ -153,6 +153,32 @@ export const articleCategories = pgTable("article_categories", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
+// Price Lists
+export const priceLists = pgTable("price_lists", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  currency: text("currency").notNull().default("DA"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Price Rules
+export const priceRules = pgTable("price_rules", {
+  id: serial("id").primaryKey(),
+  priceListId: integer("price_list_id").references(() => priceLists.id).notNull(),
+  applyTo: text("apply_to").notNull(), // 'product' or 'category'
+  productId: integer("product_id").references(() => recipes.id), // null if applies to category
+  categoryId: integer("category_id").references(() => articleCategories.id), // null if applies to product
+  priceType: text("price_type").notNull(), // 'fixed', 'discount', 'formula'
+  fixedPrice: decimal("fixed_price", { precision: 10, scale: 2 }),
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
+  minQuantity: decimal("min_quantity", { precision: 10, scale: 3 }).notNull().default("1"),
+  validFrom: timestamp("valid_from", { mode: 'string' }),
+  validTo: timestamp("valid_to", { mode: 'string' }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
@@ -168,6 +194,8 @@ export const insertLabelSchema = createInsertSchema(labels).omit({ id: true });
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
+export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
+export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -198,3 +226,7 @@ export type MeasurementUnit = typeof measurementUnits.$inferSelect;
 export type InsertMeasurementUnit = z.infer<typeof insertMeasurementUnitSchema>;
 export type ArticleCategory = typeof articleCategories.$inferSelect;
 export type InsertArticleCategory = z.infer<typeof insertArticleCategorySchema>;
+export type PriceList = typeof priceLists.$inferSelect;
+export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
+export type PriceRule = typeof priceRules.$inferSelect;
+export type InsertPriceRule = z.infer<typeof insertPriceRuleSchema>;

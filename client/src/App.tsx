@@ -16,6 +16,7 @@ import Delivery from "@/pages/delivery";
 import Users from "@/pages/users";
 import MeasurementUnits from "@/pages/measurement-units";
 import ArticleCategories from "@/pages/article-categories";
+import PriceLists from "@/pages/price-lists";
 import ClientCatalog from "@/pages/client-catalog";
 import ClientDashboard from "@/pages/client-dashboard";
 import DeliveryDashboard from "@/pages/delivery-dashboard";
@@ -137,6 +138,7 @@ function ProtectedRouter() {
       <Route path="/users" component={Users} />
       <Route path="/measurement-units" component={MeasurementUnits} />
       <Route path="/article-categories" component={ArticleCategories} />
+      <Route path="/price-lists" component={PriceLists} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>

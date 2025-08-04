@@ -1,0 +1,451 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trash2, Plus, Edit, Euro, DollarSign } from "lucide-react";
+import type { PriceList, InsertPriceList, PriceRule, InsertPriceRule } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+
+export default function PriceListsPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedPriceListId, setSelectedPriceListId] = useState<number | null>(null);
+  const [isNewPriceListDialogOpen, setIsNewPriceListDialogOpen] = useState(false);
+  const [isNewRuleDialogOpen, setIsNewRuleDialogOpen] = useState(false);
+  const [editingPriceList, setEditingPriceList] = useState<PriceList | null>(null);
+  const [editingRule, setEditingRule] = useState<PriceRule | null>(null);
+
+  // Fetch price lists
+  const { data: priceLists = [], isLoading: priceListsLoading } = useQuery<PriceList[]>({
+    queryKey: ["/api/price-lists"],
+  });
+
+  // Fetch recipes and categories for rules
+  const { data: recipes = [] } = useQuery({
+    queryKey: ["/api/recipes"],
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["/api/article-categories"],
+  });
+
+  // Fetch price rules for selected price list
+  const { data: priceRules = [], isLoading: rulesLoading } = useQuery<PriceRule[]>({
+    queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }],
+    enabled: !!selectedPriceListId,
+  });
+
+  // Price List mutations
+  const createPriceListMutation = useMutation({
+    mutationFn: (data: InsertPriceList) => apiRequest("/api/price-lists", "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-lists"] });
+      setIsNewPriceListDialogOpen(false);
+      toast({ description: "Liste de prix créée avec succès" });
+    },
+    onError: () => toast({ description: "Erreur lors de la création", variant: "destructive" }),
+  });
+
+  const updatePriceListMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertPriceList> }) =>
+      apiRequest(`/api/price-lists/${id}`, "PUT", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-lists"] });
+      setEditingPriceList(null);
+      toast({ description: "Liste de prix modifiée avec succès" });
+    },
+    onError: () => toast({ description: "Erreur lors de la modification", variant: "destructive" }),
+  });
+
+  const deletePriceListMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/price-lists/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-lists"] });
+      if (selectedPriceListId === selectedPriceListId) {
+        setSelectedPriceListId(null);
+      }
+      toast({ description: "Liste de prix supprimée avec succès" });
+    },
+    onError: () => toast({ description: "Erreur lors de la suppression", variant: "destructive" }),
+  });
+
+  // Price Rule mutations
+  const createRuleMutation = useMutation({
+    mutationFn: (data: InsertPriceRule) => apiRequest("/api/price-rules", "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }] });
+      setIsNewRuleDialogOpen(false);
+      toast({ description: "Règle de prix créée avec succès" });
+    },
+    onError: () => toast({ description: "Erreur lors de la création", variant: "destructive" }),
+  });
+
+  const updateRuleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertPriceRule> }) =>
+      apiRequest(`/api/price-rules/${id}`, "PUT", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }] });
+      setEditingRule(null);
+      toast({ description: "Règle de prix modifiée avec succès" });
+    },
+    onError: () => toast({ description: "Erreur lors de la modification", variant: "destructive" }),
+  });
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/price-rules/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }] });
+      toast({ description: "Règle de prix supprimée avec succès" });
+    },
+    onError: () => toast({ description: "Erreur lors de la suppression", variant: "destructive" }),
+  });
+
+  const handlePriceListSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    const data: InsertPriceList = {
+      designation: formData.get("designation") as string,
+      currency: formData.get("currency") as string,
+      active: formData.get("active") === "on",
+    };
+
+    if (editingPriceList) {
+      updatePriceListMutation.mutate({ id: editingPriceList.id, data });
+    } else {
+      createPriceListMutation.mutate(data);
+    }
+  };
+
+  const handleRuleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    const data: InsertPriceRule = {
+      priceListId: selectedPriceListId!,
+      applyTo: formData.get("applyTo") as string,
+      productId: formData.get("productId") ? parseInt(formData.get("productId") as string) : undefined,
+      categoryId: formData.get("categoryId") ? parseInt(formData.get("categoryId") as string) : undefined,
+      priceType: formData.get("priceType") as string,
+      fixedPrice: formData.get("fixedPrice") ? formData.get("fixedPrice") as string : undefined,
+      discountPercent: formData.get("discountPercent") ? formData.get("discountPercent") as string : undefined,
+      minQuantity: formData.get("minQuantity") as string,
+      validFrom: formData.get("validFrom") ? formData.get("validFrom") as string : undefined,
+      validTo: formData.get("validTo") ? formData.get("validTo") as string : undefined,
+      active: formData.get("active") === "on",
+    };
+
+    if (editingRule) {
+      updateRuleMutation.mutate({ id: editingRule.id, data });
+    } else {
+      createRuleMutation.mutate(data);
+    }
+  };
+
+  const getCurrencyIcon = (currency: string) => {
+    switch (currency) {
+      case "EUR": return <Euro className="w-4 h-4" />;
+      case "USD": return <DollarSign className="w-4 h-4" />;
+      default: return <span className="w-4 h-4 text-center font-bold text-xs">{currency}</span>;
+    }
+  };
+
+  if (priceListsLoading) return <div>Chargement...</div>;
+
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Listes de Prix</h1>
+        <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-new-price-list">
+              <Plus className="w-4 h-4 mr-2" />
+              Nouvelle Liste
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nouvelle Liste de Prix</DialogTitle>
+              <DialogDescription>
+                Créer une nouvelle liste de prix avec ses paramètres
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handlePriceListSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="designation">Désignation</Label>
+                <Input
+                  id="designation"
+                  name="designation"
+                  required
+                  data-testid="input-designation"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currency">Monnaie</Label>
+                <Select name="currency" defaultValue="DA">
+                  <SelectTrigger data-testid="select-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
+                    <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                    <SelectItem value="USD">USD (Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="active" name="active" defaultChecked />
+                <Label htmlFor="active">Active</Label>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsNewPriceListDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" data-testid="button-submit-price-list">
+                  Créer
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Tabs defaultValue="lists" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="lists">Listes de Prix</TabsTrigger>
+          <TabsTrigger value="rules" disabled={!selectedPriceListId}>
+            Règles {selectedPriceListId && `(${priceLists.find(p => p.id === selectedPriceListId)?.designation})`}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="lists" className="space-y-4">
+          <div className="grid gap-4">
+            {priceLists.map((priceList: PriceList) => (
+              <Card 
+                key={priceList.id} 
+                className={`cursor-pointer transition-colors hover:bg-gray-50 ${
+                  selectedPriceListId === priceList.id ? 'ring-2 ring-blue-500' : ''
+                }`}
+                onClick={() => setSelectedPriceListId(priceList.id)}
+                data-testid={`card-price-list-${priceList.id}`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center space-x-2">
+                      <CardTitle className="text-lg">{priceList.designation}</CardTitle>
+                      <div className="flex items-center space-x-1">
+                        {getCurrencyIcon(priceList.currency)}
+                        <span className="text-sm text-gray-600">{priceList.currency}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={priceList.active ? "default" : "secondary"}>
+                        {priceList.active ? "Active" : "Inactive"}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPriceList(priceList);
+                        }}
+                        data-testid={`button-edit-price-list-${priceList.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deletePriceListMutation.mutate(priceList.id);
+                        }}
+                        data-testid={`button-delete-price-list-${priceList.id}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    Créée le {new Date(priceList.createdAt!).toLocaleDateString("fr-FR")}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rules" className="space-y-4">
+          {selectedPriceListId && (
+            <>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">
+                  Règles - {priceLists.find(p => p.id === selectedPriceListId)?.designation}
+                </h2>
+                <Dialog open={isNewRuleDialogOpen} onOpenChange={setIsNewRuleDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-new-rule">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nouvelle Règle
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Nouvelle Règle de Prix</DialogTitle>
+                      <DialogDescription>
+                        Créer une nouvelle règle de prix pour cette liste
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleRuleSubmit} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="applyTo">Appliquer à</Label>
+                          <Select name="applyTo" required>
+                            <SelectTrigger data-testid="select-apply-to">
+                              <SelectValue placeholder="Choisir..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="product">Produit spécifique</SelectItem>
+                              <SelectItem value="category">Catégorie d'articles</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setIsNewRuleDialogOpen(false)}>
+                          Annuler
+                        </Button>
+                        <Button type="submit" data-testid="button-submit-rule">
+                          Créer
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {rulesLoading ? (
+                <div>Chargement des règles...</div>
+              ) : (
+                <div className="grid gap-4">
+                  {priceRules.map((rule: PriceRule) => (
+                    <Card key={rule.id} data-testid={`card-rule-${rule.id}`}>
+                      <CardHeader className="pb-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">
+                              {rule.applyTo === 'product' ? 'Produit' : 'Catégorie'}
+                            </CardTitle>
+                            <p className="text-sm text-gray-600">
+                              Type: {rule.priceType}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={rule.active ? "default" : "secondary"}>
+                              {rule.active ? "Active" : "Inactive"}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingRule(rule)}
+                              data-testid={`button-edit-rule-${rule.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteRuleMutation.mutate(rule.id)}
+                              data-testid={`button-delete-rule-${rule.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Quantité min:</span> {rule.minQuantity}
+                          </div>
+                          {rule.fixedPrice && (
+                            <div>
+                              <span className="font-medium">Prix fixe:</span> {rule.fixedPrice}
+                            </div>
+                          )}
+                          {rule.discountPercent && (
+                            <div>
+                              <span className="font-medium">Remise:</span> {rule.discountPercent}%
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Price List Dialog */}
+      <Dialog open={!!editingPriceList} onOpenChange={(open) => !open && setEditingPriceList(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier la Liste de Prix</DialogTitle>
+          </DialogHeader>
+          {editingPriceList && (
+            <form onSubmit={handlePriceListSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="designation">Désignation</Label>
+                <Input
+                  id="designation"
+                  name="designation"
+                  defaultValue={editingPriceList.designation}
+                  required
+                  data-testid="input-edit-designation"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currency">Monnaie</Label>
+                <Select name="currency" defaultValue={editingPriceList.currency}>
+                  <SelectTrigger data-testid="select-edit-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
+                    <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                    <SelectItem value="USD">USD (Dollar)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch id="active" name="active" defaultChecked={editingPriceList.active} />
+                <Label htmlFor="active">Active</Label>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setEditingPriceList(null)}>
+                  Annuler
+                </Button>
+                <Button type="submit" data-testid="button-update-price-list">
+                  Modifier
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

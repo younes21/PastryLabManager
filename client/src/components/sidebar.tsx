@@ -15,7 +15,8 @@ import {
   LogOut,
   CheckCircle,
   Scale,
-  FolderTree
+  FolderTree,
+  DollarSign
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -51,6 +52,7 @@ export function Sidebar() {
     { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
     { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
     { path: "/article-categories", label: "Catégories d'Articles", icon: "fas fa-folder-tree", lucideIcon: FolderTree },
+    { path: "/price-lists", label: "Listes de Prix", icon: "fas fa-dollar-sign", lucideIcon: DollarSign },
   ];
 
   // Filter navigation based on user role
