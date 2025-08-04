@@ -71,6 +71,7 @@ export function Sidebar() {
     { path: "/email-config", label: "Configuration Email", icon: "fas fa-envelope", lucideIcon: Mail },
     { path: "/suppliers", label: "Fournisseurs", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/clients", label: "Clients", icon: "fas fa-users", lucideIcon: Users },
+    { path: "/products", label: "Produits", icon: "fas fa-box", lucideIcon: Package },
   ];
 
   // Filter navigation based on user role

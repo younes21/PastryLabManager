@@ -62,6 +62,42 @@ export const clients = pgTable("clients", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
+// Products
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // PRD-000001
+  designation: text("designation").notNull(),
+  description: text("description"),
+  
+  // Gestion stock
+  managedInStock: boolean("managed_in_stock").default(true),
+  active: boolean("active").default(true),
+  stockTracking: text("stock_tracking").notNull(), // 'unit', 'weight', 'volume'
+  managementUnit: text("management_unit").notNull(), // Unité de gestion
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
+  stockAlertThreshold: decimal("stock_alert_threshold", { precision: 10, scale: 2 }).default("0"),
+  
+  // Vente
+  allowedForSale: boolean("allowed_for_sale").default(true),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0"), // Taux TVA en %
+  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
+  saleUnit: text("sale_unit").notNull(), // Unité de vente
+  
+  // Conservation
+  perishable: boolean("perishable").default(false),
+  conservationDuration: integer("conservation_duration"), // Durée en jours
+  conservationTemperature: decimal("conservation_temperature", { precision: 5, scale: 2 }), // Température en °C
+  dlc: timestamp("dlc", { mode: 'string' }), // Date limite de consommation
+  
+  // Classification
+  categoryId: integer("category_id").references(() => articleCategories.id),
+  photo: text("photo"),
+  
+  // Audit
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
 // Les tables recipes, productions, orders, deliveries et productStock ont été supprimées
 // Elles seront réimplémentées avec de nouvelles règles de gestion
 
@@ -336,9 +372,12 @@ export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ i
 export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, code: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, code: true, createdAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, code: true, createdAt: true });
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, code: true, createdAt: true, updatedAt: true });
 
 // Types pour TypeScript
 export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = typeof insertSupplierSchema._type;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = typeof insertClientSchema._type;
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = typeof insertProductSchema._type;

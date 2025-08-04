@@ -109,6 +109,14 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **Products CRUD Module Completed (January 2025)**:
+  - Implemented comprehensive products management system with 16 detailed attributes
+  - Added products database table with stock tracking, perishability, temperature conservation, and sales authorization
+  - Created complete CRUD interface with tabbed form (General, Stock & Gestion, Vente & Prix, Conservation)  
+  - Display columns: name, conservation, DLC, price, storage zone with visual icons
+  - Automatic code generation (PRD-000001, etc.) and product-specific validation
+  - Integration with storage zones and article categories for complete product management
+  - Added products navigation to sidebar and routing for admin/manager access
 - **Modules Legacy Removed (August 2025)**:
   - Completely removed recipes, productions, orders, deliveries modules (database tables, API routes, UI components)
   - Removed ingredients table and API routes - using unified articles table with type="ingredient" filtering

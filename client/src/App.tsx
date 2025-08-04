@@ -31,6 +31,7 @@ import WorkStations from "@/pages/work-stations";
 import EmailConfig from "@/pages/email-config";
 import Suppliers from "@/pages/suppliers";
 import Clients from "@/pages/clients-new";
+import Products from "@/pages/products";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -161,6 +162,7 @@ function ProtectedRouter() {
       <Route path="/email-config" component={EmailConfig} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/clients" component={Clients} />
+      <Route path="/products" component={Products} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>
