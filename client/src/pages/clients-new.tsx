@@ -595,7 +595,9 @@ export default function Clients() {
   };
 
   const handleDelete = (client: Client) => {
-    const displayName = client.companyName || `${client.lastName} ${client.firstName}`.trim();
+    const displayName = client.type === "societe" 
+      ? client.companyName || "Nom d'entreprise non défini"
+      : `${client.lastName || ""} ${client.firstName || ""}`.trim() || "Nom non défini";
     if (confirm(`Êtes-vous sûr de vouloir supprimer le client ${displayName} ?`)) {
       deleteMutation.mutate(client.id);
     }
@@ -669,7 +671,9 @@ export default function Clients() {
               </TableHeader>
               <TableBody>
                 {clients.map((client) => {
-                  const displayName = client.companyName || `${client.lastName} ${client.firstName}`.trim();
+                  const displayName = client.type === "societe" 
+                    ? client.companyName || "Nom d'entreprise non défini"
+                    : `${client.lastName || ""} ${client.firstName || ""}`.trim() || "Nom non défini";
                   
                   return (
                     <TableRow key={client.id}>

@@ -30,7 +30,7 @@ import StorageZones from "@/pages/storage-zones";
 import WorkStations from "@/pages/work-stations";
 import EmailConfig from "@/pages/email-config";
 import Suppliers from "@/pages/suppliers";
-import Clients from "@/pages/clients";
+import Clients from "@/pages/clients-new";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
