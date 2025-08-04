@@ -109,6 +109,12 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **Modules Legacy Removed (August 2025)**:
+  - Completely removed recipes, productions, orders, deliveries modules (database tables, API routes, UI components)
+  - Cleaned up all references in storage.ts, routes.ts, App.tsx, sidebar navigation
+  - Preserved ingredients management with unified articles table architecture
+  - Currency system with DA, EUR, USD symbols fully operational
+  - System ready for new business rules implementation
 - **Measurement Units Management System (January 2025)**:
   - Implemented comprehensive measurement units system with categories and conversion factors
   - Added measurement categories (Poids, Volume, Quantité, Température) with full CRUD operations

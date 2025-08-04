@@ -47,100 +47,8 @@ export const ingredients = pgTable("ingredients", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
-export const recipes = pgTable("recipes", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  preparationTime: integer("preparation_time"), // minutes
-  difficulty: text("difficulty"), // 'easy', 'medium', 'hard'
-  servings: integer("servings").default(1),
-  price: decimal("price", { precision: 10, scale: 2 }).default("0"),
-  active: boolean("active").default(true),
-});
-
-export const recipeIngredients = pgTable("recipe_ingredients", {
-  id: serial("id").primaryKey(),
-  recipeId: integer("recipe_id").references(() => recipes.id),
-  ingredientId: integer("ingredient_id").references(() => ingredients.id),
-  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
-});
-
-export const productions = pgTable("productions", {
-  id: serial("id").primaryKey(),
-  recipeId: integer("recipe_id").references(() => recipes.id),
-  preparerId: integer("preparer_id").references(() => users.id),
-  orderId: integer("order_id").references(() => orders.id), // Link to order if production is from order
-  quantity: integer("quantity").notNull(),
-  scheduledTime: timestamp("scheduled_time", { mode: 'string' }).notNull(),
-  startTime: timestamp("start_time", { mode: 'string' }),
-  endTime: timestamp("end_time", { mode: 'string' }),
-  status: text("status").notNull(), // 'en_attente', 'en_production', 'termine', 'a_refaire'
-});
-
-export const orders = pgTable("orders", {
-  id: serial("id").primaryKey(),
-  customerId: integer("customer_id").references(() => users.id),
-  customerName: text("customer_name"),
-  customerEmail: text("customer_email"),
-  customerPhone: text("customer_phone"),
-  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull(), // 'pending', 'confirmed', 'preparation', 'ready', 'in_delivery', 'delivered', 'cancelled'
-  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-  deliveryAddress: text("delivery_address"),
-  deliveryDate: timestamp("delivery_date", { mode: 'string' }),
-  deliveryTime: text("delivery_time"),
-  delivererId: integer("deliverer_id").references(() => users.id),
-  notes: text("notes"),
-});
-
-export const orderItems = pgTable("order_items", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").references(() => orders.id),
-  recipeId: integer("recipe_id").references(() => recipes.id),
-  quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
-});
-
-export const deliveries = pgTable("deliveries", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").references(() => orders.id),
-  delivererId: integer("deliverer_id").references(() => users.id),
-  status: text("status").notNull(), // 'assigned', 'in_transit', 'delivered', 'failed'
-  assignedAt: timestamp("assigned_at", { mode: 'string' }).defaultNow(),
-  deliveredAt: timestamp("delivered_at", { mode: 'string' }),
-  notes: text("notes"),
-  paymentReceived: decimal("payment_received", { precision: 10, scale: 2 }),
-});
-
-export const productStock = pgTable("product_stock", {
-  id: serial("id").primaryKey(),
-  productionId: integer("production_id").references(() => productions.id),
-  recipeId: integer("recipe_id").references(() => recipes.id),
-  orderId: integer("order_id").references(() => orders.id),
-  customerName: text("customer_name"),
-  quantity: integer("quantity").notNull(),
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
-  productionDate: timestamp("production_date", { mode: 'string' }).defaultNow(),
-  expirationDate: timestamp("expiration_date", { mode: 'string' }).notNull(),
-  barcode: text("barcode").unique(),
-  status: text("status").notNull().default("available"), // 'available', 'reserved', 'delivered', 'expired'
-  preparerId: integer("preparer_id").references(() => users.id),
-});
-
-export const labels = pgTable("labels", {
-  id: serial("id").primaryKey(),
-  productStockId: integer("product_stock_id").references(() => productStock.id),
-  barcode: text("barcode").notNull(),
-  productName: text("product_name").notNull(),
-  customerName: text("customer_name"),
-  productionDate: timestamp("production_date", { mode: 'string' }).notNull(),
-  expirationDate: timestamp("expiration_date", { mode: 'string' }).notNull(),
-  preparerName: text("preparer_name"),
-  quantity: integer("quantity").notNull(),
-  printed: boolean("printed").default(false),
-  printedAt: timestamp("printed_at", { mode: 'string' }),
-});
+// Les tables recipes, productions, orders, deliveries et productStock ont été supprimées
+// Elles seront réimplémentées avec de nouvelles règles de gestion
 
 export const measurementCategories = pgTable("measurement_categories", {
   id: serial("id").primaryKey(),
@@ -237,14 +145,7 @@ export const priceRules = pgTable("price_rules", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
 export const insertIngredientSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true });
-export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true });
-export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
-export const insertProductionSchema = createInsertSchema(productions).omit({ id: true });
-export const insertOrderSchema = createInsertSchema(orders).omit({ id: true });
-export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true });
-export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true });
-export const insertProductStockSchema = createInsertSchema(productStock).omit({ id: true });
-export const insertLabelSchema = createInsertSchema(labels).omit({ id: true });
+// Modules supprimés - schémas à recréer
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
@@ -259,22 +160,7 @@ export type StorageLocation = typeof storageLocations.$inferSelect;
 export type InsertStorageLocation = z.infer<typeof insertStorageLocationSchema>;
 export type Ingredient = typeof articles.$inferSelect;
 export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
-export type Recipe = typeof recipes.$inferSelect;
-export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
-export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
-export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
-export type Production = typeof productions.$inferSelect;
-export type InsertProduction = z.infer<typeof insertProductionSchema>;
-export type Order = typeof orders.$inferSelect;
-export type InsertOrder = z.infer<typeof insertOrderSchema>;
-export type OrderItem = typeof orderItems.$inferSelect;
-export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
-export type Delivery = typeof deliveries.$inferSelect;
-export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
-export type ProductStock = typeof productStock.$inferSelect;
-export type InsertProductStock = z.infer<typeof insertProductStockSchema>;
-export type Label = typeof labels.$inferSelect;
-export type InsertLabel = z.infer<typeof insertLabelSchema>;
+// Types supprimés - à recréer
 export type MeasurementCategory = typeof measurementCategories.$inferSelect;
 export type InsertMeasurementCategory = z.infer<typeof insertMeasurementCategorySchema>;
 export type MeasurementUnit = typeof measurementUnits.$inferSelect;

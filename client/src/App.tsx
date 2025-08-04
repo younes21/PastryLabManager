@@ -8,11 +8,12 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
 import Ingredients from "@/pages/ingredients";
-import Recipes from "@/pages/recipes";
-import Production from "@/pages/production";
+// Modules supprimés - à réimplémenter
+// import Recipes from "@/pages/recipes";
+// import Production from "@/pages/production";
+// import Orders from "@/pages/orders";
+// import Delivery from "@/pages/delivery";
 import Stock from "@/pages/stock";
-import Orders from "@/pages/orders";
-import Delivery from "@/pages/delivery";
 import Users from "@/pages/users";
 import MeasurementUnits from "@/pages/measurement-units";
 import ArticleCategories from "@/pages/article-categories";
@@ -139,11 +140,12 @@ function ProtectedRouter() {
       <Route path="/" component={Dashboard} />
       <Route path="/inventory" component={Inventory} />
       <Route path="/ingredients" component={Ingredients} />
-      <Route path="/recipes" component={Recipes} />
-      <Route path="/production" component={Production} />
+      {/* Routes supprimées - à réimplémenter */}
+      {/* <Route path="/recipes" component={Recipes} /> */}
+      {/* <Route path="/production" component={Production} /> */}
+      {/* <Route path="/orders" component={Orders} /> */}
+      {/* <Route path="/delivery" component={Delivery} /> */}
       <Route path="/stock" component={Stock} />
-      <Route path="/orders" component={Orders} />
-      <Route path="/delivery" component={Delivery} />
       <Route path="/users" component={Users} />
       <Route path="/measurement-units" component={MeasurementUnits} />
       <Route path="/article-categories" component={ArticleCategories} />
