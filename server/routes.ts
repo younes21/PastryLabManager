@@ -348,6 +348,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route PATCH pour la compatibilité avec le frontend
+  app.patch("/api/articles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      console.log("PATCH - Updating article:", id, updateData);
+      
+      // Mettre à jour dans la table articles
+      const updateResult = await pool.query(`
+        UPDATE articles 
+        SET name = $1, description = $2, category_id = $3, unit = $4, cost_per_unit = $5,
+            min_stock = $6, max_stock = $7, storage_location_id = $8, active = $9, price = $10,
+            current_stock = $11
+        WHERE id = $12
+        RETURNING *
+      `, [
+        updateData.name,
+        updateData.description,
+        updateData.categoryId,
+        updateData.unit,
+        updateData.costPerUnit,
+        updateData.minStock,
+        updateData.maxStock,
+        updateData.storageLocationId,
+        updateData.active,
+        updateData.salePrice,
+        updateData.currentStock,
+        id
+      ]);
+      
+      if (updateResult.rows.length === 0) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      const updatedArticle = updateResult.rows[0];
+      const ingredient = {
+        ...updatedArticle,
+        code: `ING-${String(updatedArticle.id).padStart(6, '0')}`,
+        type: 'ingredient',
+        categoryId: updatedArticle.category_id,
+        unitId: null,
+        managedInStock: true,
+        allowSale: updateData.allowSale || false,
+        costPerUnit: updatedArticle.cost_per_unit,
+        salePrice: updatedArticle.price,
+        storageLocationId: updatedArticle.storage_location_id,
+        currentStock: updatedArticle.current_stock,
+        minStock: updatedArticle.min_stock,
+        maxStock: updatedArticle.max_stock,
+        createdAt: updatedArticle.created_at
+      };
+      
+      res.json(ingredient);
+    } catch (error: any) {
+      console.error("Error updating article:", error);
+      console.error("Error stack:", error.stack);
+      res.status(400).json({ message: "Failed to update article", error: error.message });
+    }
+  });
+
   app.delete("/api/ingredients/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
