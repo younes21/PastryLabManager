@@ -217,17 +217,20 @@ export default function SuppliersPage() {
     return supplier.companyName || "Sans nom";
   };
 
-  const SupplierForm = ({ onSubmit, isLoading: submitting }: { 
+  const SupplierFormComponent = ({ onSubmit, isLoading: submitting, formInstance, currentTab, setCurrentTab }: { 
     onSubmit: (data: z.infer<typeof supplierFormSchema>) => void;
     isLoading: boolean;
+    formInstance: any;
+    currentTab: string;
+    setCurrentTab: (tab: string) => void;
   }) => {
     // Obtenir le type actuel sans watcher pour éviter les re-renders
-    const [supplierType, setSupplierType] = useState<"particulier" | "societe">(form.getValues("type") || "societe");
+    const [supplierType, setSupplierType] = useState<"particulier" | "societe">(formInstance.getValues("type") || "societe");
     
     return (
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Form {...formInstance}>
+        <form onSubmit={formInstance.handleSubmit(onSubmit)} className="space-y-6">
+          <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -238,7 +241,7 @@ export default function SuppliersPage() {
           <TabsContent value="general" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="type"
                 render={({ field }) => (
                   <FormItem>
@@ -264,7 +267,7 @@ export default function SuppliersPage() {
 
               {supplierType === "societe" && (
                 <FormField
-                  control={form.control}
+                  control={formInstance.control}
                   name="companyType"
                   render={({ field }) => (
                     <FormItem>
@@ -291,7 +294,7 @@ export default function SuppliersPage() {
             {supplierType === "particulier" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
-                  control={form.control}
+                  control={formInstance.control}
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
@@ -305,7 +308,7 @@ export default function SuppliersPage() {
                 />
 
                 <FormField
-                  control={form.control}
+                  control={formInstance.control}
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
@@ -320,7 +323,7 @@ export default function SuppliersPage() {
               </div>
             ) : (
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="companyName"
                 render={({ field }) => (
                   <FormItem>
@@ -335,7 +338,7 @@ export default function SuppliersPage() {
             )}
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="active"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
@@ -361,7 +364,7 @@ export default function SuppliersPage() {
           <TabsContent value="contact" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
@@ -375,7 +378,7 @@ export default function SuppliersPage() {
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
@@ -390,7 +393,7 @@ export default function SuppliersPage() {
             </div>
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
@@ -404,7 +407,7 @@ export default function SuppliersPage() {
             />
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="contactName"
               render={({ field }) => (
                 <FormItem>
@@ -420,7 +423,7 @@ export default function SuppliersPage() {
 
           <TabsContent value="address" className="space-y-4">
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="address"
               render={({ field }) => (
                 <FormItem>
@@ -435,7 +438,7 @@ export default function SuppliersPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="city"
                 render={({ field }) => (
                   <FormItem>
@@ -449,7 +452,7 @@ export default function SuppliersPage() {
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="postalCode"
                 render={({ field }) => (
                   <FormItem>
@@ -463,7 +466,7 @@ export default function SuppliersPage() {
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="wilaya"
                 render={({ field }) => (
                   <FormItem>
@@ -490,7 +493,7 @@ export default function SuppliersPage() {
           <TabsContent value="legal" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="rc"
                 render={({ field }) => (
                   <FormItem>
@@ -504,7 +507,7 @@ export default function SuppliersPage() {
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="na"
                 render={({ field }) => (
                   <FormItem>
@@ -520,7 +523,7 @@ export default function SuppliersPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="mf"
                 render={({ field }) => (
                   <FormItem>
@@ -534,7 +537,7 @@ export default function SuppliersPage() {
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="nis"
                 render={({ field }) => (
                   <FormItem>
@@ -549,7 +552,7 @@ export default function SuppliersPage() {
             </div>
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="photo"
               render={({ field }) => (
                 <FormItem>
@@ -569,7 +572,7 @@ export default function SuppliersPage() {
             setIsCreateDialogOpen(false);
             setIsEditDialogOpen(false);
             setActiveTab("general");
-            form.reset();
+            formInstance.reset();
           }}>
             Annuler
           </Button>
@@ -618,7 +621,13 @@ export default function SuppliersPage() {
                   Créez un nouveau fournisseur avec toutes ses informations
                 </DialogDescription>
               </DialogHeader>
-              <SupplierForm onSubmit={handleCreate} isLoading={createMutation.isPending} />
+              <SupplierFormComponent 
+                onSubmit={handleCreate} 
+                isLoading={createMutation.isPending}
+                formInstance={form}
+                currentTab={activeTab}
+                setCurrentTab={setActiveTab}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -772,7 +781,13 @@ export default function SuppliersPage() {
                 Modifiez les informations du fournisseur
               </DialogDescription>
             </DialogHeader>
-            <SupplierForm onSubmit={handleUpdate} isLoading={updateMutation.isPending} />
+            <SupplierFormComponent 
+              onSubmit={handleUpdate} 
+              isLoading={updateMutation.isPending}
+              formInstance={form}
+              currentTab={activeTab}
+              setCurrentTab={setActiveTab}
+            />
           </DialogContent>
         </Dialog>
       </div>
