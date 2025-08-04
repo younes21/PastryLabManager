@@ -15,19 +15,15 @@ import {
   LogOut,
   CheckCircle
 } from "lucide-react";
+import { storageLocations } from "@/../../shared/schema";
 
-interface StorageLocationStatus {
-  id: number;
-  name: string;
-  temperature: string;
-  status: "ok" | "warning" | "error";
-}
+type StorageLocation = typeof storageLocations.$inferSelect;
 
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const { data: storageLocations } = useQuery({
+  const { data: storageLocations } = useQuery<StorageLocation[]>({
     queryKey: ["/api/storage-locations"],
   });
 
@@ -143,7 +139,7 @@ export function Sidebar() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <h4 className="text-sm font-medium text-blue-900 mb-2">État des Stockages</h4>
             <div className="space-y-1">
-              {storageLocations?.map((location: any) => (
+              {storageLocations?.map((location) => (
                 <div key={location.id} className="flex justify-between text-xs">
                   <span className="text-blue-700">
                     {location.name} ({location.temperature}°C)
