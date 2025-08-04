@@ -27,6 +27,7 @@ const ingredientSchema = z.object({
   storageLocationId: z.number().optional(),
   categoryId: z.number().optional(),
   unit: z.string().min(1, "L'unité de mesure est requise"),
+  minStock: z.number().min(0, "Le stock minimum doit être positif").optional(),
   allowSale: z.boolean().default(false),
   saleCategoryId: z.number().optional(),
   saleUnit: z.string().optional(),
@@ -67,6 +68,7 @@ export default function IngredientsPage() {
       description: "",
       managedInStock: true,
       unit: "kg",
+      minStock: 0,
       allowSale: false,
       saleUnit: "kg",
     },
@@ -120,6 +122,7 @@ export default function IngredientsPage() {
       storageLocationId: ingredient.storageLocationId || undefined,
       categoryId: ingredient.categoryId || undefined,
       unit: ingredient.unit || "kg",
+      minStock: (ingredient as any).minStock || 0,
       allowSale: (ingredient as any).allowSale ?? false,
       saleCategoryId: (ingredient as any).saleCategoryId || undefined,
       saleUnit: (ingredient as any).saleUnit || "kg",
@@ -331,7 +334,8 @@ export default function IngredientsPage() {
                             <Input 
                               type="number" 
                               {...field} 
-                              onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
                               data-testid="input-ingredient-min-stock" 
                             />
                           </FormControl>
