@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Search, Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -159,13 +159,87 @@ export default function IngredientsPage() {
             Gérez vos ingrédients avec toutes leurs propriétés
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleClose()} data-testid="button-add-ingredient">
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter un Ingrédient
-            </Button>
-          </DialogTrigger>
+      </div>
+
+      {/* Barre de menu/toolbar */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            {/* Actions principales */}
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setIsDialogOpen(true)} data-testid="button-add-ingredient">
+                <Plus className="w-4 h-4 mr-2" />
+                Nouvel Ingrédient
+              </Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Actualiser
+              </Button>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Exporter
+              </Button>
+            </div>
+
+            {/* Recherche et filtres */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un ingrédient..."
+                  className="pl-8 w-64"
+                  data-testid="input-search-ingredients"
+                />
+              </div>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-40" data-testid="select-filter-category">
+                  <SelectValue placeholder="Catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes catégories</SelectItem>
+                  {(categories as any[])?.map((category: any) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.designation}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select defaultValue="all">
+                <SelectTrigger className="w-32" data-testid="select-filter-status">
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  <SelectItem value="active">Actifs</SelectItem>
+                  <SelectItem value="inactive">Inactifs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Statistiques rapides */}
+          <div className="flex gap-6 mt-4 pt-4 border-t">
+            <div className="text-sm">
+              <span className="text-muted-foreground">Total ingrédients: </span>
+              <span className="font-medium">{ingredients?.length || 0}</span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Actifs: </span>
+              <span className="font-medium text-green-600">
+                {ingredients?.filter(i => i.active).length || 0}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Stock faible: </span>
+              <span className="font-medium text-orange-600">
+                {ingredients?.filter(i => Number(i.currentStock) <= Number(i.minStock)).length || 0}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -520,7 +594,6 @@ export default function IngredientsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
