@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, Building2, User, Phone, Mail, MapPin, FileText, Camera } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -217,20 +217,36 @@ export default function SuppliersPage() {
     return supplier.companyName || "Sans nom";
   };
 
-  const SupplierFormComponent = ({ onSubmit, isLoading: submitting, formInstance, currentTab, setCurrentTab }: { 
+  const SupplierFormComponent = memo(({ onSubmit, isLoading: submitting, formInstance, currentTab, setCurrentTab }: { 
     onSubmit: (data: z.infer<typeof supplierFormSchema>) => void;
     isLoading: boolean;
     formInstance: any;
     currentTab: string;
     setCurrentTab: (tab: string) => void;
   }) => {
-    // Obtenir le type actuel sans watcher pour éviter les re-renders
-    const [supplierType, setSupplierType] = useState<"particulier" | "societe">(formInstance.getValues("type") || "societe");
+    // Obtenir le type actuel une seule fois au montage
+    const [supplierType, setSupplierType] = useState<"particulier" | "societe">(() => 
+      formInstance.getValues("type") || "societe"
+    );
+
+    // Mémoriser les handlers pour éviter les re-renders
+    const handleTabChange = useCallback((tab: string) => {
+      setCurrentTab(tab);
+    }, [setCurrentTab]);
+
+    const handleTypeChange = useCallback((value: "particulier" | "societe") => {
+      formInstance.setValue("type", value);
+      setSupplierType(value);
+    }, [formInstance]);
+
+    const handleFormSubmit = useCallback((data: z.infer<typeof supplierFormSchema>) => {
+      onSubmit(data);
+    }, [onSubmit]);
     
     return (
       <Form {...formInstance}>
-        <form onSubmit={formInstance.handleSubmit(onSubmit)} className="space-y-6">
-          <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+        <form onSubmit={formInstance.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -248,7 +264,7 @@ export default function SuppliersPage() {
                     <FormLabel>Type *</FormLabel>
                     <Select onValueChange={(value: "particulier" | "societe") => {
                       field.onChange(value);
-                      setSupplierType(value);
+                      handleTypeChange(value);
                     }} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-supplier-type">
@@ -583,7 +599,7 @@ export default function SuppliersPage() {
       </form>
     </Form>
   );
-};
+});
 
   return (
     <Layout title="Gestion des Fournisseurs">
