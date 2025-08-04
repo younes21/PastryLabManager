@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Package, Search, Download, RotateCcw } from "lucide-react";
+import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -150,8 +151,9 @@ export default function IngredientsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* En-tête */}
+    <Layout title="Gestion des Ingrédients">
+      <div className="container mx-auto p-6 space-y-6">
+        {/* En-tête */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Gestion des Ingrédients</h1>
@@ -159,10 +161,10 @@ export default function IngredientsPage() {
             Gérez vos ingrédients avec toutes leurs propriétés
           </p>
         </div>
-      </div>
+        </div>
 
-      {/* Barre de menu/toolbar */}
-      <Card>
+        {/* Barre de menu/toolbar */}
+        <Card>
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
             {/* Actions principales */}
@@ -237,9 +239,9 @@ export default function IngredientsPage() {
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -595,8 +597,8 @@ export default function IngredientsPage() {
           </DialogContent>
         </Dialog>
 
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Statistiques */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Ingrédients</CardTitle>
@@ -632,10 +634,10 @@ export default function IngredientsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      {/* Table des ingrédients selon spécifications */}
-      <Card>
+        {/* Table des ingrédients selon spécifications */}
+        <Card>
         <CardHeader>
           <CardTitle>Liste des Ingrédients</CardTitle>
           <CardDescription>
@@ -699,6 +701,7 @@ export default function IngredientsPage() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Layout>
   );
 }

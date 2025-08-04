@@ -141,37 +141,35 @@ function ProtectedRouter() {
 
   // Default routes for admin, preparateur, gerant
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/inventory" component={Inventory} />
-        {/* Route ingredients supprimée - utiliser Articles avec filtrage */}
-        {/* Routes supprimées - à réimplémenter */}
-        {/* <Route path="/recipes" component={Recipes} /> */}
-        {/* <Route path="/production" component={Production} /> */}
-        {/* <Route path="/orders" component={Orders} /> */}
-        {/* <Route path="/delivery" component={Delivery} /> */}
-        <Route path="/stock" component={Stock} />
-        <Route path="/users" component={Users} />
-        <Route path="/measurement-units" component={MeasurementUnits} />
-        <Route path="/article-categories" component={ArticleCategories} />
-        <Route path="/price-lists" component={PriceLists} />
-        <Route path="/taxes" component={Taxes} />
-        <Route path="/currencies" component={Currencies} />
-        <Route path="/delivery-methods" component={DeliveryMethods} />
-        <Route path="/accounting-journals" component={AccountingJournals} />
-        <Route path="/accounting-accounts" component={AccountingAccounts} />
-        <Route path="/storage-zones" component={StorageZones} />
-        <Route path="/work-stations" component={WorkStations} />
-        <Route path="/email-config" component={EmailConfig} />
-        <Route path="/suppliers" component={Suppliers} />
-        <Route path="/clients" component={Clients} />
-        <Route path="/products" component={Products} />
-        <Route path="/ingredients" component={IngredientsNew} />
-        <Route path="/catalog" component={ClientCatalog} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/" component={Dashboard} />
+      <Route path="/inventory" component={Inventory} />
+      {/* Route ingredients supprimée - utiliser Articles avec filtrage */}
+      {/* Routes supprimées - à réimplémenter */}
+      {/* <Route path="/recipes" component={Recipes} /> */}
+      {/* <Route path="/production" component={Production} /> */}
+      {/* <Route path="/orders" component={Orders} /> */}
+      {/* <Route path="/delivery" component={Delivery} /> */}
+      <Route path="/stock" component={Stock} />
+      <Route path="/users" component={Users} />
+      <Route path="/measurement-units" component={MeasurementUnits} />
+      <Route path="/article-categories" component={ArticleCategories} />
+      <Route path="/price-lists" component={PriceLists} />
+      <Route path="/taxes" component={Taxes} />
+      <Route path="/currencies" component={Currencies} />
+      <Route path="/delivery-methods" component={DeliveryMethods} />
+      <Route path="/accounting-journals" component={AccountingJournals} />
+      <Route path="/accounting-accounts" component={AccountingAccounts} />
+      <Route path="/storage-zones" component={StorageZones} />
+      <Route path="/work-stations" component={WorkStations} />
+      <Route path="/email-config" component={EmailConfig} />
+      <Route path="/suppliers" component={Suppliers} />
+      <Route path="/clients" component={Clients} />
+      <Route path="/products" component={Products} />
+      <Route path="/ingredients" component={IngredientsNew} />
+      <Route path="/catalog" component={ClientCatalog} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
