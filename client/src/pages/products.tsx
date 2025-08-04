@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertProductSchema, type Product, type InsertProduct, type ArticleCategory, type StorageZone, type MeasurementUnit } from "@shared/schema";
+import { insertProductSchema, insertRecipeSchema, type Product, type InsertProduct, type Recipe, type InsertRecipe, type ArticleCategory, type StorageZone, type MeasurementUnit } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,6 +28,276 @@ const stockTrackingOptions = [
 const commonUnits = [
   "pièce", "kg", "g", "l", "ml", "m", "cm", "m²", "m³", "boîte", "paquet", "sachet"
 ];
+
+function RecipeManagement({ productId }: { productId: number }) {
+  const [recipeForm, setRecipeForm] = useState<InsertRecipe | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const { toast } = useToast();
+
+  const { data: recipe, isLoading } = useQuery<Recipe>({
+    queryKey: ["/api/products", productId, "recipe"],
+    queryFn: () => fetch(`/api/products/${productId}/recipe`).then(res => {
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('Failed to fetch recipe');
+      return res.json();
+    }),
+  });
+
+  const { data: measurementUnits } = useQuery<MeasurementUnit[]>({
+    queryKey: ["/api/measurement-units"],
+  });
+
+  const form = useForm<InsertRecipe>({
+    resolver: zodResolver(insertRecipeSchema),
+    defaultValues: {
+      productId,
+      designation: recipe?.designation || "",
+      description: recipe?.description || "",
+      quantity: recipe?.quantity || "1",
+      unit: recipe?.unit || "pièce",
+      isSubRecipe: Boolean(recipe?.isSubRecipe ?? false),
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: InsertRecipe) => apiRequest("/api/recipes", "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
+      toast({ title: "Recette créée avec succès" });
+      setIsEditing(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la création", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: InsertRecipe) => apiRequest(`/api/recipes/${recipe!.id}`, "PUT", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
+      toast({ title: "Recette modifiée avec succès" });
+      setIsEditing(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/recipes/${recipe!.id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
+      toast({ title: "Recette supprimée avec succès" });
+      setIsEditing(false);
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
+    },
+  });
+
+  const onSubmit = (data: InsertRecipe) => {
+    if (recipe) {
+      updateMutation.mutate(data);
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const handleEdit = () => {
+    if (recipe) {
+      form.reset({
+        productId,
+        designation: recipe.designation,
+        description: recipe.description || "",
+        quantity: recipe.quantity,
+        unit: recipe.unit,
+        isSubRecipe: recipe.isSubRecipe,
+      });
+    }
+    setIsEditing(true);
+  };
+
+  const handleDelete = () => {
+    if (recipe && confirm('Êtes-vous sûr de vouloir supprimer cette recette ?')) {
+      deleteMutation.mutate();
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-4">Chargement de la recette...</div>;
+  }
+
+  if (!recipe && !isEditing) {
+    return (
+      <div className="text-center p-6">
+        <p className="text-muted-foreground mb-4">Aucune recette associée à ce produit</p>
+        <Button onClick={() => setIsEditing(true)} data-testid="button-create-recipe">
+          <Plus className="w-4 h-4 mr-2" />
+          Créer une recette
+        </Button>
+      </div>
+    );
+  }
+
+  if (recipe && !isEditing) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-start">
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">{recipe.designation}</h3>
+            {recipe.description && (
+              <p className="text-muted-foreground">{recipe.description}</p>
+            )}
+          </div>
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" onClick={handleEdit} data-testid="button-edit-recipe">
+              <Edit className="w-4 h-4 mr-2" />
+              Modifier
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDelete} data-testid="button-delete-recipe">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Supprimer
+            </Button>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+          <div>
+            <span className="text-sm font-medium">Quantité/Parts:</span>
+            <p className="text-lg">{recipe.quantity} {recipe.unit}</p>
+          </div>
+          <div>
+            <span className="text-sm font-medium">Type:</span>
+            <Badge variant={recipe.isSubRecipe ? "secondary" : "default"}>
+              {recipe.isSubRecipe ? "Sous-recette" : "Recette principale"}
+            </Badge>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="designation"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Désignation *</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="Nom de la recette" data-testid="input-recipe-designation" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea {...field} value={field.value || ""} placeholder="Description de la recette" data-testid="input-recipe-description" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="quantity"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quantité/Nombre de parts *</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" step="0.001" placeholder="1" data-testid="input-recipe-quantity" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="unit"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Unité de mesure *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-recipe-unit">
+                      <SelectValue placeholder="Sélectionner une unité" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {commonUnits.map((unit) => (
+                      <SelectItem key={unit} value={unit}>
+                        {unit}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="space-y-0.5">
+            <FormLabel className="text-base">Est sous-recette ?</FormLabel>
+            <p className="text-sm text-muted-foreground">
+              Cette recette est-elle une sous-recette d'une recette principale ?
+            </p>
+          </div>
+          <FormField
+            control={form.control}
+            name="isSubRecipe"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Switch
+                    checked={Boolean(field.value)}
+                    onCheckedChange={field.onChange}
+                    data-testid="switch-is-sub-recipe"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="flex justify-end space-x-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsEditing(false)}
+            data-testid="button-cancel-recipe"
+          >
+            Annuler
+          </Button>
+          <Button
+            type="submit"
+            disabled={createMutation.isPending || updateMutation.isPending}
+            data-testid="button-submit-recipe"
+          >
+            {createMutation.isPending || updateMutation.isPending
+              ? "Enregistrement..."
+              : recipe
+              ? "Modifier"
+              : "Créer"}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
 
 function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () => void }) {
   const { toast } = useToast();
@@ -115,11 +385,12 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="stock">Stock & Gestion</TabsTrigger>
             <TabsTrigger value="vente">Vente & Prix</TabsTrigger>
             <TabsTrigger value="conservation">Conservation</TabsTrigger>
+            <TabsTrigger value="recipe">Recette</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -485,6 +756,16 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
                   )}
                 />
               </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="recipe" className="space-y-4">
+            {isEditing && product ? (
+              <RecipeManagement productId={product.id} />
+            ) : (
+              <div className="text-center p-6 text-muted-foreground">
+                <p>La gestion des recettes est disponible après la création du produit</p>
+              </div>
             )}
           </TabsContent>
         </Tabs>

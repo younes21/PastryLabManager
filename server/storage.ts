@@ -2,7 +2,7 @@ import {
   users, storageLocations,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
-  suppliers, clients, products,
+  suppliers, clients, products, recipes,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -11,7 +11,7 @@ import {
   type Tax, type InsertTax, type Currency, type InsertCurrency, type DeliveryMethod, type InsertDeliveryMethod,
   type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
   type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation,
-  type Supplier, type InsertSupplier, type Product, type InsertProduct
+  type Supplier, type InsertSupplier, type Product, type InsertProduct, type Recipe, type InsertRecipe
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -162,6 +162,15 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<boolean>;
+
+  // Recipes (attached to products)
+  getAllRecipes(): Promise<Recipe[]>;
+  getRecipe(id: number): Promise<Recipe | undefined>;
+  getRecipeByProductId(productId: number): Promise<Recipe | undefined>;
+  createRecipe(recipe: InsertRecipe): Promise<Recipe>;
+  updateRecipe(id: number, recipe: Partial<InsertRecipe>): Promise<Recipe | undefined>;
+  deleteRecipe(id: number): Promise<boolean>;
+  deleteRecipeByProductId(productId: number): Promise<boolean>;
 
   // Ingredients (filtrage articles par type="ingredient")
   getAllIngredients(): Promise<Article[]>;
@@ -793,6 +802,44 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: number): Promise<boolean> {
     const result = await db.delete(products).where(eq(products.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Recipes (attached to products)
+  async getAllRecipes(): Promise<Recipe[]> {
+    return await db.select().from(recipes).orderBy(recipes.designation);
+  }
+
+  async getRecipe(id: number): Promise<Recipe | undefined> {
+    const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
+    return recipe || undefined;
+  }
+
+  async getRecipeByProductId(productId: number): Promise<Recipe | undefined> {
+    const [recipe] = await db.select().from(recipes).where(eq(recipes.productId, productId));
+    return recipe || undefined;
+  }
+
+  async createRecipe(insertRecipe: InsertRecipe): Promise<Recipe> {
+    const [recipe] = await db.insert(recipes).values(insertRecipe).returning();
+    return recipe;
+  }
+
+  async updateRecipe(id: number, updateData: Partial<InsertRecipe>): Promise<Recipe | undefined> {
+    const [recipe] = await db.update(recipes)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(recipes.id, id))
+      .returning();
+    return recipe || undefined;
+  }
+
+  async deleteRecipe(id: number): Promise<boolean> {
+    const result = await db.delete(recipes).where(eq(recipes.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteRecipeByProductId(productId: number): Promise<boolean> {
+    const result = await db.delete(recipes).where(eq(recipes.productId, productId));
     return (result.rowCount || 0) > 0;
   }
 

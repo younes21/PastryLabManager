@@ -98,7 +98,22 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
 });
 
-// Les tables recipes, productions, orders, deliveries et productStock ont été supprimées
+// Recettes - attachées aux produits (une seule recette max par produit)
+export const recipes = pgTable("recipes", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull().unique(), // Une seule recette par produit
+  designation: text("designation").notNull(),
+  description: text("description"),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(), // Quantité/nombre de parts
+  unit: text("unit").notNull(), // Unité de mesure
+  isSubRecipe: boolean("is_sub_recipe").default(false), // Est sous recette ?
+  
+  // Audit
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+// Les tables productions, orders, deliveries et productStock ont été supprimées
 // Elles seront réimplémentées avec de nouvelles règles de gestion
 
 export const measurementCategories = pgTable("measurement_categories", {
@@ -206,6 +221,7 @@ export const insertArticleCategorySchema = createInsertSchema(articleCategories)
 export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true });
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
 export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
+export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -228,6 +244,8 @@ export type PriceList = typeof priceLists.$inferSelect;
 export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
 export type PriceRule = typeof priceRules.$inferSelect;
 export type InsertPriceRule = z.infer<typeof insertPriceRuleSchema>;
+export type Recipe = typeof recipes.$inferSelect;
+export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type Tax = typeof taxes.$inferSelect;
 export type InsertTax = z.infer<typeof insertTaxSchema>;
 export type Currency = typeof currencies.$inferSelect;
