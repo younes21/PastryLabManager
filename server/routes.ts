@@ -1392,11 +1392,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/accounting-accounts", async (req, res) => {
     try {
+      console.log("Account data received:", req.body);
       const accountData = insertAccountingAccountSchema.parse(req.body);
+      console.log("Account data parsed:", accountData);
       const account = await storage.createAccountingAccount(accountData);
       res.status(201).json(account);
     } catch (error) {
-      res.status(400).json({ message: "Invalid accounting account data" });
+      console.error("Account creation error:", error);
+      res.status(400).json({ message: "Invalid accounting account data", error: error.message });
     }
   });
 

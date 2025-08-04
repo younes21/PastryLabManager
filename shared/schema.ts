@@ -324,6 +324,7 @@ export const accountingAccounts = pgTable("accounting_accounts", {
   designation: text("designation").notNull(),
   code: text("code").notNull().unique(), // Numéro de compte comptable
   type: text("type").notNull(), // 'actif', 'passif', 'charge', 'produit'
+  nature: text("nature").notNull().default("debit"), // 'debit', 'credit'
   parentId: integer("parent_id"), // Comptes hiérarchiques - référence ajoutée après
   description: text("description"),
   active: boolean("active").default(true),

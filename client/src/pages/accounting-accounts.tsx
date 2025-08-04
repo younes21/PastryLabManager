@@ -17,8 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { AccountingAccount, InsertAccountingAccount } from "@shared/schema";
 
 const accountFormSchema = z.object({
-  code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
+  code: z.string().min(1, "Le code est requis"),
   description: z.string().optional(),
   type: z.string().min(1, "Le type est requis"),
   nature: z.string().min(1, "La nature est requise"),
@@ -51,6 +51,7 @@ export default function AccountingAccountsPage() {
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
       designation: "",
+      code: "",
       description: "",
       type: "",
       nature: "",
@@ -169,6 +170,20 @@ export default function AccountingAccountsPage() {
                       <FormLabel>Désignation</FormLabel>
                       <FormControl>
                         <Input {...field} data-testid="input-designation" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code comptable</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="ex: 512001" data-testid="input-code" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

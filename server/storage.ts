@@ -1235,6 +1235,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAccountingAccount(insertAccount: InsertAccountingAccount): Promise<AccountingAccount> {
+    // The accounting accounts table expects user to provide the code (account number)
     const [account] = await db.insert(accountingAccounts).values(insertAccount).returning();
     return account;
   }
