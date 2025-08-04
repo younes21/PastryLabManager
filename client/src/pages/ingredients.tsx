@@ -546,7 +546,8 @@ export default function IngredientsPage() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof ingredientFormSchema>) => {
-      const response = await fetch("/api/articles", {
+      console.log("Frontend sending data:", data);
+      const response = await fetch("/api/ingredients", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -556,6 +557,7 @@ export default function IngredientsPage() {
       
       if (!response.ok) {
         const error = await response.text();
+        console.error("API Error:", error);
         throw new Error(error || "Erreur lors de la création");
       }
       
@@ -672,7 +674,7 @@ export default function IngredientsPage() {
     console.log("Creating ingredient with data:", data);
     const submissionData = {
       ...data,
-      type: 'ingredient',
+      type: 'ingredient' as const,
       managedInStock: data.managedInStock ?? true,
       allowSale: data.allowSale ?? false,
       active: data.active ?? true,
@@ -690,6 +692,7 @@ export default function IngredientsPage() {
       storageLocationId: ingredient.storageLocationId,
       categoryId: ingredient.categoryId,
       unitId: ingredient.unitId,
+      unit: ingredient.unit || 'kg',
       allowSale: ingredient.allowSale ?? false,
       saleCategoryId: ingredient.saleCategoryId,
       saleUnitId: ingredient.saleUnitId,
@@ -711,7 +714,7 @@ export default function IngredientsPage() {
       console.log("Updating ingredient with data:", data);
       const submissionData = {
         ...data,
-        type: 'ingredient',
+        type: 'ingredient' as const,
         managedInStock: data.managedInStock ?? true,
         allowSale: data.allowSale ?? false,
         active: data.active ?? true,
