@@ -2,7 +2,25 @@
 
 ## Overview
 
-This is a full-stack bakery management system built with React and Express.js. The application provides comprehensive functionality for managing bakery operations including inventory, recipes, production, orders, and deliveries. It features role-based access control with different interfaces for administrators, preparers, managers, clients, and delivery personnel.
+This is a comprehensive bakery laboratory management system (ERP) built with React and Express.js, inspired by Odoo. The application provides full CRUD functionality for managing professional bakery operations including sales, purchasing, accounting, production, inventory, and administration. It features role-based access control with interfaces adapted for point-of-sale systems.
+
+### Business Rules
+- **Articles** can be: products, ingredients, or services
+- **Default currency**: DA (Algerian Dinar)
+- **Automatic codes** for main entities: `{prefix(5 chars max)}-{000000-999999}` (e.g., `frt-000021`)
+- **Administrator** has all privileges by default
+- **Event tracking table** for change monitoring (activatable/deactivatable)
+- **Audit fields** required: `createdAt`, `creatorId`, etc.
+
+### Core Modules
+1. **Sales Management**: Clients, Products/Recipes, Quotes/Orders, Product/Ingredient Sales
+2. **Purchase Management**: Suppliers, Ingredients, Ingredient Purchases
+3. **Billing & Accounting**: Journals/Entries, Delivery/Invoicing, Supplier/Client Payments  
+4. **Production (Laboratory)**: Technical Sheets (Recipes), Preparation Planning, Preparations
+5. **Inventory (Stock)**: Operations (transfers, adjustments, provisioning), Product/Ingredient tracking
+6. **Dashboard**: Overview and analytics
+7. **User Management**: Users, Roles, Permissions
+8. **Administration**: Users, Measurement Units, Product Categories, Price Lists, Delivery Methods, Taxes, Storage Zones, Currencies, Work Stations, Accounting Journals
 
 ## User Preferences
 

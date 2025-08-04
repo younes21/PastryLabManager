@@ -1,0 +1,115 @@
+## 🔰 Démarrage
+
+Utiliser juste :
+
+- Tester le code généré avec des données fictives et fixer les erreurs pour ne pas avoir de fix manuel après génération.
+- Interfaces adaptées aux POS (point of sale)
+
+---
+
+## 📘 Définitions
+
+### CRUD :
+
+- Afficher la liste avec tri et filtre simple et avancé
+- Ajouter les boutons nécessaires pour :
+  - Créer
+  - Modifier
+  - Supprimer un enregistrement
+- Implémenter la logique de :
+  - Création
+  - Modification
+  - Suppression
+
+---
+
+## 📏 Règles générales (à respecter pour chaque instruction)
+
+- Tester le code généré avec des données fictives
+- Corriger les erreurs pour éviter les fixes manuels
+- Interfaces adaptées aux POS
+- Implémentation complète du CRUD (voir section ci-dessus)
+
+---
+
+## 🌐 Contexte de l'application
+
+Tu vas créer une application web avec :
+
+- **Frontend** : React.js  
+- **Backend** : Express.js  
+- **But** : Gérer un laboratoire de pâtisserie (ERP spécialisé inspiré d’Odoo)
+
+---
+
+## 🧩 Modules de l’application
+
+### 1. Gestion des Ventes
+- Clients
+- Produits et Recettes
+- Devis et Commandes
+- Ventes des produits/ingrédients
+
+### 2. Gestion des Achats
+- Fournisseurs
+- Ingrédients
+- Achats des ingrédients
+
+### 3. Facturation et Comptabilité
+- Journaux & écritures comptables
+- Livraison et facturation
+- Règlements fournisseurs
+- Règlements clients
+
+### 4. Production (Laboratoire ou Cuisine)
+- Fiches techniques (recettes)
+- Planning de préparation
+- Préparations
+
+### 5. Inventaire (Stock)
+- Opérations d’inventaire :
+  - Transferts : réception, livraison, fabrication, interne
+  - Ajustements : inventaire physique, rebut
+  - Approvisionnement : reliquat, approvisionnement planifié
+- Produits et ingrédients suivis
+
+### 6. Tableau de bord
+
+### 7. Gestion des utilisateurs
+- Gestion des utilisateurs
+- Rôles et permissions
+
+### 8. Administration
+- Gestion des utilisateurs
+- Unités de mesure
+- Catégories de produits
+- Liste des prix
+- Remise & fidélité *(plus tard)*
+- Modes de livraison *(standard, prix fixe, autres comme Odoo)*
+- Configuration messagerie
+- Taxes
+- Zones de stockage
+- Devises
+- Postes de travail *(équipements de fabrication)*
+- Journaux & Comptes comptables
+
+---
+
+## 📌 Règles générales de l’application
+
+- Un **article** peut être :
+  - un **produit**
+  - un **ingrédient**
+  - un **service**
+- Devise par défaut : **DA** *(dinar algérien)*
+- Chaque entité principale possède un **code automatique** :
+  - Format : `{prefix(5 lettres max)}-{000000 à 999999}`
+  - Exemple : `frt-000021` (banane, catégorie fruits)
+- L’administrateur possède **tous les privilèges** par défaut
+- Il faut une **table d’événements** pour suivre les changements :
+  - Fonction **activable/désactivable** via l’interface
+- Chaque entité doit inclure des **champs d’audit** :
+  - `createdAt`
+  - `creatorId`
+  - *(et autres si besoin)*
+

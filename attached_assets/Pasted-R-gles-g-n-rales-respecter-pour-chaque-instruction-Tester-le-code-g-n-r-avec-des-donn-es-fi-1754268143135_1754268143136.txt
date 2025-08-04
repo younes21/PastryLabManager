@@ -1,0 +1,60 @@
+Règles générales à respecter pour chaque instruction :
+-	 Tester le code généré avec des données fictives et fixer les erreurs pour ne pas avoir de fix manuel après génération.
+-	Interfaces adaptées aux POS (point of sale)
+ CRUD :
+-	Afficher la liste avec tri et filtre simple et avancée
+-	Ajouter les boutons nécessaires pour créer, modifier et supprimer un enregistrement
+-	Implémenter la création, modification et suppression
+
+## contexte :
+1.	Tu vas créer une application web avec reactjs et expressjs permettant de gérer un laboratoire de pâtisserie. Cette application est semblable à un ERP comme « odoo » mais spécifique. Cette application contient les modules suivants :
+1.	 Gestion des Ventes
+a.	Clients
+b.	Produits et recettes
+c.	Devis et Commandes
+d.	Les ventes des produits/ingrédients
+2.	Gestion des Achats
+a.	Fournisseurs
+b.	Ingrédients
+c.	Les achats des ingrédients
+3.	Gestion facturation et comptabilité
+a.	Les journaux et les écritures comptables
+b.	Livraison et facturation
+c.	Règlements fournisseurs
+d.	Règlements clients
+4.	Gestion de la Production (laboratoire ou cuisine)
+a.	Liste des fiches techniques (recettes de cuisine)
+b.	Planning préparations
+c.	Préparations
+5.	Inventaire (gestion de stock)
+a.	Operations d’inventaire
+i.	Transferts (réception, livraison, fabrication/préparation, interne)
+ii.	Ajustement (inventaire physique, rebut)
+iii.	Approvisionnement (reliquat, approvisionnement planifié)
+b.	Produits et ingrédients (articles qui ont un suivi)
+6.	Tableau de bord
+7.	Gestion des utilisateurs
+a.	Gestion des utilisateurs
+b.	Gestion des rôles et permissions
+8.	Administration
+a.	Gestion des utilisateurs
+b.	Unités de mesures 
+c.	Catégorie des produits
+d.	Liste des prix
+e.	Remise et fidélité (plutart)
+f.	Modes de livraison (standard prix fixe) existe autres voir odoo
+g.	Config messagerie
+h.	Taxes
+i.	Zones de stockage
+j.	Devises
+k.	Postes de travail (équipements de fabrication)
+l.	Zones de stockage
+m.	Journaux et Comptes comptables 
+
+Règles générales de l’application :
+-	Un article peut être un produit, un ingrédient ou un service
+-	La devise utilisée par défaut est DA (dinar algérien)
+-	Chaque entité principale (table métier) a un code qui sera généré automatiquement lors de l’enregistrement. Ce code est constitué d’un préfix sur 5 caractères max et un chiffre sur 6 caractères fixes Ex : banane de catégorie fruits : code : frt-000021
+-	Un administrateur peut tout faire par défaut (à tous les privilèges).
+-	Tu dois créer une table d’événement pour suivre les changements. Cette fonction peut etre activer ou descativer par l’administrateur dans l’interface.
+-	Ajouter les champs d’audit createdAt, creatorId,……
