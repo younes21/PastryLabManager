@@ -14,7 +14,8 @@ import {
   Cake,
   LogOut,
   CheckCircle,
-  Scale
+  Scale,
+  FolderTree
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -49,6 +50,7 @@ export function Sidebar() {
     { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
     { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
+    { path: "/article-categories", label: "Catégories d'Articles", icon: "fas fa-folder-tree", lucideIcon: FolderTree },
   ];
 
   // Filter navigation based on user role

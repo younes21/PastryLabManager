@@ -144,6 +144,15 @@ export const measurementUnits = pgTable("measurement_units", {
   active: boolean("active").default(true),
 });
 
+export const articleCategories = pgTable("article_categories", {
+  id: serial("id").primaryKey(),
+  designation: text("designation").notNull(),
+  parentId: integer("parent_id"),
+  forSale: boolean("for_sale").default(false),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
@@ -158,6 +167,7 @@ export const insertProductStockSchema = createInsertSchema(productStock).omit({ 
 export const insertLabelSchema = createInsertSchema(labels).omit({ id: true });
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
+export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -186,3 +196,5 @@ export type MeasurementCategory = typeof measurementCategories.$inferSelect;
 export type InsertMeasurementCategory = z.infer<typeof insertMeasurementCategorySchema>;
 export type MeasurementUnit = typeof measurementUnits.$inferSelect;
 export type InsertMeasurementUnit = z.infer<typeof insertMeasurementUnitSchema>;
+export type ArticleCategory = typeof articleCategories.$inferSelect;
+export type InsertArticleCategory = z.infer<typeof insertArticleCategorySchema>;

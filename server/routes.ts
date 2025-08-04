@@ -6,7 +6,7 @@ import {
   insertRecipeSchema, insertRecipeIngredientSchema, insertProductionSchema,
   insertOrderSchema, insertOrderItemSchema, insertDeliverySchema,
   insertProductStockSchema, insertLabelSchema, insertMeasurementCategorySchema,
-  insertMeasurementUnitSchema
+  insertMeasurementUnitSchema, insertArticleCategorySchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -933,6 +933,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Measurement unit deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete measurement unit" });
+    }
+  });
+
+  // Article Categories routes
+  app.get("/api/article-categories", async (req, res) => {
+    try {
+      const categories = await storage.getAllArticleCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch article categories" });
+    }
+  });
+
+  app.get("/api/article-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.getArticleCategory(id);
+      
+      if (!category) {
+        return res.status(404).json({ message: "Article category not found" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch article category" });
+    }
+  });
+
+  app.get("/api/article-categories/parent/:parentId", async (req, res) => {
+    try {
+      const parentId = req.params.parentId === 'null' ? null : parseInt(req.params.parentId);
+      const categories = await storage.getArticleCategoriesByParent(parentId);
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch article categories by parent" });
+    }
+  });
+
+  app.post("/api/article-categories", async (req, res) => {
+    try {
+      const categoryData = insertArticleCategorySchema.parse(req.body);
+      const category = await storage.createArticleCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid article category data" });
+    }
+  });
+
+  app.put("/api/article-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const categoryData = req.body;
+      const category = await storage.updateArticleCategory(id, categoryData);
+      
+      if (!category) {
+        return res.status(404).json({ message: "Article category not found" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update article category" });
+    }
+  });
+
+  app.delete("/api/article-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteArticleCategory(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Article category not found" });
+      }
+
+      res.json({ message: "Article category deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete article category" });
     }
   });
 

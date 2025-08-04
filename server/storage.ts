@@ -1,14 +1,14 @@
 import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
-  measurementCategories, measurementUnits,
+  measurementCategories, measurementUnits, articleCategories,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type Delivery, type InsertDelivery, type ProductStock, type InsertProductStock,
   type Label, type InsertLabel, type MeasurementCategory, type InsertMeasurementCategory,
-  type MeasurementUnit, type InsertMeasurementUnit
+  type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -127,6 +127,14 @@ export interface IStorage {
   createMeasurementUnit(unit: InsertMeasurementUnit): Promise<MeasurementUnit>;
   updateMeasurementUnit(id: number, unit: Partial<InsertMeasurementUnit>): Promise<MeasurementUnit | undefined>;
   deleteMeasurementUnit(id: number): Promise<boolean>;
+
+  // Article Categories
+  getArticleCategory(id: number): Promise<ArticleCategory | undefined>;
+  getAllArticleCategories(): Promise<ArticleCategory[]>;
+  getArticleCategoriesByParent(parentId: number | null): Promise<ArticleCategory[]>;
+  createArticleCategory(category: InsertArticleCategory): Promise<ArticleCategory>;
+  updateArticleCategory(id: number, category: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined>;
+  deleteArticleCategory(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -813,6 +821,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMeasurementUnit(id: number): Promise<boolean> {
     const result = await db.delete(measurementUnits).where(eq(measurementUnits.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Article Categories methods
+  async getArticleCategory(id: number): Promise<ArticleCategory | undefined> {
+    const [category] = await db.select().from(articleCategories).where(eq(articleCategories.id, id));
+    return category || undefined;
+  }
+
+  async getAllArticleCategories(): Promise<ArticleCategory[]> {
+    return await db.select().from(articleCategories).orderBy(articleCategories.designation);
+  }
+
+  async getArticleCategoriesByParent(parentId: number | null): Promise<ArticleCategory[]> {
+    if (parentId === null) {
+      return await db.select().from(articleCategories)
+        .where(isNull(articleCategories.parentId))
+        .orderBy(articleCategories.designation);
+    }
+    return await db.select().from(articleCategories)
+      .where(eq(articleCategories.parentId, parentId))
+      .orderBy(articleCategories.designation);
+  }
+
+  async createArticleCategory(insertCategory: InsertArticleCategory): Promise<ArticleCategory> {
+    const [category] = await db.insert(articleCategories).values(insertCategory).returning();
+    return category;
+  }
+
+  async updateArticleCategory(id: number, updateData: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined> {
+    const [category] = await db.update(articleCategories)
+      .set(updateData)
+      .where(eq(articleCategories.id, id))
+      .returning();
+    return category || undefined;
+  }
+
+  async deleteArticleCategory(id: number): Promise<boolean> {
+    const result = await db.delete(articleCategories).where(eq(articleCategories.id, id));
     return (result.rowCount || 0) > 0;
   }
 }
