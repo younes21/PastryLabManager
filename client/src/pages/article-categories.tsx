@@ -255,11 +255,11 @@ export default function ArticleCategories() {
                 <div>
                   <Label htmlFor="parent">Catégorie parent (optionnel)</Label>
                   <Select 
-                    value={categoryForm.parentId?.toString() || ""} 
+                    value={categoryForm.parentId?.toString() || "none"} 
                     onValueChange={(value) => {
                       setCategoryForm({
                         ...categoryForm, 
-                        parentId: value === "" ? undefined : parseInt(value)
+                        parentId: value === "none" ? undefined : parseInt(value)
                       });
                     }}
                   >
@@ -267,7 +267,7 @@ export default function ArticleCategories() {
                       <SelectValue placeholder="Aucune catégorie parent" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Aucune catégorie parent</SelectItem>
+                      <SelectItem value="none">Aucune catégorie parent</SelectItem>
                       {getAvailableParents(editingCategory?.id).map((category) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           {buildCategoryPath(category, categories)}
