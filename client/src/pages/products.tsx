@@ -63,7 +63,7 @@ const productSchema = insertArticleSchema.extend({
   storageConditions: z.string().optional(),
 });
 
-type ProductForm = z.infer<typeof productSchema>;
+type ProductFormData = z.infer<typeof productSchema>;
 
 export default function Products() {
   console.log("🔥 PRODUCTS PAGE - Début de rendu");
@@ -299,7 +299,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
   const { toast } = useToast();
   const isEditing = !!product;
   
-  const form = useForm<ProductForm>({
+  const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       type: "product" as const,
@@ -312,7 +312,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       allowSale: Boolean(product?.allowSale ?? true),
       saleCategoryId: product?.saleCategoryId || undefined,
       saleUnit: product?.saleUnit || "pièce",
-      salePrice: product?.salePrice ? product.salePrice.toString() : "",
+      salePrice: product?.salePrice ? String(product.salePrice) : "",
       taxId: product?.taxId || undefined,
       minStock: product?.minStock ? product.minStock.toString() : "",
       maxStock: product?.maxStock ? product.maxStock.toString() : "",
@@ -337,7 +337,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: ProductForm) => {
+    mutationFn: (data: ProductFormData) => {
       console.log("🔥 CREATE PRODUCT - Données envoyées:", data);
       return apiRequest("/api/articles", "POST", data);
     },
@@ -353,7 +353,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: ProductForm) => {
+    mutationFn: (data: ProductFormData) => {
       console.log("🔥 UPDATE PRODUCT - Données envoyées:", data);
       return apiRequest(`/api/articles/${product!.id}`, "PUT", data);
     },
@@ -368,7 +368,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     },
   });
 
-  const onSubmit = (formData: ProductForm) => {
+  const onSubmit = (formData: ProductFormData) => {
     console.log("🔥 PRODUCT FORM - Soumission des données:", formData);
     
     // Plus de transformation nécessaire - le schéma côté serveur gère la conversion
@@ -381,7 +381,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-6">
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="general">Général</TabsTrigger>
