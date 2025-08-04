@@ -4,7 +4,6 @@ import {
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
   suppliers,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
-  type Ingredient, type InsertIngredient,
   type MeasurementCategory, type InsertMeasurementCategory,
   type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
   type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule,
@@ -33,14 +32,7 @@ export interface IStorage {
   updateStorageLocation(id: number, location: Partial<InsertStorageLocation>): Promise<StorageLocation | undefined>;
   deleteStorageLocation(id: number): Promise<boolean>;
 
-  // Ingredients  
-  getIngredient(id: number): Promise<Ingredient | undefined>;
-  getAllIngredients(): Promise<Ingredient[]>;
-  getLowStockIngredients(): Promise<Ingredient[]>;
-  createIngredient(ingredient: InsertIngredient): Promise<Ingredient>;
-  updateIngredient(id: number, ingredient: Partial<InsertIngredient>): Promise<Ingredient | undefined>;
-  deleteIngredient(id: number): Promise<boolean>;
-  updateIngredientStock(id: number, quantity: number): Promise<void>;
+  // Ingredients supprimés - utiliser articles avec type="ingredient"
 
   // Modules supprimés - à réimplémenter avec nouvelles règles
   // Recipes, Productions, Orders, Deliveries, ProductStock, Labels
@@ -223,75 +215,7 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Ingredients (using articles table with type filter)
-  async getIngredient(id: number): Promise<Ingredient | undefined> {
-    console.log("Using direct SQL query...");
-    const [ingredient] = await db.select().from(articles).where(
-      and(eq(articles.id, id), eq(articles.type, "ingredient"))
-    );
-    return ingredient as any || undefined;
-  }
-
-  async getAllIngredients(): Promise<Ingredient[]> {
-    console.log("Using direct SQL query...");
-    const ingredients = await db.select().from(articles).where(eq(articles.type, "ingredient"));
-    return ingredients as any[];
-  }
-
-  async getLowStockIngredients(): Promise<Ingredient[]> {
-    console.log("Using direct SQL query...");
-    const ingredients = await db.select().from(articles).where(
-      and(
-        eq(articles.type, "ingredient"),
-        eq(articles.managedInStock, true),
-        lt(articles.currentStock, articles.minStock)
-      )
-    );
-    return ingredients as any[];
-  }
-
-  async createIngredient(insertIngredient: any): Promise<any> {
-    // Generate automatic code
-    const existingIngredients = await this.getAllIngredients();
-    const nextNumber = existingIngredients.length + 1;
-    const code = `ING-${nextNumber.toString().padStart(6, '0')}`;
-    
-    const ingredientData = {
-      ...insertIngredient,
-      code,
-      type: "ingredient",
-    };
-    
-    const [ingredient] = await db.insert(articles).values(ingredientData).returning();
-    return ingredient;
-  }
-
-  async updateIngredient(id: number, updateData: any): Promise<any> {
-    const [ingredient] = await db.update(articles)
-      .set(updateData)
-      .where(and(eq(articles.id, id), eq(articles.type, "ingredient")))
-      .returning();
-    return ingredient || undefined;
-  }
-
-  async deleteIngredient(id: number): Promise<boolean> {
-    const result = await db.delete(articles).where(
-      and(eq(articles.id, id), eq(articles.type, "ingredient"))
-    );
-    return (result.rowCount || 0) > 0;
-  }
-
-  async updateIngredientStock(id: number, quantity: number): Promise<void> {
-    const ingredient = await this.getIngredient(id);
-    if (!ingredient) return;
-    
-    const currentStock = parseFloat(ingredient.currentStock || "0");
-    const newStock = Math.max(0, currentStock + quantity);
-    
-    await db.update(articles)
-      .set({ currentStock: newStock.toString() })
-      .where(and(eq(articles.id, id), eq(articles.type, "ingredient")));
-  }
+  // Méthodes ingrédients supprimées - utiliser articles avec type="ingredient"
 
   // Measurement Categories
   async getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined> {

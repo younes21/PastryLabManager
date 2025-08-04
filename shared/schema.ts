@@ -21,31 +21,7 @@ export const storageLocations = pgTable("storage_locations", {
   unit: text("unit").notNull(), // 'kg', 'l', 'm3'
 });
 
-export const ingredients = pgTable("ingredients", {
-  id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // ING-000001
-  name: text("name").notNull(), // Désignation
-  description: text("description"), // Description
-  managedInStock: boolean("managed_in_stock").default(true), // Gérer en stock ?
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id), // Zone de stockage
-  categoryId: integer("category_id").references(() => articleCategories.id), // Catégorie
-  unitId: integer("unit_id").references(() => measurementUnits.id), // Unité de mesure
-  allowSale: boolean("allow_sale").default(false), // Autoriser à la vente ?
-  saleCategoryId: integer("sale_category_id").references(() => articleCategories.id), // Catégorie de vente
-  saleUnitId: integer("sale_unit_id").references(() => measurementUnits.id), // Unité de vente
-  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).default("0"), // Prix de vente
-  taxId: integer("tax_id").references(() => taxes.id), // TVA
-  photo: text("photo"), // Photo
-  active: boolean("active").default(true), // Est actif
-  
-  // Champs existants pour la gestion de stock
-  currentStock: decimal("current_stock", { precision: 10, scale: 2 }).default("0"),
-  minStock: decimal("min_stock", { precision: 10, scale: 2 }).default("0"),
-  maxStock: decimal("max_stock", { precision: 10, scale: 2 }).default("0"),
-  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }).default("0"), // PMP - Prix Moyen Pondéré
-  
-  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-});
+// Table ingredients supprimée - utilisation de la table articles unifiée avec type="ingredient"
 
 // Les tables recipes, productions, orders, deliveries et productStock ont été supprimées
 // Elles seront réimplémentées avec de nouvelles règles de gestion
@@ -144,7 +120,7 @@ export const priceRules = pgTable("price_rules", {
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
-export const insertIngredientSchema = createInsertSchema(articles).omit({ id: true, createdAt: true, code: true });
+// Schema ingrédients supprimé - utiliser insertArticleSchema avec type="ingredient"
 // Modules supprimés - schémas à recréer
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
@@ -158,8 +134,9 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type StorageLocation = typeof storageLocations.$inferSelect;
 export type InsertStorageLocation = z.infer<typeof insertStorageLocationSchema>;
+// Types ingrédients supprimés - utiliser Article avec type="ingredient"
 export type Ingredient = typeof articles.$inferSelect;
-export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
+export type InsertIngredient = z.infer<typeof insertArticleSchema>;
 // Types supprimés - à recréer
 export type MeasurementCategory = typeof measurementCategories.$inferSelect;
 export type InsertMeasurementCategory = z.infer<typeof insertMeasurementCategorySchema>;

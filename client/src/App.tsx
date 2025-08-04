@@ -7,7 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
-import Ingredients from "@/pages/ingredients";
+// import Ingredients supprimé - utiliser Articles avec filtrage
 // Modules supprimés - à réimplémenter
 // import Recipes from "@/pages/recipes";
 // import Production from "@/pages/production";
@@ -139,7 +139,7 @@ function ProtectedRouter() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/inventory" component={Inventory} />
-      <Route path="/ingredients" component={Ingredients} />
+      {/* Route ingredients supprimée - utiliser Articles avec filtrage */}
       {/* Routes supprimées - à réimplémenter */}
       {/* <Route path="/recipes" component={Recipes} /> */}
       {/* <Route path="/production" component={Production} /> */}

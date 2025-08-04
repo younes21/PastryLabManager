@@ -51,7 +51,7 @@ export function Sidebar() {
   const navItems = [
     { path: "/", label: "Tableau de bord", icon: "fas fa-tachometer-alt", lucideIcon: LayoutDashboard },
     { path: "/inventory", label: "Gestion de Stock", icon: "fas fa-boxes", lucideIcon: Package },
-    { path: "/ingredients", label: "Ingrédients", icon: "fas fa-seedling", lucideIcon: ChefHat },
+    // Ingrédients supprimés - utiliser Articles avec filtrage
     // Modules temporairement supprimés - à réimplémenter
     // { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
     // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },

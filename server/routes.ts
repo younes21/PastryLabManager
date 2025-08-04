@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { 
-  insertUserSchema, insertStorageLocationSchema, insertIngredientSchema,
+  insertUserSchema, insertStorageLocationSchema,
   insertMeasurementCategorySchema, insertMeasurementUnitSchema, insertArticleCategorySchema, 
   insertArticleSchema, insertPriceListSchema, insertPriceRuleSchema, insertTaxSchema, 
   insertCurrencySchema, insertDeliveryMethodSchema, insertAccountingJournalSchema, 
@@ -72,65 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ingredients routes (using articles table)
-  app.get("/api/ingredients", async (req, res) => {
-    try {
-      const ingredients = await storage.getAllIngredients();
-      res.json(ingredients);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch ingredients" });
-    }
-  });
-
-  app.get("/api/ingredients/low-stock", async (req, res) => {
-    try {
-      const ingredients = await storage.getLowStockIngredients();
-      res.json(ingredients);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch low stock ingredients" });
-    }
-  });
-
-  app.post("/api/ingredients", async (req, res) => {
-    try {
-      const ingredientData = insertIngredientSchema.parse(req.body);
-      const ingredient = await storage.createIngredient(ingredientData);
-      res.status(201).json(ingredient);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid ingredient data" });
-    }
-  });
-
-  app.put("/api/ingredients/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const ingredientData = req.body;
-      const ingredient = await storage.updateIngredient(id, ingredientData);
-      
-      if (!ingredient) {
-        return res.status(404).json({ message: "Ingredient not found" });
-      }
-
-      res.json(ingredient);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to update ingredient" });
-    }
-  });
-
-  app.delete("/api/ingredients/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deleteIngredient(id);
-      
-      if (!deleted) {
-        return res.status(404).json({ message: "Ingredient not found" });
-      }
-
-      res.json({ message: "Ingredient deleted successfully" });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete ingredient" });
-    }
-  });
+  // Routes ingrédients supprimées - utiliser /api/articles avec filtrage type="ingredient"
 
   // MODULES SUPPRIMÉS - À RÉIMPLÉMENTER
   // Recipes, Productions, Orders, Deliveries routes supprimées
@@ -138,10 +80,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard - version simplifiée sans les modules supprimés
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
-      const lowStockIngredients = await storage.getLowStockIngredients();
+      // Articles avec stock faible (type="ingredient")
+      const lowStockArticles = await storage.getAllArticles();
+      const lowStockCount = lowStockArticles.filter(article => 
+        article.type === "ingredient" && 
+        article.managedInStock && 
+        parseFloat(article.currentStock || "0") < parseFloat(article.minStock || "0")
+      ).length;
       
       res.json({
-        lowStockCount: lowStockIngredients.length,
+        lowStockCount,
         activeOrdersCount: 0, // À reimplémenter
         todayProductionCount: 0, // À reimplémenter
         dailyRevenue: "0.00" // À reimplémenter

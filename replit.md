@@ -111,8 +111,9 @@ The application uses a comprehensive schema with the following main entities:
 ### Recent Changes
 - **Modules Legacy Removed (August 2025)**:
   - Completely removed recipes, productions, orders, deliveries modules (database tables, API routes, UI components)
+  - Removed ingredients table and API routes - using unified articles table with type="ingredient" filtering
   - Cleaned up all references in storage.ts, routes.ts, App.tsx, sidebar navigation
-  - Preserved ingredients management with unified articles table architecture
+  - System uses only articles table for products, ingredients, and services
   - Currency system with DA, EUR, USD symbols fully operational
   - System ready for new business rules implementation
 - **Measurement Units Management System (January 2025)**:
