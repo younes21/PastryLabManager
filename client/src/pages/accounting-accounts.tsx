@@ -43,7 +43,7 @@ export default function AccountingAccountsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: accounts, isLoading } = useQuery({
+  const { data: accounts = [], isLoading } = useQuery<AccountingAccount[]>({
     queryKey: ["/api/accounting-accounts"],
   });
 

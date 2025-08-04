@@ -27,7 +27,7 @@ export default function TaxesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: taxes, isLoading } = useQuery({
+  const { data: taxes = [], isLoading } = useQuery<Tax[]>({
     queryKey: ["/api/taxes"],
   });
 
@@ -89,8 +89,8 @@ export default function TaxesPage() {
     setEditingTax(tax);
     form.reset({
       designation: tax.designation,
-      rate: tax.rate,
-      active: tax.active,
+      rate: parseFloat(tax.rate || '0'),
+      active: tax.active || true,
     });
     setDialogOpen(true);
   };

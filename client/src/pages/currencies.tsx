@@ -29,7 +29,7 @@ export default function CurrenciesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: currencies, isLoading } = useQuery({
+  const { data: currencies = [], isLoading } = useQuery<Currency[]>({
     queryKey: ["/api/currencies"],
   });
 
@@ -96,9 +96,9 @@ export default function CurrenciesPage() {
       code: currency.code,
       designation: currency.designation,
       symbol: currency.symbol,
-      rate: currency.rate,
-      isBase: currency.isBase,
-      active: currency.active,
+      rate: parseFloat(currency.exchangeRate || '1'),
+      isBase: currency.isBase || false,
+      active: currency.active || true,
     });
     setDialogOpen(true);
   };
@@ -344,7 +344,7 @@ export default function CurrenciesPage() {
                     )}
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Taux: {currency.rate.toFixed(4)}
+                    Taux: {parseFloat(currency.exchangeRate || '1').toFixed(4)}
                   </p>
                 </div>
                 <div className="flex gap-2">

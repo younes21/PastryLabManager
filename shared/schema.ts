@@ -257,6 +257,20 @@ export type PriceList = typeof priceLists.$inferSelect;
 export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
 export type PriceRule = typeof priceRules.$inferSelect;
 export type InsertPriceRule = z.infer<typeof insertPriceRuleSchema>;
+export type Tax = typeof taxes.$inferSelect;
+export type InsertTax = z.infer<typeof insertTaxSchema>;
+export type Currency = typeof currencies.$inferSelect;
+export type InsertCurrency = z.infer<typeof insertCurrencySchema>;
+export type DeliveryMethod = typeof deliveryMethods.$inferSelect;
+export type InsertDeliveryMethod = z.infer<typeof insertDeliveryMethodSchema>;
+export type AccountingJournal = typeof accountingJournals.$inferSelect;
+export type InsertAccountingJournal = z.infer<typeof insertAccountingJournalSchema>;
+export type AccountingAccount = typeof accountingAccounts.$inferSelect;
+export type InsertAccountingAccount = z.infer<typeof insertAccountingAccountSchema>;
+export type StorageZone = typeof storageZones.$inferSelect;
+export type InsertStorageZone = z.infer<typeof insertStorageZoneSchema>;
+export type WorkStation = typeof workStations.$inferSelect;
+export type InsertWorkStation = z.infer<typeof insertWorkStationSchema>;
 
 // 7. Taxes des articles
 export const taxes = pgTable("taxes", {
@@ -349,54 +363,11 @@ export const workStations = pgTable("work_stations", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
-// Insert schemas pour les nouvelles tables
-export const insertTaxSchema = createInsertSchema(taxes).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCurrencySchema = createInsertSchema(currencies).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertDeliveryMethodSchema = createInsertSchema(deliveryMethods).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAccountingJournalSchema = createInsertSchema(accountingJournals).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertAccountingAccountSchema = createInsertSchema(accountingAccounts).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertWorkStationSchema = createInsertSchema(workStations).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Types pour les nouvelles tables
-export type Tax = typeof taxes.$inferSelect;
-export type InsertTax = z.infer<typeof insertTaxSchema>;
-export type Currency = typeof currencies.$inferSelect;
-export type InsertCurrency = z.infer<typeof insertCurrencySchema>;
-export type DeliveryMethod = typeof deliveryMethods.$inferSelect;
-export type InsertDeliveryMethod = z.infer<typeof insertDeliveryMethodSchema>;
-export type AccountingJournal = typeof accountingJournals.$inferSelect;
-export type InsertAccountingJournal = z.infer<typeof insertAccountingJournalSchema>;
-export type AccountingAccount = typeof accountingAccounts.$inferSelect;
-export type InsertAccountingAccount = z.infer<typeof insertAccountingAccountSchema>;
-export type StorageZone = typeof storageZones.$inferSelect;
-export type InsertStorageZone = z.infer<typeof insertStorageZoneSchema>;
-export type WorkStation = typeof workStations.$inferSelect;
-export type InsertWorkStation = z.infer<typeof insertWorkStationSchema>;
+// Insert schemas for new tables
+export const insertTaxSchema = createInsertSchema(taxes).omit({ id: true, createdAt: true });
+export const insertCurrencySchema = createInsertSchema(currencies).omit({ id: true, createdAt: true });
+export const insertDeliveryMethodSchema = createInsertSchema(deliveryMethods).omit({ id: true, createdAt: true });
+export const insertAccountingJournalSchema = createInsertSchema(accountingJournals).omit({ id: true, createdAt: true });
+export const insertAccountingAccountSchema = createInsertSchema(accountingAccounts).omit({ id: true, createdAt: true });
+export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ id: true, createdAt: true });
+export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, createdAt: true });
