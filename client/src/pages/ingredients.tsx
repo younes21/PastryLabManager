@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Edit, Trash2, Package, Euro, Tag, ImageIcon } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -45,9 +45,9 @@ type Ingredient = {
 };
 
 // Validation avec schéma étendu pour les articles de type "ingredient"
-const ingredientFormSchema = insertArticleSchema.extend({
+const ingredientFormSchema = z.object({
   name: z.string().min(1, "La désignation est requise"),
-  type: z.literal("ingredient"),
+  type: z.literal("ingredient").default("ingredient"),
   description: z.string().optional(),
   managedInStock: z.boolean().default(true),
   storageLocationId: z.number().optional(),
@@ -96,6 +96,14 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
   const managedInStock = form.watch("managedInStock");
   const allowSale = form.watch("allowSale");
   const currentUnit = form.watch("unit") || 'unité';
+  
+  // Éviter les setState pendant le rendu
+  const [displayUnit, setDisplayUnit] = useState('unité');
+  
+  useEffect(() => {
+    const unit = form.watch("unit") || 'unité';
+    setDisplayUnit(unit);
+  }, [form.watch("unit")]);
 
   return (
     <Form {...form}>
@@ -486,10 +494,20 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
             type="submit" 
             disabled={submitting} 
             data-testid="button-submit-ingredient"
-            onClick={(e) => {
+            onClick={async (e) => {
               console.log("Button clicked!");
               console.log("Form state:", form.formState);
-              // Le submit sera géré par onSubmit du form
+              console.log("Form values:", form.getValues());
+              console.log("Form errors:", form.formState.errors);
+              
+              // Déclencher manuellement la validation
+              const isValid = await form.trigger();
+              console.log("Validation result:", isValid);
+              
+              if (!isValid) {
+                console.log("Form is invalid, errors:", form.formState.errors);
+                e.preventDefault();
+              }
             }}
           >
             {submitting ? "Enregistrement..." : "Enregistrer"}
