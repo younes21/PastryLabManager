@@ -6,7 +6,7 @@ import {
   insertRecipeSchema, insertRecipeIngredientSchema, insertProductionSchema,
   insertOrderSchema, insertOrderItemSchema, insertDeliverySchema,
   insertProductStockSchema, insertLabelSchema, insertMeasurementCategorySchema,
-  insertMeasurementUnitSchema, insertArticleCategorySchema, insertPriceListSchema,
+  insertMeasurementUnitSchema, insertArticleCategorySchema, insertArticleSchema, insertPriceListSchema,
   insertPriceRuleSchema
 } from "@shared/schema";
 
@@ -947,6 +947,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Articles routes (unified products, ingredients, services)
+  app.get("/api/articles", async (req, res) => {
+    try {
+      const { type, categoryId, active } = req.query;
+      let articles;
+      
+      if (type) {
+        articles = await storage.getArticlesByType(type as string);
+      } else if (categoryId) {
+        articles = await storage.getArticlesByCategory(parseInt(categoryId as string));
+      } else if (active === "true") {
+        articles = await storage.getActiveArticles();
+      } else {
+        articles = await storage.getAllArticles();
+      }
+      
+      res.json(articles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch articles" });
+    }
+  });
+
+  app.post("/api/articles", async (req, res) => {
+    try {
+      const validatedData = insertArticleSchema.parse(req.body);
+      const article = await storage.createArticle(validatedData);
+      res.status(201).json(article);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid data" });
+    }
+  });
+
   app.get("/api/article-categories/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1082,15 +1114,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Price Rules routes
   app.get("/api/price-rules", async (req, res) => {
     try {
-      const { priceListId } = req.query;
-      let priceRules;
-      
-      if (priceListId) {
-        priceRules = await storage.getPriceRulesByPriceList(parseInt(priceListId as string));
-      } else {
-        priceRules = await storage.getAllPriceRules();
-      }
-      
+      const priceRules = await storage.getAllPriceRules();
+      res.json(priceRules);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch price rules" });
+    }
+  });
+
+  app.get("/api/price-rules/by-list/:priceListId", async (req, res) => {
+    try {
+      const priceListId = parseInt(req.params.priceListId);
+      const priceRules = await storage.getPriceRulesByPriceList(priceListId);
       res.json(priceRules);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch price rules" });

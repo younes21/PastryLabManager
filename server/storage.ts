@@ -1,7 +1,7 @@
 import {
   users, storageLocations, ingredients, recipes, recipeIngredients,
   productions, orders, orderItems, deliveries, productStock, labels,
-  measurementCategories, measurementUnits, articleCategories, priceLists, priceRules,
+  measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Ingredient, type InsertIngredient, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type Production, type InsertProduction,
@@ -9,7 +9,7 @@ import {
   type Delivery, type InsertDelivery, type ProductStock, type InsertProductStock,
   type Label, type InsertLabel, type MeasurementCategory, type InsertMeasurementCategory,
   type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
-  type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule
+  type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -136,6 +136,16 @@ export interface IStorage {
   createArticleCategory(category: InsertArticleCategory): Promise<ArticleCategory>;
   updateArticleCategory(id: number, category: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined>;
   deleteArticleCategory(id: number): Promise<boolean>;
+
+  // Articles (unified products, ingredients, services)
+  getArticle(id: number): Promise<Article | undefined>;
+  getAllArticles(): Promise<Article[]>;
+  getArticlesByType(type: string): Promise<Article[]>;
+  getArticlesByCategory(categoryId: number): Promise<Article[]>;
+  getActiveArticles(): Promise<Article[]>;
+  createArticle(article: InsertArticle): Promise<Article>;
+  updateArticle(id: number, article: Partial<InsertArticle>): Promise<Article | undefined>;
+  deleteArticle(id: number): Promise<boolean>;
 
   // Price Lists
   getPriceList(id: number): Promise<PriceList | undefined>;
@@ -893,6 +903,52 @@ export class DatabaseStorage implements IStorage {
 
   async deleteArticleCategory(id: number): Promise<boolean> {
     const result = await db.delete(articleCategories).where(eq(articleCategories.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Articles (unified products, ingredients, services) methods
+  async getArticle(id: number): Promise<Article | undefined> {
+    const [article] = await db.select().from(articles).where(eq(articles.id, id));
+    return article || undefined;
+  }
+
+  async getAllArticles(): Promise<Article[]> {
+    return await db.select().from(articles).orderBy(articles.name);
+  }
+
+  async getArticlesByType(type: string): Promise<Article[]> {
+    return await db.select().from(articles)
+      .where(eq(articles.type, type))
+      .orderBy(articles.name);
+  }
+
+  async getArticlesByCategory(categoryId: number): Promise<Article[]> {
+    return await db.select().from(articles)
+      .where(eq(articles.categoryId, categoryId))
+      .orderBy(articles.name);
+  }
+
+  async getActiveArticles(): Promise<Article[]> {
+    return await db.select().from(articles)
+      .where(eq(articles.active, true))
+      .orderBy(articles.name);
+  }
+
+  async createArticle(insertArticle: InsertArticle): Promise<Article> {
+    const [article] = await db.insert(articles).values(insertArticle).returning();
+    return article;
+  }
+
+  async updateArticle(id: number, updateData: Partial<InsertArticle>): Promise<Article | undefined> {
+    const [article] = await db.update(articles)
+      .set(updateData)
+      .where(eq(articles.id, id))
+      .returning();
+    return article || undefined;
+  }
+
+  async deleteArticle(id: number): Promise<boolean> {
+    const result = await db.delete(articles).where(eq(articles.id, id));
     return (result.rowCount || 0) > 0;
   }
 

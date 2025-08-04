@@ -13,6 +13,7 @@ import { Trash2, Plus, Edit, Euro, DollarSign } from "lucide-react";
 import type { PriceList, InsertPriceList, PriceRule, InsertPriceRule } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { PriceRuleForm } from "@/components/price-rule-form";
 
 export default function PriceListsPage() {
   const { toast } = useToast();
@@ -28,9 +29,9 @@ export default function PriceListsPage() {
     queryKey: ["/api/price-lists"],
   });
 
-  // Fetch recipes and categories for rules
-  const { data: recipes = [] } = useQuery({
-    queryKey: ["/api/recipes"],
+  // Fetch articles and categories for rules
+  const { data: articles = [] } = useQuery({
+    queryKey: ["/api/articles"],
   });
 
   const { data: categories = [] } = useQuery({
@@ -39,7 +40,7 @@ export default function PriceListsPage() {
 
   // Fetch price rules for selected price list
   const { data: priceRules = [], isLoading: rulesLoading } = useQuery<PriceRule[]>({
-    queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }],
+    queryKey: [`/api/price-rules/by-list/${selectedPriceListId}`],
     enabled: !!selectedPriceListId,
   });
 
@@ -81,7 +82,7 @@ export default function PriceListsPage() {
   const createRuleMutation = useMutation({
     mutationFn: (data: InsertPriceRule) => apiRequest("/api/price-rules", "POST", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }] });
+      queryClient.invalidateQueries({ queryKey: [`/api/price-rules/by-list/${selectedPriceListId}`] });
       setIsNewRuleDialogOpen(false);
       toast({ description: "Règle de prix créée avec succès" });
     },
@@ -92,7 +93,7 @@ export default function PriceListsPage() {
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertPriceRule> }) =>
       apiRequest(`/api/price-rules/${id}`, "PUT", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }] });
+      queryClient.invalidateQueries({ queryKey: [`/api/price-rules/by-list/${selectedPriceListId}`] });
       setEditingRule(null);
       toast({ description: "Règle de prix modifiée avec succès" });
     },
@@ -102,7 +103,7 @@ export default function PriceListsPage() {
   const deleteRuleMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/price-rules/${id}`, "DELETE"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/price-rules", { priceListId: selectedPriceListId }] });
+      queryClient.invalidateQueries({ queryKey: [`/api/price-rules/by-list/${selectedPriceListId}`] });
       toast({ description: "Règle de prix supprimée avec succès" });
     },
     onError: () => toast({ description: "Erreur lors de la suppression", variant: "destructive" }),
@@ -125,30 +126,7 @@ export default function PriceListsPage() {
     }
   };
 
-  const handleRuleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    const data: InsertPriceRule = {
-      priceListId: selectedPriceListId!,
-      applyTo: formData.get("applyTo") as string,
-      productId: formData.get("productId") ? parseInt(formData.get("productId") as string) : undefined,
-      categoryId: formData.get("categoryId") ? parseInt(formData.get("categoryId") as string) : undefined,
-      priceType: formData.get("priceType") as string,
-      fixedPrice: formData.get("fixedPrice") ? formData.get("fixedPrice") as string : undefined,
-      discountPercent: formData.get("discountPercent") ? formData.get("discountPercent") as string : undefined,
-      minQuantity: formData.get("minQuantity") as string,
-      validFrom: formData.get("validFrom") ? formData.get("validFrom") as string : undefined,
-      validTo: formData.get("validTo") ? formData.get("validTo") as string : undefined,
-      active: formData.get("active") === "on",
-    };
 
-    if (editingRule) {
-      updateRuleMutation.mutate({ id: editingRule.id, data });
-    } else {
-      createRuleMutation.mutate(data);
-    }
-  };
 
   const getCurrencyIcon = (currency: string) => {
     switch (currency) {
@@ -299,37 +277,15 @@ export default function PriceListsPage() {
                       Nouvelle Règle
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Nouvelle Règle de Prix</DialogTitle>
-                      <DialogDescription>
-                        Créer une nouvelle règle de prix pour cette liste
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleRuleSubmit} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="applyTo">Appliquer à</Label>
-                          <Select name="applyTo" required>
-                            <SelectTrigger data-testid="select-apply-to">
-                              <SelectValue placeholder="Choisir..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="product">Produit spécifique</SelectItem>
-                              <SelectItem value="category">Catégorie d'articles</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => setIsNewRuleDialogOpen(false)}>
-                          Annuler
-                        </Button>
-                        <Button type="submit" data-testid="button-submit-rule">
-                          Créer
-                        </Button>
-                      </div>
-                    </form>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <PriceRuleForm
+                      priceListId={selectedPriceListId}
+                      articles={articles}
+                      categories={categories}
+                      onSubmit={(data) => createRuleMutation.mutate(data)}
+                      onCancel={() => setIsNewRuleDialogOpen(false)}
+                      isLoading={createRuleMutation.isPending}
+                    />
                   </DialogContent>
                 </Dialog>
               </div>
