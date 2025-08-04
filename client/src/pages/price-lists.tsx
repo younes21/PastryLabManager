@@ -14,6 +14,7 @@ import type { PriceList, InsertPriceList, PriceRule, InsertPriceRule, Article, A
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PriceRuleForm } from "@/components/price-rule-form";
+import { Layout } from "@/components/layout";
 
 export default function PriceListsPage() {
   const { toast } = useToast();
@@ -139,10 +140,11 @@ export default function PriceListsPage() {
   if (priceListsLoading) return <div>Chargement...</div>;
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Listes de Prix</h1>
-        <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
+    <Layout title="Listes de Prix">
+      <div className="container mx-auto p-4 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Listes de Prix</h1>
+          <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-new-price-list">
               <Plus className="w-4 h-4 mr-2" />
@@ -417,6 +419,7 @@ export default function PriceListsPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </Layout>
   );
 }
