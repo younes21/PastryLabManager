@@ -52,9 +52,13 @@ import {
 } from "@shared/schema";
 import { RecipeDisplay } from "@/components/recipe-display";
 
-// Schéma de validation pour les produits
+// Schéma de validation pour les produits avec tous les champs
 const productSchema = insertArticleSchema.extend({
-  type: z.literal("product")
+  type: z.literal("product"),
+  costPerUnit: z.string().optional(),
+  currentStock: z.string().optional(),
+  minStock: z.string().optional(),
+  maxStock: z.string().optional(),
 });
 
 type ProductForm = z.infer<typeof productSchema>;
@@ -266,14 +270,23 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       type: "product" as const,
       name: product?.name || "",
       description: product?.description || "",
-      unit: product?.unit || "",
-      managedInStock: Boolean(product?.managedInStock ?? false),
-      allowSale: Boolean(product?.allowSale ?? true),
-      salePrice: product?.salePrice ? product.salePrice.toString() : "",
-      saleUnit: product?.saleUnit || "",
-      active: Boolean(product?.active ?? true),
-      categoryId: product?.categoryId || undefined,
+      unit: product?.unit || "pièce",
+      managedInStock: Boolean(product?.managedInStock ?? true),
       storageLocationId: product?.storageLocationId || undefined,
+      categoryId: product?.categoryId || undefined,
+      allowSale: Boolean(product?.allowSale ?? true),
+      saleCategoryId: product?.saleCategoryId || undefined,
+      saleUnit: product?.saleUnit || "pièce",
+      salePrice: product?.salePrice ? product.salePrice.toString() : "",
+      taxId: product?.taxId || undefined,
+      costPerUnit: product?.costPerUnit ? product.costPerUnit.toString() : "",
+      currentStock: product?.currentStock ? product.currentStock.toString() : "",
+      minStock: product?.minStock ? product.minStock.toString() : "",
+      maxStock: product?.maxStock ? product.maxStock.toString() : "",
+      preparationTime: product?.preparationTime || undefined,
+      difficulty: product?.difficulty || "easy",
+      servings: product?.servings || undefined,
+      active: Boolean(product?.active ?? true),
       photo: product?.photo || "",
     },
   });
@@ -331,9 +344,10 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="general">Général</TabsTrigger>
-            <TabsTrigger value="stock">Stock & Vente</TabsTrigger>
+            <TabsTrigger value="stock">Stock & Gestion</TabsTrigger>
+            <TabsTrigger value="vente">Vente & Prix</TabsTrigger>
             <TabsTrigger value="recipe">Recette</TabsTrigger>
           </TabsList>
 
@@ -343,7 +357,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom du produit *</FormLabel>
+                  <FormLabel>Désignation *</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="Nom du produit" data-testid="input-name" />
                   </FormControl>
@@ -359,7 +373,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea {...field} value={field.value || ""} placeholder="Description du produit" data-testid="input-description" />
+                    <Textarea {...field} value={field.value || ""} placeholder="Description détaillée du produit" data-testid="input-description" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -394,6 +408,73 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="preparationTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Temps de préparation (min)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        type="number" 
+                        value={field.value || ""} 
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="30" 
+                        data-testid="input-preparation-time" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="difficulty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Difficulté</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "easy"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-difficulty">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="easy">Facile</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="hard">Difficile</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="servings"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre de portions</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        type="number" 
+                        value={field.value || ""} 
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="8" 
+                        data-testid="input-servings" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">
@@ -445,20 +526,111 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unité de gestion</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="Ex: pièce, kg, litre" data-testid="input-unit" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="storageLocationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Zone de stockage</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                      value={field.value?.toString() || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-storage-location">
+                          <SelectValue placeholder="Sélectionner une zone" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune zone</SelectItem>
+                        {storageZones?.map((zone) => (
+                          <SelectItem key={zone.id} value={zone.id.toString()}>
+                            {zone.designation}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="currentStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock actuel</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-current-stock" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="minStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock minimum</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-min-stock" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock maximum</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-max-stock" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
-              name="unit"
+              name="costPerUnit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Unité de mesure</FormLabel>
+                  <FormLabel>Prix Moyen Pondéré (PMP)</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} placeholder="Ex: pièce, kg, litre" data-testid="input-unit" />
+                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-cost-per-unit" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+          </TabsContent>
 
+          <TabsContent value="vente" className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">
                 <FormLabel className="text-base">Autoriser la vente</FormLabel>
@@ -486,20 +658,6 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="salePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Prix de vente (DA)</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-sale-price" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="saleUnit"
                 render={({ field }) => (
                   <FormItem>
@@ -511,7 +669,92 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="saleCategoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Catégorie de vente</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                      value={field.value?.toString() || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-sale-category">
+                          <SelectValue placeholder="Sélectionner une catégorie" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune catégorie</SelectItem>
+                        {categories?.map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.designation}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="salePrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prix de vente (DA)</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} type="number" step="0.01" placeholder="0.00" data-testid="input-sale-price" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="taxId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>TVA</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                      value={field.value?.toString() || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-tax">
+                          <SelectValue placeholder="Sélectionner une TVA" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune TVA</SelectItem>
+                        <SelectItem value="1">TVA 19%</SelectItem>
+                        <SelectItem value="2">TVA 9%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="photo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Photo</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="URL de la photo" data-testid="input-photo" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </TabsContent>
 
           <TabsContent value="recipe" className="space-y-4">
