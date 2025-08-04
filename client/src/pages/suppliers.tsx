@@ -95,6 +95,7 @@ export default function SuppliersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [activeTab, setActiveTab] = useState("general");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -193,6 +194,7 @@ export default function SuppliersPage() {
       photo: supplier.photo || undefined,
       active: supplier.active,
     });
+    setActiveTab("general"); // Reset tab when editing
     setIsEditDialogOpen(true);
   };
 
@@ -219,8 +221,6 @@ export default function SuppliersPage() {
     onSubmit: (data: z.infer<typeof supplierFormSchema>) => void;
     isLoading: boolean;
   }) => {
-    const [activeTab, setActiveTab] = useState("general");
-    
     return (
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -562,6 +562,7 @@ export default function SuppliersPage() {
           <Button type="button" variant="outline" onClick={() => {
             setIsCreateDialogOpen(false);
             setIsEditDialogOpen(false);
+            setActiveTab("general");
             form.reset();
           }}>
             Annuler
@@ -588,7 +589,16 @@ export default function SuppliersPage() {
             </p>
           </div>
 
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+            setIsCreateDialogOpen(open);
+            if (open) {
+              setActiveTab("general");
+              form.reset({
+                type: "societe",
+                active: true,
+              });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700" data-testid="button-add-supplier">
                 <Plus className="mr-2 h-4 w-4" />
