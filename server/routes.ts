@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { 
   insertUserSchema, insertStorageLocationSchema, insertIngredientSchema,
   insertRecipeSchema, insertRecipeIngredientSchema, insertProductionSchema,
@@ -135,10 +136,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ingredients routes (legacy)
   app.get("/api/ingredients", async (req, res) => {
     try {
-      const ingredients = await storage.getAllIngredients();
+      console.log("Using direct SQL query...");
+      // Direct SQL query to avoid schema issues
+      const result = await pool.query(`
+        SELECT id, name, category_id, description, unit, price, cost_per_unit, 
+               current_stock, min_stock, max_stock, storage_location_id, active, created_at
+        FROM articles
+        ORDER BY name
+      `);
+      
+      const ingredients = result.rows.map(row => ({
+        id: row.id,
+        code: `ING-${String(row.id).padStart(6, '0')}`,
+        name: row.name,
+        type: 'ingredient',
+        categoryId: row.category_id,
+        description: row.description,
+        unit: row.unit,
+        unitId: null,
+        managedInStock: true,
+        allowSale: false,
+        currentStock: row.current_stock,
+        minStock: row.min_stock,
+        maxStock: row.max_stock,
+        costPerUnit: row.cost_per_unit,
+        salePrice: row.price,
+        storageLocationId: row.storage_location_id,
+        active: row.active,
+        photo: null,
+        taxId: null,
+        createdAt: row.created_at
+      }));
+      
       res.json(ingredients);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch ingredients" });
+    } catch (error: any) {
+      console.error("Error fetching ingredients:", error);
+      res.status(500).json({ message: "Failed to fetch ingredients", error: error.message });
     }
   });
 

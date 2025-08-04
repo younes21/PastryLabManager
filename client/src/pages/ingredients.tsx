@@ -276,7 +276,7 @@ const StableIngredientForm = memo(({ form, activeTab, setActiveTab, onSubmit, on
 
                 <div className="col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
-                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"} {getUnitName(form.watch("unitId"))}
+                    <strong>Stock actuel :</strong> {form.watch("currentStock") || "0"}
                   </p>
                   <p className="text-xs text-yellow-600 mt-1">
                     Le stock actuel sera modifié via les opérations d'inventaire initial ou d'ajustement

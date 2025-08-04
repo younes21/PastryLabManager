@@ -565,7 +565,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllIngredients(): Promise<Ingredient[]> {
-    return await db.select().from(articles).where(eq(articles.type, "ingredient"));
+    // Récupérer tous les articles et les transformer en ingrédients
+    const allArticles = await db.select().from(articles);
+    return allArticles.map(article => ({
+      id: article.id,
+      code: `ING-${String(article.id).padStart(6, '0')}`,
+      name: article.name,
+      type: 'ingredient' as const,
+      categoryId: article.categoryId,
+      description: article.description,
+      unitId: null, // À mapper
+      managedInStock: true,
+      allowSale: false,
+      currentStock: article.currentStock,
+      minStock: article.minStock,
+      maxStock: article.maxStock,
+      costPerUnit: article.costPerUnit,
+      salePrice: article.price,
+      storageLocationId: article.storageLocationId,
+      active: article.active,
+      photo: null,
+      taxId: null,
+      createdAt: article.createdAt
+    }));
   }
 
   async getLowStockIngredients(): Promise<Ingredient[]> {
