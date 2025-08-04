@@ -2,7 +2,7 @@ import {
   users, storageLocations,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
-  suppliers, clients, products, recipes, recipeIngredients, recipeOperations,
+  suppliers, clients, recipes, recipeIngredients, recipeOperations,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -11,7 +11,7 @@ import {
   type Tax, type InsertTax, type Currency, type InsertCurrency, type DeliveryMethod, type InsertDeliveryMethod,
   type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
   type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation,
-  type Supplier, type InsertSupplier, type Product, type InsertProduct, type Recipe, type InsertRecipe,
+  type Supplier, type InsertSupplier, type Recipe, type InsertRecipe,
   type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation
 } from "@shared/schema";
 import { db } from "./db";
@@ -157,21 +157,14 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: number): Promise<boolean>;
 
-  // Products
-  getAllProducts(): Promise<Product[]>;
-  getProduct(id: number): Promise<Product | undefined>;
-  createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
-  deleteProduct(id: number): Promise<boolean>;
-
-  // Recipes (attached to products)
+  // Recipes (attached to articles with type="product")
   getAllRecipes(): Promise<Recipe[]>;
   getRecipe(id: number): Promise<Recipe | undefined>;
-  getRecipeByProductId(productId: number): Promise<Recipe | undefined>;
+  getRecipeByArticleId(articleId: number): Promise<Recipe | undefined>;
   createRecipe(recipe: InsertRecipe): Promise<Recipe>;
   updateRecipe(id: number, recipe: Partial<InsertRecipe>): Promise<Recipe | undefined>;
   deleteRecipe(id: number): Promise<boolean>;
-  deleteRecipeByProductId(productId: number): Promise<boolean>;
+  deleteRecipeByArticleId(articleId: number): Promise<boolean>;
 
   // Ingredients (filtrage articles par type="ingredient")
   getAllIngredients(): Promise<Article[]>;
@@ -768,45 +761,7 @@ export class DatabaseStorage implements IStorage {
 
   // Email Configs - module supprimé
 
-  // Products
-  async getAllProducts(): Promise<Product[]> {
-    return await db.select().from(products).orderBy(products.designation);
-  }
-
-  async getProduct(id: number): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.id, id));
-    return product || undefined;
-  }
-
-  async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    // Generate automatic code
-    const existingProducts = await this.getAllProducts();
-    const nextNumber = existingProducts.length + 1;
-    const code = `PRD-${nextNumber.toString().padStart(6, '0')}`;
-    
-    const productData = {
-      ...insertProduct,
-      code,
-    };
-    
-    const [product] = await db.insert(products).values(productData).returning();
-    return product;
-  }
-
-  async updateProduct(id: number, updateData: Partial<InsertProduct>): Promise<Product | undefined> {
-    const [product] = await db.update(products)
-      .set({ ...updateData, updatedAt: new Date().toISOString() })
-      .where(eq(products.id, id))
-      .returning();
-    return product || undefined;
-  }
-
-  async deleteProduct(id: number): Promise<boolean> {
-    const result = await db.delete(products).where(eq(products.id, id));
-    return (result.rowCount || 0) > 0;
-  }
-
-  // Recipes (attached to products)
+  // Recipes (attached to articles with type="product")
   async getAllRecipes(): Promise<Recipe[]> {
     return await db.select().from(recipes).orderBy(recipes.designation);
   }
@@ -816,8 +771,8 @@ export class DatabaseStorage implements IStorage {
     return recipe || undefined;
   }
 
-  async getRecipeByProductId(productId: number): Promise<Recipe | undefined> {
-    const [recipe] = await db.select().from(recipes).where(eq(recipes.productId, productId));
+  async getRecipeByArticleId(articleId: number): Promise<Recipe | undefined> {
+    const [recipe] = await db.select().from(recipes).where(eq(recipes.articleId, articleId));
     return recipe || undefined;
   }
 
@@ -839,8 +794,8 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  async deleteRecipeByProductId(productId: number): Promise<boolean> {
-    const result = await db.delete(recipes).where(eq(recipes.productId, productId));
+  async deleteRecipeByArticleId(articleId: number): Promise<boolean> {
+    const result = await db.delete(recipes).where(eq(recipes.articleId, articleId));
     return (result.rowCount || 0) > 0;
   }
 

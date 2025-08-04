@@ -62,46 +62,10 @@ export const clients = pgTable("clients", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
-// Products
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // PRD-000001
-  designation: text("designation").notNull(),
-  description: text("description"),
-  
-  // Gestion stock
-  managedInStock: boolean("managed_in_stock").default(true),
-  active: boolean("active").default(true),
-  stockTracking: text("stock_tracking").notNull(), // 'unit', 'weight', 'volume'
-  managementUnit: text("management_unit").notNull(), // Unité de gestion
-  storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
-  stockAlertThreshold: decimal("stock_alert_threshold", { precision: 10, scale: 2 }).default("0"),
-  
-  // Vente
-  allowedForSale: boolean("allowed_for_sale").default(true),
-  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).default("0"), // Taux TVA en %
-  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
-  saleUnit: text("sale_unit").notNull(), // Unité de vente
-  
-  // Conservation
-  perishable: boolean("perishable").default(false),
-  conservationDuration: integer("conservation_duration"), // Durée en jours
-  conservationTemperature: decimal("conservation_temperature", { precision: 5, scale: 2 }), // Température en °C
-  dlc: text("dlc"), // Date limite de consommation (format date string)
-  
-  // Classification
-  categoryId: integer("category_id").references(() => articleCategories.id),
-  photo: text("photo"),
-  
-  // Audit
-  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
-});
-
-// Recettes - attachées aux produits (une seule recette max par produit)
+// Recettes - attachées aux articles de type "product" (une seule recette max par produit)
 export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id).notNull().unique(), // Une seule recette par produit
+  articleId: integer("article_id").references(() => articles.id).notNull().unique(), // Une seule recette par article-produit
   designation: text("designation").notNull(),
   description: text("description"),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(), // Quantité/nombre de parts
@@ -427,12 +391,8 @@ export const insertStorageZoneSchema = createInsertSchema(storageZones).omit({ i
 export const insertWorkStationSchema = createInsertSchema(workStations).omit({ id: true, code: true, createdAt: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, code: true, createdAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, code: true, createdAt: true });
-export const insertProductSchema = createInsertSchema(products).omit({ id: true, code: true, createdAt: true, updatedAt: true });
-
 // Types pour TypeScript
 export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = typeof insertSupplierSchema._type;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = typeof insertClientSchema._type;
-export type Product = typeof products.$inferSelect;
-export type InsertProduct = typeof insertProductSchema._type;

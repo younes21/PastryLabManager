@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertProductSchema, insertRecipeSchema, insertRecipeIngredientSchema, insertRecipeOperationSchema, type Product, type InsertProduct, type Recipe, type InsertRecipe, type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation, type Article, type WorkStation, type ArticleCategory, type StorageZone, type MeasurementUnit } from "@shared/schema";
+import { insertArticleSchema, insertRecipeSchema, insertRecipeIngredientSchema, insertRecipeOperationSchema, type Article, type InsertArticle, type Recipe, type InsertRecipe, type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation, type WorkStation, type ArticleCategory, type StorageZone, type MeasurementUnit } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,12 +29,12 @@ const commonUnits = [
   "pièce", "kg", "g", "l", "ml", "m", "cm", "m²", "m³", "boîte", "paquet", "sachet"
 ];
 
-function RecipeDisplay({ productId }: { productId: number }) {
+function RecipeDisplay({ articleId }: { articleId: number }) {
   const [recipeDialogOpen, setRecipeDialogOpen] = useState(false);
   
   const { data: recipe, isLoading } = useQuery<Recipe>({
-    queryKey: ["/api/products", productId, "recipe"],
-    queryFn: () => fetch(`/api/products/${productId}/recipe`).then(res => {
+    queryKey: ["/api/articles", articleId, "recipe"],
+    queryFn: () => fetch(`/api/articles/${articleId}/recipe`).then(res => {
       if (res.status === 404) return null;
       if (!res.ok) throw new Error('Failed to fetch recipe');
       return res.json();
@@ -63,7 +63,7 @@ function RecipeDisplay({ productId }: { productId: number }) {
                 Créer une nouvelle recette pour ce produit
               </DialogDescription>
             </DialogHeader>
-            <RecipeForm productId={productId} onSuccess={() => setRecipeDialogOpen(false)} />
+            <RecipeForm articleId={articleId} onSuccess={() => setRecipeDialogOpen(false)} />
           </DialogContent>
         </Dialog>
       </div>
@@ -95,7 +95,7 @@ function RecipeDisplay({ productId }: { productId: number }) {
                 </DialogDescription>
               </DialogHeader>
               <RecipeForm 
-                productId={productId} 
+                articleId={articleId} 
                 recipeData={recipe}
                 onSuccess={() => setRecipeDialogOpen(false)} 
               />
@@ -136,8 +136,8 @@ function RecipeDisplay({ productId }: { productId: number }) {
   );
 }
 
-function RecipeForm({ productId, recipeData, onSuccess }: { 
-  productId: number; 
+function RecipeForm({ articleId, recipeData, onSuccess }: { 
+  articleId: number; 
   recipeData?: Recipe; 
   onSuccess: () => void;
 }) {
@@ -150,7 +150,7 @@ function RecipeForm({ productId, recipeData, onSuccess }: {
   const form = useForm<InsertRecipe>({
     resolver: zodResolver(insertRecipeSchema),
     defaultValues: {
-      productId,
+      articleId,
       designation: recipeData?.designation || "",
       description: recipeData?.description || "",
       quantity: recipeData?.quantity || "1",
@@ -162,7 +162,7 @@ function RecipeForm({ productId, recipeData, onSuccess }: {
   const createMutation = useMutation({
     mutationFn: (data: InsertRecipe) => apiRequest("/api/recipes", "POST", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/articles", articleId, "recipe"] });
       toast({ title: "Recette créée avec succès" });
       onSuccess();
     },
@@ -174,7 +174,7 @@ function RecipeForm({ productId, recipeData, onSuccess }: {
   const updateMutation = useMutation({
     mutationFn: (data: InsertRecipe) => apiRequest(`/api/recipes/${recipeData!.id}`, "PUT", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products", productId, "recipe"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/articles", articleId, "recipe"] });
       toast({ title: "Recette modifiée avec succès" });
       onSuccess();
     },
@@ -305,35 +305,34 @@ function RecipeForm({ productId, recipeData, onSuccess }: {
   );
 }
 
-function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () => void }) {
+function ProductForm({ product, onSuccess }: { product?: Article; onSuccess: () => void }) {
   const { toast } = useToast();
   const isEditing = !!product;
   
-  const form = useForm<InsertProduct>({
-    resolver: zodResolver(insertProductSchema),
+  const form = useForm<InsertArticle>({
+    resolver: zodResolver(insertArticleSchema.extend({
+      type: z.literal("product")
+    })),
     defaultValues: {
+      type: "product" as const,
       designation: product?.designation || "",
       description: product?.description || "",
       managedInStock: Boolean(product?.managedInStock ?? true),
       active: Boolean(product?.active ?? true),
       stockTracking: product?.stockTracking || "unit",
       managementUnit: product?.managementUnit || "pièce",
-      storageZoneId: product?.storageZoneId || undefined,
+      storageLocationId: product?.storageLocationId || undefined,
       stockAlertThreshold: product?.stockAlertThreshold || "0",
-      allowedForSale: Boolean(product?.allowedForSale ?? true),
-      vatRate: product?.vatRate || "0",
+      allowSale: Boolean(product?.allowSale ?? true),
+      tax: product?.tax || "0",
       salePrice: product?.salePrice || "0",
       saleUnit: product?.saleUnit || "pièce",
-      perishable: Boolean(product?.perishable ?? false),
-      conservationDuration: product?.conservationDuration || undefined,
-      conservationTemperature: product?.conservationTemperature || undefined,
-      dlc: product?.dlc || "",
       categoryId: product?.categoryId || undefined,
       photo: product?.photo || "",
     },
   });
 
-  const watchPerishable = form.watch("perishable");
+
 
   const { data: categories } = useQuery<ArticleCategory[]>({
     queryKey: ["/api/article-categories"],
@@ -344,9 +343,9 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: InsertProduct) => apiRequest("/api/products", "POST", data),
+    mutationFn: (data: InsertArticle) => apiRequest("/api/articles", "POST", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
       toast({ title: "Produit créé avec succès" });
       onSuccess();
     },
@@ -356,9 +355,9 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: InsertProduct) => apiRequest(`/api/products/${product!.id}`, "PUT", data),
+    mutationFn: (data: InsertArticle) => apiRequest(`/api/articles/${product!.id}`, "PUT", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
       toast({ title: "Produit modifié avec succès" });
       onSuccess();
     },
@@ -367,19 +366,7 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
     },
   });
 
-  const onSubmit = (data: InsertProduct) => {
-    // Si non périssable, vider les champs de conservation
-    if (!data.perishable) {
-      data.conservationDuration = undefined;
-      data.conservationTemperature = undefined;
-      data.dlc = undefined;
-    } else {
-      // Si périssable mais DLC vide, mettre undefined au lieu de chaîne vide
-      if (data.dlc === "") {
-        data.dlc = undefined;
-      }
-    }
-    
+  const onSubmit = (data: InsertArticle) => {
     if (isEditing) {
       updateMutation.mutate(data);
     } else {
@@ -391,11 +378,10 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="stock">Stock & Gestion</TabsTrigger>
             <TabsTrigger value="vente">Vente & Prix</TabsTrigger>
-            <TabsTrigger value="conservation">Conservation</TabsTrigger>
             <TabsTrigger value="recipe">Recette</TabsTrigger>
           </TabsList>
 
@@ -670,12 +656,12 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
 
               <FormField
                 control={form.control}
-                name="vatRate"
+                name="tax"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Taux TVA (%)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" value={field.value || ""} data-testid="input-vat-rate" />
+                      <Input {...field} type="number" step="0.01" placeholder="0.00" value={field.value || ""} data-testid="input-tax" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -684,90 +670,11 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
             </div>
           </TabsContent>
 
-          <TabsContent value="conservation" className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">Produit périssable</FormLabel>
-                <p className="text-sm text-muted-foreground">
-                  Le produit a une durée de conservation limitée
-                </p>
-              </div>
-              <FormField
-                control={form.control}
-                name="perishable"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Switch
-                        checked={Boolean(field.value)}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-perishable"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
 
-            {watchPerishable && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="conservationDuration"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Durée de conservation (jours)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            type="number" 
-                            value={field.value || ""} 
-                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-                            placeholder="Ex: 7" 
-                            data-testid="input-conservation-duration" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="conservationTemperature"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Température de conservation (°C)</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="number" step="0.1" value={field.value || ""} placeholder="Ex: 4.0" data-testid="input-conservation-temperature" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="dlc"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date limite de consommation</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="date" value={field.value || ""} data-testid="input-dlc" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
-            )}
-          </TabsContent>
 
           <TabsContent value="recipe" className="space-y-4">
             {isEditing && product ? (
-              <RecipeDisplay productId={product.id} />
+              <RecipeDisplay articleId={product.id} />
             ) : (
               <div className="text-center p-6 text-muted-foreground">
                 <p>La gestion des recettes est disponible après la création du produit</p>
@@ -796,12 +703,13 @@ function ProductForm({ product, onSuccess }: { product?: Product; onSuccess: () 
 
 export default function Products() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+  const [selectedProduct, setSelectedProduct] = useState<Article | undefined>();
   const [viewMode, setViewMode] = useState<"edit" | "view">("edit");
   const { toast } = useToast();
 
-  const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+  const { data: products, isLoading } = useQuery<Article[]>({
+    queryKey: ["/api/articles"],
+    queryFn: () => fetch("/api/articles?type=product").then(res => res.json()),
   });
 
   const { data: storageZones } = useQuery<StorageZone[]>({
@@ -809,9 +717,9 @@ export default function Products() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/products/${id}`, "DELETE"),
+    mutationFn: (id: number) => apiRequest(`/api/articles/${id}`, "DELETE"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
       toast({ title: "Produit supprimé avec succès" });
     },
     onError: () => {
@@ -819,19 +727,19 @@ export default function Products() {
     },
   });
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: Article) => {
     setSelectedProduct(product);
     setViewMode("edit");
     setIsDialogOpen(true);
   };
 
-  const handleView = (product: Product) => {
+  const handleView = (product: Article) => {
     setSelectedProduct(product);
     setViewMode("view");
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (product: Product) => {
+  const handleDelete = (product: Article) => {
     if (confirm(`Êtes-vous sûr de vouloir supprimer le produit "${product.designation}" ?`)) {
       deleteMutation.mutate(product.id);
     }
@@ -917,8 +825,8 @@ export default function Products() {
               </TableHeader>
               <TableBody>
                 {products.map((product) => {
-                  const storageZone = product.storageZoneId 
-                    ? storageZones?.find(z => z.id === product.storageZoneId)
+                  const storageLocation = product.storageLocationId 
+                    ? storageZones?.find(z => z.id === product.storageLocationId)
                     : null;
                   
                   return (
@@ -935,32 +843,29 @@ export default function Products() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Thermometer className="w-4 h-4 text-cyan-500" />
-                          {formatTemperature(product.conservationTemperature)}
+                          -
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-orange-500" />
-                          {formatDLC(product.dlc)}
+                          -
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4 text-green-500" />
-                          {formatPrice(product.salePrice)}
+                          {formatPrice(product.salePrice || "0")}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {storageZone ? storageZone.designation : "-"}
+                        {storageLocation ? storageLocation.designation : "-"}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Badge variant={product.active ? "default" : "destructive"}>
                             {product.active ? "Actif" : "Inactif"}
                           </Badge>
-                          {product.perishable && (
-                            <Badge variant="outline">Périssable</Badge>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
