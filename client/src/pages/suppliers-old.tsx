@@ -1,6 +1,6 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, Building2, User, Phone, Mail, MapPin, FileText } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Building2, User, Phone, Mail, MapPin, FileText, Camera } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -35,15 +34,15 @@ type Supplier = {
   address?: string;
   city?: string;
   postalCode?: string;
-  country?: string;
-  taxId?: string;
-  commercialRegister?: string;
+  wilaya?: string;
+  rc?: string;
+  na?: string;
+  mf?: string;
+  nis?: string;
   photo?: string;
   active: boolean;
   createdAt: string;
 };
-
-const companyTypes = ["EURL", "SARL", "SPA", "SNC", "SCS", "Entreprise individuelle", "Autre"];
 
 // Validation avec schéma étendu
 const supplierFormSchema = insertSupplierSchema.extend({
@@ -59,9 +58,11 @@ const supplierFormSchema = insertSupplierSchema.extend({
   address: z.string().optional(),
   city: z.string().optional(),
   postalCode: z.string().optional(),
-  country: z.string().optional(),
-  taxId: z.string().optional(),
-  commercialRegister: z.string().optional(),
+  wilaya: z.string().optional(),
+  rc: z.string().optional(),
+  na: z.string().optional(),
+  mf: z.string().optional(),
+  nis: z.string().optional(),
   photo: z.string().optional(),
   active: z.boolean().default(true),
 }).refine((data) => {
@@ -75,29 +76,177 @@ const supplierFormSchema = insertSupplierSchema.extend({
   path: ["companyName"],
 });
 
-// Composant formulaire stable - défini en dehors du composant principal
-const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCancel, submitting }: {
-  form: any;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  onSubmit: (data: any) => void;
-  onCancel: () => void;
-  submitting: boolean;
-}) => {
-  // État local stable pour le type de fournisseur
-  const [supplierType, setSupplierType] = useState<"particulier" | "societe">(() => {
-    const currentType = form.getValues("type");
-    return currentType || "societe";
+// Options pour les wilayas algériennes (principales)
+const wilayaOptions = [
+  "Adrar", "Chlef", "Laghouat", "Oum El Bouaghi", "Batna", "Béjaïa", "Biskra", "Béchar",
+  "Blida", "Bouira", "Tamanrasset", "Tébessa", "Tlemcen", "Tiaret", "Tizi Ouzou", "Alger",
+  "Djelfa", "Jijel", "Sétif", "Saïda", "Skikda", "Sidi Bel Abbès", "Annaba", "Guelma",
+  "Constantine", "Médéa", "Mostaganem", "M'Sila", "Mascara", "Ouargla", "Oran", "El Bayadh",
+  "Illizi", "Bordj Bou Arreridj", "Boumerdès", "El Tarf", "Tindouf", "Tissemsilt", "El Oued",
+  "Khenchela", "Souk Ahras", "Tipaza", "Mila", "Aïn Defla", "Naâma", "Aïn Témouchent",
+  "Ghardaïa", "Relizane"
+];
+
+const companyTypes = ["EURL", "SARL", "SPA", "SNC", "SCS", "Entreprise individuelle", "Autre"];
+
+export default function SuppliersPage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [activeTab, setActiveTab] = useState("general");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const form = useForm<z.infer<typeof supplierFormSchema>>({
+    resolver: zodResolver(supplierFormSchema),
+    defaultValues: {
+      type: "societe",
+      active: true,
+    },
   });
 
-  const handleTypeChange = useCallback((value: "particulier" | "societe") => {
-    setSupplierType(value);
-  }, []);
+  // Récupération des fournisseurs
+  const { data: suppliers = [], isLoading } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
+  });
 
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: (data: z.infer<typeof supplierFormSchema>) => 
+      apiRequest("/api/suppliers", "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      setIsCreateDialogOpen(false);
+      form.reset();
+      toast({ title: "Fournisseur créé avec succès" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la création", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<z.infer<typeof supplierFormSchema>> }) =>
+      apiRequest(`/api/suppliers/${id}`, "PUT", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      setIsEditDialogOpen(false);
+      setSelectedSupplier(null);
+      form.reset();
+      toast({ title: "Fournisseur modifié avec succès" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/suppliers/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      toast({ title: "Fournisseur supprimé avec succès" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
+    },
+  });
+
+  // Filtrage des fournisseurs
+  const filteredSuppliers = suppliers.filter((supplier) => {
+    const matchesSearch = 
+      supplier.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (supplier.companyName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (supplier.firstName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (supplier.lastName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (supplier.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesType = filterType === "all" || supplier.type === filterType;
+    
+    return matchesSearch && matchesType;
+  });
+
+  const handleCreate = (data: z.infer<typeof supplierFormSchema>) => {
+    createMutation.mutate(data);
+  };
+
+  const handleEdit = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    form.reset({
+      type: supplier.type,
+      companyType: supplier.companyType || undefined,
+      firstName: supplier.firstName || undefined,
+      lastName: supplier.lastName || undefined,
+      companyName: supplier.companyName || undefined,
+      phone: supplier.phone || undefined,
+      mobile: supplier.mobile || undefined,
+      email: supplier.email || undefined,
+      contactName: supplier.contactName || undefined,
+      address: supplier.address || undefined,
+      city: supplier.city || undefined,
+      postalCode: supplier.postalCode || undefined,
+      wilaya: supplier.wilaya || undefined,
+      rc: supplier.rc || undefined,
+      na: supplier.na || undefined,
+      mf: supplier.mf || undefined,
+      nis: supplier.nis || undefined,
+      photo: supplier.photo || undefined,
+      active: supplier.active,
+    });
+    setActiveTab("general"); // Reset tab when editing
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdate = (data: z.infer<typeof supplierFormSchema>) => {
+    if (selectedSupplier) {
+      updateMutation.mutate({ id: selectedSupplier.id, data });
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const getSupplierDisplayName = (supplier: Supplier) => {
+    if (supplier.type === "particulier") {
+      return `${supplier.firstName || ""} ${supplier.lastName || ""}`.trim();
+    }
+    return supplier.companyName || "Sans nom";
+  };
+
+  const SupplierFormComponent = memo(({ onSubmit, isLoading: submitting, formInstance, currentTab, setCurrentTab }: { 
+    onSubmit: (data: z.infer<typeof supplierFormSchema>) => void;
+    isLoading: boolean;
+    formInstance: any;
+    currentTab: string;
+    setCurrentTab: (tab: string) => void;
+  }) => {
+    // Obtenir le type actuel une seule fois au montage
+    const [supplierType, setSupplierType] = useState<"particulier" | "societe">(() => 
+      formInstance.getValues("type") || "societe"
+    );
+
+    // Mémoriser les handlers pour éviter les re-renders
+    const handleTabChange = useCallback((tab: string) => {
+      setCurrentTab(tab);
+    }, [setCurrentTab]);
+
+    const handleTypeChange = useCallback((value: "particulier" | "societe") => {
+      formInstance.setValue("type", value);
+      setSupplierType(value);
+    }, [formInstance]);
+
+    const handleFormSubmit = useCallback((data: z.infer<typeof supplierFormSchema>) => {
+      onSubmit(data);
+    }, [onSubmit]);
+    
+    return (
+      <Form {...formInstance}>
+        <form onSubmit={formInstance.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
@@ -108,7 +257,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
           <TabsContent value="general" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="type"
                 render={({ field }) => (
                   <FormItem>
@@ -134,7 +283,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
 
               {supplierType === "societe" && (
                 <FormField
-                  control={form.control}
+                  control={formInstance.control}
                   name="companyType"
                   render={({ field }) => (
                     <FormItem>
@@ -161,7 +310,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
             {supplierType === "particulier" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
-                  control={form.control}
+                  control={formInstance.control}
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
@@ -175,7 +324,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
                 />
 
                 <FormField
-                  control={form.control}
+                  control={formInstance.control}
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
@@ -190,7 +339,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
               </div>
             ) : (
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="companyName"
                 render={({ field }) => (
                   <FormItem>
@@ -205,18 +354,23 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
             )}
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="active"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                   <div className="space-y-0.5">
                     <FormLabel>Fournisseur actif</FormLabel>
                     <FormDescription>
-                      Ce fournisseur peut passer des commandes
+                      Les fournisseurs inactifs n'apparaissent pas dans les listes de sélection
                     </FormDescription>
                   </div>
                   <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-active" />
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      data-testid="checkbox-active"
+                    />
                   </FormControl>
                 </FormItem>
               )}
@@ -226,7 +380,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
           <TabsContent value="contact" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
@@ -240,7 +394,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
@@ -255,7 +409,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
             </div>
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
@@ -269,7 +423,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
             />
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="contactName"
               render={({ field }) => (
                 <FormItem>
@@ -285,7 +439,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
 
           <TabsContent value="address" className="space-y-4">
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="address"
               render={({ field }) => (
                 <FormItem>
@@ -300,7 +454,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="city"
                 render={({ field }) => (
                   <FormItem>
@@ -314,13 +468,13 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
               />
 
               <FormField
-                control={form.control}
+                control={formInstance.control}
                 name="postalCode"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Code postal</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Code postal" data-testid="input-postal-code" />
+                      <Input {...field} placeholder="16000" data-testid="input-postal-code" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -328,14 +482,23 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
               />
 
               <FormField
-                control={form.control}
-                name="country"
+                control={formInstance.control}
+                name="wilaya"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pays</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Pays" data-testid="input-country" />
-                    </FormControl>
+                    <FormLabel>Wilaya</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-wilaya">
+                          <SelectValue placeholder="Sélectionnez une wilaya" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {wilayaOptions.map((wilaya) => (
+                          <SelectItem key={wilaya} value={wilaya}>{wilaya}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -346,13 +509,13 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
           <TabsContent value="legal" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                control={form.control}
-                name="taxId"
+                control={formInstance.control}
+                name="rc"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro fiscal</FormLabel>
+                    <FormLabel>Registre de Commerce (RC)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="NIF" data-testid="input-tax-id" />
+                      <Input {...field} placeholder="RC XXXXXXX" data-testid="input-rc" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -360,13 +523,43 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
               />
 
               <FormField
-                control={form.control}
-                name="commercialRegister"
+                control={formInstance.control}
+                name="na"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Registre de commerce</FormLabel>
+                    <FormLabel>Numéro d'Agrément (NA)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="RC" data-testid="input-commercial-register" />
+                      <Input {...field} placeholder="NA XXXXXXX" data-testid="input-na" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={formInstance.control}
+                name="mf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Matricule Fiscale (MF)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="MF XXXXXXX" data-testid="input-mf" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={formInstance.control}
+                name="nis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Numéro d'Identification Statistique (NIS)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="NIS XXXXXXX" data-testid="input-nis" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -375,7 +568,7 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
             </div>
 
             <FormField
-              control={form.control}
+              control={formInstance.control}
               name="photo"
               render={({ field }) => (
                 <FormItem>
@@ -391,7 +584,12 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
         </Tabs>
 
         <div className="flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={() => {
+            setIsCreateDialogOpen(false);
+            setIsEditDialogOpen(false);
+            setActiveTab("general");
+            formInstance.reset();
+          }}>
             Annuler
           </Button>
           <Button type="submit" disabled={submitting} data-testid="button-submit-supplier">
@@ -402,168 +600,6 @@ const StableSupplierForm = memo(({ form, activeTab, setActiveTab, onSubmit, onCa
     </Form>
   );
 });
-
-export default function SuppliersPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [activeTab, setActiveTab] = useState("general");
-
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  // Formulaire stable avec valeurs par défaut
-  const form = useForm<z.infer<typeof supplierFormSchema>>({
-    resolver: zodResolver(supplierFormSchema),
-    defaultValues: {
-      type: "societe",
-      active: true,
-    },
-  });
-
-  // Requête pour les fournisseurs
-  const { data: suppliers = [], isLoading } = useQuery({
-    queryKey: ["/api/suppliers"],
-  });
-
-  // Mutations
-  const createMutation = useMutation({
-    mutationFn: (data: z.infer<typeof supplierFormSchema>) =>
-      apiRequest("/api/suppliers", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      setIsCreateDialogOpen(false);
-      form.reset({ type: "societe", active: true });
-      setActiveTab("general");
-      toast({
-        title: "Succès",
-        description: "Fournisseur créé avec succès",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la création",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: z.infer<typeof supplierFormSchema> }) =>
-      apiRequest(`/api/suppliers/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      setIsEditDialogOpen(false);
-      form.reset({ type: "societe", active: true });
-      setActiveTab("general");
-      toast({
-        title: "Succès",
-        description: "Fournisseur mis à jour avec succès",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la mise à jour",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/suppliers/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      toast({
-        title: "Succès",
-        description: "Fournisseur supprimé avec succès",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la suppression",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Handlers stables
-  const handleCreate = useCallback((data: z.infer<typeof supplierFormSchema>) => {
-    createMutation.mutate(data);
-  }, [createMutation]);
-
-  const handleEdit = useCallback((supplier: Supplier) => {
-    setSelectedSupplier(supplier);
-    form.reset({
-      type: supplier.type,
-      companyType: supplier.companyType || undefined,
-      firstName: supplier.firstName || undefined,
-      lastName: supplier.lastName || undefined,
-      companyName: supplier.companyName || undefined,
-      phone: supplier.phone || undefined,
-      mobile: supplier.mobile || undefined,
-      email: supplier.email || undefined,
-      contactName: supplier.contactName || undefined,
-      address: supplier.address || undefined,
-      city: supplier.city || undefined,
-      postalCode: supplier.postalCode || undefined,
-      country: supplier.country || undefined,
-      taxId: supplier.taxId || undefined,
-      commercialRegister: supplier.commercialRegister || undefined,
-      photo: supplier.photo || undefined,
-      active: supplier.active,
-    });
-    setActiveTab("general");
-    setIsEditDialogOpen(true);
-  }, [form]);
-
-  const handleUpdate = useCallback((data: z.infer<typeof supplierFormSchema>) => {
-    if (selectedSupplier) {
-      updateMutation.mutate({ id: selectedSupplier.id, data });
-    }
-  }, [selectedSupplier, updateMutation]);
-
-  const handleDelete = useCallback((id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
-      deleteMutation.mutate(id);
-    }
-  }, [deleteMutation]);
-
-  const handleCancel = useCallback(() => {
-    setIsCreateDialogOpen(false);
-    setIsEditDialogOpen(false);
-    setActiveTab("general");
-    form.reset({ type: "societe", active: true });
-  }, [form]);
-
-  const getSupplierDisplayName = (supplier: Supplier) => {
-    if (supplier.type === "particulier") {
-      return `${supplier.firstName || ""} ${supplier.lastName || ""}`.trim();
-    }
-    return supplier.companyName || "Sans nom";
-  };
-
-  // Filtrage des fournisseurs
-  const filteredSuppliers = suppliers.filter((supplier: Supplier) => {
-    const matchesSearch = searchTerm === "" || 
-      supplier.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getSupplierDisplayName(supplier).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (supplier.email && supplier.email.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesType = filterType === "all" || supplier.type === filterType;
-    
-    return matchesSearch && matchesType;
-  });
 
   return (
     <Layout title="Gestion des Fournisseurs">
@@ -582,7 +618,10 @@ export default function SuppliersPage() {
             setIsCreateDialogOpen(open);
             if (open) {
               setActiveTab("general");
-              form.reset({ type: "societe", active: true });
+              form.reset({
+                type: "societe",
+                active: true,
+              });
             }
           }}>
             <DialogTrigger asChild>
@@ -598,13 +637,12 @@ export default function SuppliersPage() {
                   Créez un nouveau fournisseur avec toutes ses informations
                 </DialogDescription>
               </DialogHeader>
-              <StableSupplierForm 
-                form={form}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                onSubmit={handleCreate}
-                onCancel={handleCancel}
-                submitting={createMutation.isPending}
+              <SupplierFormComponent 
+                onSubmit={handleCreate} 
+                isLoading={createMutation.isPending}
+                formInstance={form}
+                currentTab={activeTab}
+                setCurrentTab={setActiveTab}
               />
             </DialogContent>
           </Dialog>
@@ -639,58 +677,93 @@ export default function SuppliersPage() {
         </Card>
 
         {/* Liste des fournisseurs */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-500">Chargement des fournisseurs...</p>
-            </div>
+            Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                </CardContent>
+              </Card>
+            ))
           ) : filteredSuppliers.length === 0 ? (
             <div className="col-span-full text-center py-8">
-              <p className="text-gray-500">Aucun fournisseur trouvé</p>
+              <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Aucun fournisseur trouvé
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400">
+                {searchTerm || filterType !== "all" 
+                  ? "Modifiez vos critères de recherche ou créez un nouveau fournisseur."
+                  : "Commencez par créer votre premier fournisseur."
+                }
+              </p>
             </div>
           ) : (
-            filteredSuppliers.map((supplier: Supplier) => (
-              <Card key={supplier.id} className="hover:shadow-lg transition-shadow">
+            filteredSuppliers.map((supplier) => (
+              <Card key={supplier.id} className="hover:shadow-lg transition-shadow" data-testid={`card-supplier-${supplier.id}`}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {supplier.type === "particulier" ? (
-                        <User className="h-8 w-8 text-blue-600" />
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      {supplier.type === "societe" ? (
+                        <Building2 className="h-5 w-5 text-blue-600" />
                       ) : (
-                        <Building2 className="h-8 w-8 text-green-600" />
+                        <User className="h-5 w-5 text-green-600" />
                       )}
-                      <div>
-                        <CardTitle className="text-lg">{getSupplierDisplayName(supplier)}</CardTitle>
-                        <CardDescription className="flex items-center gap-2">
-                          <Badge variant="outline">{supplier.code}</Badge>
-                          <Badge variant={supplier.active ? "default" : "secondary"}>
-                            {supplier.active ? "Actif" : "Inactif"}
-                          </Badge>
-                        </CardDescription>
-                      </div>
+                      <Badge variant={supplier.active ? "default" : "secondary"}>
+                        {supplier.code}
+                      </Badge>
                     </div>
+                    <Badge variant={supplier.active ? "default" : "destructive"}>
+                      {supplier.active ? "Actif" : "Inactif"}
+                    </Badge>
                   </div>
+                  <CardTitle className="text-lg">
+                    {getSupplierDisplayName(supplier)}
+                  </CardTitle>
+                  {supplier.companyType && (
+                    <CardDescription>{supplier.companyType}</CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {supplier.email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Mail className="h-4 w-4" />
-                      <span>{supplier.email}</span>
+                  {supplier.contactName && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <User className="h-4 w-4" />
+                      {supplier.contactName}
                     </div>
                   )}
+                  
                   {(supplier.phone || supplier.mobile) && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <Phone className="h-4 w-4" />
-                      <span>{supplier.mobile || supplier.phone}</span>
+                      {supplier.phone || supplier.mobile}
                     </div>
                   )}
-                  {supplier.address && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                  
+                  {supplier.email && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Mail className="h-4 w-4" />
+                      {supplier.email}
+                    </div>
+                  )}
+                  
+                  {(supplier.city || supplier.wilaya) && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <MapPin className="h-4 w-4" />
-                      <span className="truncate">{supplier.address}</span>
+                      {[supplier.city, supplier.wilaya].filter(Boolean).join(", ")}
                     </div>
                   )}
-                  <div className="flex gap-2 pt-2">
+
+                  {(supplier.rc || supplier.mf) && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <FileText className="h-4 w-4" />
+                      {supplier.rc || supplier.mf}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -724,13 +797,12 @@ export default function SuppliersPage() {
                 Modifiez les informations du fournisseur
               </DialogDescription>
             </DialogHeader>
-            <StableSupplierForm 
-              form={form}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              onSubmit={handleUpdate}
-              onCancel={handleCancel}
-              submitting={updateMutation.isPending}
+            <SupplierFormComponent 
+              onSubmit={handleUpdate} 
+              isLoading={updateMutation.isPending}
+              formInstance={form}
+              currentTab={activeTab}
+              setCurrentTab={setActiveTab}
             />
           </DialogContent>
         </Dialog>
