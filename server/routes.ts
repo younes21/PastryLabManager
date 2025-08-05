@@ -9,8 +9,11 @@ import {
   insertCurrencySchema, insertDeliveryMethodSchema, insertAccountingJournalSchema, 
   insertAccountingAccountSchema, insertStorageZoneSchema, insertWorkStationSchema, 
   insertSupplierSchema, insertClientSchema, insertRecipeSchema, insertRecipeIngredientSchema, 
-  insertRecipeOperationSchema
+  insertRecipeOperationSchema, insertOrderSchema, insertOrderItemSchema, 
+  insertInventoryOperationSchema, insertInventoryOperationItemSchema, insertDeliverySchema, 
+  insertInvoiceSchema, insertInvoiceItemSchema
 } from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -958,6 +961,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting recipe operation:", error);
       res.status(500).json({ message: "Failed to delete recipe operation" });
+    }
+  });
+
+  // ============ COMMANDES & DEVIS ROUTES ============
+  
+  // Orders/Quotes
+  app.get("/api/orders", async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.getOrder(id);
+      if (order) {
+        res.json(order);
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
+
+  app.post("/api/orders", async (req, res) => {
+    try {
+      const orderData = insertOrderSchema.parse(req.body);
+      const order = await storage.createOrder(orderData);
+      res.status(201).json(order);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid order data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create order" });
+      }
+    }
+  });
+
+  app.put("/api/orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertOrderSchema.partial().parse(req.body);
+      const order = await storage.updateOrder(id, updateData);
+      if (order) {
+        res.json(order);
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      console.error("Error updating order:", error);
+      res.status(500).json({ message: "Failed to update order" });
+    }
+  });
+
+  app.delete("/api/orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteOrder(id);
+      if (success) {
+        res.json({ message: "Order deleted successfully" });
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      res.status(500).json({ message: "Failed to delete order" });
+    }
+  });
+
+  // Order Items
+  app.get("/api/orders/:orderId/items", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.orderId);
+      const items = await storage.getOrderItems(orderId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching order items:", error);
+      res.status(500).json({ message: "Failed to fetch order items" });
+    }
+  });
+
+  app.post("/api/orders/:orderId/items", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.orderId);
+      const itemData = insertOrderItemSchema.parse({
+        ...req.body,
+        orderId,
+      });
+      const item = await storage.createOrderItem(itemData);
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating order item:", error);
+      res.status(500).json({ message: "Failed to create order item" });
+    }
+  });
+
+  // ============ OPERATIONS D'INVENTAIRE ROUTES ============
+  
+  app.get("/api/inventory-operations", async (req, res) => {
+    try {
+      const { type } = req.query;
+      let operations;
+      if (type) {
+        operations = await storage.getInventoryOperationsByType(type as string);
+      } else {
+        operations = await storage.getAllInventoryOperations();
+      }
+      res.json(operations);
+    } catch (error) {
+      console.error("Error fetching inventory operations:", error);
+      res.status(500).json({ message: "Failed to fetch inventory operations" });
+    }
+  });
+
+  app.post("/api/inventory-operations", async (req, res) => {
+    try {
+      const operationData = insertInventoryOperationSchema.parse(req.body);
+      const operation = await storage.createInventoryOperation(operationData);
+      res.status(201).json(operation);
+    } catch (error) {
+      console.error("Error creating inventory operation:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid operation data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create inventory operation" });
+      }
+    }
+  });
+
+  // ============ LIVRAISONS ROUTES ============
+  
+  app.get("/api/deliveries", async (req, res) => {
+    try {
+      const deliveries = await storage.getAllDeliveries();
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching deliveries:", error);
+      res.status(500).json({ message: "Failed to fetch deliveries" });
+    }
+  });
+
+  app.post("/api/deliveries", async (req, res) => {
+    try {
+      const deliveryData = insertDeliverySchema.parse(req.body);
+      const delivery = await storage.createDelivery(deliveryData);
+      res.status(201).json(delivery);
+    } catch (error) {
+      console.error("Error creating delivery:", error);
+      res.status(500).json({ message: "Failed to create delivery" });
+    }
+  });
+
+  // ============ FACTURATION ROUTES ============
+  
+  app.get("/api/invoices", async (req, res) => {
+    try {
+      const invoices = await storage.getAllInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.post("/api/invoices", async (req, res) => {
+    try {
+      const invoiceData = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice(invoiceData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      res.status(500).json({ message: "Failed to create invoice" });
     }
   });
 

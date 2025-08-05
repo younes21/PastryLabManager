@@ -395,3 +395,298 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
+
+// ============ COMMANDES & DEVIS ============
+
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // CMD-000001 ou DEV-000001
+  type: text("type").notNull().default("order"), // 'quote' (devis) ou 'order' (commande)
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  status: text("status").notNull().default("draft"), // draft, confirmed, prepared, ready, partially_delivered, delivered, cancelled
+  
+  // Dates
+  orderDate: timestamp("order_date", { mode: 'string' }).defaultNow(),
+  deliveryDate: timestamp("delivery_date", { mode: 'string' }),
+  confirmedAt: timestamp("confirmed_at", { mode: 'string' }),
+  
+  // Totaux
+  subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).default("0.00"),
+  totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).default("0.00"),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Notes
+  notes: text("notes"),
+  deliveryNotes: text("delivery_notes"),
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  confirmedBy: integer("confirmed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: 'cascade' }).notNull(),
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0.00"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Production tracking
+  quantityPlanned: decimal("quantity_planned", { precision: 10, scale: 3 }).default("0.00"),
+  quantityPrepared: decimal("quantity_prepared", { precision: 10, scale: 3 }).default("0.00"),
+  quantityDelivered: decimal("quantity_delivered", { precision: 10, scale: 3 }).default("0.00"),
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// ============ OPERATIONS D'INVENTAIRE ============
+
+export const inventoryOperations = pgTable("inventory_operations", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // REC-000001, PREP-000001, etc.
+  type: text("type").notNull(), // reception, preparation, preparation_reliquat, ajustement, ajustement_rebut, inventaire_initiale, interne, livraison
+  status: text("status").notNull().default("draft"), // draft, pending, ready, completed, cancelled, programmed, in_progress
+  
+  // Références
+  supplierId: integer("supplier_id").references(() => suppliers.id), // Pour réceptions
+  orderId: integer("order_id").references(() => orders.id), // Pour préparations/livraisons
+  parentOperationId: integer("parent_operation_id"), // Pour reliquats et rectifications
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
+  operatorId: integer("operator_id").references(() => users.id), // Préparateur/opérateur
+  
+  // Dates
+  scheduledDate: timestamp("scheduled_date", { mode: 'string' }),
+  startedAt: timestamp("started_at", { mode: 'string' }),
+  completedAt: timestamp("completed_at", { mode: 'string' }),
+  
+  // Montants (pour réceptions)
+  subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).default("0.00"),
+  totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).default("0.00"),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Divers
+  notes: text("notes"),
+  cancellationReason: text("cancellation_reason"),
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  completedBy: integer("completed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const inventoryOperationItems = pgTable("inventory_operation_items", {
+  id: serial("id").primaryKey(),
+  operationId: integer("operation_id").references(() => inventoryOperations.id, { onDelete: 'cascade' }).notNull(),
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  
+  // Quantités
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  quantityBefore: decimal("quantity_before", { precision: 10, scale: 3 }), // Stock avant opération
+  quantityAfter: decimal("quantity_after", { precision: 10, scale: 3 }), // Stock après opération
+  
+  // Prix (pour réceptions)
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).default("0.00"),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).default("0.00"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0.00"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Zone de stockage
+  fromStorageZoneId: integer("from_storage_zone_id").references(() => storageZones.id),
+  toStorageZoneId: integer("to_storage_zone_id").references(() => storageZones.id),
+  
+  // Rebuts
+  wasteReason: text("waste_reason"), // pour ajustement_rebut
+  wasteLocationId: integer("waste_location_id").references(() => storageZones.id),
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// ============ LIVRAISONS ============
+
+export const deliveries = pgTable("deliveries", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // LIV-000001
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  operationId: integer("operation_id").references(() => inventoryOperations.id), // Opération de livraison liée
+  
+  // Livreur et dates
+  deliveryPersonId: integer("delivery_person_id").references(() => users.id),
+  scheduledDate: timestamp("scheduled_date", { mode: 'string' }),
+  deliveredAt: timestamp("delivered_at", { mode: 'string' }),
+  
+  // Statut et adresse
+  status: text("status").notNull().default("pending"), // pending, in_transit, delivered, cancelled
+  deliveryAddress: text("delivery_address"),
+  deliveryNotes: text("delivery_notes"),
+  
+  // Colis
+  packageCount: integer("package_count").default(1),
+  trackingNumbers: text("tracking_numbers"), // JSON array of tracking numbers
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const deliveryPackages = pgTable("delivery_packages", {
+  id: serial("id").primaryKey(),
+  deliveryId: integer("delivery_id").references(() => deliveries.id, { onDelete: 'cascade' }).notNull(),
+  packageNumber: text("package_number").notNull(), // COL-000001
+  weight: decimal("weight", { precision: 8, scale: 3 }),
+  dimensions: text("dimensions"), // LxWxH
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+export const deliveryItems = pgTable("delivery_items", {
+  id: serial("id").primaryKey(),
+  deliveryId: integer("delivery_id").references(() => deliveries.id, { onDelete: 'cascade' }).notNull(),
+  packageId: integer("package_id").references(() => deliveryPackages.id),
+  orderItemId: integer("order_item_id").references(() => orderItems.id).notNull(),
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// ============ FACTURATION ============
+
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // FAC-000001
+  orderId: integer("order_id").references(() => orders.id),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  
+  // Statut et dates
+  status: text("status").notNull().default("draft"), // draft, sent, paid, overdue, cancelled
+  issueDate: timestamp("issue_date", { mode: 'string' }).defaultNow(),
+  dueDate: timestamp("due_date", { mode: 'string' }),
+  paidAt: timestamp("paid_at", { mode: 'string' }),
+  
+  // Montants
+  subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).notNull(),
+  totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Adresses et notes
+  billingAddress: text("billing_address"),
+  notes: text("notes"),
+  paymentTerms: text("payment_terms"),
+  
+  // Comptabilité
+  accountingEntryId: integer("accounting_entry_id"), // Référence vers écriture comptable
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const invoiceItems = pgTable("invoice_items", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: 'cascade' }).notNull(),
+  articleId: integer("article_id").references(() => articles.id),
+  orderItemId: integer("order_item_id").references(() => orderItems.id),
+  
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0.00"),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// ============ COMPTABILITE ============
+
+export const accountingEntries = pgTable("accounting_entries", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // ECR-000001
+  journalId: integer("journal_id").references(() => accountingJournals.id).notNull(),
+  
+  // Dates et référence
+  entryDate: timestamp("entry_date", { mode: 'string' }).defaultNow(),
+  reference: text("reference"), // Référence externe (facture, etc.)
+  description: text("description").notNull(),
+  
+  // Montants
+  totalDebit: decimal("total_debit", { precision: 15, scale: 2 }).default("0.00"),
+  totalCredit: decimal("total_credit", { precision: 15, scale: 2 }).default("0.00"),
+  
+  // Statut
+  status: text("status").notNull().default("draft"), // draft, validated, cancelled
+  validatedAt: timestamp("validated_at", { mode: 'string' }),
+  validatedBy: integer("validated_by").references(() => users.id),
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const accountingEntryLines = pgTable("accounting_entry_lines", {
+  id: serial("id").primaryKey(),
+  entryId: integer("entry_id").references(() => accountingEntries.id, { onDelete: 'cascade' }).notNull(),
+  accountId: integer("account_id").references(() => accountingAccounts.id).notNull(),
+  
+  description: text("description").notNull(),
+  debit: decimal("debit", { precision: 15, scale: 2 }).default("0.00"),
+  credit: decimal("credit", { precision: 15, scale: 2 }).default("0.00"),
+  
+  // Références optionnelles
+  partnerId: integer("partner_id"), // Client ou fournisseur
+  partnerType: text("partner_type"), // 'client' ou 'supplier'
+  
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Insert schemas
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, code: true, createdAt: true, updatedAt: true });
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true, createdAt: true });
+export const insertInventoryOperationSchema = createInsertSchema(inventoryOperations).omit({ id: true, code: true, createdAt: true, updatedAt: true });
+export const insertInventoryOperationItemSchema = createInsertSchema(inventoryOperationItems).omit({ id: true, createdAt: true });
+export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true, code: true, createdAt: true, updatedAt: true });
+export const insertDeliveryPackageSchema = createInsertSchema(deliveryPackages).omit({ id: true, createdAt: true });
+export const insertDeliveryItemSchema = createInsertSchema(deliveryItems).omit({ id: true, createdAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, code: true, createdAt: true, updatedAt: true });
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true });
+export const insertAccountingEntrySchema = createInsertSchema(accountingEntries).omit({ id: true, code: true, createdAt: true, updatedAt: true });
+export const insertAccountingEntryLineSchema = createInsertSchema(accountingEntryLines).omit({ id: true, createdAt: true });
+
+// Types
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
+export type InventoryOperation = typeof inventoryOperations.$inferSelect;
+export type InsertInventoryOperation = z.infer<typeof insertInventoryOperationSchema>;
+export type InventoryOperationItem = typeof inventoryOperationItems.$inferSelect;
+export type InsertInventoryOperationItem = z.infer<typeof insertInventoryOperationItemSchema>;
+export type Delivery = typeof deliveries.$inferSelect;
+export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
+export type DeliveryPackage = typeof deliveryPackages.$inferSelect;
+export type InsertDeliveryPackage = z.infer<typeof insertDeliveryPackageSchema>;
+export type DeliveryItem = typeof deliveryItems.$inferSelect;
+export type InsertDeliveryItem = z.infer<typeof insertDeliveryItemSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type AccountingEntry = typeof accountingEntries.$inferSelect;
+export type InsertAccountingEntry = z.infer<typeof insertAccountingEntrySchema>;
+export type AccountingEntryLine = typeof accountingEntryLines.$inferSelect;
+export type InsertAccountingEntryLine = z.infer<typeof insertAccountingEntryLineSchema>;

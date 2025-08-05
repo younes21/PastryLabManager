@@ -3,6 +3,8 @@ import {
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
+  orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
+  invoices, invoiceItems, accountingEntries, accountingEntryLines,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -12,7 +14,12 @@ import {
   type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
   type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation,
   type Supplier, type InsertSupplier, type Recipe, type InsertRecipe,
-  type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation
+  type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation,
+  type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
+  type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
+  type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
+  type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
+  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -934,6 +941,274 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClient(id: number): Promise<boolean> {
     const result = await db.delete(clients).where(eq(clients.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============ COMMANDES & DEVIS ============
+  
+  async getAllOrders(): Promise<Order[]> {
+    return await db.select().from(orders).orderBy(desc(orders.createdAt));
+  }
+
+  async getOrder(id: number): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order || undefined;
+  }
+
+  async getOrdersByClient(clientId: number): Promise<Order[]> {
+    return await db.select().from(orders)
+      .where(eq(orders.clientId, clientId))
+      .orderBy(desc(orders.createdAt));
+  }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    // Generate automatic code
+    const prefix = insertOrder.type === 'quote' ? 'DEV' : 'CMD';
+    const existingOrders = await this.getAllOrders();
+    const nextNumber = existingOrders.length + 1;
+    const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const orderData = {
+      ...insertOrder,
+      code,
+    };
+    
+    const [order] = await db.insert(orders).values(orderData).returning();
+    return order;
+  }
+
+  async updateOrder(id: number, updateData: Partial<InsertOrder>): Promise<Order | undefined> {
+    const [order] = await db.update(orders)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(orders.id, id))
+      .returning();
+    return order || undefined;
+  }
+
+  async deleteOrder(id: number): Promise<boolean> {
+    const result = await db.delete(orders).where(eq(orders.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Order Items
+  async getOrderItems(orderId: number): Promise<OrderItem[]> {
+    return await db.select().from(orderItems)
+      .where(eq(orderItems.orderId, orderId))
+      .orderBy(orderItems.id);
+  }
+
+  async createOrderItem(insertOrderItem: InsertOrderItem): Promise<OrderItem> {
+    const [item] = await db.insert(orderItems).values(insertOrderItem).returning();
+    return item;
+  }
+
+  async updateOrderItem(id: number, updateData: Partial<InsertOrderItem>): Promise<OrderItem | undefined> {
+    const [item] = await db.update(orderItems)
+      .set(updateData)
+      .where(eq(orderItems.id, id))
+      .returning();
+    return item || undefined;
+  }
+
+  async deleteOrderItem(id: number): Promise<boolean> {
+    const result = await db.delete(orderItems).where(eq(orderItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============ OPERATIONS D'INVENTAIRE ============
+  
+  async getAllInventoryOperations(): Promise<InventoryOperation[]> {
+    return await db.select().from(inventoryOperations).orderBy(desc(inventoryOperations.createdAt));
+  }
+
+  async getInventoryOperation(id: number): Promise<InventoryOperation | undefined> {
+    const [operation] = await db.select().from(inventoryOperations).where(eq(inventoryOperations.id, id));
+    return operation || undefined;
+  }
+
+  async getInventoryOperationsByType(type: string): Promise<InventoryOperation[]> {
+    return await db.select().from(inventoryOperations)
+      .where(eq(inventoryOperations.type, type))
+      .orderBy(desc(inventoryOperations.createdAt));
+  }
+
+  async createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation> {
+    // Generate automatic code based on type
+    const prefixes: Record<string, string> = {
+      'reception': 'REC',
+      'preparation': 'PREP',
+      'preparation_reliquat': 'PREL',
+      'ajustement': 'AJU',
+      'ajustement_rebut': 'REB',
+      'inventaire_initiale': 'INV',
+      'interne': 'INT',
+      'livraison': 'LIV'
+    };
+    
+    const prefix = prefixes[insertOperation.type] || 'OP';
+    const existingOps = await this.getInventoryOperationsByType(insertOperation.type);
+    const nextNumber = existingOps.length + 1;
+    const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const operationData = {
+      ...insertOperation,
+      code,
+    };
+    
+    const [operation] = await db.insert(inventoryOperations).values(operationData).returning();
+    return operation;
+  }
+
+  async updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined> {
+    const [operation] = await db.update(inventoryOperations)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(inventoryOperations.id, id))
+      .returning();
+    return operation || undefined;
+  }
+
+  async deleteInventoryOperation(id: number): Promise<boolean> {
+    const result = await db.delete(inventoryOperations).where(eq(inventoryOperations.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Inventory Operation Items
+  async getInventoryOperationItems(operationId: number): Promise<InventoryOperationItem[]> {
+    return await db.select().from(inventoryOperationItems)
+      .where(eq(inventoryOperationItems.operationId, operationId))
+      .orderBy(inventoryOperationItems.id);
+  }
+
+  async createInventoryOperationItem(insertItem: InsertInventoryOperationItem): Promise<InventoryOperationItem> {
+    const [item] = await db.insert(inventoryOperationItems).values(insertItem).returning();
+    return item;
+  }
+
+  async updateInventoryOperationItem(id: number, updateData: Partial<InsertInventoryOperationItem>): Promise<InventoryOperationItem | undefined> {
+    const [item] = await db.update(inventoryOperationItems)
+      .set(updateData)
+      .where(eq(inventoryOperationItems.id, id))
+      .returning();
+    return item || undefined;
+  }
+
+  async deleteInventoryOperationItem(id: number): Promise<boolean> {
+    const result = await db.delete(inventoryOperationItems).where(eq(inventoryOperationItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============ LIVRAISONS ============
+  
+  async getAllDeliveries(): Promise<Delivery[]> {
+    return await db.select().from(deliveries).orderBy(desc(deliveries.createdAt));
+  }
+
+  async getDelivery(id: number): Promise<Delivery | undefined> {
+    const [delivery] = await db.select().from(deliveries).where(eq(deliveries.id, id));
+    return delivery || undefined;
+  }
+
+  async getDeliveriesByOrder(orderId: number): Promise<Delivery[]> {
+    return await db.select().from(deliveries)
+      .where(eq(deliveries.orderId, orderId))
+      .orderBy(desc(deliveries.createdAt));
+  }
+
+  async createDelivery(insertDelivery: InsertDelivery): Promise<Delivery> {
+    // Generate automatic code
+    const existingDeliveries = await this.getAllDeliveries();
+    const nextNumber = existingDeliveries.length + 1;
+    const code = `LIV-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const deliveryData = {
+      ...insertDelivery,
+      code,
+    };
+    
+    const [delivery] = await db.insert(deliveries).values(deliveryData).returning();
+    return delivery;
+  }
+
+  async updateDelivery(id: number, updateData: Partial<InsertDelivery>): Promise<Delivery | undefined> {
+    const [delivery] = await db.update(deliveries)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(deliveries.id, id))
+      .returning();
+    return delivery || undefined;
+  }
+
+  async deleteDelivery(id: number): Promise<boolean> {
+    const result = await db.delete(deliveries).where(eq(deliveries.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============ FACTURATION ============
+  
+  async getAllInvoices(): Promise<Invoice[]> {
+    return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice || undefined;
+  }
+
+  async getInvoicesByClient(clientId: number): Promise<Invoice[]> {
+    return await db.select().from(invoices)
+      .where(eq(invoices.clientId, clientId))
+      .orderBy(desc(invoices.createdAt));
+  }
+
+  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
+    // Generate automatic code
+    const existingInvoices = await this.getAllInvoices();
+    const nextNumber = existingInvoices.length + 1;
+    const code = `FAC-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const invoiceData = {
+      ...insertInvoice,
+      code,
+    };
+    
+    const [invoice] = await db.insert(invoices).values(invoiceData).returning();
+    return invoice;
+  }
+
+  async updateInvoice(id: number, updateData: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const [invoice] = await db.update(invoices)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(invoices.id, id))
+      .returning();
+    return invoice || undefined;
+  }
+
+  async deleteInvoice(id: number): Promise<boolean> {
+    const result = await db.delete(invoices).where(eq(invoices.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Invoice Items
+  async getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]> {
+    return await db.select().from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, invoiceId))
+      .orderBy(invoiceItems.id);
+  }
+
+  async createInvoiceItem(insertInvoiceItem: InsertInvoiceItem): Promise<InvoiceItem> {
+    const [item] = await db.insert(invoiceItems).values(insertInvoiceItem).returning();
+    return item;
+  }
+
+  async updateInvoiceItem(id: number, updateData: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined> {
+    const [item] = await db.update(invoiceItems)
+      .set(updateData)
+      .where(eq(invoiceItems.id, id))
+      .returning();
+    return item || undefined;
+  }
+
+  async deleteInvoiceItem(id: number): Promise<boolean> {
+    const result = await db.delete(invoiceItems).where(eq(invoiceItems.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

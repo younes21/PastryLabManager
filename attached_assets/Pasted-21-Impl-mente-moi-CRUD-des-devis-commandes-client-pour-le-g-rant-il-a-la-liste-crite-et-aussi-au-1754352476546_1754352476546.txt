@@ -1,0 +1,102 @@
+21.	Implémente-moi CRUD des devis/commandes client pour le gérant (il a la liste écrite) et aussi au client pour qu’il puisse commander en ligne :
+
+a.	Ajouter la possibilité de filtrer aussi par num commande, date livraison et d’enregistrement (du ,au , hier, aujourd’hui, demain)
+b.	Afficher en haut la liste des catégories de produit en vente pour permettre de filtrer les produits (grille).
+c.	Permettre de trier la liste par nom, téléphone, référence commande.
+d.	Une commande est définie par :
+i.	Le client à sélectionner
+ii.	Un ou plusieurs Produits à sélectionner : choisir le nombre de produit
+iii.	Date et heure de livraison prévu
+iv.	Le total de la commande ainsi le nombre de produits
+e.	Permettre de confirmer la devis/commande
+f.	Permettre d’annuler une commande
+g.	Voici quelques règles de gestion à respecter :
+1.	Un devis confirmé ne peut être supprimé
+2.	Une commande passe par les états suivants : brouillon, confirmé, préparée, prête à être livrée, livrée partiellement, livrée, annulée
+3.	Un devis validé devient une commande
+4.	Le gérant est celui qui confirme les commandes
+5.	Une fois les quantités des produits de la commande sont disponible (en enlevant les quantités des commandes précédentes), l’état de la commande passe à « préparée ». (ex :deux commande confirmé, commande 1 : 10 flan vanille, commande 2 : 5 flan vanille, on a 12 flan vanille en stock alors commande 1 est marqué comme « préparée « et commande 2 reste a « confirmé » )
+6.	L’état de la commande peut être changé manuellement par le gérant.
+7.	Une commande validée ne peut être supprimé (elle peut être annulée) sauf pour un administrateur
+8.	La commande peut être crée par le gérant (en prenant les commandes par email ou téléphone) pour ces clients.
+9.	La commande peut être crée par le client en s’authentifiant dans le système
+
+22.	Implémente-moi CRUD des devis/commandes pour le client à travers l’utilisation d’un affichage plus élégant que celui du point précèdent (19 ) dans une interface ou le client doit s’authentifier (voir le point 19 pour plus de détail)
+
+Inventaire (gestion de stock)
+23.	 Voici les règles de gestion d’inventaire à respecter pour les instructions que je vais te donner par la suite :
+a.	On a plusieurs types d’opération qui sont : « réception », « préparation », « préparation reliquat », « ajustement », « ajustement rebut », « inventaire initiale », « interne », « livraison » .
+b.	Chaque opération a plusieurs états : brouillon, en attente, prêt, terminé, annulé.
+c.	Une opération terminée ne peut être modifié que par l’administrateur.
+d.	Seule une opération terminée qui peut être annulé.
+e.	Une fois l’utilisateur valide, l’état change vers « terminé » et les quantités dans le stock  doivent être mise à jour (états du stock mis a jour).
+f.	Si l’utilisateur annule l’opération, les quantités dans le stock doivent être restauré et l’état de l’opération change vers « annulé ».
+g.	Si l’opération est validée, l’utilisateur ne peut pas changer directement les valeurs de l’opération mais en créant une autre opération de rectification qui permet de changer les valeurs sans toucher à l’opération d’origine et aussi il faut rattacher ces deux opérations pour avoir une traçabilité des changements
+h.	Il existe plusieurs zones de stockage ou l’utilisateur doit choisir la zone dans les opérations d’entrés
+i.	Toute opération commence par l’état brouillon.
+j.	Le gérant peut changer manuellement l’état des opérations.
+k.	Afficher le PMP des produits, la valeur réelle aussi, dernier prix d’achat.
+24.	Implémenter-moi CRUD de l’opération réception :
+i.	Permettre d’ajouter des articles au stock.
+ii.	Scenario : permettre d’acheter des ingrédients sur un fournisseur. 
+iii.	Etats : brouillon, terminé, annulé.
+iv.	Cette opération peut être créé, modifié ou supprimé (état brouillon) par le gérant
+v.	Cette opération consiste à ajouter les ingrédients avec le prix d’achat de chaque ingrédient, le fournisseur, la quantité du stock déjà existante (afficher l’unité de mesure), la zone de stockage, quantité à acheter, montant HT, tva,
+vi.	Afficher en bas de l’interface le total HT, total TVA, total TTC, total remise (champ à saisir).
+vii.	On peut créer une facture (règlement) attaché à cette opération et consulter les règlements vis-à-vis a ce fournisseur.
+25.	Implémenter-moi CRUD de l’opération préparation :
+a.	Permettre de fabriquer/préparer un produit selon la recette attaché à ce produit.
+b.	Scenario : préparer des flans vanilles issue des commandes qui sont confirmé.
+c.	Etats : brouillon, programmé, en attente, en cours, terminé, annulé.
+d.	Cette opération peut être créé, modifié ou supprimé (état brouillon) par le gérant
+e.	Planification des préparations (création) : Dans l’interface permettant de créer une préparation, l’utilisateur doit sélectionner un produit, soit sélectionné depuis une liste déroulante pour choisir n’importe quel produit, soit depuis un dialogue contenant la liste des produit commandés « confirmé » (affiché les colonnes : nom du produit, le nombre de produit commandés et non traité, et le producteur), il doit saisir le producteur, le nombre de produit, date programmée.
+f.	L’utilisateur peut lancer des préparations qui sont en état « programmé » en spécifiant « produire tout », l’état de l’opération devient « en cours »
+g.	Afficher la liste des préparations (date, référence, quantité, opérateur, nom de la recette) trié par date
+h.	Permettre de filtrer la liste par date ( une date quelconque, hier, aujourd’hui, demain, état ..etc)
+i.	Une  fois la préparation est terminée le nombre restant planifiée de la commande doit être mise à jour, si est à 0 la commande doit être marqué comme « préparée ».(autrement dit, une fois des produits préparés le nombre planifié de produits à préparer doit diminuer)
+j.	lors de l’ajout une nouvelle opération de préparation depuis la liste des produits commandés, le nombre a produire ne doit pas dépasser le nombre total commandé(  commande en cours) du produit 
+k.	Une préparation ne peut être lancé si les quantités des ingrédients selon la recette ne sont pas disponible.
+l.	une préparation d’un produit doit ajouter les quantités produites au stock du produit et aussi consommer les quantités des composants selon la recette depuis le stock
+
+
+26.	Implémenter-moi CRUD des opérations « préparation reliquat »  :
+a.	Permet de faire des préparations partielles depuis la préparation initiale.
+b.	Etats : en cours, terminé, annulé.
+c.	C’est des opérations rattachées à une opération de préparation.
+d.	L’utilisateur peut lancer des préparations qui sont en état « programmé » en créant une opération « préparation reliquat » rattaché (préparation partielle).
+e.	Lors de la création d’une opération de « préparation reliquat » , l’utilisateur doit choisir la quantité a produire et le Préparateur.
+f.	Chaque Préparateur ne peut gérer que ses propres préparations.
+g.	Dans le cas « produire tout » : Si les quantités des ingrédients sont disponible alors l’état de l’opération « préparation » devient « en cours » sinon « en attente »
+h.	Dans le cas ou on crée une opération de reliquat : Si les quantités des ingrédients sont disponible alors l’état de l’opération « préparation reliquat » devient « en cours » sinon « en attente » idem pour l’opération mère  (préparation)
+i.	Si toutes les opérations « préparation reliquat » sont marqué « terminé » alors l’opération de préparation mère aussi sera marqué « terminé ».
+j.	Une  fois la « préparation reliquat » est terminée le nombre restant planifiée de la commande doit être mise à jour, (autrement dit, une fois des produits préparés le nombre planifié de produits à préparer doit diminuer)
+k.	Permettre de filtrer par préparateur, date, en attente, terminé
+l.	Permettre à l’utilisateur de consulter les opérations « préparation reliquat » pour n’importe quelle opération de préparation
+m.	Afficher la disponibilité des opérations de préparations selon la disponibilité de leurs ingrédients selon la recette du produit
+n.	Ajouter la possibilité de consulter l’aperçu de la préparation en affichant une liste arborescente des composants/ingrédients avec leurs sous-composant/ingrédients et pour chacun afficher :
+i.	 La quantité a utiliser pour produire selon la recette,
+ii.	 La quantité en stock de l’ingrédient, 
+iii.	Cout de la fabrication 
+o.	
+
+27.	Implémenter-moi CRUD des opérations « ajustement rebut » :
+a.	Permettre d’ajouter des opérations « ajustement rebut » pour les opérations de type « préparation » ou bien « préparation reliquat) en contrôlant les quantités à ne pas dépasser en introduisant la quantité et la cause (produit non conforme, produit détérioré, produit non vendu), l’emplacement rebut.
+
+28.	Implémenter-moi CRUD des opérations «ajustement »
+29.	Implémenter-moi CRUD des opérations «inventaire initiale»
+30.	Implémenter-moi CRUD des opérations «interne» : transfert d’une zone vers une autre
+31.	Implémenter-moi CRUD des opérations «livraison»
+a.	Une opération de livraison est attachée à une commande (une commande peut avoir plusieurs livraisons)
+b.	Choisir le livreur, sélectionner les produits à livrer depuis les produits commandés avec les quantités.
+c.	Contrôler les quantités livrées pour ne pas dépassé la quantité totale commandée.
+d.	Les produits peuvent être grouper par des colis ou tu dois générer automatiquement le numéro de colis (tu dois me donner la possibilité de tracer facilement les produits livrés dans n’importe quel numéro de colis)
+Facturation et livraison.
+32.	Implémenter-moi CRUD factures
+a.	Une commande peut avoir une ou plusieurs factures
+b.	Chaque facture a un état : brouillon, payé.
+c.	Une fois payé écrire dans journal (comptabilité)
+d.	Remettre la facture en brouillon (supprimer l’écriture comptable)
+e.	L’utilisateur peut imprimer la facture
+f.	Gérer moi les fonctionnalités de comptabilités.
+g.	Voir un aperçu de la facture
+h.	Imprimer la facture.

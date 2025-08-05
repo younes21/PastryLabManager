@@ -56,7 +56,7 @@ export function Sidebar() {
     // Modules temporairement supprimés - à réimplémenter
     { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
     // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
-    // { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
+    { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
     // { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
     { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
