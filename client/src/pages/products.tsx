@@ -371,11 +371,22 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
   const onSubmit = (formData: ProductForm) => {
     console.log("🔥 PRODUCT FORM - Soumission des données:", formData);
     
-    // Plus de transformation nécessaire - le schéma côté serveur gère la conversion
+    // Conversion des types pour l'API - en gardant les strings car le schéma les attend comme ça
+    const transformedData = {
+      ...formData,
+      // Ne pas convertir - le schéma côté serveur attend des strings
+      shelfLife: formData.shelfLife || null,
+      salePrice: formData.salePrice || null,
+      minStock: formData.minStock || "0.00",
+      maxStock: formData.maxStock || "0.00",
+    };
+    
+    console.log("🔥 PRODUCT FORM - Données transformées:", transformedData);
+    
     if (isEditing) {
-      updateMutation.mutate(formData);
+      updateMutation.mutate(transformedData);
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(transformedData);
     }
   };
 

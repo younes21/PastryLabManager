@@ -338,7 +338,35 @@ export const insertStorageLocationSchema = createInsertSchema(storageLocations).
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
-export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, code: true, createdAt: true });
+export const insertArticleSchema = createInsertSchema(articles).omit({ id: true, code: true, createdAt: true }).extend({
+  // Transform string inputs to appropriate types for numeric fields
+  shelfLife: z.union([z.string(), z.number(), z.null()]).transform((val) => {
+    if (val === null || val === "" || val === undefined) return null;
+    if (typeof val === "string") {
+      const parsed = parseInt(val);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return val;
+  }),
+  salePrice: z.union([z.string(), z.number(), z.null()]).transform((val) => {
+    if (val === null || val === "" || val === undefined) return null;
+    if (typeof val === "string") {
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? null : parsed.toString();
+    }
+    return val?.toString() || null;
+  }),
+  minStock: z.union([z.string(), z.number()]).transform((val) => {
+    if (val === null || val === "" || val === undefined) return "0.00";
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  maxStock: z.union([z.string(), z.number()]).transform((val) => {
+    if (val === null || val === "" || val === undefined) return "0.00";
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+});
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, createdAt: true });
 export const insertPriceRuleSchema = createInsertSchema(priceRules).omit({ id: true, createdAt: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
