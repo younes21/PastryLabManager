@@ -684,7 +684,21 @@ export const accountingEntryLines = pgTable("accounting_entry_lines", {
 
 // Insert schemas
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, code: true, createdAt: true, updatedAt: true });
-export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true, createdAt: true });
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true, createdAt: true }).extend({
+  // Transform numeric inputs to appropriate types for decimal fields
+  quantity: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  unitPrice: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  totalPrice: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+});
 export const insertInventoryOperationSchema = createInsertSchema(inventoryOperations).omit({ id: true, code: true, createdAt: true, updatedAt: true });
 export const insertInventoryOperationItemSchema = createInsertSchema(inventoryOperationItems).omit({ id: true, createdAt: true });
 export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true, code: true, createdAt: true, updatedAt: true });

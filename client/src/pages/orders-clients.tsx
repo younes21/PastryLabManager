@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ClientLayout } from "@/components/client-layout";
 import { useToast } from "@/hooks/use-toast";
 import {
   ShoppingCart,
@@ -80,14 +81,26 @@ export default function ClientOrdersPage() {
   const [orderNotes, setOrderNotes] = useState("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
-  // ID du client connecté (à récupérer depuis le contexte d'auth)
-  const currentClientId = 1; // À remplacer par la vraie logique d'auth
+  // Récupérer le client connecté via son userId
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const { data: currentClient } = useQuery({
+    queryKey: ["/api/clients"],
+    select: (data: Client[]) => 
+      data?.find((client: Client) => client.userId === (currentUser as any)?.id),
+    enabled: !!(currentUser as any)?.id,
+  });
+
+  const currentClientId = currentClient?.id;
 
   // Queries
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     select: (data) =>
       data?.filter((order: Order) => order.clientId === currentClientId),
+    enabled: !!currentClientId,
   });
 
   const { data: categories = [] } = useQuery<ArticleCategory[]>({
@@ -111,6 +124,8 @@ export default function ClientOrdersPage() {
   // Mutations
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: OrderFormData) => {
+      console.log("🔥 CREATING ORDER - Data:", orderData);
+      
       const order = await apiRequest("/api/orders", "POST", {
         type: "order",
         clientId: orderData.clientId,
@@ -119,11 +134,16 @@ export default function ClientOrdersPage() {
         status: "draft",
       });
 
+      console.log("🔥 ORDER CREATED - Order:", order);
+
       // Ajouter les items de commande
       for (const item of orderData.items) {
-        await apiRequest("/api/order-items", "POST", {
-          orderId: order.id,
-          ...item,
+        console.log("🔥 ADDING ORDER ITEM:", item);
+        await apiRequest(`/api/orders/${order.id}/items`, "POST", {
+          articleId: item.articleId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
         });
       }
 
@@ -144,18 +164,26 @@ export default function ClientOrdersPage() {
 
   const updateOrderMutation = useMutation({
     mutationFn: async (orderData: { id: number } & OrderFormData) => {
+      console.log("🔥 UPDATING ORDER - Data:", orderData);
+      
       const order = await apiRequest(`/api/orders/${orderData.id}`, "PUT", {
         deliveryDate: orderData.deliveryDate,
         notes: orderData.notes,
+        status: "draft", // Maintenir le statut draft lors de l'édition
       });
 
-      // Supprimer les anciens items et ajouter les nouveaux
-      await apiRequest(`/api/orders/${orderData.id}/items`, "DELETE");
+      console.log("🔥 ORDER UPDATED - Order:", order);
 
+      // Note: Pour la mise à jour des items, on devrait avoir une route spécifique
+      // ou gérer les items individuellement. Pour l'instant, on ne peut que créer de nouveaux items.
+      
       for (const item of orderData.items) {
-        await apiRequest("/api/order-items", "POST", {
-          orderId: orderData.id,
-          ...item,
+        console.log("🔥 ADDING/UPDATING ORDER ITEM:", item);
+        await apiRequest(`/api/orders/${orderData.id}/items`, "POST", {
+          articleId: item.articleId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
         });
       }
 
@@ -233,6 +261,14 @@ export default function ClientOrdersPage() {
   };
 
   const handleCreateOrder = () => {
+    if (!currentClientId) {
+      toast({
+        title: "Erreur: Client non identifié",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!deliveryDate) {
       toast({
         title: "Veuillez sélectionner une date de livraison",
@@ -253,6 +289,8 @@ export default function ClientOrdersPage() {
       })),
     };
 
+    console.log("🔥 ORDER FORM DATA:", orderData);
+
     if (editingOrder) {
       updateOrderMutation.mutate({ id: editingOrder.id, ...orderData });
     } else {
@@ -265,10 +303,7 @@ export default function ClientOrdersPage() {
       setEditingOrder(order);
 
       // Charger les items de la commande
-      const response = await apiRequest(`/api/orders/${order.id}/items`, "GET");
-      const orderItems = Array.isArray(response)
-        ? response
-        : response?.data || [];
+      const orderItems = await apiRequest(`/api/orders/${order.id}/items`, "GET");
 
       const cartItems: CartItem[] = [];
 
@@ -280,14 +315,14 @@ export default function ClientOrdersPage() {
             cartItems.push({
               articleId: item.articleId,
               article: product,
-              quantity: parseFloat(item.quantity) || 1,
+              quantity: parseFloat(item.quantity?.toString() || "1"),
             });
           }
         }
       }
 
       setCart(cartItems);
-      setDeliveryDate(order.deliveryDate || "");
+      setDeliveryDate(order.deliveryDate?.split('T')[0] || "");
       setOrderNotes(order.notes || "");
       setCurrentView("cart");
     } catch (error) {
@@ -324,9 +359,10 @@ export default function ClientOrdersPage() {
     return new Date(dateString).toLocaleDateString("fr-FR");
   };
 
+  var result = <div></div>;
   // Vue principale des commandes
   if (currentView === "orders") {
-    return (
+    result = (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -423,7 +459,7 @@ export default function ClientOrdersPage() {
                       <div className="flex items-center gap-3 ml-4">
                         <div className="text-right">
                           <div className="text-lg font-bold text-orange-600">
-                            {parseFloat(order.totalTTC).toFixed(2)} DA
+                            {parseFloat(order.totalTTC?.toString() || "0").toFixed(2)} DA
                           </div>
                         </div>
 
@@ -472,7 +508,7 @@ export default function ClientOrdersPage() {
 
   // Vue boutique (catégories et produits côte à côte)
   if (currentView === "shop") {
-    return (
+    result = (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-6">
         <div className=" mx-auto">
           {/* Header */}
@@ -550,11 +586,7 @@ export default function ClientOrdersPage() {
                             <div className="font-medium">
                               {category.designation}
                             </div>
-                            {category.description && (
-                              <div className="text-xs opacity-75 line-clamp-1">
-                                {category.description}
-                              </div>
-                            )}
+                            {/* Les catégories n'ont pas de description pour l'instant */}
                           </div>
                         </div>
                       </button>
@@ -700,9 +732,9 @@ export default function ClientOrdersPage() {
 
   // Vue panier et finalisation
   if (currentView === "cart") {
-    return (
+    result = (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -946,5 +978,5 @@ export default function ClientOrdersPage() {
     );
   }
 
-  return null;
+  return <ClientLayout title="Gestion des Clients"> {result} </ClientLayout>;
 }

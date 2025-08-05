@@ -1,16 +1,16 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
-import { 
-  LayoutDashboard, 
-  Package, 
-  ChefHat, 
-  BookOpen, 
-  Factory, 
+import {
+  LayoutDashboard,
+  Package,
+  ChefHat,
+  BookOpen,
+  Factory,
   Warehouse,
-  ShoppingCart, 
-  Truck, 
-  Users, 
+  ShoppingCart,
+  Truck,
+  Users,
   Cake,
   LogOut,
   CheckCircle,
@@ -26,7 +26,7 @@ import {
   Settings,
   Mail,
   Leaf,
-  FileText
+  FileText,
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -51,41 +51,162 @@ export function Sidebar() {
   };
 
   const navItems = [
-    { path: "/", label: "Tableau de bord", icon: "fas fa-tachometer-alt", lucideIcon: LayoutDashboard },
-    { path: "/inventory", label: "Gestion de Stock", icon: "fas fa-boxes", lucideIcon: Package },
+    {
+      path: "/",
+      label: "Tableau de bord",
+      icon: "fas fa-tachometer-alt",
+      lucideIcon: LayoutDashboard,
+    },
+    {
+      path: "/inventory",
+      label: "Gestion de Stock",
+      icon: "fas fa-boxes",
+      lucideIcon: Package,
+    },
     // Ingrédients supprimés - utiliser Articles avec filtrage
     // Modules temporairement supprimés - à réimplémenter
-    { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
+    {
+      path: "/recipes",
+      label: "Recettes",
+      icon: "fas fa-book-open",
+      lucideIcon: BookOpen,
+    },
     // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
-    { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
-    { path: "/inventory-operations", label: "Opérations Stock", icon: "fas fa-warehouse", lucideIcon: Package },
-    { path: "/invoices", label: "Facturation", icon: "fas fa-file-invoice", lucideIcon: FileText },
-    { path: "/deliveries", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
-    { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
-    { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
-    { path: "/article-categories", label: "Catégories d'Articles", icon: "fas fa-folder-tree", lucideIcon: FolderTree },
-    { path: "/price-lists", label: "Listes de Prix", icon: "fas fa-dollar-sign", lucideIcon: DollarSign },
-    { path: "/taxes", label: "Taxes", icon: "fas fa-receipt", lucideIcon: Receipt },
-    { path: "/currencies", label: "Devises", icon: "fas fa-coins", lucideIcon: Coins },
-    { path: "/delivery-methods", label: "Méthodes de Livraison", icon: "fas fa-shipping-fast", lucideIcon: TruckIcon },
-    { path: "/accounting-journals", label: "Journaux Comptables", icon: "fas fa-book", lucideIcon: BookIcon },
-    { path: "/accounting-accounts", label: "Comptes Comptables", icon: "fas fa-calculator", lucideIcon: Calculator },
-    { path: "/storage-zones", label: "Zones de Stockage", icon: "fas fa-building", lucideIcon: Building },
-    { path: "/work-stations", label: "Postes de Travail", icon: "fas fa-cogs", lucideIcon: Settings },
-    { path: "/email-config", label: "Configuration Email", icon: "fas fa-envelope", lucideIcon: Mail },
-    { path: "/suppliers", label: "Fournisseurs", icon: "fas fa-truck", lucideIcon: Truck },
-    { path: "/clients", label: "Clients", icon: "fas fa-users", lucideIcon: Users },
-    { path: "/products", label: "Produits", icon: "fas fa-box", lucideIcon: Package },
-    { path: "/ingredients", label: "Ingrédients", icon: "fas fa-leaf", lucideIcon: Leaf },
+    {
+      path: "/orders",
+      label: "Commandes",
+      icon: "fas fa-shopping-cart",
+      lucideIcon: ShoppingCart,
+    },
+    {
+      path: "/client_orders",
+      label: "Commandes clients",
+      icon: "fas fa-shopping-cart",
+      lucideIcon: ShoppingCart,
+    },
+    {
+      path: "/inventory-operations",
+      label: "Opérations Stock",
+      icon: "fas fa-warehouse",
+      lucideIcon: Package,
+    },
+    {
+      path: "/invoices",
+      label: "Facturation",
+      icon: "fas fa-file-invoice",
+      lucideIcon: FileText,
+    },
+    {
+      path: "/deliveries",
+      label: "Livraisons",
+      icon: "fas fa-truck",
+      lucideIcon: Truck,
+    },
+    {
+      path: "/users",
+      label: "Utilisateurs",
+      icon: "fas fa-users",
+      lucideIcon: Users,
+    },
+    {
+      path: "/measurement-units",
+      label: "Unités de Mesure",
+      icon: "fas fa-balance-scale",
+      lucideIcon: Scale,
+    },
+    {
+      path: "/article-categories",
+      label: "Catégories d'Articles",
+      icon: "fas fa-folder-tree",
+      lucideIcon: FolderTree,
+    },
+    {
+      path: "/price-lists",
+      label: "Listes de Prix",
+      icon: "fas fa-dollar-sign",
+      lucideIcon: DollarSign,
+    },
+    {
+      path: "/taxes",
+      label: "Taxes",
+      icon: "fas fa-receipt",
+      lucideIcon: Receipt,
+    },
+    {
+      path: "/currencies",
+      label: "Devises",
+      icon: "fas fa-coins",
+      lucideIcon: Coins,
+    },
+    {
+      path: "/delivery-methods",
+      label: "Méthodes de Livraison",
+      icon: "fas fa-shipping-fast",
+      lucideIcon: TruckIcon,
+    },
+    {
+      path: "/accounting-journals",
+      label: "Journaux Comptables",
+      icon: "fas fa-book",
+      lucideIcon: BookIcon,
+    },
+    {
+      path: "/accounting-accounts",
+      label: "Comptes Comptables",
+      icon: "fas fa-calculator",
+      lucideIcon: Calculator,
+    },
+    {
+      path: "/storage-zones",
+      label: "Zones de Stockage",
+      icon: "fas fa-building",
+      lucideIcon: Building,
+    },
+    {
+      path: "/work-stations",
+      label: "Postes de Travail",
+      icon: "fas fa-cogs",
+      lucideIcon: Settings,
+    },
+    {
+      path: "/email-config",
+      label: "Configuration Email",
+      icon: "fas fa-envelope",
+      lucideIcon: Mail,
+    },
+    {
+      path: "/suppliers",
+      label: "Fournisseurs",
+      icon: "fas fa-truck",
+      lucideIcon: Truck,
+    },
+    {
+      path: "/clients",
+      label: "Clients",
+      icon: "fas fa-users",
+      lucideIcon: Users,
+    },
+    {
+      path: "/products",
+      label: "Produits",
+      icon: "fas fa-box",
+      lucideIcon: Package,
+    },
+    {
+      path: "/ingredients",
+      label: "Ingrédients",
+      icon: "fas fa-leaf",
+      lucideIcon: Leaf,
+    },
   ];
 
   // Filter navigation based on user role
-  const filteredNavItems = navItems.filter(item => {
+  const filteredNavItems = navItems.filter((item) => {
     if (!user) return false;
-    
+
     switch (user.role) {
       case "client":
-        return ["/"].includes(item.path); // Only dashboard for clients
+        return ["/", "/client_orders"].includes(item.path); // Only dashboard for clients
       case "livreur":
         return ["/"].includes(item.path); // Only dashboard for deliverers
       case "preparateur":
@@ -106,18 +227,40 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
           <div className="mr-3">
-            <svg width="32" height="32" viewBox="0 0 32 32" className="text-primary">
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 32 32"
+              className="text-primary"
+            >
               <defs>
-                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient
+                  id="logoGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
                   <stop offset="0%" stopColor="#ec4899" />
                   <stop offset="50%" stopColor="#f97316" />
                   <stop offset="100%" stopColor="#eab308" />
                 </linearGradient>
               </defs>
               {/* Chef hat */}
-              <path d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z" fill="url(#logoGradient)" />
+              <path
+                d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z"
+                fill="url(#logoGradient)"
+              />
               {/* Chef hat band */}
-              <rect x="8" y="18" width="16" height="2" fill="white" opacity="0.8" rx="1" />
+              <rect
+                x="8"
+                y="18"
+                width="16"
+                height="2"
+                fill="white"
+                opacity="0.8"
+                rx="1"
+              />
               {/* Decorative dots */}
               <circle cx="12" cy="12" r="1" fill="white" opacity="0.6" />
               <circle cx="17" cy="10" r="1" fill="white" opacity="0.6" />
@@ -129,7 +272,7 @@ export function Sidebar() {
             <p className="text-xs text-gray-500 font-medium">Gestion Pro</p>
           </div>
         </div>
-        
+
         {/* User Info */}
         {user && (
           <div className="mt-6 px-4">
@@ -162,17 +305,21 @@ export function Sidebar() {
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer"
                 }`}
               >
-                <item.lucideIcon className={`h-5 w-5 mr-3 ${isActive(item.path) ? "text-primary" : ""}`} />
+                <item.lucideIcon
+                  className={`h-5 w-5 mr-3 ${isActive(item.path) ? "text-primary" : ""}`}
+                />
                 {item.label}
               </div>
             </Link>
           ))}
         </nav>
-        
+
         {/* Storage Temperature Status */}
         <div className="px-4 pb-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">État des Stockages</h4>
+            <h4 className="text-sm font-medium text-blue-900 mb-2">
+              État des Stockages
+            </h4>
             <div className="space-y-1">
               {storageLocations?.map((location) => (
                 <div key={location.id} className="flex justify-between text-xs">
@@ -186,7 +333,7 @@ export function Sidebar() {
               ))}
             </div>
           </div>
-          
+
           {/* Logout button */}
           <button
             onClick={logout}
