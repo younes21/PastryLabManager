@@ -833,7 +833,7 @@ export class DatabaseStorage implements IStorage {
   async getRecipeOperations(recipeId: number): Promise<RecipeOperation[]> {
     return await db.select().from(recipeOperations)
       .where(eq(recipeOperations.recipeId, recipeId))
-      .orderBy(recipeOperations.stepOrder);
+      .orderBy(recipeOperations.order);
   }
 
   async createRecipeOperation(insertRecipeOperation: InsertRecipeOperation): Promise<RecipeOperation> {

@@ -864,10 +864,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recipes/:recipeId/ingredients", async (req, res) => {
     try {
       const recipeId = parseInt(req.params.recipeId);
-      const ingredientData = insertRecipeIngredientSchema.parse({ 
+      const ingredientData = { 
         ...req.body, 
         recipeId 
-      });
+      };
       const ingredient = await storage.createRecipeIngredient(ingredientData);
       res.status(201).json(ingredient);
     } catch (error) {
@@ -920,10 +920,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recipes/:recipeId/operations", async (req, res) => {
     try {
       const recipeId = parseInt(req.params.recipeId);
-      const operationData = insertRecipeOperationSchema.parse({ 
+      const operationData = { 
         ...req.body, 
         recipeId 
-      });
+      };
       const operation = await storage.createRecipeOperation(operationData);
       res.status(201).json(operation);
     } catch (error) {
