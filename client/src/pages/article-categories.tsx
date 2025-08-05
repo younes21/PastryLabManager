@@ -36,8 +36,7 @@ export default function ArticleCategories() {
   // Create category mutation
   const createCategoryMutation = useMutation({
     mutationFn: async (data: InsertArticleCategory) => {
-      const response = await apiRequest("POST", "/api/article-categories", data);
-      return response.json();
+      return await apiRequest("/api/article-categories", "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/article-categories"] });
@@ -60,8 +59,7 @@ export default function ArticleCategories() {
   // Update category mutation
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertArticleCategory> }) => {
-      const response = await apiRequest("PUT", `/api/article-categories/${id}`, data);
-      return response.json();
+      return await apiRequest(`/api/article-categories/${id}`, "PUT", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/article-categories"] });
@@ -84,8 +82,7 @@ export default function ArticleCategories() {
   // Delete category mutation
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/article-categories/${id}`);
-      return response.json();
+      return await apiRequest(`/api/article-categories/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/article-categories"] });

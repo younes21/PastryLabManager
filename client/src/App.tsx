@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Layout } from "@/components/layout";
 import { useState, lazy } from "react";
+import ClientOrdersPage from "./pages/orders-clients";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -58,11 +59,11 @@ function LoginPage() {
     setError("");
 
     const success = await login(username, password);
-    
+
     if (!success) {
       setError("Nom d'utilisateur ou mot de passe incorrect");
     }
-    
+
     setIsLoading(false);
   };
 
@@ -89,7 +90,7 @@ function LoginPage() {
                 required
               />
             </div>
-            
+
             <div>
               <Label htmlFor="password">Mot de passe</Label>
               <Input
@@ -101,9 +102,7 @@ function LoginPage() {
               />
             </div>
 
-            {error && (
-              <div className="text-red-600 text-sm">{error}</div>
-            )}
+            {error && <div className="text-red-600 text-sm">{error}</div>}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Connexion..." : "Se connecter"}
@@ -172,6 +171,7 @@ function ProtectedRouter() {
       <Route path="/products" component={Products} />
       <Route path="/ingredients" component={IngredientsNew} />
       <Route path="/orders" component={OrdersPage} />
+      <Route path="/client_orders" component={ClientOrdersPage} />
       <Route path="/inventory-operations" component={InventoryOperationsPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/deliveries" component={DeliveriesPage} />
