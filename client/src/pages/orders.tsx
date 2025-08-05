@@ -123,8 +123,8 @@ export default function OrdersPage() {
     .filter((order) => {
       const matchesSearch = order.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            getClientName(order.clientId).toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = !filterStatus || order.status === filterStatus;
-      const matchesType = !filterType || order.type === filterType;
+      const matchesStatus = !filterStatus || filterStatus === "all" || order.status === filterStatus;
+      const matchesType = !filterType || filterType === "all" || order.type === filterType;
       return matchesSearch && matchesStatus && matchesType;
     })
     .sort((a, b) => {
@@ -274,7 +274,7 @@ export default function OrdersPage() {
                 <SelectValue placeholder="Filtrer par statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tous les statuts</SelectItem>
+                <SelectItem value="all">Tous les statuts</SelectItem>
                 {Object.entries(orderStatusLabels).map(([status, label]) => (
                   <SelectItem key={status} value={status}>
                     {label}
@@ -288,7 +288,7 @@ export default function OrdersPage() {
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tous les types</SelectItem>
+                <SelectItem value="all">Tous les types</SelectItem>
                 <SelectItem value="quote">Devis</SelectItem>
                 <SelectItem value="order">Commande</SelectItem>
               </SelectContent>

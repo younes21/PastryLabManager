@@ -34,6 +34,9 @@ import Clients from "@/pages/clients-new";
 import Products from "@/pages/products";
 import IngredientsNew from "@/pages/ingredients-new";
 import OrdersPage from "@/pages/orders";
+import InventoryOperationsPage from "@/pages/inventory-operations";
+import InvoicesPage from "@/pages/invoices";
+import DeliveriesPage from "@/pages/deliveries";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -169,6 +172,9 @@ function ProtectedRouter() {
       <Route path="/products" component={Products} />
       <Route path="/ingredients" component={IngredientsNew} />
       <Route path="/orders" component={OrdersPage} />
+      <Route path="/inventory-operations" component={InventoryOperationsPage} />
+      <Route path="/invoices" component={InvoicesPage} />
+      <Route path="/deliveries" component={DeliveriesPage} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route component={NotFound} />
     </Switch>

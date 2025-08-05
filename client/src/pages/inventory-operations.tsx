@@ -73,10 +73,7 @@ export default function InventoryOperationsPage() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/inventory-operations", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("/api/inventory-operations", "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
@@ -89,10 +86,7 @@ export default function InventoryOperationsPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      return await apiRequest(`/api/inventory-operations/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
+      return await apiRequest(`/api/inventory-operations/${id}`, "PUT", { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
@@ -107,8 +101,8 @@ export default function InventoryOperationsPage() {
   const filteredAndSortedOperations = operations
     .filter((operation) => {
       const matchesSearch = operation.code.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = !filterStatus || operation.status === filterStatus;
-      const matchesType = !filterType || operation.type === filterType;
+      const matchesStatus = !filterStatus || filterStatus === "all" || operation.status === filterStatus;
+      const matchesType = !filterType || filterType === "all" || operation.type === filterType;
       return matchesSearch && matchesStatus && matchesType;
     })
     .sort((a, b) => {
@@ -184,7 +178,7 @@ export default function InventoryOperationsPage() {
                 <SelectValue placeholder="Filtrer par statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tous les statuts</SelectItem>
+                <SelectItem value="all">Tous les statuts</SelectItem>
                 {Object.entries(operationStatusLabels).map(([status, label]) => (
                   <SelectItem key={status} value={status}>
                     {label}
@@ -198,7 +192,7 @@ export default function InventoryOperationsPage() {
                 <SelectValue placeholder="Type d'opération" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tous les types</SelectItem>
+                <SelectItem value="all">Tous les types</SelectItem>
                 {Object.entries(operationTypeLabels).map(([type, label]) => (
                   <SelectItem key={type} value={type}>
                     {label}

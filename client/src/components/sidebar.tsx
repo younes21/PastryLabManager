@@ -25,7 +25,8 @@ import {
   Building,
   Settings,
   Mail,
-  Leaf
+  Leaf,
+  FileText
 } from "lucide-react";
 import { storageLocations } from "@/../../shared/schema";
 
@@ -57,7 +58,9 @@ export function Sidebar() {
     { path: "/recipes", label: "Recettes", icon: "fas fa-book-open", lucideIcon: BookOpen },
     // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
     { path: "/orders", label: "Commandes", icon: "fas fa-shopping-cart", lucideIcon: ShoppingCart },
-    // { path: "/delivery", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
+    { path: "/inventory-operations", label: "Opérations Stock", icon: "fas fa-warehouse", lucideIcon: Package },
+    { path: "/invoices", label: "Facturation", icon: "fas fa-file-invoice", lucideIcon: FileText },
+    { path: "/deliveries", label: "Livraisons", icon: "fas fa-truck", lucideIcon: Truck },
     { path: "/users", label: "Utilisateurs", icon: "fas fa-users", lucideIcon: Users },
     { path: "/measurement-units", label: "Unités de Mesure", icon: "fas fa-balance-scale", lucideIcon: Scale },
     { path: "/article-categories", label: "Catégories d'Articles", icon: "fas fa-folder-tree", lucideIcon: FolderTree },
