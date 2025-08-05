@@ -21,6 +21,7 @@ import {
   Factory
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { InventoryOperationForm } from "@/components/forms/inventory-operation-form";
 import type { InventoryOperation } from "@shared/schema";
 
 const operationTypeLabels = {
@@ -145,10 +146,7 @@ export default function InventoryOperationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button data-testid="button-create-operation">
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvelle opération
-          </Button>
+          <InventoryOperationForm />
         </div>
       </div>
 

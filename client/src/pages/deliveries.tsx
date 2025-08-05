@@ -23,6 +23,7 @@ import {
   MapPin
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { DeliveryForm } from "@/components/forms/delivery-form";
 import type { Delivery, Order, Client } from "@shared/schema";
 
 const deliveryStatusLabels = {
@@ -126,7 +127,7 @@ export default function DeliveriesPage() {
 
   const getDeliveryPersonName = (deliveryPersonId: number | null) => {
     if (!deliveryPersonId) return "-";
-    const user = users.find((u: any) => u.id === deliveryPersonId);
+    const user = (users as any[]).find((u: any) => u.id === deliveryPersonId);
     return user?.username || "Livreur inconnu";
   };
 
@@ -168,10 +169,7 @@ export default function DeliveriesPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button data-testid="button-create-delivery">
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvelle livraison
-          </Button>
+          <DeliveryForm />
         </div>
       </div>
 

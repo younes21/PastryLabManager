@@ -21,6 +21,7 @@ import {
   User
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { OrderForm } from "@/components/forms/order-form";
 import type { Order, Client, Article } from "@shared/schema";
 
 const orderStatusLabels = {
@@ -72,10 +73,7 @@ export default function OrdersPage() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/orders", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("/api/orders", "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -89,10 +87,7 @@ export default function OrdersPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      return await apiRequest(`/api/orders/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
+      return await apiRequest(`/api/orders/${id}`, "PUT", { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -105,9 +100,7 @@ export default function OrdersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/orders/${id}`, {
-        method: "DELETE",
-      });
+      return await apiRequest(`/api/orders/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -241,10 +234,7 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleCreate} data-testid="button-create-order">
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvelle commande
-          </Button>
+          <OrderForm />
         </div>
       </div>
 
@@ -402,8 +392,8 @@ export default function OrdersPage() {
                       </div>
                     </TableCell>
                     <TableCell>{getClientPhone(order.clientId)}</TableCell>
-                    <TableCell>{formatDate(order.orderDate)}</TableCell>
-                    <TableCell>{formatDate(order.deliveryDate)}</TableCell>
+                    <TableCell>{formatDate(order.orderDate || null)}</TableCell>
+                    <TableCell>{formatDate(order.deliveryDate || null)}</TableCell>
                     <TableCell className="font-semibold">
                       {parseFloat(order.totalTTC).toFixed(2)} DA
                     </TableCell>

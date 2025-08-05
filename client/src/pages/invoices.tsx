@@ -23,6 +23,7 @@ import {
   Euro
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { InvoiceForm } from "@/components/forms/invoice-form";
 import type { Invoice, Client } from "@shared/schema";
 
 const invoiceStatusLabels = {
@@ -159,10 +160,7 @@ export default function InvoicesPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button data-testid="button-create-invoice">
-            <Plus className="h-4 w-4 mr-2" />
-            Nouvelle facture
-          </Button>
+          <InvoiceForm />
         </div>
       </div>
 
@@ -302,7 +300,7 @@ export default function InvoicesPage() {
                       </div>
                     </TableCell>
                     <TableCell>{formatDate(invoice.issueDate)}</TableCell>
-                    <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                    <TableCell>{formatDate(invoice.dueDate || null)}</TableCell>
                     <TableCell className="font-semibold">
                       {parseFloat(invoice.totalTTC).toFixed(2)} DA
                     </TableCell>
