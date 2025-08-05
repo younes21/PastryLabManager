@@ -82,18 +82,11 @@ export default function ClientOrdersPage() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   // Récupérer le client connecté via son userId
-  const { data: currentUser } = useQuery({
-    queryKey: ["/api/auth/me"],
-  });
-
-  const { data: currentClient } = useQuery({
-    queryKey: ["/api/clients"],
-    select: (data: Client[]) => 
-      data?.find((client: Client) => client.userId === (currentUser as any)?.id),
-    enabled: !!(currentUser as any)?.id,
-  });
-
-  const currentClientId = currentClient?.id;
+  const storedUser = localStorage.getItem("user");
+  let currentClientId = null;
+  if (storedUser) {
+    currentClientId = JSON.parse(storedUser)?.id;
+  }
 
   // Queries
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
@@ -125,7 +118,7 @@ export default function ClientOrdersPage() {
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: OrderFormData) => {
       console.log("🔥 CREATING ORDER - Data:", orderData);
-      
+
       const order = await apiRequest("/api/orders", "POST", {
         type: "order",
         clientId: orderData.clientId,
@@ -165,7 +158,7 @@ export default function ClientOrdersPage() {
   const updateOrderMutation = useMutation({
     mutationFn: async (orderData: { id: number } & OrderFormData) => {
       console.log("🔥 UPDATING ORDER - Data:", orderData);
-      
+
       const order = await apiRequest(`/api/orders/${orderData.id}`, "PUT", {
         deliveryDate: orderData.deliveryDate,
         notes: orderData.notes,
@@ -176,7 +169,7 @@ export default function ClientOrdersPage() {
 
       // Note: Pour la mise à jour des items, on devrait avoir une route spécifique
       // ou gérer les items individuellement. Pour l'instant, on ne peut que créer de nouveaux items.
-      
+
       for (const item of orderData.items) {
         console.log("🔥 ADDING/UPDATING ORDER ITEM:", item);
         await apiRequest(`/api/orders/${orderData.id}/items`, "POST", {
@@ -303,7 +296,10 @@ export default function ClientOrdersPage() {
       setEditingOrder(order);
 
       // Charger les items de la commande
-      const orderItems = await apiRequest(`/api/orders/${order.id}/items`, "GET");
+      const orderItems = await apiRequest(
+        `/api/orders/${order.id}/items`,
+        "GET",
+      );
 
       const cartItems: CartItem[] = [];
 
@@ -322,7 +318,7 @@ export default function ClientOrdersPage() {
       }
 
       setCart(cartItems);
-      setDeliveryDate(order.deliveryDate?.split('T')[0] || "");
+      setDeliveryDate(order.deliveryDate?.split("T")[0] || "");
       setOrderNotes(order.notes || "");
       setCurrentView("cart");
     } catch (error) {
@@ -459,7 +455,10 @@ export default function ClientOrdersPage() {
                       <div className="flex items-center gap-3 ml-4">
                         <div className="text-right">
                           <div className="text-lg font-bold text-orange-600">
-                            {parseFloat(order.totalTTC?.toString() || "0").toFixed(2)} DA
+                            {parseFloat(
+                              order.totalTTC?.toString() || "0",
+                            ).toFixed(2)}{" "}
+                            DA
                           </div>
                         </div>
 
