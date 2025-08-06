@@ -915,6 +915,11 @@ export class DatabaseStorage implements IStorage {
     const [client] = await db.select().from(clients).where(eq(clients.id, id));
     return client || undefined;
   }
+  
+  async getClientIdByUserId(id: number): Promise<number | undefined> {
+     const [client]= await db.select({idClient:clients.id}).from(clients).where(eq(clients.userId, id));
+    return client?.idClient || undefined;
+  }
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     // Generate automatic code
@@ -975,6 +980,73 @@ export class DatabaseStorage implements IStorage {
     
     const [order] = await db.insert(orders).values(orderData).returning();
     return order;
+  }
+  
+  async createOrderWithItems(insertOrder: InsertOrder,items: InsertOrderItem[]): Promise<Order> {
+        insertOrder.subtotalHT = items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();    
+        insertOrder.totalTax = items.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
+        insertOrder.totalTTC = insertOrder.subtotalHT + insertOrder.totalTax ;
+    
+    return await db.transaction(async (tx) => {
+      const prefix = insertOrder.type === "quote" ? "DEV" : "CMD";
+      const existingOrders = await tx.select().from(orders);
+      const nextNumber = existingOrders.length + 1;
+      const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
+
+      const [order] = await tx
+        .insert(orders)
+        .values({ ...insertOrder, code })
+        .returning();
+
+      const orderItemsToInsert = items.map((item) => ({
+        ...item,
+        orderId: order.id,
+      }));
+
+      await tx.insert(orderItems).values(orderItemsToInsert);
+                  
+      return order;
+    });
+  }
+
+  
+  async updateOrderWithItems(
+    orderId: number,
+    updatedOrder: Partial<InsertOrder>,
+    updatedItems: InsertOrderItem[]
+  ): Promise<Order> {
+    return await db.transaction(async (tx) => {
+      // 1. Vérifier que la commande existe
+      const existing = await tx.query.orders.findFirst({
+        where: (orders, { eq }) => eq(orders.id, orderId),
+      });
+
+      if (!existing) {
+        throw new Error("Commande introuvable");
+      }
+      updatedOrder.subtotalHT = updatedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();    
+      updatedOrder.totalTax = updatedItems.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
+      updatedOrder.totalTTC = updatedOrder.subtotalHT + updatedOrder.totalTax ;
+      // 2. Mise à jour de la commande
+      await tx.update(orders)
+        .set({ ...updatedOrder, updatedAt: new Date().toISOString() })
+        .where(eq(orders.id, orderId));
+
+      // 3. Supprimer les lignes existantes
+      await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+
+      // 4. Ajouter les nouvelles lignes
+      const itemsToInsert = updatedItems.map(item => ({
+        ...item,
+        orderId,
+      }));
+
+      await tx.insert(orderItems).values(itemsToInsert);
+
+      // 5. Retourner la commande mise à jour
+      const [updated] = await tx.select().from(orders).where(eq(orders.id, orderId));
+      return updated;
+    });
   }
 
   async updateOrder(id: number, updateData: Partial<InsertOrder>): Promise<Order | undefined> {

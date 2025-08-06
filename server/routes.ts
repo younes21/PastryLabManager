@@ -2,16 +2,36 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { 
-  insertUserSchema, insertStorageLocationSchema,
-  insertMeasurementCategorySchema, insertMeasurementUnitSchema, insertArticleCategorySchema, 
-  insertArticleSchema, insertPriceListSchema, insertPriceRuleSchema, insertTaxSchema, 
-  insertCurrencySchema, insertDeliveryMethodSchema, insertAccountingJournalSchema, 
-  insertAccountingAccountSchema, insertStorageZoneSchema, insertWorkStationSchema, 
-  insertSupplierSchema, insertClientSchema, insertRecipeSchema, insertRecipeIngredientSchema, 
-  insertRecipeOperationSchema, insertOrderSchema, insertOrderItemSchema, 
-  insertInventoryOperationSchema, insertInventoryOperationItemSchema, insertDeliverySchema, 
-  insertInvoiceSchema, insertInvoiceItemSchema
+import {
+  insertUserSchema,
+  insertStorageLocationSchema,
+  insertMeasurementCategorySchema,
+  insertMeasurementUnitSchema,
+  insertArticleCategorySchema,
+  insertArticleSchema,
+  insertPriceListSchema,
+  insertPriceRuleSchema,
+  insertTaxSchema,
+  insertCurrencySchema,
+  insertDeliveryMethodSchema,
+  insertAccountingJournalSchema,
+  insertAccountingAccountSchema,
+  insertStorageZoneSchema,
+  insertWorkStationSchema,
+  insertSupplierSchema,
+  insertClientSchema,
+  insertRecipeSchema,
+  insertRecipeIngredientSchema,
+  insertRecipeOperationSchema,
+  insertOrderSchema,
+  insertOrderItemSchema,
+  insertInventoryOperationSchema,
+  insertInventoryOperationItemSchema,
+  insertDeliverySchema,
+  insertInvoiceSchema,
+  insertInvoiceItemSchema,
+  insertOrderWithItemsSchema,
+  updateOrderWithItemsSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -21,14 +41,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username);
-      
+
       if (!user || user.password !== password) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
+
+      // get user client id if exists
+      let clientId = null;
+      if (user.role == "client") {
+        clientId = await storage.getClientIdByUserId(user.id);
+      }
+      res.json({ user: userWithoutPassword, clientId: clientId });
     } catch (error) {
       res.status(500).json({ message: "Login failed" });
     }
@@ -86,17 +112,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Articles avec stock faible (type="ingredient")
       const lowStockArticles = await storage.getAllArticles();
-      const lowStockCount = lowStockArticles.filter(article => 
-        article.type === "ingredient" && 
-        article.managedInStock && 
-        parseFloat(article.currentStock || "0") < parseFloat(article.minStock || "0")
+      const lowStockCount = lowStockArticles.filter(
+        (article) =>
+          article.type === "ingredient" &&
+          article.managedInStock &&
+          parseFloat(article.currentStock || "0") <
+            parseFloat(article.minStock || "0"),
       ).length;
-      
+
       res.json({
         lowStockCount,
         activeOrdersCount: 0, // À reimplémenter
         todayProductionCount: 0, // À reimplémenter
-        dailyRevenue: "0.00" // À reimplémenter
+        dailyRevenue: "0.00", // À reimplémenter
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
@@ -109,7 +137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const categories = await storage.getAllMeasurementCategories();
       res.json(categories);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch measurement categories" });
+      res
+        .status(500)
+        .json({ message: "Failed to fetch measurement categories" });
     }
   });
 
@@ -127,15 +157,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const categoryData = req.body;
-      const category = await storage.updateMeasurementCategory(id, categoryData);
-      
+      const category = await storage.updateMeasurementCategory(
+        id,
+        categoryData,
+      );
+
       if (!category) {
-        return res.status(404).json({ message: "Measurement category not found" });
+        return res
+          .status(404)
+          .json({ message: "Measurement category not found" });
       }
 
       res.json(category);
     } catch (error) {
-      res.status(400).json({ message: "Failed to update measurement category" });
+      res
+        .status(400)
+        .json({ message: "Failed to update measurement category" });
     }
   });
 
@@ -143,14 +180,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteMeasurementCategory(id);
-      
+
       if (!deleted) {
-        return res.status(404).json({ message: "Measurement category not found" });
+        return res
+          .status(404)
+          .json({ message: "Measurement category not found" });
       }
 
       res.json({ message: "Measurement category deleted successfully" });
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete measurement category" });
+      res
+        .status(500)
+        .json({ message: "Failed to delete measurement category" });
     }
   });
 
@@ -179,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const unitData = req.body;
       const unit = await storage.updateMeasurementUnit(id, unitData);
-      
+
       if (!unit) {
         return res.status(404).json({ message: "Measurement unit not found" });
       }
@@ -194,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteMeasurementUnit(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Measurement unit not found" });
       }
@@ -230,7 +271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const categoryData = req.body;
       const category = await storage.updateArticleCategory(id, categoryData);
-      
+
       if (!category) {
         return res.status(404).json({ message: "Article category not found" });
       }
@@ -245,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteArticleCategory(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Article category not found" });
       }
@@ -301,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const taxData = req.body;
       const tax = await storage.updateTax(id, taxData);
-      
+
       if (!tax) {
         return res.status(404).json({ message: "Tax not found" });
       }
@@ -316,7 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteTax(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Tax not found" });
       }
@@ -353,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const currency = await storage.setBaseCurrency(id);
-      
+
       if (!currency) {
         return res.status(404).json({ message: "Currency not found" });
       }
@@ -379,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const currencyData = req.body;
       const currency = await storage.updateCurrency(id, currencyData);
-      
+
       if (!currency) {
         return res.status(404).json({ message: "Currency not found" });
       }
@@ -394,7 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteCurrency(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Currency not found" });
       }
@@ -418,7 +459,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/delivery-methods", async (req, res) => {
     try {
       const deliveryMethodData = insertDeliveryMethodSchema.parse(req.body);
-      const deliveryMethod = await storage.createDeliveryMethod(deliveryMethodData);
+      const deliveryMethod =
+        await storage.createDeliveryMethod(deliveryMethodData);
       res.status(201).json(deliveryMethod);
     } catch (error) {
       res.status(400).json({ message: "Invalid delivery method data" });
@@ -485,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Work Stations routes  
+  // Work Stations routes
   app.get("/api/work-stations", async (req, res) => {
     try {
       const workStations = await storage.getAllWorkStations();
@@ -539,11 +581,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const client = await storage.getClient(id);
-      
+
       if (!client) {
         return res.status(404).json({ message: "Client not found" });
       }
-      
+
       res.json(client);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch client" });
@@ -565,7 +607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const clientData = req.body;
       const client = await storage.updateClient(id, clientData);
-      
+
       if (!client) {
         return res.status(404).json({ message: "Client not found" });
       }
@@ -580,7 +622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteClient(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Client not found" });
       }
@@ -608,7 +650,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(ingredients);
     } catch (error) {
       console.error("Error fetching low stock ingredients:", error);
-      res.status(500).json({ message: "Failed to fetch low stock ingredients" });
+      res
+        .status(500)
+        .json({ message: "Failed to fetch low stock ingredients" });
     }
   });
 
@@ -653,7 +697,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/ingredients/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log("PATCH /api/ingredients/:id called with:", { id, body: req.body });
+      console.log("PATCH /api/ingredients/:id called with:", {
+        id,
+        body: req.body,
+      });
       const updatedIngredient = await storage.updateIngredient(id, req.body);
       if (!updatedIngredient) {
         return res.status(404).json({ message: "Ingredient not found" });
@@ -707,28 +754,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/articles", async (req, res) => {
     try {
-      console.log("🔥 CREATE ARTICLE - Request body:", JSON.stringify(req.body, null, 2));
+      console.log(
+        "🔥 CREATE ARTICLE - Request body:",
+        JSON.stringify(req.body, null, 2),
+      );
       const articleData = insertArticleSchema.parse(req.body);
-      
+
       // Generate automatic code based on type
       let code = "";
       if (articleData.type === "product") {
         const existingProducts = await storage.getAllArticles();
-        const productCount = existingProducts.filter(a => a.type === "product").length;
-        code = `PRD-${String(productCount + 1).padStart(6, '0')}`;
+        const productCount = existingProducts.filter(
+          (a) => a.type === "product",
+        ).length;
+        code = `PRD-${String(productCount + 1).padStart(6, "0")}`;
       } else if (articleData.type === "ingredient") {
         const existingIngredients = await storage.getAllArticles();
-        const ingredientCount = existingIngredients.filter(a => a.type === "ingredient").length;
-        code = `ING-${String(ingredientCount + 1).padStart(6, '0')}`;
+        const ingredientCount = existingIngredients.filter(
+          (a) => a.type === "ingredient",
+        ).length;
+        code = `ING-${String(ingredientCount + 1).padStart(6, "0")}`;
       } else if (articleData.type === "service") {
         const existingServices = await storage.getAllArticles();
-        const serviceCount = existingServices.filter(a => a.type === "service").length;
-        code = `SRV-${String(serviceCount + 1).padStart(6, '0')}`;
+        const serviceCount = existingServices.filter(
+          (a) => a.type === "service",
+        ).length;
+        code = `SRV-${String(serviceCount + 1).padStart(6, "0")}`;
       }
-      
+
       const articleWithCode = { ...articleData, code };
       const article = await storage.createArticle(articleWithCode);
-      console.log("✅ CREATE ARTICLE - Success:", JSON.stringify(article, null, 2));
+      console.log(
+        "✅ CREATE ARTICLE - Success:",
+        JSON.stringify(article, null, 2),
+      );
       res.status(201).json(article);
     } catch (error) {
       console.error("❌ CREATE ARTICLE - Error:", error);
@@ -739,15 +798,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/articles/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log("🔥 UPDATE ARTICLE - ID:", id, "Data:", JSON.stringify(req.body, null, 2));
+      console.log(
+        "🔥 UPDATE ARTICLE - ID:",
+        id,
+        "Data:",
+        JSON.stringify(req.body, null, 2),
+      );
       const articleData = insertArticleSchema.parse(req.body);
       const article = await storage.updateArticle(id, articleData);
-      
+
       if (!article) {
         return res.status(404).json({ message: "Article not found" });
       }
-      
-      console.log("✅ UPDATE ARTICLE - Success:", JSON.stringify(article, null, 2));
+
+      console.log(
+        "✅ UPDATE ARTICLE - Success:",
+        JSON.stringify(article, null, 2),
+      );
       res.json(article);
     } catch (error) {
       console.error("❌ UPDATE ARTICLE - Error:", error);
@@ -760,11 +827,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       console.log("🔥 DELETE ARTICLE - ID:", id);
       const deleted = await storage.deleteArticle(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Article not found" });
       }
-      
+
       console.log("✅ DELETE ARTICLE - Success");
       res.json({ message: "Article deleted successfully" });
     } catch (error) {
@@ -803,7 +870,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const articleId = parseInt(req.params.articleId);
       const recipe = await storage.getRecipeByArticleId(articleId);
       if (!recipe) {
-        return res.status(404).json({ message: "Recipe not found for this article" });
+        return res
+          .status(404)
+          .json({ message: "Recipe not found for this article" });
       }
       res.json(recipe);
     } catch (error) {
@@ -814,9 +883,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/recipes", async (req, res) => {
     try {
-      console.log("🔥 CREATE RECIPE - Request body:", JSON.stringify(req.body, null, 2));
+      console.log(
+        "🔥 CREATE RECIPE - Request body:",
+        JSON.stringify(req.body, null, 2),
+      );
       const newRecipe = await storage.createRecipe(req.body);
-      console.log("✅ CREATE RECIPE - Success:", JSON.stringify(newRecipe, null, 2));
+      console.log(
+        "✅ CREATE RECIPE - Success:",
+        JSON.stringify(newRecipe, null, 2),
+      );
       res.status(201).json(newRecipe);
     } catch (error) {
       console.error("❌ CREATE RECIPE - Error:", error);
@@ -867,9 +942,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recipes/:recipeId/ingredients", async (req, res) => {
     try {
       const recipeId = parseInt(req.params.recipeId);
-      const ingredientData = { 
-        ...req.body, 
-        recipeId 
+      const ingredientData = {
+        ...req.body,
+        recipeId,
       };
       const ingredient = await storage.createRecipeIngredient(ingredientData);
       res.status(201).json(ingredient);
@@ -923,9 +998,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recipes/:recipeId/operations", async (req, res) => {
     try {
       const recipeId = parseInt(req.params.recipeId);
-      const operationData = { 
-        ...req.body, 
-        recipeId 
+      const operationData = {
+        ...req.body,
+        recipeId,
       };
       const operation = await storage.createRecipeOperation(operationData);
       res.status(201).json(operation);
@@ -965,7 +1040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============ COMMANDES & DEVIS ROUTES ============
-  
+
   // Orders/Quotes
   app.get("/api/orders", async (req, res) => {
     try {
@@ -1000,10 +1075,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating order:", error);
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid order data", errors: error.errors });
+        res
+          .status(400)
+          .json({ message: "Invalid order data", errors: error.errors });
       } else {
         res.status(500).json({ message: "Failed to create order" });
       }
+    }
+  });
+  app.post("/api/ordersWithItems", async (req, res) => {
+    try {
+      const payload = insertOrderWithItemsSchema.parse(req.body);
+      const { order, items } = payload;
+
+      const result = await storage.createOrderWithItems(order, items);
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Erreur création commande:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          message: "Données invalides",
+          errors: error.errors,
+        });
+      } else {
+        res.status(500).json({
+          message: "Échec de la création de la commande",
+        });
+      }
+    }
+  });
+  app.put("/api/ordersWithItems/:id", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id, 10);
+      if (isNaN(orderId)) {
+        return res.status(400).json({ message: "ID de commande invalide" });
+      }
+
+      const data = updateOrderWithItemsSchema.parse(req.body);
+      const { order, items } = data;
+
+      const updatedOrder = await storage.updateOrderWithItems(orderId, order, items);
+      res.json({ message: "Commande mise à jour avec succès", order: updatedOrder });
+
+    } catch (error) {
+      console.error("Erreur mise à jour commande:", error);
+
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Données invalides",
+          errors: error.errors,
+        });
+      }
+
+      res.status(500).json({ message: "Échec de la mise à jour de la commande" });
     }
   });
 
@@ -1066,7 +1191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============ OPERATIONS D'INVENTAIRE ROUTES ============
-  
+
   app.get("/api/inventory-operations", async (req, res) => {
     try {
       const { type } = req.query;
@@ -1091,15 +1216,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating inventory operation:", error);
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid operation data", errors: error.errors });
+        res
+          .status(400)
+          .json({ message: "Invalid operation data", errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to create inventory operation" });
+        res
+          .status(500)
+          .json({ message: "Failed to create inventory operation" });
       }
     }
   });
 
   // ============ LIVRAISONS ROUTES ============
-  
+
   app.get("/api/deliveries", async (req, res) => {
     try {
       const deliveries = await storage.getAllDeliveries();
@@ -1122,7 +1251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============ FACTURATION ROUTES ============
-  
+
   app.get("/api/invoices", async (req, res) => {
     try {
       const invoices = await storage.getAllInvoices();

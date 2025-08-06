@@ -85,7 +85,8 @@ export default function ClientOrdersPage() {
   const storedUser = localStorage.getItem("user");
   let currentClientId = null;
   if (storedUser) {
-    currentClientId = JSON.parse(storedUser)?.id;
+    currentClientId = JSON.parse(storedUser)?.clientId;
+    console.log("client id for this user ", currentClientId);
   }
 
   // Queries
@@ -95,7 +96,6 @@ export default function ClientOrdersPage() {
       data?.filter((order: Order) => order.clientId === currentClientId),
     enabled: !!currentClientId,
   });
-
   const { data: categories = [] } = useQuery<ArticleCategory[]>({
     queryKey: ["/api/article-categories"],
     select: (data) =>
@@ -119,26 +119,18 @@ export default function ClientOrdersPage() {
     mutationFn: async (orderData: OrderFormData) => {
       console.log("🔥 CREATING ORDER - Data:", orderData);
 
-      const order = await apiRequest("/api/orders", "POST", {
-        type: "order",
-        clientId: orderData.clientId,
-        deliveryDate: orderData.deliveryDate,
-        notes: orderData.notes,
-        status: "draft",
+      const order = await apiRequest("/api/ordersWithItems", "POST", {
+        order: {
+          type: "order",
+          clientId: orderData.clientId,
+          deliveryDate: orderData.deliveryDate,
+          notes: orderData.notes,
+          status: "draft",
+        },
+        items: orderData.items.map((f) => ({ orderId: 0, ...f })),
       });
 
       console.log("🔥 ORDER CREATED - Order:", order);
-
-      // Ajouter les items de commande
-      for (const item of orderData.items) {
-        console.log("🔥 ADDING ORDER ITEM:", item);
-        await apiRequest(`/api/orders/${order.id}/items`, "POST", {
-          articleId: item.articleId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-        });
-      }
 
       return order;
     },
@@ -158,27 +150,20 @@ export default function ClientOrdersPage() {
   const updateOrderMutation = useMutation({
     mutationFn: async (orderData: { id: number } & OrderFormData) => {
       console.log("🔥 UPDATING ORDER - Data:", orderData);
-
-      const order = await apiRequest(`/api/orders/${orderData.id}`, "PUT", {
-        deliveryDate: orderData.deliveryDate,
-        notes: orderData.notes,
-        status: "draft", // Maintenir le statut draft lors de l'édition
-      });
-
-      console.log("🔥 ORDER UPDATED - Order:", order);
-
-      // Note: Pour la mise à jour des items, on devrait avoir une route spécifique
-      // ou gérer les items individuellement. Pour l'instant, on ne peut que créer de nouveaux items.
-
-      for (const item of orderData.items) {
-        console.log("🔥 ADDING/UPDATING ORDER ITEM:", item);
-        await apiRequest(`/api/orders/${orderData.id}/items`, "POST", {
-          articleId: item.articleId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-        });
-      }
+      const order = await apiRequest(
+        `/api/ordersWithItems/${orderData.id}`,
+        "PUT",
+        {
+          order: {
+            type: "order",
+            clientId: orderData.clientId,
+            deliveryDate: orderData.deliveryDate,
+            notes: orderData.notes,
+            status: "draft",
+          },
+          items: orderData.items.map((f) => ({ orderId: 0, ...f })),
+        },
+      );
 
       return order;
     },
@@ -253,6 +238,14 @@ export default function ClientOrdersPage() {
     }, 0);
   };
 
+  const createOrder = () => {
+    setCurrentView("shop");
+     setCart([]);
+     setDeliveryDate("");
+     setOrderNotes("");
+    setEditingOrder(null);
+  };
+
   const handleCreateOrder = () => {
     if (!currentClientId) {
       toast({
@@ -272,7 +265,7 @@ export default function ClientOrdersPage() {
 
     const orderData: OrderFormData = {
       clientId: currentClientId,
-      deliveryDate,
+      deliveryDate: deliveryDate,
       notes: orderNotes,
       items: cart.map((item) => ({
         articleId: item.articleId,
@@ -295,18 +288,19 @@ export default function ClientOrdersPage() {
     try {
       setEditingOrder(order);
 
-      // Charger les items de la commande
-      const orderItems = await apiRequest(
-        `/api/orders/${order.id}/items`,
-        "GET",
-      );
+      //  Charger les items de la commande
+      const res = await apiRequest(`/api/orders/${order.id}/items`, "GET");
+
+      const orderItems = await res.json();
 
       const cartItems: CartItem[] = [];
 
       // Vérifier que orderItems est bien un tableau
+      console.log("**** order items:", orderItems);
       if (Array.isArray(orderItems)) {
         for (const item of orderItems) {
           const product = products.find((p) => p.id === item.articleId);
+          console.log("**** article product", product, item.articleId);
           if (product) {
             cartItems.push({
               articleId: item.articleId,
@@ -318,9 +312,9 @@ export default function ClientOrdersPage() {
       }
 
       setCart(cartItems);
-      setDeliveryDate(order.deliveryDate?.split("T")[0] || "");
+      setDeliveryDate(order.deliveryDate?.split(" ")[0] || "");
       setOrderNotes(order.notes || "");
-      setCurrentView("cart");
+      setCurrentView("shop");
     } catch (error) {
       console.error(
         "Erreur lors du chargement des items de la commande:",
@@ -372,7 +366,7 @@ export default function ClientOrdersPage() {
               </p>
             </div>
             <Button
-              onClick={() => setCurrentView("shop")}
+              onClick={() => createOrder()}
               className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-8 py-3 rounded-xl font-semibold shadow-lg transform hover:scale-105 transition-all"
             >
               <Plus className="w-5 h-5 mr-2" />
@@ -456,22 +450,14 @@ export default function ClientOrdersPage() {
                         <div className="text-right">
                           <div className="text-lg font-bold text-orange-600">
                             {parseFloat(
-                              order.totalTTC?.toString() || "0",
+                              order.subtotalHT?.toString() || "0",
                             ).toFixed(2)}{" "}
                             DA
                           </div>
                         </div>
 
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-
-                          {order.status === "draft" && (
+                            {order.status === "draft" && (
                             <>
                               <Button
                                 variant="ghost"
@@ -731,6 +717,7 @@ export default function ClientOrdersPage() {
 
   // Vue panier et finalisation
   if (currentView === "cart") {
+    console.log("🔍 deliveryDate (render):", deliveryDate);
     result = (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-6">
         <div className="max-w-6xl mx-auto">
@@ -748,12 +735,12 @@ export default function ClientOrdersPage() {
             <Button
               variant="outline"
               onClick={() =>
-                editingOrder ? setCurrentView("orders") : setCurrentView("shop")
+                 setCurrentView("shop")
               }
               className="border-gray-300"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              {editingOrder ? "Retour aux commandes" : "Continuer mes achats"}
+              {editingOrder ? "Ajouter d'autres produits" : "Continuer mes achats"}
             </Button>
           </div>
 

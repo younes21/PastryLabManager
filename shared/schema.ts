@@ -699,6 +699,14 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: t
     return val;
   }),
 });
+export const insertOrderWithItemsSchema = z.object({
+  order: insertOrderSchema,
+  items: z.array(insertOrderItemSchema).min(1, "Au moins un article est requis."),
+});
+export const updateOrderWithItemsSchema = z.object({
+  order: insertOrderSchema.omit({ createdBy: true }).partial(),
+  items: z.array(insertOrderItemSchema).min(1, "Au moins un article est requis."),
+});
 export const insertInventoryOperationSchema = createInsertSchema(inventoryOperations).omit({ id: true, code: true, createdAt: true, updatedAt: true });
 export const insertInventoryOperationItemSchema = createInsertSchema(inventoryOperationItems).omit({ id: true, createdAt: true });
 export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true, code: true, createdAt: true, updatedAt: true });
