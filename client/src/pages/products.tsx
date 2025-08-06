@@ -52,6 +52,7 @@ import {
   type Recipe 
 } from "@shared/schema";
 import { RecipeDisplay } from "@/components/recipe-display";
+import { Layout } from "@/components/layout";
 
 // Schéma de validation pour les produits
 const productSchema = insertArticleSchema.extend({
@@ -126,12 +127,12 @@ export default function Products() {
       </div>
     );
   }
-
-  return (
+  return (<Layout title="Gestion des produits">  
+  
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Gestion des Produits</h1>
+          
           <p className="text-muted-foreground">Gérez vos produits finis et leurs recettes</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -180,6 +181,7 @@ export default function Products() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Photo</TableHead>
                 <TableHead>Nom</TableHead>
                 <TableHead>Conservation</TableHead>
                 <TableHead>D.L.C</TableHead>
@@ -214,6 +216,13 @@ export default function Products() {
                   
                   return (
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                    <TableCell className="font-medium">
+                      {product.photo ?(<img
+                         src={product.photo}
+                         alt={product.name}
+                         className="w-[7rem] h-[5rem] object-cover rounded-t-lg"
+                       />) : (<Package className="w-16 h-16 text-orange-400" />)}
+                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
                       {product.isPerishable ? (
@@ -290,7 +299,7 @@ export default function Products() {
         </CardContent>
       </Card>
     </div>
-  );
+  )</Layout>);
 }
 
 function ProductForm({ product, onSuccess }: { product?: Article | null; onSuccess: () => void }) {

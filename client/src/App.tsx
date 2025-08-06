@@ -127,7 +127,6 @@ function ProtectedRouter() {
     return (
       <Switch>
         <Route path="/" component={ClientDashboard} />
-        <Route path="/catalog" component={ClientCatalog} />
         <Route path="/client_orders" component={ClientOrdersPage} />
         <Route component={NotFound} />
       </Switch>

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { ClientLayout } from "@/components/client-layout";
 import { useToast } from "@/hooks/use-toast";
 import {
   ShoppingCart,
@@ -28,6 +27,7 @@ import type {
   Article,
   ArticleCategory,
 } from "@shared/schema";
+import { Layout } from "@/components/layout";
 
 const orderStatusLabels = {
   draft: "Brouillon",
@@ -238,11 +238,35 @@ export default function ClientOrdersPage() {
     }, 0);
   };
 
+  // Calculer les totaux avec TVA
+  const calculateOrderTotals = (items: CartItem[]) => {
+    let totalHT = 0;
+    let totalTVA = 0;
+
+    items.forEach((item) => {
+      const priceHT = parseFloat(item.article.salePrice || "0");
+      const taxRate = item.article.taxId ? 19 : 0; // Taux par défaut ou récupérer depuis les données
+      const itemTotalHT = priceHT * item.quantity;
+      const itemTVA = (itemTotalHT * taxRate) / 100;
+      
+      totalHT += itemTotalHT;
+      totalTVA += itemTVA;
+    });
+
+    const totalTTC = totalHT + totalTVA;
+
+    return {
+      totalHT: parseFloat(totalHT.toFixed(2)),
+      totalTVA: parseFloat(totalTVA.toFixed(2)),
+      totalTTC: parseFloat(totalTTC.toFixed(2))
+    };
+  };
+
   const createOrder = () => {
     setCurrentView("shop");
-     setCart([]);
-     setDeliveryDate("");
-     setOrderNotes("");
+    setCart([]);
+    setDeliveryDate("");
+    setOrderNotes("");
     setEditingOrder(null);
   };
 
@@ -450,14 +474,19 @@ export default function ClientOrdersPage() {
                         <div className="text-right">
                           <div className="text-lg font-bold text-orange-600">
                             {parseFloat(
-                              order.subtotalHT?.toString() || "0",
+                              order.totalTTC?.toString() || "0",
                             ).toFixed(2)}{" "}
-                            DA
+                            DA TTC
                           </div>
+                          {parseFloat(order.totalTax?.toString() || "0") > 0 && (
+                            <div className="text-xs text-gray-500">
+                              dont TVA: {parseFloat(order.totalTax?.toString() || "0").toFixed(2)} DA
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1">
-                            {order.status === "draft" && (
+                          {order.status === "draft" && (
                             <>
                               <Button
                                 variant="ghost"
@@ -619,7 +648,7 @@ export default function ClientOrdersPage() {
                               <img
                                 src={product.photo}
                                 alt={product.name}
-                                className="w-full h-full object-cover rounded-t-lg"
+                                className="w-full h-full object-cover rounded-t-lg mw-12 mh-12"
                               />
                             ) : (
                               <Package className="w-16 h-16 text-orange-400" />
@@ -734,13 +763,13 @@ export default function ClientOrdersPage() {
 
             <Button
               variant="outline"
-              onClick={() =>
-                 setCurrentView("shop")
-              }
+              onClick={() => setCurrentView("shop")}
               className="border-gray-300"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              {editingOrder ? "Ajouter d'autres produits" : "Continuer mes achats"}
+              {editingOrder
+                ? "Ajouter d'autres produits"
+                : "Continuer mes achats"}
             </Button>
           </div>
 
@@ -875,12 +904,28 @@ export default function ClientOrdersPage() {
 
                   <hr />
 
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-orange-600">
-                      {getCartTotal().toFixed(2)} DA
-                    </span>
-                  </div>
+                  {(() => {
+                    const totals = calculateOrderTotals(cart);
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Sous-total HT</span>
+                          <span>{totals.totalHT.toFixed(2)} DA</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>TVA</span>
+                          <span>{totals.totalTVA.toFixed(2)} DA</span>
+                        </div>
+                        <hr />
+                        <div className="flex justify-between items-center text-lg font-bold">
+                          <span>Total TTC</span>
+                          <span className="text-orange-600">
+                            {totals.totalTTC.toFixed(2)} DA
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -951,10 +996,7 @@ export default function ClientOrdersPage() {
               {/* Informations supplémentaires */}
               <div className="text-center space-y-2">
                 <p className="text-sm text-gray-600">
-                  🚚 Livraison gratuite à partir de 5000 DA
-                </p>
-                <p className="text-sm text-gray-600">
-                  📞 Besoin d'aide ? Contactez-nous au 023 XX XX XX
+                  📞 Besoin d'aide ? Contactez-nous au 0554 XX XX XX
                 </p>
               </div>
             </div>
@@ -964,5 +1006,5 @@ export default function ClientOrdersPage() {
     );
   }
 
-  return <ClientLayout title="Gestion des Clients"> {result} </ClientLayout>;
+  return <Layout title="Gestion des commandes"> {result} </Layout>;
 }
