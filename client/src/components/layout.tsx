@@ -26,7 +26,7 @@ export function Layout({ children, title = "Tableau de bord" }: LayoutProps) {
               <button className="lg:hidden -mr-2 p-2 text-gray-400 hover:text-gray-600">
                 <Menu className="h-6 w-6" />
               </button>
-              <h2 className="ml-4 text-lg font-semibold text-gray-900">{title}</h2>
+              <h2 className="ml-4 text-2xl font-semibold text-gray-900">{title}</h2>
             </div>
             
             <div className="flex items-center space-x-4">

@@ -316,25 +316,7 @@ export function Sidebar() {
 
         {/* Storage Temperature Status */}
         <div className="px-4 pb-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">
-              État des Stockages
-            </h4>
-            <div className="space-y-1">
-              {storageLocations?.map((location) => (
-                <div key={location.id} className="flex justify-between text-xs">
-                  <span className="text-blue-700">
-                    {location.name} ({location.temperature}°C)
-                  </span>
-                  <span className="text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Logout button */}
+         {/* Logout button */}
           <button
             onClick={logout}
             className="mt-4 w-full text-left text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded flex items-center"

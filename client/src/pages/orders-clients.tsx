@@ -65,6 +65,8 @@ interface OrderFormData {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    taxRate: number;
+    taxAmount: number;
   }>;
 }
 
@@ -251,7 +253,7 @@ export default function ClientOrdersPage() {
 
     items.forEach((item) => {
       const priceHT = parseFloat(item.article.salePrice || "0");
-      
+
       // Récupérer le taux de TVA depuis la table taxes
       let taxRate = 0;
       if (item.article.taxId && taxes.length > 0) {
@@ -260,10 +262,10 @@ export default function ClientOrdersPage() {
           taxRate = parseFloat(tax.rate?.toString() || "0");
         }
       }
-      
+
       const itemTotalHT = priceHT * item.quantity;
       const itemTVA = (itemTotalHT * taxRate) / 100;
-      
+
       totalHT += itemTotalHT;
       totalTVA += itemTVA;
     });
@@ -273,7 +275,7 @@ export default function ClientOrdersPage() {
     return {
       totalHT: parseFloat(totalHT.toFixed(2)),
       totalTVA: parseFloat(totalTVA.toFixed(2)),
-      totalTTC: parseFloat(totalTTC.toFixed(2))
+      totalTTC: parseFloat(totalTTC.toFixed(2)),
     };
   };
 
@@ -310,6 +312,15 @@ export default function ClientOrdersPage() {
         articleId: item.articleId,
         quantity: item.quantity,
         unitPrice: parseFloat(item.article.salePrice || "0"),
+        taxRate: parseFloat(
+          taxes.find((t: Tax) => t.id === item.article.taxId)?.rate || "0",
+        ),
+        taxAmount:
+          (parseFloat(
+            taxes.find((t: Tax) => t.id === item.article.taxId)?.rate || "0",
+          ) /
+            100) * item.quantity *
+          parseFloat(item.article.salePrice || "0"),
         totalPrice: parseFloat(item.article.salePrice || "0") * item.quantity,
       })),
     };
@@ -493,9 +504,14 @@ export default function ClientOrdersPage() {
                             ).toFixed(2)}{" "}
                             DA TTC
                           </div>
-                          {parseFloat(order.totalTax?.toString() || "0") > 0 && (
+                          {parseFloat(order.totalTax?.toString() || "0") >
+                            0 && (
                             <div className="text-xs text-gray-500">
-                              dont TVA: {parseFloat(order.totalTax?.toString() || "0").toFixed(2)} DA
+                              dont TVA:{" "}
+                              {parseFloat(
+                                order.totalTax?.toString() || "0",
+                              ).toFixed(2)}{" "}
+                              DA
                             </div>
                           )}
                         </div>

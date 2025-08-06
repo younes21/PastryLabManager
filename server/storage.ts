@@ -1026,7 +1026,7 @@ export class DatabaseStorage implements IStorage {
       }
       updatedOrder.subtotalHT = updatedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();    
       updatedOrder.totalTax = updatedItems.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
-      updatedOrder.totalTTC = updatedOrder.subtotalHT + updatedOrder.totalTax ;
+      updatedOrder.totalTTC = (parseFloat( updatedOrder.subtotalHT) + parseFloat(updatedOrder.totalTax) ).toString();
       // 2. Mise à jour de la commande
       await tx.update(orders)
         .set({ ...updatedOrder, updatedAt: new Date().toISOString() })

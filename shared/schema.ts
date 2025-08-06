@@ -48,20 +48,30 @@ export const articleCategories = pgTable("article_categories", {
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
+// Price Lists
 export const priceLists = pgTable("price_lists", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
-  description: text("description"),
-  active: boolean("active").default(true),
+  currency: text("currency").notNull().default("DA"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
+// Price Rules
 export const priceRules = pgTable("price_rules", {
   id: serial("id").primaryKey(),
   priceListId: integer("price_list_id").references(() => priceLists.id).notNull(),
-  articleId: integer("article_id").references(() => articles.id).notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  active: boolean("active").default(true),
+  applyTo: text("apply_to").notNull(), // 'article' or 'category'
+  articleId: integer("article_id").references(() => articles.id), // null if applies to category
+  categoryId: integer("category_id").references(() => articleCategories.id), // null if applies to article
+  priceType: text("price_type").notNull(), // 'fixed', 'discount', 'formula'
+  fixedPrice: decimal("fixed_price", { precision: 10, scale: 2 }),
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
+  formulaExpression: text("formula_expression"), // Expression pour calculs avancés
+  minQuantity: decimal("min_quantity", { precision: 10, scale: 3 }).notNull().default("1"),
+  validFrom: timestamp("valid_from", { mode: 'string' }),
+  validTo: timestamp("valid_to", { mode: 'string' }),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
@@ -695,6 +705,14 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: t
     return val;
   }),
   totalPrice: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+    taxAmount: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+    taxRate: z.union([z.string(), z.number()]).transform((val) => {
     if (typeof val === "number") return val.toString();
     return val;
   }),

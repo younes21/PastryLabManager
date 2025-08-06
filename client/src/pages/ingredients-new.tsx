@@ -153,16 +153,7 @@ export default function IngredientsPage() {
   return (
     <Layout title="Gestion des Ingrédients">
       <div className="container mx-auto p-6 space-y-6">
-        {/* En-tête */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Gestion des Ingrédients</h1>
-          <p className="text-muted-foreground">
-            Gérez vos ingrédients avec toutes leurs propriétés
-          </p>
-        </div>
-        </div>
-
+       
         {/* Barre de menu/toolbar */}
         <Card>
         <CardContent className="p-4">
@@ -219,25 +210,7 @@ export default function IngredientsPage() {
             </div>
           </div>
 
-          {/* Statistiques rapides */}
-          <div className="flex gap-6 mt-4 pt-4 border-t">
-            <div className="text-sm">
-              <span className="text-muted-foreground">Total ingrédients: </span>
-              <span className="font-medium">{ingredients?.length || 0}</span>
-            </div>
-            <div className="text-sm">
-              <span className="text-muted-foreground">Actifs: </span>
-              <span className="font-medium text-green-600">
-                {ingredients?.filter(i => i.active).length || 0}
-              </span>
-            </div>
-            <div className="text-sm">
-              <span className="text-muted-foreground">Stock faible: </span>
-              <span className="font-medium text-orange-600">
-                {ingredients?.filter(i => Number(i.currentStock) <= Number(i.minStock)).length || 0}
-              </span>
-            </div>
-          </div>
+         
         </CardContent>
         </Card>
 
@@ -638,18 +611,13 @@ export default function IngredientsPage() {
 
         {/* Table des ingrédients selon spécifications */}
         <Card>
-        <CardHeader>
-          <CardTitle>Liste des Ingrédients</CardTitle>
-          <CardDescription>
-            Colonnes: Actif, Code, Catégorie, Désignation, PMP (Prix Moyen Pondéré), Stock Min
-          </CardDescription>
-        </CardHeader>
+       
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Photo</TableHead>
                 <TableHead>Actif</TableHead>
-                <TableHead>Code</TableHead>
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Désignation</TableHead>
                 <TableHead>PMP</TableHead>
@@ -660,12 +628,18 @@ export default function IngredientsPage() {
             <TableBody>
               {ingredients?.map((ingredient) => (
                 <TableRow key={ingredient.id} data-testid={`row-ingredient-${ingredient.id}`}>
+                  <TableCell className="font-medium">
+                    {ingredient.photo ?(<img
+                       src={ingredient.photo}
+                       alt={ingredient.name}
+                       className="w-[7rem] h-[5rem] object-cover rounded-t-lg"
+                     />) : (<Package className="w-16 h-16 text-orange-400" />)}
+                   </TableCell>
                   <TableCell>
                     <Badge variant={ingredient.active ? "default" : "secondary"}>
                       {ingredient.active ? "Actif" : "Inactif"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{ingredient.code}</TableCell>
                   <TableCell>
                     {ingredient.categoryId 
                       ? (categories as any[])?.find((c: any) => c.id === ingredient.categoryId)?.designation || "Sans catégorie" 

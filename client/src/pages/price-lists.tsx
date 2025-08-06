@@ -116,7 +116,7 @@ export default function PriceListsPage() {
     
     const data: InsertPriceList = {
       designation: formData.get("designation") as string,
-      currency: formData.get("currency") as string,
+      description: formData.get("description") as string,
       active: formData.get("active") === "on",
     };
 
@@ -222,8 +222,8 @@ export default function PriceListsPage() {
                     <div className="flex items-center space-x-2">
                       <CardTitle className="text-lg">{priceList.designation}</CardTitle>
                       <div className="flex items-center space-x-1">
-                        {getCurrencyIcon(priceList.currency)}
-                        <span className="text-sm text-gray-600">{priceList.currency}</span>
+                        {priceList.description}
+                       
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
