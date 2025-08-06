@@ -26,6 +26,7 @@ import type {
   Client,
   Article,
   ArticleCategory,
+  Tax,
 } from "@shared/schema";
 import { Layout } from "@/components/layout";
 
@@ -112,6 +113,11 @@ export default function ClientOrdersPage() {
           article.active &&
           (!selectedCategory || article.saleCategoryId === selectedCategory),
       ),
+  });
+
+  // Récupérer les taxes pour les calculs
+  const { data: taxes = [] } = useQuery<Tax[]>({
+    queryKey: ["/api/taxes"],
   });
 
   // Mutations
@@ -245,7 +251,16 @@ export default function ClientOrdersPage() {
 
     items.forEach((item) => {
       const priceHT = parseFloat(item.article.salePrice || "0");
-      const taxRate = item.article.taxId ? 19 : 0; // Taux par défaut ou récupérer depuis les données
+      
+      // Récupérer le taux de TVA depuis la table taxes
+      let taxRate = 0;
+      if (item.article.taxId && taxes.length > 0) {
+        const tax = taxes.find((t: Tax) => t.id === item.article.taxId);
+        if (tax) {
+          taxRate = parseFloat(tax.rate?.toString() || "0");
+        }
+      }
+      
       const itemTotalHT = priceHT * item.quantity;
       const itemTVA = (itemTotalHT * taxRate) / 100;
       
