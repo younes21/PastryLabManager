@@ -316,7 +316,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: "Invalid price list data" });
     }
   });
+  app.put("/api/price-lists/:id", async (req, res) => {
+    try {
+      const priceListData = insertPriceListSchema.parse(req.body);
+      const priceList = await storage.updatePriceList(parseInt(req.params.id),priceListData);
+      res.status(201).json(priceList);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid price list data" });
+    }
+  });
+  // Price Rules routes
+  app.get("/api/price-rules", async (req, res) => {
+    try {
+      const priceRules = await storage.getAllPriceRules();
+      res.json(priceRules);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch price rules" });
+    }
+  });
+  app.get("/api/price-rules/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const priceRule = await storage.getPriceRule(id);
 
+      if (!priceRule) {
+        return res.status(404).json({ message: "Price rule not found" });
+      }
+
+      res.json(priceRule);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch price rule" });
+    }
+  });
+  app.get("/api/price-rules/by-list/:priceListId", async (req, res) => {
+    try {
+      const priceListId = parseInt(req.params.priceListId);
+      const priceRules = await storage.getPriceRulesByPriceList(priceListId);
+      res.json(priceRules);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch price rules" });
+    }
+  });
+  app.post("/api/price-rules", async (req, res) => {
+    try {
+      const validatedData = insertPriceRuleSchema.parse(req.body);
+      const priceRule = await storage.createPriceRule(validatedData);
+      res.status(201).json(priceRule);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid data" });
+    }
+  });
+
+  app.put("/api/price-rules/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertPriceRuleSchema.partial().parse(req.body);
+      const priceRule = await storage.updatePriceRule(id, validatedData);
+
+      if (!priceRule) {
+        return res.status(404).json({ message: "Price rule not found" });
+      }
+
+      res.json(priceRule);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid data" });
+    }
+  });
+
+  app.delete("/api/price-rules/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deletePriceRule(id);
+
+      if (!success) {
+        return res.status(404).json({ message: "Price rule not found" });
+      }
+
+      res.json({ message: "Price rule deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete price rule" });
+    }
+  });
   // Taxes routes
   app.get("/api/taxes", async (req, res) => {
     try {

@@ -56,12 +56,16 @@ export function Sidebar() {
       label: "Tableau de bord",
       icon: "fas fa-tachometer-alt",
       lucideIcon: LayoutDashboard,
+      order: 0,
+      group: "Principal",
     },
     {
       path: "/inventory",
       label: "Gestion de Stock",
       icon: "fas fa-boxes",
       lucideIcon: Package,
+      order: 0,
+      group: "Inventaire",
     },
     // Ingrédients supprimés - utiliser Articles avec filtrage
     // Modules temporairement supprimés - à réimplémenter
@@ -70,133 +74,177 @@ export function Sidebar() {
       label: "Recettes",
       icon: "fas fa-book-open",
       lucideIcon: BookOpen,
+      order: 0,
+      group: "Inventaire",
     },
-    // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },
+    // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },  order: 0, group: "admin",
     {
       path: "/orders",
       label: "Commandes",
       icon: "fas fa-shopping-cart",
       lucideIcon: ShoppingCart,
+      order: 0,
+      group: "Ventes",
     },
     {
       path: "/client_orders",
       label: "Commandes clients",
       icon: "fas fa-shopping-cart",
       lucideIcon: ShoppingCart,
+      order: 0,
+      group: "Ventes",
     },
     {
       path: "/inventory-operations",
       label: "Opérations Stock",
       icon: "fas fa-warehouse",
       lucideIcon: Package,
+      order: 0,
+      group: "Inventaire",
     },
     {
       path: "/invoices",
       label: "Facturation",
       icon: "fas fa-file-invoice",
       lucideIcon: FileText,
+      order: 0,
+      group: "Ventes",
     },
     {
       path: "/deliveries",
       label: "Livraisons",
       icon: "fas fa-truck",
       lucideIcon: Truck,
+      order: 0,
+      group: "Ventes",
     },
     {
       path: "/users",
       label: "Utilisateurs",
       icon: "fas fa-users",
       lucideIcon: Users,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/measurement-units",
       label: "Unités de Mesure",
       icon: "fas fa-balance-scale",
       lucideIcon: Scale,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/article-categories",
       label: "Catégories d'Articles",
       icon: "fas fa-folder-tree",
       lucideIcon: FolderTree,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/price-lists",
       label: "Listes de Prix",
       icon: "fas fa-dollar-sign",
       lucideIcon: DollarSign,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/taxes",
       label: "Taxes",
       icon: "fas fa-receipt",
       lucideIcon: Receipt,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/currencies",
       label: "Devises",
       icon: "fas fa-coins",
       lucideIcon: Coins,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/delivery-methods",
       label: "Méthodes de Livraison",
       icon: "fas fa-shipping-fast",
       lucideIcon: TruckIcon,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/accounting-journals",
       label: "Journaux Comptables",
       icon: "fas fa-book",
       lucideIcon: BookIcon,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/accounting-accounts",
       label: "Comptes Comptables",
       icon: "fas fa-calculator",
       lucideIcon: Calculator,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/storage-zones",
       label: "Zones de Stockage",
       icon: "fas fa-building",
       lucideIcon: Building,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/work-stations",
       label: "Postes de Travail",
       icon: "fas fa-cogs",
       lucideIcon: Settings,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/email-config",
       label: "Configuration Email",
       icon: "fas fa-envelope",
       lucideIcon: Mail,
+      order: 0,
+      group: "admin",
     },
     {
       path: "/suppliers",
       label: "Fournisseurs",
       icon: "fas fa-truck",
       lucideIcon: Truck,
+      order: 0,
+      group: "Achats",
     },
     {
       path: "/clients",
       label: "Clients",
       icon: "fas fa-users",
       lucideIcon: Users,
+      order: 0,
+      group: "Ventes",
     },
     {
       path: "/products",
       label: "Produits",
       icon: "fas fa-box",
       lucideIcon: Package,
+      order: 0,
+      group: "Ventes",
     },
     {
       path: "/ingredients",
       label: "Ingrédients",
       icon: "fas fa-leaf",
       lucideIcon: Leaf,
+      order: 0,
+      group: "Achats",
     },
   ];
 
@@ -220,6 +268,32 @@ export function Sidebar() {
         return false;
     }
   });
+
+  // Group navigation items by group
+  const groupedMenu = filteredNavItems.reduce((acc, item) => {
+    const group = item.group || "Principal";
+    if (!acc[group]) {
+      acc[group] = [];
+    }
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, typeof filteredNavItems>);
+
+  // Define group order for consistent display
+  const groupOrder = ["Principal", "Ventes", "Achats", "Inventaire", "admin"];
+  const sortedGroupEntries = Object.entries(groupedMenu).sort(([a], [b]) => {
+    const indexA = groupOrder.indexOf(a);
+    const indexB = groupOrder.indexOf(b);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+
+  // Function to get display name for groups
+  const getGroupDisplayName = (groupName: string) => {
+    switch (groupName) {
+      case "admin": return "Administration";
+      default: return groupName;
+    }
+  };
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
@@ -296,27 +370,41 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="mt-6 flex-1 px-2 space-y-1">
-          {filteredNavItems.map((item) => (
-            <Link key={item.path} href={item.path}>
-              <div
-                className={`${
-                  isActive(item.path)
-                    ? "bg-primary/10 border-r-4 border-primary text-primary-foreground group flex items-center px-2 py-2 text-sm font-medium rounded-l-md cursor-pointer"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer"
-                }`}
-              >
-                <item.lucideIcon
-                  className={`h-5 w-5 mr-3 ${isActive(item.path) ? "text-primary" : ""}`}
-                />
-                {item.label}
+          {sortedGroupEntries.map(([groupName, groupItems]) => (
+            <div key={groupName} className="mb-4">
+              {/* Group header */}
+              {groupName !== "Principal" && (
+                <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {getGroupDisplayName(groupName)}
+                </div>
+              )}
+              
+              {/* Group items */}
+              <div className="space-y-1">
+                {groupItems.map((item) => (
+                  <Link key={item.path} href={item.path}>
+                    <div
+                      className={`${
+                        isActive(item.path)
+                          ? "bg-blue-700/10 border-r-4 border-primary text-blue-900 group flex items-center px-2 py-2 text-sm font-medium rounded-l-md cursor-pointer"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer"
+                      }`}
+                    >
+                      <item.lucideIcon
+                        className={`h-5 w-5 mr-3 ${isActive(item.path) ? "text-primary" : ""}`}
+                      />
+                      {item.label}
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </Link>
+            </div>
           ))}
         </nav>
 
         {/* Storage Temperature Status */}
         <div className="px-4 pb-4">
-         {/* Logout button */}
+          {/* Logout button */}
           <button
             onClick={logout}
             className="mt-4 w-full text-left text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded flex items-center"

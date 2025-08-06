@@ -119,7 +119,7 @@ export function PriceRuleForm({
                   <SelectContent>
                     {articles.map((article) => (
                       <SelectItem key={article.id} value={article.id.toString()}>
-                        [{article.type}] {article.name} - {article.price}€/{article.unit}
+                        [{article.type}] {article.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -177,7 +177,7 @@ export function PriceRuleForm({
             {formData.priceType === "fixed" && (
               <div>
                 <Label htmlFor="fixedPrice" className="text-base font-medium">
-                  Valeur prix fixe (€)
+                  Valeur prix fixe (DA)
                 </Label>
                 <Input
                   id="fixedPrice"

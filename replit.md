@@ -148,6 +148,11 @@ The application uses a comprehensive schema with the following main entities:
   - Restricted preparateur navigation to only Production and Commands sections
   - Enhanced production workflow with automatic storage completion modal
   - Improved error handling and logging throughout the application
+- **Sidebar Navigation Enhancement (August 2025)**:
+  - Implemented grouped navigation menu organization by business modules
+  - Menu items organized into logical groups: Principal, Ventes, Achats, Inventaire, Administration
+  - Automatic group sorting and display with proper header separators
+  - Role-based filtering maintained with improved visual organization
 - **Dual Stock Management System (July 2025)**: Implemented comprehensive product stock management alongside ingredient stock
   - New ProductStock and Labels schemas for finished product tracking
   - Stock page with dual view (ingredient stock + product stock) and expiration tracking
