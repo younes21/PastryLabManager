@@ -223,6 +223,14 @@ export function Sidebar() {
       group: "Achats",
     },
     {
+      path: "/purchase-orders",
+      label: "Achats Fournisseurs",
+      icon: "fas fa-shopping-cart",
+      lucideIcon: ShoppingCart,
+      order: 1,
+      group: "Achats",
+    },
+    {
       path: "/clients",
       label: "Clients",
       icon: "fas fa-users",

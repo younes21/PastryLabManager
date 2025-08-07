@@ -4,7 +4,7 @@ import {
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
-  invoices, invoiceItems, accountingEntries, accountingEntryLines,
+  invoices, invoiceItems, accountingEntries, accountingEntryLines, purchaseOrders, purchaseOrderItems,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -19,7 +19,8 @@ import {
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
   type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
-  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine
+  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
+  type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
@@ -180,6 +181,23 @@ export interface IStorage {
   updateIngredient(id: number, ingredient: Partial<Omit<InsertArticle, 'type'>>): Promise<Article | undefined>;
   deleteIngredient(id: number): Promise<boolean>;
   getLowStockIngredients(): Promise<Article[]>;
+
+  // Purchase Orders (Achats Fournisseurs)
+  getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined>;
+  getPurchaseOrdersBySupplier(supplierId: number): Promise<PurchaseOrder[]>;
+  getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrder[]>;
+  createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder | undefined>;
+  deletePurchaseOrder(id: number): Promise<boolean>;
+  generatePurchaseOrderCode(): Promise<string>;
+
+  // Purchase Order Items
+  getPurchaseOrderItems(purchaseOrderId: number): Promise<PurchaseOrderItem[]>;
+  createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
+  updatePurchaseOrderItem(id: number, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem | undefined>;
+  deletePurchaseOrderItem(id: number): Promise<boolean>;
+  deletePurchaseOrderItems(purchaseOrderId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1281,6 +1299,89 @@ export class DatabaseStorage implements IStorage {
 
   async deleteInvoiceItem(id: number): Promise<boolean> {
     const result = await db.delete(invoiceItems).where(eq(invoiceItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ============ ACHATS FOURNISSEURS ============
+
+  async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+  }
+
+  async getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined> {
+    const [order] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+    return order || undefined;
+  }
+
+  async getPurchaseOrdersBySupplier(supplierId: number): Promise<PurchaseOrder[]> {
+    return await db.select().from(purchaseOrders)
+      .where(eq(purchaseOrders.supplierId, supplierId))
+      .orderBy(desc(purchaseOrders.createdAt));
+  }
+
+  async getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrder[]> {
+    return await db.select().from(purchaseOrders)
+      .where(eq(purchaseOrders.status, status))
+      .orderBy(desc(purchaseOrders.createdAt));
+  }
+
+  async createPurchaseOrder(insertPurchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder> {
+    const code = await this.generatePurchaseOrderCode();
+    const orderData = {
+      ...insertPurchaseOrder,
+      code,
+    };
+    
+    const [order] = await db.insert(purchaseOrders).values(orderData).returning();
+    return order;
+  }
+
+  async updatePurchaseOrder(id: number, updateData: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder | undefined> {
+    const [order] = await db.update(purchaseOrders)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(purchaseOrders.id, id))
+      .returning();
+    return order || undefined;
+  }
+
+  async deletePurchaseOrder(id: number): Promise<boolean> {
+    const result = await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async generatePurchaseOrderCode(): Promise<string> {
+    const existingOrders = await this.getAllPurchaseOrders();
+    const nextNumber = existingOrders.length + 1;
+    return `ACH-${nextNumber.toString().padStart(6, '0')}`;
+  }
+
+  // Purchase Order Items
+  async getPurchaseOrderItems(purchaseOrderId: number): Promise<PurchaseOrderItem[]> {
+    return await db.select().from(purchaseOrderItems)
+      .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId))
+      .orderBy(purchaseOrderItems.id);
+  }
+
+  async createPurchaseOrderItem(insertItem: InsertPurchaseOrderItem): Promise<PurchaseOrderItem> {
+    const [item] = await db.insert(purchaseOrderItems).values(insertItem).returning();
+    return item;
+  }
+
+  async updatePurchaseOrderItem(id: number, updateData: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem | undefined> {
+    const [item] = await db.update(purchaseOrderItems)
+      .set(updateData)
+      .where(eq(purchaseOrderItems.id, id))
+      .returning();
+    return item || undefined;
+  }
+
+  async deletePurchaseOrderItem(id: number): Promise<boolean> {
+    const result = await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deletePurchaseOrderItems(purchaseOrderId: number): Promise<boolean> {
+    const result = await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
     return (result.rowCount || 0) > 0;
   }
 }

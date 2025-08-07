@@ -32,6 +32,9 @@ import {
   insertInvoiceItemSchema,
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
+  insertPurchaseOrderSchema,
+  insertPurchaseOrderItemSchema,
+  insertPurchaseOrderWithItemsSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1350,6 +1353,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating invoice:", error);
       res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+
+  // ============ ACHATS FOURNISSEURS ROUTES ============
+
+  app.get("/api/purchase-orders", async (req, res) => {
+    try {
+      const { supplier_id, status } = req.query;
+      let orders;
+      
+      if (supplier_id) {
+        orders = await storage.getPurchaseOrdersBySupplier(parseInt(supplier_id as string));
+      } else if (status) {
+        orders = await storage.getPurchaseOrdersByStatus(status as string);
+      } else {
+        orders = await storage.getAllPurchaseOrders();
+      }
+      
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching purchase orders:", error);
+      res.status(500).json({ message: "Failed to fetch purchase orders" });
+    }
+  });
+
+  app.get("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.getPurchaseOrder(id);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+      
+      // Get order items as well
+      const items = await storage.getPurchaseOrderItems(id);
+      res.json({ ...order, items });
+    } catch (error) {
+      console.error("Error fetching purchase order:", error);
+      res.status(500).json({ message: "Failed to fetch purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders", async (req, res) => {
+    try {
+      const data = insertPurchaseOrderWithItemsSchema.parse(req.body);
+      
+      // Create the purchase order first
+      const order = await storage.createPurchaseOrder(data.purchaseOrder);
+      
+      // Create order items
+      const items = [];
+      for (const itemData of data.items) {
+        const item = await storage.createPurchaseOrderItem({
+          ...itemData,
+          purchaseOrderId: order.id,
+        });
+        items.push(item);
+      }
+      
+      res.status(201).json({ ...order, items });
+    } catch (error) {
+      console.error("Error creating purchase order:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid order data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create purchase order" });
+      }
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const order = await storage.updatePurchaseOrder(id, updateData);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+      
+      res.json(order);
+    } catch (error) {
+      console.error("Error updating purchase order:", error);
+      res.status(500).json({ message: "Failed to update purchase order" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Delete items first (cascade should handle this, but being explicit)
+      await storage.deletePurchaseOrderItems(id);
+      
+      const success = await storage.deletePurchaseOrder(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+      
+      res.json({ message: "Purchase order deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting purchase order:", error);
+      res.status(500).json({ message: "Failed to delete purchase order" });
+    }
+  });
+
+  // Purchase Order Items routes
+  app.get("/api/purchase-orders/:orderId/items", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.orderId);
+      const items = await storage.getPurchaseOrderItems(orderId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching purchase order items:", error);
+      res.status(500).json({ message: "Failed to fetch purchase order items" });
+    }
+  });
+
+  app.post("/api/purchase-order-items", async (req, res) => {
+    try {
+      const itemData = insertPurchaseOrderItemSchema.parse(req.body);
+      const item = await storage.createPurchaseOrderItem(itemData);
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating purchase order item:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid item data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to create purchase order item" });
+      }
+    }
+  });
+
+  app.patch("/api/purchase-order-items/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const item = await storage.updatePurchaseOrderItem(id, updateData);
+      
+      if (!item) {
+        return res.status(404).json({ message: "Purchase order item not found" });
+      }
+      
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating purchase order item:", error);
+      res.status(500).json({ message: "Failed to update purchase order item" });
+    }
+  });
+
+  app.delete("/api/purchase-order-items/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deletePurchaseOrderItem(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Purchase order item not found" });
+      }
+      
+      res.json({ message: "Purchase order item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting purchase order item:", error);
+      res.status(500).json({ message: "Failed to delete purchase order item" });
     }
   });
 

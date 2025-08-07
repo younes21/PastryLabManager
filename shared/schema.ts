@@ -433,6 +433,10 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
 
 // ============ ACHATS FOURNISSEURS ============
 
@@ -479,6 +483,39 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Purchase order insert schemas and types
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, code: true, createdAt: true, updatedAt: true });
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true }).extend({
+  quantityOrdered: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  unitPrice: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  totalPrice: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  taxAmount: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  taxRate: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+  currentStock: z.union([z.string(), z.number()]).transform((val) => {
+    if (typeof val === "number") return val.toString();
+    return val;
+  }),
+});
+export const insertPurchaseOrderWithItemsSchema = z.object({
+  purchaseOrder: insertPurchaseOrderSchema,
+  items: z.array(insertPurchaseOrderItemSchema).min(1, "Au moins un article est requis."),
 });
 
 // ============ COMMANDES & DEVIS ============
