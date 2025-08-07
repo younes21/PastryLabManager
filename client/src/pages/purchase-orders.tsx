@@ -1,759 +1,677 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Plus, Search, Eye, Edit, Trash2, ShoppingCart } from "lucide-react";
-import { formatDistance } from "date-fns";
-import { fr } from "date-fns/locale";
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Save, X, FileText, CreditCard, Eye, Trash2, Edit3, ChevronDown, ArrowLeft, Banknote } from 'lucide-react';
+import { Layout } from '@/components/layout';
 
-interface PurchaseOrder {
-  id: number;
-  code: string;
-  supplierId: number;
-  status: string;
-  orderDate: string;
-  expectedDate: string | null;
-  receivedDate: string | null;
-  subtotalHT: string;
-  totalTax: string;
-  totalTTC: string;
-  discount: string;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+const ReceptionAchatInterface = () => {
+  const [operations, setOperations] = useState([]);
+  const [currentOperation, setCurrentOperation] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [items, setItems] = useState([]);
+  const [showProductSelect, setShowProductSelect] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedArticle, setSelectedArticle] = useState(null);
 
-interface PurchaseOrderItem {
-  id: number;
-  purchaseOrderId: number;
-  articleId: number;
-  storageZoneId: number | null;
-  currentStock: string;
-  quantityOrdered: string;
-  unitPrice: string;
-  totalPrice: string;
-  taxRate: string;
-  taxAmount: string;
-  notes: string | null;
-}
+  // Mock data avec plus de données
+  const suppliers = [
+    { id: 1, code: 'FRN-000001', companyName: 'TAB COOK SUPPLIES', type: 'societe', phone: '023-45-67-89' },
+    { id: 2, code: 'FRN-000002', companyName: 'ECONOMAT DISTRIBUTION', type: 'societe', phone: '023-78-90-12' },
+    { id: 3, code: 'FRN-000003', companyName: 'FRESH PRODUCTS SARL', type: 'societe', phone: '023-34-56-78' },
+    { id: 4, code: 'FRN-000004', companyName: 'METRO CASH & CARRY', type: 'societe', phone: '023-89-01-23' }
+  ];
 
-interface Supplier {
-  id: number;
-  code: string;
-  name: string;
-  type: string;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-}
+  const storageZones = [
+    { id: 1, designation: 'ECONOMAT', code: 'ZON-000001', capacity: '1000', unit: 'kg', temperature: '20' },
+    { id: 2, designation: 'CHAMBRE FROIDE', code: 'ZON-000002', capacity: '500', unit: 'kg', temperature: '4' },
+    { id: 3, designation: 'CONGELATEUR', code: 'ZON-000003', capacity: '300', unit: 'kg', temperature: '-18' },
+    { id: 4, designation: 'CAVE LEGUMES', code: 'ZON-000004', capacity: '800', unit: 'kg', temperature: '12' }
+  ];
 
-interface Article {
-  id: number;
-  code: string;
-  name: string;
-  type: string;
-  category: string | null;
-  unit: string | null;
-  stock_current: string;
-}
+  const articles = [
+    { id: 1, code: 'ING-000001', name: 'NOIX', type: 'ingredient', unit: 'KG', currentStock: 5.0000, costPerUnit: 1400.00, managedInStock: true },
+    { id: 2, code: 'ING-000002', name: 'FARINE T55', type: 'ingredient', unit: 'KG', currentStock: 25.0000, costPerUnit: 180.00, managedInStock: true },
+    { id: 3, code: 'ING-000003', name: 'SUCRE BLANC', type: 'ingredient', unit: 'KG', currentStock: 15.0000, costPerUnit: 220.00, managedInStock: true },
+    { id: 4, code: 'ING-000004', name: 'BEURRE DOUX', type: 'ingredient', unit: 'KG', currentStock: 8.5000, costPerUnit: 850.00, managedInStock: true },
+    { id: 5, code: 'ING-000005', name: 'OEUFS FRAIS', type: 'ingredient', unit: 'UNITE', currentStock: 144.0000, costPerUnit: 25.00, managedInStock: true },
+    { id: 6, code: 'ING-000006', name: 'LAIT ENTIER', type: 'ingredient', unit: 'LITRE', currentStock: 12.0000, costPerUnit: 95.00, managedInStock: true },
+    { id: 7, code: 'ING-000007', name: 'CHOCOLAT NOIR', type: 'ingredient', unit: 'KG', currentStock: 3.2000, costPerUnit: 1200.00, managedInStock: true },
+    { id: 8, code: 'ING-000008', name: 'VANILLE LIQUIDE', type: 'ingredient', unit: 'LITRE', currentStock: 0.5000, costPerUnit: 2800.00, managedInStock: true },
+    { id: 9, code: 'ING-000009', name: 'SEL FIN', type: 'ingredient', unit: 'KG', currentStock: 10.0000, costPerUnit: 80.00, managedInStock: true },
+    { id: 10, code: 'ING-000010', name: 'LEVURE CHIMIQUE', type: 'ingredient', unit: 'KG', currentStock: 2.0000, costPerUnit: 450.00, managedInStock: true }
+  ];
 
-const purchaseOrderSchema = z.object({
-  supplierId: z.number().min(1, "Le fournisseur est requis"),
-  status: z.string().default("draft"),
-  expectedDate: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-const purchaseOrderItemSchema = z.object({
-  articleId: z.number().min(1, "L'article est requis"),
-  storageZoneId: z.number().optional(),
-  quantityOrdered: z.string().min(1, "La quantité est requise"),
-  unitPrice: z.string().min(1, "Le prix unitaire est requis"),
-  taxRate: z.string().default("19.00"),
-  notes: z.string().optional(),
-});
-
-const purchaseOrderWithItemsSchema = z.object({
-  purchaseOrder: purchaseOrderSchema,
-  items: z.array(purchaseOrderItemSchema).min(1, "Au moins un article est requis"),
-});
-
-type PurchaseOrderFormData = z.infer<typeof purchaseOrderWithItemsSchema>;
-
-function getStatusColor(status: string) {
-  switch (status) {
-    case "draft":
-      return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
-    case "confirmed":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100";
-    case "received":
-      return "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100";
-    case "cancelled":
-      return "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100";
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
-  }
-}
-
-function getStatusLabel(status: string) {
-  switch (status) {
-    case "draft":
-      return "Brouillon";
-    case "confirmed":
-      return "Confirmé";
-    case "received":
-      return "Reçu";
-    case "cancelled":
-      return "Annulé";
-    default:
-      return status;
-  }
-}
-
-export default function PurchaseOrders() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [supplierFilter, setSupplierFilter] = useState<string>("all");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
-
-  const queryClient = useQueryClient();
-
-  // Queries
-  const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrder[]>({
-    queryKey: ["/api/purchase-orders"],
-  });
-
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
-  });
-
-  const { data: ingredients = [] } = useQuery<Article[]>({
-    queryKey: ["/api/articles", { type: "ingredient" }],
-  });
-
-  // Mutations
-  const createMutation = useMutation({
-    mutationFn: async (data: PurchaseOrderFormData) => {
-      const response = await fetch("/api/purchase-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to create purchase order");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      toast({
-        title: "Bon de commande créé",
-        description: "Le bon de commande d'achat a été créé avec succès.",
-      });
-      setIsCreateOpen(false);
-    },
-    onError: (error) => {
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer le bon de commande d'achat.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/purchase-orders/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete purchase order");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      toast({
-        title: "Bon de commande supprimé",
-        description: "Le bon de commande d'achat a été supprimé avec succès.",
-      });
-    },
-  });
-
-  // Form
-  const form = useForm<PurchaseOrderFormData>({
-    resolver: zodResolver(purchaseOrderWithItemsSchema),
-    defaultValues: {
-      purchaseOrder: {
-        status: "draft",
-      },
-      items: [
-        {
-          quantityOrdered: "1",
-          unitPrice: "0",
-          taxRate: "19.00",
-        },
-      ],
-    },
-  });
-
-  const [items, setItems] = useState([
+  // Données de test pour les opérations existantes
+  const mockOperations = [
     {
-      articleId: undefined,
-      storageZoneId: undefined,
-      quantityOrdered: "1",
-      unitPrice: "0",
-      taxRate: "19.00",
-      notes: "",
+      id: 1,
+      code: 'REC-000001',
+      type: 'reception',
+      status: 'completed',
+      supplierId: 1,
+      storageZoneId: 1,
+      subtotalHT: 7000.00,
+      totalTax: 1330.00,
+      totalTTC: 8330.00,
+      discount: 0,
+      notes: 'Livraison matinale',
+      createdAt: '2025-06-25T08:30:00',
+      items: [
+        { id: 1, articleId: 1, quantity: 5.000, unitCost: 1400.00, totalCost: 7000.00, taxRate: 19.00, taxAmount: 1330.00 }
+      ]
     },
-  ]);
+    {
+      id: 2,
+      code: 'REC-000002',
+      type: 'reception',
+      status: 'draft',
+      supplierId: 2,
+      storageZoneId: 1,
+      subtotalHT: 4500.00,
+      totalTax: 855.00,
+      totalTTC: 5355.00,
+      discount: 100,
+      notes: 'Commande urgente',
+      createdAt: '2025-06-28T14:15:00',
+      items: [
+        { id: 2, articleId: 2, quantity: 25.000, unitCost: 180.00, totalCost: 4500.00, taxRate: 19.00, taxAmount: 855.00 }
+      ]
+    }
+  ];
 
-  // Filter purchase orders
-  const filteredOrders = purchaseOrders.filter((order: PurchaseOrder) => {
-    const matchesSearch = order.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.notes?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    const matchesSupplier = supplierFilter === "all" || order.supplierId.toString() === supplierFilter;
-    
-    return matchesSearch && matchesStatus && matchesSupplier;
-  });
+  useEffect(() => {
+    setOperations(mockOperations);
+  }, []);
 
-  const onSubmit = (data: PurchaseOrderFormData) => {
-    // Calculate totals for each item and overall order
-    const processedItems = data.items.map(item => {
-      const quantity = parseFloat(item.quantityOrdered);
-      const unitPrice = parseFloat(item.unitPrice);
-      const taxRate = parseFloat(item.taxRate) / 100;
-      
-      const totalPrice = quantity * unitPrice;
-      const taxAmount = totalPrice * taxRate;
-      
-      return {
-        ...item,
-        totalPrice: totalPrice.toFixed(2),
-        taxAmount: taxAmount.toFixed(2),
-        currentStock: "0", // Will be filled from article data
-      };
-    });
-
-    const subtotalHT = processedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0);
-    const totalTax = processedItems.reduce((sum, item) => sum + parseFloat(item.taxAmount), 0);
-    const totalTTC = subtotalHT + totalTax;
-
-    const orderData = {
-      purchaseOrder: {
-        ...data.purchaseOrder,
-        subtotalHT: subtotalHT.toFixed(2),
-        totalTax: totalTax.toFixed(2),
-        totalTTC: totalTTC.toFixed(2),
-        discount: "0.00",
-      },
-      items: processedItems,
+  const createNewOperation = () => {
+    const newOp = {
+      id: Date.now(),
+      code: `REC-${String(operations.length + 1).padStart(6, '0')}`,
+      type: 'reception',
+      status: 'draft',
+      supplierId: '',
+      storageZoneId: '',
+      subtotalHT: 0,
+      totalTax: 0,
+      totalTTC: 0,
+      discount: 0,
+      notes: '',
+      createdAt: new Date().toISOString(),
+      items: []
     };
-
-    createMutation.mutate(orderData);
+    setCurrentOperation(newOp);
+    setItems([]);
+    setIsEditing(true);
   };
 
-  const addItem = () => {
-    setItems([...items, {
-      articleId: undefined,
-      storageZoneId: undefined,
-      quantityOrdered: "1",
-      unitPrice: "0",
-      taxRate: "19.00",
-      notes: "",
-    }]);
+  const editOperation = (op) => {
+    setCurrentOperation(op);
+    setItems(op.items || []);
+    setIsEditing(true);
   };
 
-  const removeItem = (index: number) => {
-    if (items.length > 1) {
-      const newItems = items.filter((_, i) => i !== index);
-      setItems(newItems);
+  const deleteOperation = (opId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette opération ?')) {
+      setOperations(operations.filter(op => op.id !== opId));
+      if (currentOperation?.id === opId) {
+        setCurrentOperation(null);
+        setItems([]);
+        setIsEditing(false);
+      }
     }
   };
 
-  if (isLoading) {
-    return <div>Chargement...</div>;
+  const filteredArticles = articles.filter(article =>
+    article?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    article?.code.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const addItem = (articleToAdd) => {
+    if (articleToAdd) {
+      const unitPrice = articleToAdd.costPerUnit;
+      const quantity = 1;
+      const totalPrice = quantity * unitPrice;
+      const taxRate = 19.00;
+      const taxAmount = totalPrice * (taxRate / 100);
+
+      const newItem = {
+        id: Date.now(),
+        articleId: articleToAdd.id,
+        article: articleToAdd,
+        quantity: quantity,
+        unitCost: unitPrice,
+        totalCost: totalPrice,
+        taxRate: taxRate,
+        taxAmount: taxAmount,
+        quantityBefore: articleToAdd.currentStock
+      };
+
+      setItems([...items, newItem]);
+      setSelectedArticle(null);
+      // setShowProductSelect(false);
+      setSearchTerm('');
+    }
+  };
+
+  const removeItem = (itemId) => {
+    setItems(items.filter(item => item.id !== itemId));
+  };
+
+  const updateItemQuantity = (itemId, newQuantity) => {
+    setItems(items.map(item => {
+      if (item.id === itemId) {
+        const totalCost = parseFloat(newQuantity || 0) * item.unitCost;
+        const taxAmount = totalCost * (item.taxRate / 100);
+        return {
+          ...item,
+          quantity: parseFloat(newQuantity || 0),
+          totalCost: totalCost,
+          taxAmount: taxAmount
+        };
+      }
+      return item;
+    }));
+  };
+
+  const updateItemPrice = (itemId, newPrice) => {
+    setItems(items.map(item => {
+      if (item.id === itemId) {
+        const totalCost = item.quantity * parseFloat(newPrice || 0);
+        const taxAmount = totalCost * (item.taxRate / 100);
+        return {
+          ...item,
+          unitCost: parseFloat(newPrice || 0),
+          totalCost: totalCost,
+          taxAmount: taxAmount
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Calculate totals
+  useEffect(() => {
+    if (currentOperation) {
+      const subtotalHT = items.reduce((sum, item) => sum + item.totalCost, 0);
+      const totalTax = items.reduce((sum, item) => sum + item.taxAmount, 0);
+      const totalTTC = subtotalHT + totalTax - (currentOperation.discount || 0);
+
+      setCurrentOperation(prev => ({
+        ...prev,
+        subtotalHT,
+        totalTax,
+        totalTTC
+      }));
+    }
+  }, [items, currentOperation?.discount]);
+
+  const saveOperation = () => {
+    if (!currentOperation) return;
+
+    const updatedOperation = {
+      ...currentOperation,
+      items: items
+    };
+
+    if (operations.find(op => op.id === currentOperation.id)) {
+      setOperations(operations.map(op => 
+        op.id === currentOperation.id ? updatedOperation : op
+      ));
+    } else {
+      setOperations([...operations, updatedOperation]);
+    }
+
+    alert('Opération sauvegardée avec succès!');
+  };
+
+  const completeOperation = () => {
+    if (items.length === 0) {
+      alert('Veuillez ajouter au moins un article avant de terminer.');
+      return;
+    }
+
+    const updatedOperation = {
+      ...currentOperation,
+      status: 'completed',
+      items: items
+    };
+
+    setOperations(operations.map(op => 
+      op.id === currentOperation.id ? updatedOperation : op
+    ));
+    setCurrentOperation(updatedOperation);
+    alert('Opération terminée avec succès!');
+  };
+
+  const cancelOperation = () => {
+    if (currentOperation) {
+      const updatedOperation = {
+        ...currentOperation,
+        status: 'cancelled'
+      };
+      setOperations(operations.map(op => 
+        op.id === currentOperation.id ? updatedOperation : op
+      ));
+      setCurrentOperation(updatedOperation);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const styles = {
+      draft: 'bg-yellow-100 text-yellow-800',
+      completed: 'bg-green-100 text-green-800',
+      cancelled: 'bg-red-100 text-red-800'
+    };
+    const labels = {
+      draft: 'Brouillon',
+      completed: 'Terminé',
+      cancelled: 'Annulé'
+    };
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status]}`}>
+        {labels[status]}
+      </span>
+    );
+  };
+
+  if (!isEditing) {
+    return (
+      <Layout title='Réceptions des achats founisseurs'>
+      <div >
+        {/* Header */}
+        
+          <div className=" mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <p className='text-gray-600 dark:text-gray-400 mt-2'>gerer les achat de vos ingrédients depuis vos fournisseur </p>
+            <button
+                onClick={createNewOperation}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-blue-700 flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nouvelle Réception</span>
+              </button>
+              
+            </div>
+          </div>
+       
+
+        {/* Operations List */}
+        <div className=" mx-auto px-4 py-6">
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Code</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Fournisseur</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zone</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Total TTC</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {operations.map((operation, index) => {
+                    const supplier = suppliers.find(s => s.id === operation.supplierId);
+                    const zone = storageZones.find(z => z.id === operation.storageZoneId);
+                    
+                    return (
+                      <tr key={operation.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-3 text-sm font-medium text-blue-600">
+                          {operation.code}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-800">
+                          {supplier?.companyName || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {zone?.designation || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {getStatusBadge(operation.status)}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-right">
+                          {operation.totalTTC.toFixed(2)} DA
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {new Date(operation.createdAt).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button
+                              onClick={() => editOperation(operation)}
+                              className="text-blue-600 hover:text-blue-800 p-1"
+                              title="Modifier"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteOperation(operation.id)}
+                              disabled={operation.status === 'completed'}
+                              className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              
+              {operations.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Aucune réception créée.</p>
+                  <button
+                    onClick={createNewOperation}
+                    className="mt-2 text-blue-600 hover:text-blue-800"
+                  >
+                    Créer votre première réception
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      </Layout>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <Layout title='Réceptions des achats founisseurs > Ajouter des achats founisseurs'>
+    <div>
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Achats Fournisseurs
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Gérez les commandes d'achat auprès des fournisseurs
-          </p>
-        </div>
-
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-purchase-order">
-              <Plus className="h-4 w-4 mr-2" />
-              Nouveau bon de commande
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nouveau bon de commande d'achat</DialogTitle>
-            </DialogHeader>
-            
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <Tabs defaultValue="general" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="general">Informations générales</TabsTrigger>
-                    <TabsTrigger value="items">Articles à commander</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="general" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="purchaseOrder.supplierId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Fournisseur *</FormLabel>
-                            <Select onValueChange={(value) => field.onChange(parseInt(value))}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-supplier">
-                                  <SelectValue placeholder="Sélectionner un fournisseur" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {suppliers.map((supplier) => (
-                                  <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                                    {supplier.code} - {supplier.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="purchaseOrder.status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Statut</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-status">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="draft">Brouillon</SelectItem>
-                                <SelectItem value="confirmed">Confirmé</SelectItem>
-                                <SelectItem value="received">Reçu</SelectItem>
-                                <SelectItem value="cancelled">Annulé</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="purchaseOrder.expectedDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Date de livraison prévue</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="datetime-local"
-                                {...field}
-                                data-testid="input-expected-date"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div></div>
-
-                      <div className="col-span-2">
-                        <FormField
-                          control={form.control}
-                          name="purchaseOrder.notes"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Notes</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Notes sur la commande..."
-                                  {...field}
-                                  data-testid="input-notes"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="items" className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Articles à commander</h3>
-                      <Button type="button" onClick={addItem} variant="outline" size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Ajouter un article
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {items.map((item, index) => (
-                        <Card key={index}>
-                          <CardContent className="pt-4">
-                            <div className="grid grid-cols-4 gap-4">
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.articleId`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Article *</FormLabel>
-                                    <Select onValueChange={(value) => field.onChange(parseInt(value))}>
-                                      <FormControl>
-                                        <SelectTrigger data-testid={`select-article-${index}`}>
-                                          <SelectValue placeholder="Sélectionner un article" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {ingredients.map((ingredient) => (
-                                          <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                                            {ingredient.code} - {ingredient.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.quantityOrdered`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Quantité *</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        step="0.001"
-                                        min="0"
-                                        placeholder="1.000"
-                                        {...field}
-                                        data-testid={`input-quantity-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.unitPrice`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Prix unitaire (DA) *</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="0.00"
-                                        {...field}
-                                        data-testid={`input-price-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <div className="flex items-end">
-                                {items.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeItem(index)}
-                                    className="text-red-600 hover:text-red-700"
-                                    data-testid={`button-remove-${index}`}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateOpen(false)}
-                  >
-                    Annuler
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    data-testid="button-submit"
-                  >
-                    {createMutation.isPending ? "Création..." : "Créer le bon de commande"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Rechercher par code ou notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search"
-              />
+      <div className="bg-white shadow-sm border-b">
+        <div className=" mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setIsEditing(false)}
+                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-orange-500 rounded-lg shadow-sm hover:bg-orange-50 transition"
+              >
+                <ArrowLeft className="w-4 h-4" /> Retour
+              </button>
+              
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                {currentOperation?.code || 'Nouveau'}
+              </span>
+              {currentOperation?.status && getStatusBadge(currentOperation.status)}
             </div>
-
-            <div className="w-48">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="select-status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="draft">Brouillon</SelectItem>
-                  <SelectItem value="confirmed">Confirmé</SelectItem>
-                  <SelectItem value="received">Reçu</SelectItem>
-                  <SelectItem value="cancelled">Annulé</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="w-64">
-              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger data-testid="select-supplier-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les fournisseurs</SelectItem>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                      {supplier.code} - {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="text-sm text-gray-500">
+              {new Date().toLocaleDateString('fr-FR')}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Purchase Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Bons de commande d'achat ({filteredOrders.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead>Fournisseur</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Date de commande</TableHead>
-                <TableHead>Date prévue</TableHead>
-                <TableHead>Total TTC</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order: PurchaseOrder) => {
-                const supplier = suppliers.find(s => s.id === order.supplierId);
-                
-                return (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-mono" data-testid={`text-code-${order.id}`}>
-                      {order.code}
-                    </TableCell>
-                    <TableCell data-testid={`text-supplier-${order.id}`}>
-                      {supplier?.name || "Fournisseur inconnu"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(order.status)} data-testid={`badge-status-${order.id}`}>
-                        {getStatusLabel(order.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell data-testid={`text-order-date-${order.id}`}>
-                      {formatDistance(new Date(order.orderDate), new Date(), { 
-                        addSuffix: true, 
-                        locale: fr 
-                      })}
-                    </TableCell>
-                    <TableCell data-testid={`text-expected-date-${order.id}`}>
-                      {order.expectedDate ? 
-                        formatDistance(new Date(order.expectedDate), new Date(), { 
-                          addSuffix: true, 
-                          locale: fr 
-                        }) : 
-                        "-"
-                      }
-                    </TableCell>
-                    <TableCell className="font-semibold" data-testid={`text-total-${order.id}`}>
-                      {parseFloat(order.totalTTC).toFixed(2)} DA
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setIsViewOpen(true);
-                          }}
-                          data-testid={`button-view-${order.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => deleteMutation.mutate(order.id)}
-                          disabled={deleteMutation.isPending}
-                          className="text-red-600 hover:text-red-700"
-                          data-testid={`button-delete-${order.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              
-              {filteredOrders.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    Aucun bon de commande trouvé
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* View Order Dialog */}
-      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>
-              Détails du bon de commande {selectedOrder?.code}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedOrder && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-semibold mb-2">Informations générales</h3>
-                  <div className="space-y-1 text-sm">
-                    <p><span className="font-medium">Code:</span> {selectedOrder.code}</p>
-                    <p><span className="font-medium">Statut:</span> 
-                      <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
-                        {getStatusLabel(selectedOrder.status)}
-                      </Badge>
-                    </p>
-                    <p><span className="font-medium">Date de commande:</span> {new Date(selectedOrder.orderDate).toLocaleDateString('fr-FR')}</p>
-                    {selectedOrder.expectedDate && (
-                      <p><span className="font-medium">Date prévue:</span> {new Date(selectedOrder.expectedDate).toLocaleDateString('fr-FR')}</p>
-                    )}
-                    {selectedOrder.receivedDate && (
-                      <p><span className="font-medium">Date de réception:</span> {new Date(selectedOrder.receivedDate).toLocaleDateString('fr-FR')}</p>
-                    )}
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold mb-2">Totaux</h3>
-                  <div className="space-y-1 text-sm">
-                    <p><span className="font-medium">Sous-total HT:</span> {parseFloat(selectedOrder.subtotalHT).toFixed(2)} DA</p>
-                    <p><span className="font-medium">TVA:</span> {parseFloat(selectedOrder.totalTax).toFixed(2)} DA</p>
-                    <p><span className="font-medium">Remise:</span> {parseFloat(selectedOrder.discount).toFixed(2)} DA</p>
-                    <p className="text-lg"><span className="font-bold">Total TTC:</span> {parseFloat(selectedOrder.totalTTC).toFixed(2)} DA</p>
-                  </div>
-                </div>
+      <div className=" mx-auto px-4 py-4">
+        {/* Configuration compacte */}
+        <div className="bg-white rounded-lg shadow-sm border mb-4">
+          <div className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur *</label>
+                <select
+                  value={currentOperation?.supplierId || ''}
+                  onChange={(e) => setCurrentOperation(prev => ({ ...prev, supplierId: parseInt(e.target.value) }))}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                  disabled={currentOperation?.status !== 'draft'}
+                >
+                  <option value="">Sélectionner...</option>
+                  {suppliers.map(supplier => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.companyName}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {selectedOrder.notes && (
-                <div>
-                  <h3 className="font-semibold mb-2">Notes</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedOrder.notes}</p>
-                </div>
-              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Zone de stockage *</label>
+                <select
+                  value={currentOperation?.storageZoneId || ''}
+                  onChange={(e) => setCurrentOperation(prev => ({ ...prev, storageZoneId: parseInt(e.target.value) }))}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                  disabled={currentOperation?.status !== 'draft'}
+                >
+                  <option value="">Sélectionner...</option>
+                  {storageZones.map(zone => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.designation}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Remise (DA)</label>
+                <input
+                  type="number"
+                  value={currentOperation?.discount || 0}
+                  onChange={(e) => setCurrentOperation(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                  step="1"
+                  disabled={currentOperation?.status !== 'draft'}
+                />
+              </div>
+
+              <div className="relative col-span-2 md:col-span-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Ajouter Produit</label>
+                <button
+                  onClick={() => setShowProductSelect(!showProductSelect)}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                  disabled={currentOperation?.status !== 'draft'}
+                >
+                  <span>{selectedArticle ? selectedArticle.name : 'Sélectionner...'}</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                
+                {showProductSelect && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                    <div className="p-2">
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Rechercher..."
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredArticles.map(article => (
+                        <div
+                          key={article.id}
+                          onClick={() => {
+                            setSelectedArticle(article);
+                            addItem(article);
+                           
+                          }}
+                          className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
+                        >
+                          <div className="text-sm font-medium">{article.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {article?.code} - Stock: {article.currentStock} {article.unit}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                value={currentOperation?.notes || ''}
+                onChange={(e) => setCurrentOperation(prev => ({ ...prev, notes: e.target.value }))}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
+                rows="2"
+                placeholder="Notes sur cette réception..."
+                disabled={currentOperation?.status !== 'draft'}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Table compacte */}
+        <div className="bg-white rounded-lg shadow-sm border mb-4">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gradient-to-r from-pink-500 to-orange-500 text-white">
+                  <th className="px-3 py-2 text-left text-xs font-semibold">CODE</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold">ARTICLES</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">QTÉ ACHAT</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">QTÉ STOCK</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">U.M</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">PRIX (DA)</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">MNT HT</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, index) => (
+                  <tr key={item.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                    <td className="px-3 py-2 text-xs font-medium text-gray-800">
+                      {item.article?.code}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-800">
+                      {item.article?.name}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                        step="1"
+                        min="0"
+                        className="w-20 px-1 py-0.5 text-center text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        disabled={currentOperation?.status !== 'draft'}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center text-xs">
+                      {item.quantityBefore?.toFixed(3)}
+                    </td>
+                    <td className="px-3 py-2 text-center text-xs">
+                      {item.article?.unit}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        value={item.unitCost}
+                        onChange={(e) => updateItemPrice(item.id, e.target.value)}
+                        step="1"
+                        min="0"
+                        className="w-30 px-1 py-0.5 text-center text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        disabled={currentOperation?.status !== 'draft'}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center text-xs font-semibold">
+                      {item.totalCost.toFixed(2)} DA
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {currentOperation?.status === 'draft' && (
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {items.length === 0 && (
+              <div className="text-center py-6 text-gray-500 text-sm">
+                Aucun article ajouté
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Totaux et Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Totaux */}
+          <div className="bg-white rounded-lg shadow-sm border md:col-span-2">
+            <div className="p-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>TOTAL HT</span>
+                  <span className="font-semibold">{currentOperation?.subtotalHT.toFixed(2)} DA</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>TOTAL TVA</span>
+                  <span>{currentOperation?.totalTax.toFixed(2)} DA</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>TOTAL REMISE</span>
+                  <span>{currentOperation?.discount.toFixed(2)} DA</span>
+                </div>
+                <hr />
+                <div className="flex justify-between font-bold">
+                  <span>TOTAL TTC</span>
+                  <span className="text-green-600">{currentOperation?.totalTTC.toFixed(2)} DA</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className=" rounded-lg  md:col-span-1">
+            <div className="px-28 py-4 font-bold">
+              <div className="grid grid-cols-1 gap-4">
+                <button
+                  onClick={saveOperation}
+                  disabled={currentOperation?.status !== 'draft'}
+                  className="px-3 py-3 text-sm border-blue-500  border-2 rounded hover:bg-blue-50 disabled:opacity-50 flex items-center justify-center space-x-1"
+                >
+                  <Save className="w-4 h-4 text-blue-700" />
+                  <span>Sauvegarder</span>
+                </button>
+                
+                <button
+                  onClick={completeOperation}
+                  disabled={currentOperation?.status !== 'draft' || items.length === 0}
+                  className="px-3 py-3 text-sm border-green-500  border-2 rounded hover:bg-green-50 disabled:opacity-50 flex items-center justify-center space-x-1"
+                >
+                  <FileText className="w-4 h-4 text-green-700" />
+                  <span>Confirmer</span>
+                </button>
+                
+                <button
+                  onClick={cancelOperation}
+                  disabled={currentOperation?.status !== 'draft'}
+                  className="px-3 py-3 text-sm border-red-500  border-2 rounded hover:bg-red-50 disabled:opacity-50 flex items-center justify-center space-x-1"
+                >
+                  <X className="w-4 h-4 text-red-700" />
+                  <span>Annuler</span>
+                </button>
+                
+                <button
+                  className="px-3 py-3 text-sm border-purple-500  border-2 rounded hover:bg-purple-50 flex items-center justify-center space-x-1"
+                >
+                  <CreditCard className="w-4 h-4  text-purple-700" />
+                  <span>Facture</span>
+                </button>
+                
+                <button
+                  className="px-3 py-3 text-sm border-orange-500  border-2 rounded hover:bg-orange-50 flex items-center justify-center space-x-1"
+                >
+                  <Banknote  className="w-4 h-4 text-orange-700" />
+                  <span>Règlements</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></Layout>
   );
-}
+};
+
+export default ReceptionAchatInterface;
