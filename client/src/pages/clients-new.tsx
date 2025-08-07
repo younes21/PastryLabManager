@@ -17,7 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient, type PriceList, type User as UserType } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ClientLayout } from "@/components/client-layout";
+import { Layout } from "@/components/layout";
 
 const algerianWilayas = [
   "01 - Adrar", "02 - Chlef", "03 - Laghouat", "04 - Oum El Bouaghi", "05 - Batna",
@@ -614,14 +614,14 @@ export default function Clients() {
 
   if (isLoading) {
     return (
-      <ClientLayout>
+      <Layout>
         <div className="p-6">Chargement...</div>
-      </ClientLayout>
+      </Layout>
     );
   }
 
   return (
-    <ClientLayout title="Gestion des Clients">
+    <Layout title="Gestion des Clients">
       <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -752,6 +752,6 @@ export default function Clients() {
         </CardContent>
       </Card>
       </div>
-    </ClientLayout>
+    </Layout>
   );
 }

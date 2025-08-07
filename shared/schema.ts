@@ -89,7 +89,7 @@ export const currencies = pgTable("currencies", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(), // DA, EUR, USD
-  symbol: text("symbol").notNull(), // دج, €, $
+  symbol: text("symbol").notNull(), // دج, DA, $
   rate: decimal("rate", { precision: 10, scale: 4 }).notNull().default("1.0000"), // Taux par rapport à la devise de base
   isBase: boolean("is_base").default(false), // Devise de base (DA)
   active: boolean("active").default(true),
@@ -433,6 +433,53 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
+
+// ============ ACHATS FOURNISSEURS ============
+
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // ACH-000001
+  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
+  status: text("status").notNull().default("draft"), // draft, confirmed, received, cancelled
+  
+  // Dates
+  orderDate: timestamp("order_date", { mode: 'string' }).defaultNow(),
+  expectedDate: timestamp("expected_date", { mode: 'string' }),
+  receivedDate: timestamp("received_date", { mode: 'string' }),
+  
+  // Totaux
+  subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).default("0.00"),
+  totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).default("0.00"),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Notes
+  notes: text("notes"),
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  confirmedBy: integer("confirmed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: serial("id").primaryKey(),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id, { onDelete: 'cascade' }).notNull(),
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Zone de stockage
+  
+  // Quantités et prix
+  currentStock: decimal("current_stock", { precision: 10, scale: 3 }).default("0.00"), // Stock actuel
+  quantityOrdered: decimal("quantity_ordered", { precision: 10, scale: 3 }).notNull(), // Quantité à acheter
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(), // Prix d'achat unitaire
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("19.00"), // Taux TVA
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
 
 // ============ COMMANDES & DEVIS ============
 

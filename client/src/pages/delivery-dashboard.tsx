@@ -119,7 +119,7 @@ export default function DeliveryDashboard() {
         </div>
         <div className="text-right">
           {getStatusBadge(delivery.status)}
-          <div className="text-lg font-bold mt-1">{parseFloat(delivery.order?.totalAmount || "0").toFixed(2)} €</div>
+          <div className="text-lg font-bold mt-1">{parseFloat(delivery.order?.totalAmount || "0").toFixed(2)} DA</div>
         </div>
       </div>
 

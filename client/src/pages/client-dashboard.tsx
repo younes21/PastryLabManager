@@ -181,7 +181,7 @@ export default function ClientDashboard() {
                         <p className="text-sm text-gray-600 mb-3">{recipe.description}</p>
                         <div className="flex justify-between items-center mb-3">
                           <div className="text-lg font-bold text-primary">
-                            {parseFloat(recipe.price).toFixed(2)} €
+                            {parseFloat(recipe.price).toFixed(2)} DA
                           </div>
                           <div className="text-sm text-gray-500">
                             {recipe.preparationTime} min
@@ -222,7 +222,7 @@ export default function ClientDashboard() {
                           </div>
                           <div className="text-right">
                             {getStatusBadge(order.status)}
-                            <div className="text-lg font-bold mt-1">{parseFloat(order.totalAmount).toFixed(2)} €</div>
+                            <div className="text-lg font-bold mt-1">{parseFloat(order.totalAmount).toFixed(2)} DA</div>
                           </div>
                         </div>
                         {order.deliveryAddress && (
@@ -264,7 +264,7 @@ export default function ClientDashboard() {
                       <p className="text-sm text-yellow-600">Commandes livrées non payées</p>
                     </div>
                     <div className="text-2xl font-bold text-yellow-800">
-                      {calculateOutstandingDebt().toFixed(2)} €
+                      {calculateOutstandingDebt().toFixed(2)} DA
                     </div>
                   </div>
                 </div>
@@ -278,7 +278,7 @@ export default function ClientDashboard() {
                           <p className="text-sm text-gray-600">Livrée le {formatDate(order.createdAt)}</p>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-bold">{parseFloat(order.totalAmount).toFixed(2)} €</div>
+                          <div className="text-lg font-bold">{parseFloat(order.totalAmount).toFixed(2)} DA</div>
                           <Badge variant={order.paymentReceived ? "outline" : "destructive"}>
                             {order.paymentReceived ? "Payée" : "À payer"}
                           </Badge>
@@ -314,7 +314,7 @@ export default function ClientDashboard() {
                               <RecipeImage recipeName={recipe?.name || ""} size={60} />
                               <div>
                                 <h3 className="font-semibold">{recipe?.name}</h3>
-                                <p className="text-sm text-gray-600">{parseFloat(recipe?.price || "0").toFixed(2)} € l'unité</p>
+                                <p className="text-sm text-gray-600">{parseFloat(recipe?.price || "0").toFixed(2)} DA l'unité</p>
                               </div>
                             </div>
                             <div className="flex items-center space-x-3">
@@ -334,7 +334,7 @@ export default function ClientDashboard() {
                                 +
                               </Button>
                               <div className="text-lg font-bold ml-4">
-                                {(parseFloat(recipe?.price || "0") * quantity).toFixed(2)} €
+                                {(parseFloat(recipe?.price || "0") * quantity).toFixed(2)} DA
                               </div>
                             </div>
                           </div>
@@ -344,7 +344,7 @@ export default function ClientDashboard() {
                     <div className="border-t pt-4">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold">Total</h3>
-                        <div className="text-2xl font-bold">{getTotalAmount().toFixed(2)} €</div>
+                        <div className="text-2xl font-bold">{getTotalAmount().toFixed(2)} DA</div>
                       </div>
                       <Button
                         onClick={submitOrder}

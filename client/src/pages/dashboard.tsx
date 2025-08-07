@@ -160,7 +160,7 @@ export default function Dashboard() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">CA du Jour</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {stats?.dailyRevenue || 0}€
+                      {stats?.dailyRevenue || 0}DA
                     </dd>
                   </dl>
                 </div>
@@ -202,7 +202,7 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <div className="inline-flex items-center text-base font-semibold text-gray-900">
-                            {order.totalAmount}€
+                            {order.totalAmount}DA
                           </div>
                         </div>
                       </li>

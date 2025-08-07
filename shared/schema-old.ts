@@ -261,7 +261,7 @@ export const currencies = pgTable("currencies", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(), // Euro, Dollar US, Dinar Algérien
   code: text("code").notNull().unique(), // EUR, USD, DZD
-  symbol: text("symbol").notNull(), // €, $, DA
+  symbol: text("symbol").notNull(), // DA, $, DA
   exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }).default("1.0000"), // Taux par rapport à la devise de base
   isBase: boolean("is_base").default(false), // Une seule devise de base
   active: boolean("active").default(true),

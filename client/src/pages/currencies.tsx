@@ -212,7 +212,7 @@ export default function CurrenciesPage() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          placeholder="€"
+                          placeholder="DA"
                           className="h-12 text-lg"
                           data-testid="input-currency-symbol"
                         />

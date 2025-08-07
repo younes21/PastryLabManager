@@ -178,7 +178,7 @@ export default function ClientCatalog() {
           <h1 className="text-2xl font-bold text-gray-900">Catalogue de Pâtisseries</h1>
           <div className="flex items-center space-x-4">
             <div className="text-sm text-gray-600">
-              Panier: {cart.length} article(s) - {getCartTotal().toFixed(2)}€
+              Panier: {cart.length} article(s) - {getCartTotal().toFixed(2)}DA
             </div>
             {cart.length > 0 && (
               <Button onClick={() => setIsOrderModalOpen(true)}>
@@ -201,7 +201,7 @@ export default function ClientCatalog() {
                       <div className="flex justify-between items-start">
                         <CardTitle className="text-lg">{recipe.name}</CardTitle>
                         <div className="text-right">
-                          <div className="text-lg font-bold text-primary">{recipe.price || 0}€</div>
+                          <div className="text-lg font-bold text-primary">{recipe.price || 0}DA</div>
                           {getDifficultyBadge(recipe.difficulty)}
                         </div>
                       </div>
@@ -271,7 +271,7 @@ export default function ClientCatalog() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium">{(parseFloat(item.price || "0") * item.quantity).toFixed(2)}€</p>
+                          <p className="font-medium">{(parseFloat(item.price || "0") * item.quantity).toFixed(2)}DA</p>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -285,7 +285,7 @@ export default function ClientCatalog() {
                     ))}
                     <div className="border-t pt-3 flex justify-between font-medium">
                       <span>Total</span>
-                      <span>{getCartTotal().toFixed(2)}€</span>
+                      <span>{getCartTotal().toFixed(2)}DA</span>
                     </div>
                   </div>
                 ) : (
@@ -311,7 +311,7 @@ export default function ClientCatalog() {
                           </div>
                           <div className="flex justify-between text-gray-500 mt-1">
                             <span>{new Date(order.createdAt).toLocaleDateString('fr-FR')}</span>
-                            <span>{order.totalAmount}€</span>
+                            <span>{order.totalAmount}DA</span>
                           </div>
                         </div>
                       ))}
@@ -339,12 +339,12 @@ export default function ClientCatalog() {
                   {cart.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
                       <span>{item.name} x{item.quantity}</span>
-                      <span>{(parseFloat(item.price || "0") * item.quantity).toFixed(2)}€</span>
+                      <span>{(parseFloat(item.price || "0") * item.quantity).toFixed(2)}DA</span>
                     </div>
                   ))}
                   <div className="border-t pt-2 flex justify-between font-medium">
                     <span>Total</span>
-                    <span>{getCartTotal().toFixed(2)}€</span>
+                    <span>{getCartTotal().toFixed(2)}DA</span>
                   </div>
                 </div>
               </div>
@@ -426,7 +426,7 @@ export default function ClientCatalog() {
                   Annuler
                 </Button>
                 <Button type="submit" disabled={createOrderMutation.isPending}>
-                  {createOrderMutation.isPending ? "Commande en cours..." : `Commander (${getCartTotal().toFixed(2)}€)`}
+                  {createOrderMutation.isPending ? "Commande en cours..." : `Commander (${getCartTotal().toFixed(2)}DA)`}
                 </Button>
               </div>
             </form>

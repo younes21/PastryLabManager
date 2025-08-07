@@ -263,7 +263,7 @@ export default function Ingredients() {
                           {storageLocation?.name || "Non défini"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {ingredient.costPerUnit}€
+                          {ingredient.costPerUnit}DA
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                           <Button
@@ -362,7 +362,7 @@ export default function Ingredients() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="costPerUnit">Coût par unité (€)</Label>
+                  <Label htmlFor="costPerUnit">Coût par unité (DA)</Label>
                   <Input
                     id="costPerUnit"
                     type="number"

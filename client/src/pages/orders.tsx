@@ -23,6 +23,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { OrderForm } from "@/components/forms/order-form";
 import type { Order, Client, Article } from "@shared/schema";
+import { Layout } from "@/components/layout";
 
 const orderStatusLabels = {
   draft: "Brouillon",
@@ -224,11 +225,11 @@ export default function OrdersPage() {
     );
   }
 
-  return (
+  return (<Layout title="Gestion des commandes">
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Commandes & Devis</h1>
+        
           <p className="text-muted-foreground">
             Gestion des commandes et devis clients
           </p>
@@ -451,5 +452,5 @@ export default function OrdersPage() {
         </CardContent>
       </Card>
     </div>
-  );
+    </Layout>);
 }

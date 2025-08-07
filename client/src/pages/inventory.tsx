@@ -151,10 +151,10 @@ export default function Inventory() {
                             {storageLocation?.name || "Non défini"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {ingredient.costPerUnit}€
+                            {ingredient.costPerUnit}DA
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {stockValue.toFixed(2)}€
+                            {stockValue.toFixed(2)}DA
                           </td>
                         </tr>
                       );
