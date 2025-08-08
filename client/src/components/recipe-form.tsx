@@ -29,11 +29,12 @@ type RecipeFormData = z.infer<typeof recipeSchema>;
 
 interface RecipeFormProps {
   recipe?: Recipe;
-  onSubmit: (data: InsertRecipe) => Promise<Recipe | void>;
+  onSubmit?: (data: InsertRecipe) => Promise<Recipe | void>;
   onCancel: () => void;
+  articleId?: number; // nouvelle prop optionnelle
 }
 
-export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
+export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -57,7 +58,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
   const form = useForm<RecipeFormData>({
     resolver: zodResolver(recipeSchema),
     defaultValues: {
-      articleId: recipe?.articleId || 0,
+      articleId: articleId ?? recipe?.articleId ?? 0,
       description: recipe?.description || "",
       quantity: recipe?.quantity || "",
       unit: recipe?.unit || "",
@@ -408,7 +409,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
     // Sauvegarder la recette d'abord
     let savedRecipe;
     try {
-      savedRecipe = await onSubmit(recipeData);
+      savedRecipe = await onSubmit?.(recipeData);
     } catch (error: any) {
       console.error("Erreur lors de la création de la recette:", error);
 
@@ -517,25 +518,37 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Informations générales</h3>
             <div className="grid grid-cols-5 gap-3">
-              <div className="col-span-2">
-                <Label htmlFor="articleId" className="text-xs">Produit *</Label>
-                <Select
-                  value={form.watch("articleId")?.toString()}
-                  onValueChange={(value) => form.setValue("articleId", parseInt(value))}
-                  data-testid="select-articleId"
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="Produit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products?.map((product: Article) => (
-                      <SelectItem key={product.id} value={product.id.toString()}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Si pas de articleId, afficher le select produit */}
+              {!articleId && (
+                <div className="col-span-2">
+                  <Label htmlFor="articleId" className="text-xs">Produit *</Label>
+                  <Select
+                    value={form.watch("articleId")?.toString()}
+                    onValueChange={(value) => form.setValue("articleId", parseInt(value))}
+                    data-testid="select-articleId"
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Produit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products?.map((product: Article) => (
+                        <SelectItem key={product.id} value={product.id.toString()}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {/* Si articleId fourni, afficher le nom du produit en lecture seule */}
+              {articleId && (
+                <div className="col-span-2 flex items-center">
+                  <Label className="text-xs mr-2">Produit :</Label>
+                  <span className="font-medium text-sm">
+                    {allArticles.find((a: Article) => a.id === articleId)?.name || "Produit inconnu"}
+                  </span>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="quantity" className="text-xs">Quantité *</Label>

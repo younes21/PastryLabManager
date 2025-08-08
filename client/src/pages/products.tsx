@@ -53,6 +53,7 @@ import {
 } from "@shared/schema";
 import { RecipeDisplay } from "@/components/recipe-display";
 import { Layout } from "@/components/layout";
+import { RecipeForm } from "@/components/recipe-form";
 
 // Schéma de validation pour les produits
 const productSchema = insertArticleSchema.extend({
@@ -73,6 +74,7 @@ export default function Products() {
   const [selectedProduct, setSelectedProduct] = useState<Article | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [recipeDialogProduct, setRecipeDialogProduct] = useState<Article | null>(null);
 
   // Récupération des articles de type "product"
   const { data: articles = [], isLoading } = useQuery<Article[]>({
@@ -282,7 +284,7 @@ export default function Products() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Modifier
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setRecipeDialogProduct(product)}>
                             <ChefHat className="mr-2 h-4 w-4" />
                             Gérer recette
                           </DropdownMenuItem>
@@ -299,7 +301,17 @@ export default function Products() {
         </CardContent>
       </Card>
     </div>
-  )</Layout>);
+    {recipeDialogProduct && (
+      <Dialog open={!!recipeDialogProduct} onOpenChange={() => setRecipeDialogProduct(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gérer la recette pour {recipeDialogProduct.name}</DialogTitle>
+          </DialogHeader>
+          <RecipeForm articleId={recipeDialogProduct.id} onCancel={() => setRecipeDialogProduct(null)} />
+        </DialogContent>
+      </Dialog>
+    )}
+  </Layout>);
 }
 
 function ProductForm({ product, onSuccess }: { product?: Article | null; onSuccess: () => void }) {
@@ -383,8 +395,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     // Conversion des types pour l'API - en gardant les strings car le schéma les attend comme ça
     const transformedData = {
       ...formData,
-      // Ne pas convertir - le schéma côté serveur attend des strings
-      shelfLife: formData.shelfLife || null,
+      shelfLife: formData.shelfLife || undefined,
       salePrice: formData.salePrice || null,
       minStock: formData.minStock || "0.00",
       maxStock: formData.maxStock || "0.00",
@@ -407,7 +418,6 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="stock">Stock & Gestion</TabsTrigger>
             <TabsTrigger value="vente">Vente & Prix</TabsTrigger>
-            <TabsTrigger value="recipe">Recette</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -804,16 +814,6 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 )}
               />
             </div>
-          </TabsContent>
-
-          <TabsContent value="recipe" className="space-y-4">
-            {isEditing && product ? (
-              <RecipeDisplay articleId={product.id} />
-            ) : (
-              <div className="text-center p-6 text-muted-foreground">
-                <p>La gestion des recettes est disponible après la création du produit</p>
-              </div>
-            )}
           </TabsContent>
         </Tabs>
 
