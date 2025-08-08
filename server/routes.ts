@@ -1002,6 +1002,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "🔥 CREATE RECIPE - Request body:",
         JSON.stringify(req.body, null, 2),
       );
+      
+      // Vérifier si une recette existe déjà pour cet article
+      const existingRecipe = await storage.getRecipeByArticleId(req.body.articleId);
+      if (existingRecipe) {
+        console.log("❌ CREATE RECIPE - Recipe already exists for article:", req.body.articleId);
+        return res.status(409).json({ 
+          message: "Une recette existe déjà pour ce produit. Vous ne pouvez pas créer plusieurs recettes pour le même produit." 
+        });
+      }
+      
       const newRecipe = await storage.createRecipe(req.body);
       console.log(
         "✅ CREATE RECIPE - Success:",

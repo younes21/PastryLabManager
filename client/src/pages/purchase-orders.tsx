@@ -367,7 +367,7 @@ const ReceptionAchatInterface = () => {
               <p className='text-gray-600 dark:text-gray-400 mt-2'>gerer les achat de vos ingrédients depuis vos fournisseur </p>
             <button
                 onClick={createNewOperation}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-blue-700 flex items-center space-x-2"
+                className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg  flex items-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nouvelle Réception</span>

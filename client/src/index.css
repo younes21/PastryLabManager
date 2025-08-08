@@ -14,6 +14,7 @@
   --border: hsl(20, 5.9%, 90%);
   --input: hsl(20, 5.9%, 90%);
   --primary: hsl(26.05deg 95% 52.94%);
+  --primary-hover: hsl(26.05deg 95% 45%);
   --primary-foreground: hsl(210, 40%, 98%);
   --secondary: hsl(60, 4.8%, 95.9%);
   --secondary-foreground: hsl(24, 9.8%, 10%);

@@ -778,7 +778,7 @@ export class DatabaseStorage implements IStorage {
 
   // Recipes (attached to articles with type="product")
   async getAllRecipes(): Promise<Recipe[]> {
-    return await db.select().from(recipes).orderBy(recipes.designation);
+    return await db.select().from(recipes).orderBy(recipes.id);
   }
 
   async getRecipe(id: number): Promise<Recipe | undefined> {

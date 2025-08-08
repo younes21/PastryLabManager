@@ -273,8 +273,7 @@ export const articles = pgTable("articles", {
 // Recettes - attachées aux articles de type "product"
 export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
-  articleId: integer("article_id").references(() => articles.id).notNull(),
-  designation: text("designation").notNull(),
+  articleId: integer("article_id").references(() => articles.id).notNull().unique(),
   description: text("description"),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(), // Quantité/nombre de parts
   unit: text("unit").notNull(), // Unité de mesure
