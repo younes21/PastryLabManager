@@ -1,91 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Save, X, FileText, CreditCard, Eye, Trash2, Edit3, ChevronDown, ArrowLeft, Banknote } from 'lucide-react';
+import { Plus, Save, X, FileText, CreditCard, Trash2, Edit3, ChevronDown, ArrowLeft, Banknote } from 'lucide-react';
 import { Layout } from '@/components/layout';
+import { apiRequest } from '@/lib/queryClient';
 
 const ReceptionAchatInterface = () => {
-  const [operations, setOperations] = useState([]);
-  const [currentOperation, setCurrentOperation] = useState(null);
+  const [operations, setOperations] = useState<any[]>([]);
+  const [currentOperation, setCurrentOperation] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<any[]>([]);
   const [showProductSelect, setShowProductSelect] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [selectedArticle, setSelectedArticle] = useState<any>(null);
 
-  // Mock data avec plus de données
-  const suppliers = [
-    { id: 1, code: 'FRN-000001', companyName: 'TAB COOK SUPPLIES', type: 'societe', phone: '023-45-67-89' },
-    { id: 2, code: 'FRN-000002', companyName: 'ECONOMAT DISTRIBUTION', type: 'societe', phone: '023-78-90-12' },
-    { id: 3, code: 'FRN-000003', companyName: 'FRESH PRODUCTS SARL', type: 'societe', phone: '023-34-56-78' },
-    { id: 4, code: 'FRN-000004', companyName: 'METRO CASH & CARRY', type: 'societe', phone: '023-89-01-23' }
-  ];
+  // Data from API
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [storageZones, setStorageZones] = useState<any[]>([]);
+  const [articles, setArticles] = useState<any[]>([]);
 
-  const storageZones = [
-    { id: 1, designation: 'ECONOMAT', code: 'ZON-000001', capacity: '1000', unit: 'kg', temperature: '20' },
-    { id: 2, designation: 'CHAMBRE FROIDE', code: 'ZON-000002', capacity: '500', unit: 'kg', temperature: '4' },
-    { id: 3, designation: 'CONGELATEUR', code: 'ZON-000003', capacity: '300', unit: 'kg', temperature: '-18' },
-    { id: 4, designation: 'CAVE LEGUMES', code: 'ZON-000004', capacity: '800', unit: 'kg', temperature: '12' }
-  ];
-
-  const articles = [
-    { id: 1, code: 'ING-000001', name: 'NOIX', type: 'ingredient', unit: 'KG', currentStock: 5.0000, costPerUnit: 1400.00, managedInStock: true },
-    { id: 2, code: 'ING-000002', name: 'FARINE T55', type: 'ingredient', unit: 'KG', currentStock: 25.0000, costPerUnit: 180.00, managedInStock: true },
-    { id: 3, code: 'ING-000003', name: 'SUCRE BLANC', type: 'ingredient', unit: 'KG', currentStock: 15.0000, costPerUnit: 220.00, managedInStock: true },
-    { id: 4, code: 'ING-000004', name: 'BEURRE DOUX', type: 'ingredient', unit: 'KG', currentStock: 8.5000, costPerUnit: 850.00, managedInStock: true },
-    { id: 5, code: 'ING-000005', name: 'OEUFS FRAIS', type: 'ingredient', unit: 'UNITE', currentStock: 144.0000, costPerUnit: 25.00, managedInStock: true },
-    { id: 6, code: 'ING-000006', name: 'LAIT ENTIER', type: 'ingredient', unit: 'LITRE', currentStock: 12.0000, costPerUnit: 95.00, managedInStock: true },
-    { id: 7, code: 'ING-000007', name: 'CHOCOLAT NOIR', type: 'ingredient', unit: 'KG', currentStock: 3.2000, costPerUnit: 1200.00, managedInStock: true },
-    { id: 8, code: 'ING-000008', name: 'VANILLE LIQUIDE', type: 'ingredient', unit: 'LITRE', currentStock: 0.5000, costPerUnit: 2800.00, managedInStock: true },
-    { id: 9, code: 'ING-000009', name: 'SEL FIN', type: 'ingredient', unit: 'KG', currentStock: 10.0000, costPerUnit: 80.00, managedInStock: true },
-    { id: 10, code: 'ING-000010', name: 'LEVURE CHIMIQUE', type: 'ingredient', unit: 'KG', currentStock: 2.0000, costPerUnit: 450.00, managedInStock: true }
-  ];
-
-  // Données de test pour les opérations existantes
-  const mockOperations = [
-    {
-      id: 1,
-      code: 'REC-000001',
-      type: 'reception',
-      status: 'completed',
-      supplierId: 1,
-      storageZoneId: 1,
-      subtotalHT: 7000.00,
-      totalTax: 1330.00,
-      totalTTC: 8330.00,
-      discount: 0,
-      notes: 'Livraison matinale',
-      createdAt: '2025-06-25T08:30:00',
-      items: [
-        { id: 1, articleId: 1, quantity: 5.000, unitCost: 1400.00, totalCost: 7000.00, taxRate: 19.00, taxAmount: 1330.00 }
-      ]
-    },
-    {
-      id: 2,
-      code: 'REC-000002',
-      type: 'reception',
-      status: 'draft',
-      supplierId: 2,
-      storageZoneId: 1,
-      subtotalHT: 4500.00,
-      totalTax: 855.00,
-      totalTTC: 5355.00,
-      discount: 100,
-      notes: 'Commande urgente',
-      createdAt: '2025-06-28T14:15:00',
-      items: [
-        { id: 2, articleId: 2, quantity: 25.000, unitCost: 180.00, totalCost: 4500.00, taxRate: 19.00, taxAmount: 855.00 }
-      ]
-    }
-  ];
-
+  // Load initial data from API
   useEffect(() => {
-    setOperations(mockOperations);
+    const loadAll = async () => {
+      try {
+        const [supRes, zoneRes, artRes, poRes] = await Promise.all([
+          apiRequest('/api/suppliers', 'GET'),
+          apiRequest('/api/storage-zones', 'GET'),
+          apiRequest('/api/articles', 'GET'),
+          apiRequest('/api/purchase-orders', 'GET'),
+        ]);
+
+        const suppliersData = await supRes.json();
+        const zonesData = await zoneRes.json();
+        const articlesData = await artRes.json();
+        const posData = await poRes.json();
+
+        setSuppliers(suppliersData || []);
+        setStorageZones(zonesData || []);
+        // Filter to ingredients for purchase context
+        // Normaliser types numériques pour éviter 0
+        const norm = (v: any) => (v === null || v === undefined ? '0' : v.toString());
+        const ing = (articlesData || [])
+          .filter((a: any) => a.type === 'ingredient')
+          .map((a: any) => ({
+            ...a,
+            costPerUnit: norm(a.costPerUnit),
+            currentStock: norm(a.currentStock),
+          }));
+        setArticles(ing);
+        setOperations(posData || []);
+      } catch (e) {
+        console.error('Failed to load initial data', e);
+      }
+    };
+
+    void loadAll();
   }, []);
 
   const createNewOperation = () => {
     const newOp = {
       id: Date.now(),
-      code: `REC-${String(operations.length + 1).padStart(6, '0')}`,
-      type: 'reception',
+      code: undefined,
       status: 'draft',
       supplierId: '',
       storageZoneId: '',
@@ -102,13 +75,47 @@ const ReceptionAchatInterface = () => {
     setIsEditing(true);
   };
 
-  const editOperation = (op) => {
-    setCurrentOperation(op);
-    setItems(op.items || []);
-    setIsEditing(true);
+  const editOperation = async (op: any) => {
+    try {
+      // Fetch full order with items
+      const res = await apiRequest(`/api/purchase-orders/${op.id}`, 'GET');
+      const data = await res.json();
+
+      setCurrentOperation({
+        id: data.id,
+        code: data.code,
+        supplierId: data.supplierId,
+        status: data.status,
+        discount: parseFloat(data.discount || '0'),
+        subtotalHT: parseFloat(data.subtotalHT || '0'),
+        totalTax: parseFloat(data.totalTax || '0'),
+        totalTTC: parseFloat(data.totalTTC || '0'),
+        notes: data.notes || '',
+        createdAt: data.createdAt,
+        storageZoneId: data.storageZoneId || '',
+      });
+
+      const mappedItems = (data.items || []).map((it: any) => ({
+        id: it.id,
+        articleId: it.articleId,
+        article: articles.find((a: any) => a.id === it.articleId) || { id: it.articleId },
+        currentStock: parseFloat(it.quantityBefore || '0'),
+        quantityOrdered: parseFloat(it.quantity || '0'),
+        unitPrice: parseFloat(it.unitCost || '0'),
+        totalPrice: parseFloat(it.totalCost || '0'),
+        taxRate: parseFloat(it.taxRate || '0'),
+        taxAmount: parseFloat(it.taxAmount || '0'),
+        storageZoneId: it.toStorageZoneId || null,
+        notes: it.notes || '',
+      }));
+      setItems(mappedItems);
+      setIsEditing(true);
+    } catch (e) {
+      console.error('Failed to load purchase order details', e);
+    }
   };
 
-  const deleteOperation = (opId) => {
+  const deleteOperation = (opId: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette opération ?')) {
       setOperations(operations.filter(op => op.id !== opId));
       if (currentOperation?.id === opId) {
@@ -120,28 +127,28 @@ const ReceptionAchatInterface = () => {
   };
 
   const filteredArticles = articles.filter(article =>
-    article?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    article?.code.toLowerCase().includes(searchTerm.toLowerCase())
+    (article?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (article?.code || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const addItem = (articleToAdd) => {
+  const addItem = (articleToAdd: any) => {
     if (articleToAdd) {
-      const unitPrice = articleToAdd.costPerUnit;
-      const quantity = 1;
-      const totalPrice = quantity * unitPrice;
-      const taxRate = 19.00;
+      const unitPrice = parseFloat((articleToAdd.costPerUnit ?? articleToAdd.salePrice ?? 0).toString());
+      const quantityOrdered = 1;
+      const totalPrice = quantityOrdered * unitPrice;
+      const taxRate = Number.isFinite(articleToAdd.defaultTaxRate) ? parseFloat(articleToAdd.defaultTaxRate) : 19.0;
       const taxAmount = totalPrice * (taxRate / 100);
 
       const newItem = {
         id: Date.now(),
         articleId: articleToAdd.id,
         article: articleToAdd,
-        quantity: quantity,
-        unitCost: unitPrice,
-        totalCost: totalPrice,
+        quantityOrdered,
+        unitPrice,
+        totalPrice,
         taxRate: taxRate,
         taxAmount: taxAmount,
-        quantityBefore: articleToAdd.currentStock
+         currentStock: parseFloat((articleToAdd.currentStock ?? 0).toString())
       };
 
       setItems([...items, newItem]);
@@ -151,19 +158,20 @@ const ReceptionAchatInterface = () => {
     }
   };
 
-  const removeItem = (itemId) => {
+  const removeItem = (itemId: number) => {
     setItems(items.filter(item => item.id !== itemId));
   };
 
-  const updateItemQuantity = (itemId, newQuantity) => {
+  const updateItemQuantity = (itemId: number, newQuantity: any) => {
     setItems(items.map(item => {
       if (item.id === itemId) {
-        const totalCost = parseFloat(newQuantity || 0) * item.unitCost;
-        const taxAmount = totalCost * (item.taxRate / 100);
+        const quantityOrdered = parseFloat(newQuantity || 0);
+        const totalPrice = quantityOrdered * item.unitPrice;
+        const taxAmount = totalPrice * (item.taxRate / 100);
         return {
           ...item,
-          quantity: parseFloat(newQuantity || 0),
-          totalCost: totalCost,
+          quantityOrdered,
+          totalPrice,
           taxAmount: taxAmount
         };
       }
@@ -171,15 +179,16 @@ const ReceptionAchatInterface = () => {
     }));
   };
 
-  const updateItemPrice = (itemId, newPrice) => {
+  const updateItemPrice = (itemId: number, newPrice: any) => {
     setItems(items.map(item => {
       if (item.id === itemId) {
-        const totalCost = item.quantity * parseFloat(newPrice || 0);
-        const taxAmount = totalCost * (item.taxRate / 100);
+        const unitPrice = parseFloat(newPrice || 0);
+        const totalPrice = item.quantityOrdered * unitPrice;
+        const taxAmount = totalPrice * (item.taxRate / 100);
         return {
           ...item,
-          unitCost: parseFloat(newPrice || 0),
-          totalCost: totalCost,
+          unitPrice,
+          totalPrice,
           taxAmount: taxAmount
         };
       }
@@ -190,11 +199,11 @@ const ReceptionAchatInterface = () => {
   // Calculate totals
   useEffect(() => {
     if (currentOperation) {
-      const subtotalHT = items.reduce((sum, item) => sum + item.totalCost, 0);
+      const subtotalHT = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
       const totalTax = items.reduce((sum, item) => sum + item.taxAmount, 0);
       const totalTTC = subtotalHT + totalTax - (currentOperation.discount || 0);
 
-      setCurrentOperation(prev => ({
+      setCurrentOperation((prev: any) => ({
         ...prev,
         subtotalHT,
         totalTax,
@@ -203,58 +212,133 @@ const ReceptionAchatInterface = () => {
     }
   }, [items, currentOperation?.discount]);
 
-  const saveOperation = () => {
+  const saveOperation = async () => {
     if (!currentOperation) return;
 
-    const updatedOperation = {
-      ...currentOperation,
-      items: items
-    };
+    try {
+      // Validation stricte: fournisseur, zone et articles requis, lignes valides
+      if (!currentOperation.supplierId || !currentOperation.storageZoneId || items.length === 0) {
+        alert('Sélectionnez un fournisseur, une zone de stockage et au moins un article.');
+        return;
+      }
+      const invalidLine = items.some((it) => (Number(it.quantityOrdered) || 0) <= 0 || (Number(it.unitPrice) || 0) <= 0);
+      if (invalidLine) {
+        alert('Chaque ligne doit avoir une quantité et un prix unitaire > 0.');
+        return;
+      }
 
-    if (operations.find(op => op.id === currentOperation.id)) {
-      setOperations(operations.map(op => 
-        op.id === currentOperation.id ? updatedOperation : op
-      ));
-    } else {
-      setOperations([...operations, updatedOperation]);
+      // Build payload according to schema
+      const receptionHeader = {
+        supplierId: currentOperation.supplierId,
+        status: currentOperation.status || 'draft',
+        subtotalHT: (currentOperation.subtotalHT || 0).toFixed(2),
+        totalTax: (currentOperation.totalTax || 0).toFixed(2),
+        totalTTC: (currentOperation.totalTTC || 0).toFixed(2),
+        discount: (currentOperation.discount || 0).toFixed(2),
+        notes: currentOperation.notes || '',
+        storageZoneId: currentOperation.storageZoneId || null,
+      };
+
+      const itemsPayload = items.map((it) => ({
+        articleId: it.articleId,
+        storageZoneId: it.storageZoneId || currentOperation.storageZoneId || null,
+        currentStock: (it.currentStock ?? 0).toString(),
+        quantityOrdered: (it.quantityOrdered ?? 0).toString(),
+        unitPrice: (it.unitPrice ?? 0).toString(),
+        totalPrice: (it.totalPrice ?? 0).toString(),
+        taxRate: (it.taxRate ?? 0).toString(),
+        taxAmount: (it.taxAmount ?? 0).toString(),
+        notes: it.notes || undefined,
+      }));
+
+      const res = await apiRequest('/api/purchase-orders', 'POST', {
+        purchaseOrder: receptionHeader,
+        items: itemsPayload,
+      });
+      const data = await res.json();
+
+      // Update list and current operation from server response
+      setOperations((prev) => [data, ...prev]);
+      setCurrentOperation({
+        id: data.id,
+        code: data.code,
+        supplierId: data.supplierId,
+        status: data.status,
+        discount: parseFloat(data.discount || '0'),
+        subtotalHT: parseFloat(data.subtotalHT || '0'),
+        totalTax: parseFloat(data.totalTax || '0'),
+        totalTTC: parseFloat(data.totalTTC || '0'),
+        notes: data.notes || '',
+        createdAt: data.createdAt,
+      });
+      // Map depuis inventory_operation_items pour éviter les 0
+      setItems((data.items || []).map((it: any) => ({
+        id: it.id,
+        articleId: it.articleId,
+        article: articles.find((a: any) => a.id === it.articleId) || { id: it.articleId },
+        currentStock: parseFloat(it.quantityBefore || '0'),
+        quantityOrdered: parseFloat(it.quantity || '0'),
+        unitPrice: parseFloat(it.unitCost || '0'),
+        totalPrice: parseFloat(it.totalCost || '0'),
+        taxRate: parseFloat(it.taxRate || '0'),
+        taxAmount: parseFloat(it.taxAmount || '0'),
+        storageZoneId: it.toStorageZoneId || null,
+        notes: it.notes || '',
+      })));
+
+      // rafraîchir articles pour refléter stock/coût si backend a modifié (au PATCH)
+      try {
+        const artRes = await apiRequest('/api/articles', 'GET');
+        const articlesData = await artRes.json();
+        setArticles((articlesData || []).filter((a: any) => a.type === 'ingredient'));
+      } catch {}
+      alert('Réception sauvegardée');
+    } catch (e) {
+      console.error('Failed to save purchase order', e);
+      alert('Erreur lors de la sauvegarde');
     }
-
-    alert('Opération sauvegardée avec succès!');
   };
 
-  const completeOperation = () => {
-    if (items.length === 0) {
-      alert('Veuillez ajouter au moins un article avant de terminer.');
+  const completeOperation = async () => {
+    if (!currentOperation?.id) {
+      alert('Veuillez sauvegarder avant de confirmer.');
       return;
     }
-
-    const updatedOperation = {
-      ...currentOperation,
-      status: 'completed',
-      items: items
-    };
-
-    setOperations(operations.map(op => 
-      op.id === currentOperation.id ? updatedOperation : op
-    ));
-    setCurrentOperation(updatedOperation);
-    alert('Opération terminée avec succès!');
-  };
-
-  const cancelOperation = () => {
-    if (currentOperation) {
-      const updatedOperation = {
-        ...currentOperation,
-        status: 'cancelled'
-      };
-      setOperations(operations.map(op => 
-        op.id === currentOperation.id ? updatedOperation : op
-      ));
-      setCurrentOperation(updatedOperation);
+    // Empêcher confirmation si requis non sélectionnés
+    if (!currentOperation.supplierId || !items.length) {
+      alert('Sélectionnez un fournisseur et au moins un article pour confirmer.');
+      return;
+    }
+    try {
+      await apiRequest(`/api/purchase-orders/${currentOperation.id}`, 'PATCH', { status: 'completed' });
+      setOperations(operations.map(op => op.id === currentOperation.id ? { ...op, status: 'completed' } : op));
+      setCurrentOperation({ ...currentOperation, status: 'completed' });
+      // recharger articles pour afficher le nouveau stock/coût
+      try {
+        const artRes = await apiRequest('/api/articles', 'GET');
+        const articlesData = await artRes.json();
+        setArticles((articlesData || []).filter((a: any) => a.type === 'ingredient'));
+      } catch {}
+      alert('Réception complétée');
+    } catch (e) {
+      console.error('Failed to confirm', e);
+      alert('Erreur lors de la confirmation');
     }
   };
 
-  const getStatusBadge = (status) => {
+  const cancelOperation = async () => {
+    if (!currentOperation?.id) return;
+    try {
+      await apiRequest(`/api/purchase-orders/${currentOperation.id}`, 'PATCH', { status: 'cancelled' });
+      setOperations(operations.map(op => op.id === currentOperation.id ? { ...op, status: 'cancelled' } : op));
+      setCurrentOperation({ ...currentOperation, status: 'cancelled' });
+    } catch (e) {
+      console.error('Failed to cancel', e);
+      alert('Erreur lors de l\'annulation');
+    }
+  };
+
+  const getStatusBadge = (status: 'draft' | 'completed' | 'cancelled') => {
     const styles = {
       draft: 'bg-yellow-100 text-yellow-800',
       completed: 'bg-green-100 text-green-800',
@@ -296,7 +380,7 @@ const ReceptionAchatInterface = () => {
         {/* Operations List */}
         <div className=" mx-auto px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm border">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b">
@@ -312,7 +396,7 @@ const ReceptionAchatInterface = () => {
                 <tbody>
                   {operations.map((operation, index) => {
                     const supplier = suppliers.find(s => s.id === operation.supplierId);
-                    const zone = storageZones.find(z => z.id === operation.storageZoneId);
+                     const zone = storageZones.find(z => z.id === operation.storageZoneId);
                     
                     return (
                       <tr key={operation.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -329,10 +413,10 @@ const ReceptionAchatInterface = () => {
                           {getStatusBadge(operation.status)}
                         </td>
                         <td className="px-4 py-3 text-sm font-semibold text-right">
-                          {operation.totalTTC.toFixed(2)} DA
+                           {parseFloat(operation.totalTTC || operation.totalTtc || '0').toFixed(2)} DA
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {new Date(operation.createdAt).toLocaleDateString('fr-FR')}
+                           {new Date(operation.createdAt || operation.orderDate || Date.now()).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center space-x-2">
@@ -414,7 +498,7 @@ const ReceptionAchatInterface = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur *</label>
                 <select
                   value={currentOperation?.supplierId || ''}
-                  onChange={(e) => setCurrentOperation(prev => ({ ...prev, supplierId: parseInt(e.target.value) }))}
+                     onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, supplierId: parseInt(e.target.value) }))}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                   disabled={currentOperation?.status !== 'draft'}
                 >
@@ -431,12 +515,12 @@ const ReceptionAchatInterface = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Zone de stockage *</label>
                 <select
                   value={currentOperation?.storageZoneId || ''}
-                  onChange={(e) => setCurrentOperation(prev => ({ ...prev, storageZoneId: parseInt(e.target.value) }))}
+                  onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, storageZoneId: parseInt(e.target.value) }))}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                   disabled={currentOperation?.status !== 'draft'}
                 >
                   <option value="">Sélectionner...</option>
-                  {storageZones.map(zone => (
+                     {storageZones.map(zone => (
                     <option key={zone.id} value={zone.id}>
                       {zone.designation}
                     </option>
@@ -449,7 +533,7 @@ const ReceptionAchatInterface = () => {
                 <input
                   type="number"
                   value={currentOperation?.discount || 0}
-                  onChange={(e) => setCurrentOperation(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                  onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                   step="1"
                   disabled={currentOperation?.status !== 'draft'}
@@ -505,9 +589,9 @@ const ReceptionAchatInterface = () => {
               <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
               <textarea
                 value={currentOperation?.notes || ''}
-                onChange={(e) => setCurrentOperation(prev => ({ ...prev, notes: e.target.value }))}
+                onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, notes: e.target.value }))}
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
-                rows="2"
+                rows={2}
                 placeholder="Notes sur cette réception..."
                 disabled={currentOperation?.status !== 'draft'}
               />
@@ -543,7 +627,7 @@ const ReceptionAchatInterface = () => {
                     <td className="px-3 py-2 text-center">
                       <input
                         type="number"
-                        value={item.quantity}
+                        value={item.quantityOrdered}
                         onChange={(e) => updateItemQuantity(item.id, e.target.value)}
                         step="1"
                         min="0"
@@ -552,15 +636,15 @@ const ReceptionAchatInterface = () => {
                       />
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {item.quantityBefore?.toFixed(3)}
+                       {Number.isFinite(item.currentStock) ? Number(item.currentStock).toFixed(3) : '0.000'}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
-                      {item.article?.unit}
+                       {item.article?.unit}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <input
                         type="number"
-                        value={item.unitCost}
+                         value={item.unitPrice}
                         onChange={(e) => updateItemPrice(item.id, e.target.value)}
                         step="1"
                         min="0"
@@ -569,7 +653,7 @@ const ReceptionAchatInterface = () => {
                       />
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-semibold">
-                      {item.totalCost.toFixed(2)} DA
+                       {item.totalPrice.toFixed(2)} DA
                     </td>
                     <td className="px-3 py-2 text-center">
                       {currentOperation?.status === 'draft' && (
@@ -623,11 +707,17 @@ const ReceptionAchatInterface = () => {
 
           {/* Actions */}
           <div className=" rounded-lg  md:col-span-1">
-            <div className="px-28 py-4 font-bold">
+            <div className="px-6  py-4 font-bold">
               <div className="grid grid-cols-1 gap-4">
                 <button
                   onClick={saveOperation}
-                  disabled={currentOperation?.status !== 'draft'}
+                  disabled={
+                    currentOperation?.status !== 'draft' ||
+                    !currentOperation?.supplierId ||
+                    !currentOperation?.storageZoneId ||
+                    items.length === 0 ||
+                    items.some((it) => (Number(it.quantityOrdered) || 0) <= 0 || (Number(it.unitPrice) || 0) <= 0)
+                  }
                   className="px-3 py-3 text-sm border-blue-500  border-2 rounded hover:bg-blue-50 disabled:opacity-50 flex items-center justify-center space-x-1"
                 >
                   <Save className="w-4 h-4 text-blue-700" />
@@ -636,7 +726,7 @@ const ReceptionAchatInterface = () => {
                 
                 <button
                   onClick={completeOperation}
-                  disabled={currentOperation?.status !== 'draft' || items.length === 0}
+                  disabled={currentOperation?.status !== 'draft' || !currentOperation?.id}
                   className="px-3 py-3 text-sm border-green-500  border-2 rounded hover:bg-green-50 disabled:opacity-50 flex items-center justify-center space-x-1"
                 >
                   <FileText className="w-4 h-4 text-green-700" />

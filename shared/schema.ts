@@ -433,90 +433,11 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
-export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
-export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
-export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
-export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+// Purchase types removed as purchase_* tables are not used anymore
 
 // ============ ACHATS FOURNISSEURS ============
 
-export const purchaseOrders = pgTable("purchase_orders", {
-  id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // ACH-000001
-  supplierId: integer("supplier_id").references(() => suppliers.id).notNull(),
-  status: text("status").notNull().default("draft"), // draft, confirmed, received, cancelled
-  
-  // Dates
-  orderDate: timestamp("order_date", { mode: 'string' }).defaultNow(),
-  expectedDate: timestamp("expected_date", { mode: 'string' }),
-  receivedDate: timestamp("received_date", { mode: 'string' }),
-  
-  // Totaux
-  subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).default("0.00"),
-  totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
-  totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).default("0.00"),
-  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
-  
-  // Notes
-  notes: text("notes"),
-  
-  // Audit
-  createdBy: integer("created_by").references(() => users.id),
-  confirmedBy: integer("confirmed_by").references(() => users.id),
-  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
-});
-
-export const purchaseOrderItems = pgTable("purchase_order_items", {
-  id: serial("id").primaryKey(),
-  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id, { onDelete: 'cascade' }).notNull(),
-  articleId: integer("article_id").references(() => articles.id).notNull(),
-  storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Zone de stockage
-  
-  // Quantités et prix
-  currentStock: decimal("current_stock", { precision: 10, scale: 3 }).default("0.00"), // Stock actuel
-  quantityOrdered: decimal("quantity_ordered", { precision: 10, scale: 3 }).notNull(), // Quantité à acheter
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(), // Prix d'achat unitaire
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
-  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("19.00"), // Taux TVA
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0.00"),
-  
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-});
-
-// Purchase order insert schemas and types
-export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, code: true, createdAt: true, updatedAt: true });
-export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true }).extend({
-  quantityOrdered: z.union([z.string(), z.number()]).transform((val) => {
-    if (typeof val === "number") return val.toString();
-    return val;
-  }),
-  unitPrice: z.union([z.string(), z.number()]).transform((val) => {
-    if (typeof val === "number") return val.toString();
-    return val;
-  }),
-  totalPrice: z.union([z.string(), z.number()]).transform((val) => {
-    if (typeof val === "number") return val.toString();
-    return val;
-  }),
-  taxAmount: z.union([z.string(), z.number()]).transform((val) => {
-    if (typeof val === "number") return val.toString();
-    return val;
-  }),
-  taxRate: z.union([z.string(), z.number()]).transform((val) => {
-    if (typeof val === "number") return val.toString();
-    return val;
-  }),
-  currentStock: z.union([z.string(), z.number()]).transform((val) => {
-    if (typeof val === "number") return val.toString();
-    return val;
-  }),
-});
-export const insertPurchaseOrderWithItemsSchema = z.object({
-  purchaseOrder: insertPurchaseOrderSchema,
-  items: z.array(insertPurchaseOrderItemSchema).min(1, "Au moins un article est requis."),
-});
+// purchase_* tables and schemas removed
 
 // ============ COMMANDES & DEVIS ============
 
@@ -579,6 +500,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
   // Références
   supplierId: integer("supplier_id").references(() => suppliers.id), // Pour réceptions
   orderId: integer("order_id").references(() => orders.id), // Pour préparations/livraisons
+  // purchaseOrderId removed: we don't use purchase_* tables
   parentOperationId: integer("parent_operation_id"), // Pour reliquats et rectifications
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
   operatorId: integer("operator_id").references(() => users.id), // Préparateur/opérateur
@@ -632,6 +554,44 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
+
+// ======= INVENTORY (single table, mixed approach: header + line details in one row) =======
+export const inventory = pgTable("inventory", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull(),
+  type: text("type").notNull(), // reception, preparation, ajustement, interne, livraison, etc.
+  status: text("status").notNull().default("draft"),
+
+  // Contexte opération
+  operationDate: timestamp("operation_date", { mode: 'string' }).defaultNow(),
+  operationId: integer("operation_id").references(() => inventoryOperations.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  orderId: integer("order_id").references(() => orders.id),
+  // purchaseOrderId removed: we don't use purchase_* tables
+  operatorId: integer("operator_id").references(() => users.id),
+
+  // Mouvement/Article
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  fromStorageZoneId: integer("from_storage_zone_id").references(() => storageZones.id),
+  toStorageZoneId: integer("to_storage_zone_id").references(() => storageZones.id),
+  quantityBefore: decimal("quantity_before", { precision: 10, scale: 3 }),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  quantityAfter: decimal("quantity_after", { precision: 10, scale: 3 }),
+
+  // Coûts/Taxes (pour réceptions)
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
+
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+});
+
+export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true, createdAt: true, updatedAt: true });
+export type Inventory = typeof inventory.$inferSelect;
+export type InsertInventory = z.infer<typeof insertInventorySchema>;
 
 // ============ LIVRAISONS ============
 

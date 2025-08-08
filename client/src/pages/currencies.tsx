@@ -16,7 +16,7 @@ import type { Currency, InsertCurrency } from "@shared/schema";
 
 const currencyFormSchema = z.object({
   code: z.string().min(3, "Le code doit contenir au moins 3 caractères").max(3, "Le code doit contenir exactement 3 caractères"),
-  designation: z.string().min(1, "La désignation est requise"),
+  name: z.string().min(1, "La désignation est requise"),
   symbol: z.string().min(1, "Le symbole est requis"),
   rate: z.number().min(0.001, "Le taux doit être supérieur à 0"),
   isBase: z.boolean().default(false),
@@ -74,7 +74,7 @@ export default function CurrenciesPage() {
     resolver: zodResolver(currencyFormSchema),
     defaultValues: {
       code: "",
-      designation: "",
+      name: "",
       symbol: "",
       rate: 1,
       isBase: false,
@@ -94,7 +94,7 @@ export default function CurrenciesPage() {
     setEditingCurrency(currency);
     form.reset({
       code: currency.code,
-      designation: currency.designation,
+      name: currency.name,
       symbol: currency.symbol,
       rate: parseFloat(currency.exchangeRate || '1'),
       isBase: currency.isBase || false,
@@ -113,7 +113,7 @@ export default function CurrenciesPage() {
     setEditingCurrency(null);
     form.reset({
       code: "",
-      designation: "",
+      name: "",
       symbol: "",
       rate: 1,
       isBase: false,
@@ -186,7 +186,7 @@ export default function CurrenciesPage() {
 
                 <FormField
                   control={form.control}
-                  name="designation"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Désignation</FormLabel>
@@ -195,7 +195,7 @@ export default function CurrenciesPage() {
                           {...field} 
                           placeholder="Euro"
                           className="h-12 text-lg"
-                          data-testid="input-currency-designation"
+                          data-testid="input-currency-name"
                         />
                       </FormControl>
                       <FormMessage />
@@ -329,7 +329,7 @@ export default function CurrenciesPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {currency.designation} ({currency.code})
+                      {currency.name} ({currency.code})
                     </h3>
                     <span className="text-lg font-medium text-gray-700 dark:text-gray-300">
                       {currency.symbol}

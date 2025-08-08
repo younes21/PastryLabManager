@@ -36,7 +36,7 @@ export default function RecipesPage() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   // Queries
-  const { data: recipes = [], isLoading: recipesLoading } = useQuery<Recipe[]>({
+  const { data: recipes = [], isLoading: recipesLoading } = useQuery<any[]>({
     queryKey: ["/api/recipes"],
   });
 
@@ -47,10 +47,8 @@ export default function RecipesPage() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: InsertRecipe) => {
-      return await apiRequest("/api/recipes", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest("/api/recipes", "POST", data);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
@@ -64,10 +62,8 @@ export default function RecipesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertRecipe) => {
-      return await apiRequest(`/api/recipes/${selectedRecipe?.id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest(`/api/recipes/${selectedRecipe?.id}`, "PUT", data);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
@@ -82,9 +78,8 @@ export default function RecipesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/recipes/${id}`, {
-        method: "DELETE",
-      });
+      const response = await apiRequest(`/api/recipes/${id}`, "DELETE");
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
@@ -139,11 +134,30 @@ export default function RecipesPage() {
     }
   };
 
-  const handleSubmit = (data: InsertRecipe) => {
+  const handleSubmit = async (data: InsertRecipe): Promise<Recipe | void> => {
     if (selectedRecipe) {
+      // Pour la modification, on ne peut pas retourner la recette car updateMutation est asynchrone
       updateMutation.mutate(data);
+      return;
     } else {
-      createMutation.mutate(data);
+      // Pour la création, on attend la réponse pour avoir l'ID de la recette
+      try {
+        console.log("Creating recipe with data:", data);
+        const response = await apiRequest("/api/recipes", "POST", data);
+        const responseData = await response.json();
+        
+        console.log("Recipe created:", responseData);
+        
+        if (responseData && responseData.id) {
+          queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+          setShowCreateForm(false);
+          toast({ title: "Recette créée avec succès" });
+          return responseData;
+        }
+      } catch (error) {
+        console.error("Error creating recipe:", error);
+        toast({ title: "Erreur lors de la création", variant: "destructive" });
+      }
     }
   };
 
@@ -289,7 +303,10 @@ export default function RecipesPage() {
                   </div>
                 </TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
+                 <TableHead>Ingrédients</TableHead>
+                 <TableHead>Opérations</TableHead>
+                 <TableHead>Durée tot. (min)</TableHead>
+                 <TableHead>Description</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -321,7 +338,16 @@ export default function RecipesPage() {
                         {recipe.isSubRecipe ? "Sous-recette" : "Recette"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">
+                     <TableCell>
+                       <Badge variant="outline">{(recipe as any).ingredientsCount ?? 0}</Badge>
+                     </TableCell>
+                     <TableCell>
+                       <Badge variant="outline">{(recipe as any).operationsCount ?? 0}</Badge>
+                     </TableCell>
+                     <TableCell>
+                       <Badge variant="secondary">{(recipe as any).totalOperationDuration ?? 0}</Badge>
+                     </TableCell>
+                     <TableCell className="max-w-xs truncate">
                       {recipe.description || "-"}
                     </TableCell>
                     <TableCell>

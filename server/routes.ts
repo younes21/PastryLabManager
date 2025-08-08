@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { pool } from "./db";
 import {
   insertUserSchema,
   insertStorageLocationSchema,
@@ -27,14 +26,12 @@ import {
   insertOrderItemSchema,
   insertInventoryOperationSchema,
   insertInventoryOperationItemSchema,
+  insertInventorySchema,
   insertDeliverySchema,
   insertInvoiceSchema,
   insertInvoiceItemSchema,
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
-  insertPurchaseOrderSchema,
-  insertPurchaseOrderItemSchema,
-  insertPurchaseOrderWithItemsSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -205,6 +202,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(units);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch measurement units" });
+    }
+  });
+
+  app.get("/api/measurement-units/active", async (req, res) => {
+    try {
+      const units = await storage.getActiveMeasurementUnits();
+      res.json(units);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active measurement units" });
     }
   });
 
@@ -942,8 +948,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Recipes routes (attached to articles with type="product")
   app.get("/api/recipes", async (req, res) => {
     try {
-      const recipes = await storage.getAllRecipes();
-      res.json(recipes);
+      const [recipes, stats] = await Promise.all([
+        storage.getAllRecipes(),
+        storage.getRecipeStats().catch(() => []),
+      ]);
+      const statsMap = new Map(stats.map((s: any) => [s.recipeId, s]));
+      const enriched = recipes.map((r: any) => ({
+        ...r,
+        ingredientsCount: statsMap.get(r.id)?.ingredientsCount || 0,
+        operationsCount: statsMap.get(r.id)?.operationsCount || 0,
+        totalOperationDuration: statsMap.get(r.id)?.totalOperationDuration || 0,
+      }));
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching recipes:", error);
       res.status(500).json({ message: "Failed to fetch recipes" });
@@ -1372,70 +1388,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============ ACHATS FOURNISSEURS ROUTES ============
+  // ============ ACHATS VIA INVENTORY (PAS DE purchase_*) ============
 
+  // Liste des "bons d'achat" remplacés par opérations d'inventaire type reception + lignes
   app.get("/api/purchase-orders", async (req, res) => {
     try {
       const { supplier_id, status } = req.query;
-      let orders;
-      
+      // On mappe vers inventory_operations type=reception
+      let ops = await storage.getInventoryOperationsByType('reception');
       if (supplier_id) {
-        orders = await storage.getPurchaseOrdersBySupplier(parseInt(supplier_id as string));
-      } else if (status) {
-        orders = await storage.getPurchaseOrdersByStatus(status as string);
-      } else {
-        orders = await storage.getAllPurchaseOrders();
+        ops = ops.filter(op => op.supplierId === parseInt(supplier_id as string));
       }
-      
-      res.json(orders);
+      if (status) {
+        ops = ops.filter(op => op.status === (status as string));
+      }
+      res.json(ops);
     } catch (error) {
-      console.error("Error fetching purchase orders:", error);
-      res.status(500).json({ message: "Failed to fetch purchase orders" });
+      console.error("Error fetching receptions:", error);
+      res.status(500).json({ message: "Failed to fetch receptions" });
     }
   });
 
   app.get("/api/purchase-orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const order = await storage.getPurchaseOrder(id);
-      
-      if (!order) {
-        return res.status(404).json({ message: "Purchase order not found" });
+      const op = await storage.getInventoryOperation(id);
+      if (!op || op.type !== 'reception') {
+        return res.status(404).json({ message: "Reception not found" });
       }
-      
-      // Get order items as well
-      const items = await storage.getPurchaseOrderItems(id);
-      res.json({ ...order, items });
+      const items = await storage.getInventoryOperationItems(id);
+      res.json({ ...op, items });
     } catch (error) {
-      console.error("Error fetching purchase order:", error);
-      res.status(500).json({ message: "Failed to fetch purchase order" });
+      console.error("Error fetching reception:", error);
+      res.status(500).json({ message: "Failed to fetch reception" });
     }
   });
 
+  // Création d'une réception: crée inventory_operation (header), inventory_operation_items (lignes)
+  // et journal unique inventory par ligne
   app.post("/api/purchase-orders", async (req, res) => {
     try {
-      const data = insertPurchaseOrderWithItemsSchema.parse(req.body);
-      
-      // Create the purchase order first
-      const order = await storage.createPurchaseOrder(data.purchaseOrder);
-      
-      // Create order items
-      const items = [];
-      for (const itemData of data.items) {
-        const item = await storage.createPurchaseOrderItem({
-          ...itemData,
-          purchaseOrderId: order.id,
-        });
-        items.push(item);
+      const body = req.body as any;
+      // On accepte payload existant de la page, on transforme vers opération
+      const op = await storage.createInventoryOperation({
+        type: 'reception',
+        status: body?.purchaseOrder?.status ?? 'completed',
+        supplierId: body?.purchaseOrder?.supplierId,
+        storageZoneId: body?.items?.[0]?.storageZoneId ?? null,
+        notes: body?.purchaseOrder?.notes ?? null,
+        subtotalHT: body?.purchaseOrder?.subtotalHT ?? '0',
+        totalTax: body?.purchaseOrder?.totalTax ?? '0',
+        totalTTC: body?.purchaseOrder?.totalTTC ?? '0',
+        discount: body?.purchaseOrder?.discount ?? '0',
+      } as any);
+
+      const items: any[] = [];
+      for (const it of body.items ?? []) {
+        const line = await storage.createInventoryOperationItem({
+          operationId: op.id,
+          articleId: it.articleId,
+          quantity: it.quantityOrdered,
+          quantityBefore: it.currentStock,
+          quantityAfter: (parseFloat(it.currentStock || '0') + parseFloat(it.quantityOrdered || '0')).toString(),
+          unitCost: it.unitPrice,
+          totalCost: it.totalPrice,
+          taxRate: it.taxRate,
+          taxAmount: it.taxAmount,
+          toStorageZoneId: it.storageZoneId ?? null,
+          notes: it.notes ?? null,
+        } as any);
+        items.push(line);
       }
-      
-      res.status(201).json({ ...order, items });
+
+      res.status(201).json({ ...op, items });
     } catch (error) {
-      console.error("Error creating purchase order:", error);
+      console.error("Error creating reception:", error);
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid order data", errors: error.errors });
+        res.status(400).json({ message: "Invalid data", errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to create purchase order" });
+        res.status(500).json({ message: "Failed to create reception" });
       }
     }
   });
@@ -1444,98 +1475,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const updateData = req.body;
-      
-      const order = await storage.updatePurchaseOrder(id, updateData);
-      
-      if (!order) {
-        return res.status(404).json({ message: "Purchase order not found" });
+      const op = await storage.updateInventoryOperation(id, updateData);
+      if (!op || op.type !== 'reception') {
+        return res.status(404).json({ message: "Reception not found" });
       }
-      
-      res.json(order);
+      // Si on valide (completed), recalcul/mise à jour des stocks et journal si nécessaire
+      if (updateData?.status === 'completed') {
+        const lines = await storage.getInventoryOperationItems(id);
+        for (const l of lines) {
+          const qty = parseFloat(l.quantity as unknown as string || '0');
+          await storage.adjustArticleStockAndCost(l.articleId, qty, l.unitCost || '0');
+          // Si le journal n'existe pas déjà pour cette ligne, on peut écrire
+          // (simple): toujours écrire une ligne supplémentaire de confirmation
+          await storage.createInventoryRow({
+            code: op.code,
+            type: 'reception',
+            status: 'completed',
+            operationId: op.id,
+            operationDate: new Date().toISOString(),
+            supplierId: op.supplierId || null,
+            operatorId: null,
+            articleId: l.articleId,
+            fromStorageZoneId: null,
+            toStorageZoneId: l.toStorageZoneId || null,
+            quantityBefore: l.quantityBefore || '0',
+            quantity: l.quantity,
+            quantityAfter: l.quantityAfter || '0',
+            unitCost: l.unitCost || '0',
+            totalCost: l.totalCost || '0',
+            taxRate: l.taxRate || '0',
+            taxAmount: l.taxAmount || '0',
+            notes: `Validation ${op.code}`,
+          } as any);
+        }
+      }
+      res.json(op);
     } catch (error) {
-      console.error("Error updating purchase order:", error);
-      res.status(500).json({ message: "Failed to update purchase order" });
+      console.error("Error updating reception:", error);
+      res.status(500).json({ message: "Failed to update reception" });
     }
   });
 
   app.delete("/api/purchase-orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      
-      // Delete items first (cascade should handle this, but being explicit)
-      await storage.deletePurchaseOrderItems(id);
-      
-      const success = await storage.deletePurchaseOrder(id);
-      
+      // Supprimer d'abord les lignes
+      const lines = await storage.getInventoryOperationItems(id);
+      for (const l of lines) {
+        await storage.deleteInventoryOperationItem(l.id);
+      }
+      const success = await storage.deleteInventoryOperation(id);
       if (!success) {
-        return res.status(404).json({ message: "Purchase order not found" });
+        return res.status(404).json({ message: "Reception not found" });
       }
-      
-      res.json({ message: "Purchase order deleted successfully" });
+      res.json({ message: "Reception deleted successfully" });
     } catch (error) {
-      console.error("Error deleting purchase order:", error);
-      res.status(500).json({ message: "Failed to delete purchase order" });
-    }
-  });
-
-  // Purchase Order Items routes
-  app.get("/api/purchase-orders/:orderId/items", async (req, res) => {
-    try {
-      const orderId = parseInt(req.params.orderId);
-      const items = await storage.getPurchaseOrderItems(orderId);
-      res.json(items);
-    } catch (error) {
-      console.error("Error fetching purchase order items:", error);
-      res.status(500).json({ message: "Failed to fetch purchase order items" });
-    }
-  });
-
-  app.post("/api/purchase-order-items", async (req, res) => {
-    try {
-      const itemData = insertPurchaseOrderItemSchema.parse(req.body);
-      const item = await storage.createPurchaseOrderItem(itemData);
-      res.status(201).json(item);
-    } catch (error) {
-      console.error("Error creating purchase order item:", error);
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid item data", errors: error.errors });
-      } else {
-        res.status(500).json({ message: "Failed to create purchase order item" });
-      }
-    }
-  });
-
-  app.patch("/api/purchase-order-items/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updateData = req.body;
-      
-      const item = await storage.updatePurchaseOrderItem(id, updateData);
-      
-      if (!item) {
-        return res.status(404).json({ message: "Purchase order item not found" });
-      }
-      
-      res.json(item);
-    } catch (error) {
-      console.error("Error updating purchase order item:", error);
-      res.status(500).json({ message: "Failed to update purchase order item" });
-    }
-  });
-
-  app.delete("/api/purchase-order-items/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const success = await storage.deletePurchaseOrderItem(id);
-      
-      if (!success) {
-        return res.status(404).json({ message: "Purchase order item not found" });
-      }
-      
-      res.json({ message: "Purchase order item deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting purchase order item:", error);
-      res.status(500).json({ message: "Failed to delete purchase order item" });
+      console.error("Error deleting reception:", error);
+      res.status(500).json({ message: "Failed to delete reception" });
     }
   });
 

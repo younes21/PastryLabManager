@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, MoveUp, MoveDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Recipe, InsertRecipe, Article, RecipeIngredient, RecipeOperation, WorkStation } from "@shared/schema";
+import type { Recipe, InsertRecipe, Article, RecipeIngredient, RecipeOperation, WorkStation, MeasurementUnit } from "@shared/schema";
 
 const recipeSchema = z.object({
   articleId: z.number(),
@@ -30,7 +30,7 @@ type RecipeFormData = z.infer<typeof recipeSchema>;
 
 interface RecipeFormProps {
   recipe?: Recipe;
-  onSubmit: (data: InsertRecipe) => void;
+  onSubmit: (data: InsertRecipe) => Promise<Recipe | void>;
   onCancel: () => void;
 }
 
@@ -68,47 +68,67 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
   });
 
   // Récupérer les données de référence
-  const { data: allArticles } = useQuery({
+  const { data: allArticles = [] } = useQuery<Article[]>({
     queryKey: ["/api/articles"],
   });
   
-  const products = allArticles?.filter((article: Article) => article.type === "product");
+  const products = (allArticles as Article[]).filter((article: Article) => article.type === "product");
 
-  const { data: workStations } = useQuery({
+  const { data: workStations = [] } = useQuery<WorkStation[]>({
     queryKey: ["/api/work-stations"],
   });
 
-  const { data: measurementUnits } = useQuery({
-    queryKey: ["/api/measurement-units"],
+  const { data: measurementUnits = [] } = useQuery<MeasurementUnit[]>({
+    queryKey: ["/api/measurement-units/active"],
   });
 
   // Charger les ingrédients et opérations existants si c'est une modification
   useEffect(() => {
+    console.log("useEffect triggered", { recipeId: recipe?.id, allArticles: allArticles?.length, workStations: workStations?.length });
     if (recipe?.id) {
-      fetch(`/api/recipes/${recipe.id}/ingredients`)
+      // Charger les ingrédients
+      apiRequest(`/api/recipes/${recipe.id}/ingredients`, "GET")
         .then(res => res.json())
         .then(ingredientsData => {
+          console.log("Ingredients loaded:", ingredientsData);
           const enrichedIngredients = ingredientsData.map((ing: RecipeIngredient) => ({
             ...ing,
-            article: allArticles?.find((art: Article) => art.id === ing.articleId)
+            article: allArticles.find((art: Article) => art.id === ing.articleId)
           }));
           setIngredients(enrichedIngredients);
+        })
+        .catch(error => {
+          console.error("Erreur lors du chargement des ingrédients:", error);
         });
         
-      fetch(`/api/recipes/${recipe.id}/operations`)
+      // Charger les opérations
+      apiRequest(`/api/recipes/${recipe.id}/operations`, "GET")
         .then(res => res.json())
         .then(operationsData => {
+          console.log("Operations loaded:", operationsData);
           const enrichedOperations = operationsData.map((op: RecipeOperation) => ({
             ...op,
-            workStation: workStations?.find((ws: WorkStation) => ws.id === op.workStationId)
+            workStation: workStations.find((ws: WorkStation) => ws.id === op.workStationId)
           }));
           setOperations(enrichedOperations);
+        })
+        .catch(error => {
+          console.error("Erreur lors du chargement des opérations:", error);
         });
     }
   }, [recipe?.id, allArticles, workStations]);
 
   // Ajouter un ingrédient
   const addIngredient = () => {
+    console.log("addIngredient called", { currentIngredient, allArticles: allArticles?.length });
+    if (!allArticles || allArticles.length === 0) {
+      toast({
+        title: "Erreur",
+        description: "Les articles ne sont pas encore chargés",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!currentIngredient.articleId || !currentIngredient.quantity || !currentIngredient.unit) {
       toast({
         title: "Erreur",
@@ -118,7 +138,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
       return;
     }
 
-    const article = allArticles?.find((art: Article) => art.id === parseInt(currentIngredient.articleId));
+    const article = (allArticles as Article[]).find((art: Article) => art.id === parseInt(currentIngredient.articleId));
     const newIngredient = {
       id: Date.now(), // ID temporaire pour les nouveaux éléments
       recipeId: recipe?.id || 0,
@@ -131,12 +151,25 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
       article,
     };
 
+    console.log("Adding ingredient to state:", newIngredient);
     setIngredients([...ingredients, newIngredient]);
     setCurrentIngredient({ articleId: "", quantity: "", unit: "", notes: "" });
+    console.log("New ingredients state:", [...ingredients, newIngredient]);
   };
 
   // Supprimer un ingrédient
-  const removeIngredient = (index: number) => {
+  const removeIngredient = async (index: number) => {
+    const ingredient = ingredients[index];
+    
+    // Si c'est un ingrédient existant, le supprimer en base
+    if (ingredient.id && ingredient.id > 1000000) {
+      try {
+        await apiRequest(`/api/recipe-ingredients/${ingredient.id}`, "DELETE");
+      } catch (error) {
+        console.error("Erreur lors de la suppression de l'ingrédient:", error);
+      }
+    }
+    
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
@@ -153,6 +186,15 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
 
   // Ajouter une opération
   const addOperation = () => {
+    console.log("addOperation called", { currentOperation, workStations: workStations?.length });
+    if (!workStations || workStations.length === 0) {
+      toast({
+        title: "Erreur",
+        description: "Les postes de travail ne sont pas encore chargés",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!currentOperation.description) {
       toast({
         title: "Erreur",
@@ -162,7 +204,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
       return;
     }
 
-    const workStation = workStations?.find((ws: WorkStation) => ws.id === parseInt(currentOperation.workStationId));
+    const workStation = (workStations as WorkStation[]).find((ws: WorkStation) => ws.id === parseInt(currentOperation.workStationId));
     const newOperation = {
       id: Date.now(), // ID temporaire
       recipeId: recipe?.id || 0,
@@ -181,7 +223,18 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
   };
 
   // Supprimer une opération
-  const removeOperation = (index: number) => {
+  const removeOperation = async (index: number) => {
+    const operation = operations[index];
+    
+    // Si c'est une opération existante, la supprimer en base
+    if (operation.id && operation.id > 1000000) {
+      try {
+        await apiRequest(`/api/recipe-operations/${operation.id}`, "DELETE");
+      } catch (error) {
+        console.error("Erreur lors de la suppression de l'opération:", error);
+      }
+    }
+    
     setOperations(operations.filter((_, i) => i !== index));
   };
 
@@ -196,14 +249,90 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
     }
   };
 
-  const handleSubmit = (data: RecipeFormData) => {
+  const handleSubmit = async (data: RecipeFormData) => {
+    console.log("handleSubmit called with data:", data);
+    console.log("Current ingredients:", ingredients);
+    console.log("Current operations:", operations);
+    
     const recipeData: InsertRecipe = {
       ...data,
       quantity: data.quantity,
-      // Les ingrédients et opérations seront gérés séparément via les APIs
     };
     
-    onSubmit(recipeData);
+    console.log("Recipe data to save:", recipeData);
+    
+    // Sauvegarder la recette d'abord
+    const savedRecipe = await onSubmit(recipeData);
+    
+    // Sauvegarder les ingrédients et opérations si la recette a été créée
+    console.log("savedRecipe:", savedRecipe);
+    if (savedRecipe && savedRecipe.id) {
+      console.log("Saving ingredients and operations for recipe ID:", savedRecipe.id);
+      // Sauvegarder les ingrédients
+      for (const ingredient of ingredients) {
+        console.log("Processing ingredient:", ingredient);
+        if (!ingredient.id || ingredient.id < 1000000) { // Nouvel ingrédient (ID temporaire)
+          try {
+            console.log("Saving new ingredient:", ingredient);
+            const response = await apiRequest(`/api/recipes/${savedRecipe.id}/ingredients`, "POST", {
+              articleId: ingredient.articleId,
+              quantity: ingredient.quantity,
+              unit: ingredient.unit,
+              notes: ingredient.notes,
+              order: ingredient.order,
+            });
+            console.log("Ingredient saved successfully:", await response.json());
+          } catch (error) {
+            console.error("Erreur lors de la sauvegarde de l'ingrédient:", error);
+          }
+        } else if (ingredient.id > 1000000) { // Ingrédient existant à modifier
+          try {
+            console.log("Updating existing ingredient:", ingredient);
+            const response = await apiRequest(`/api/recipe-ingredients/${ingredient.id}`, "PUT", {
+              articleId: ingredient.articleId,
+              quantity: ingredient.quantity,
+              unit: ingredient.unit,
+              notes: ingredient.notes,
+              order: ingredient.order,
+            });
+            console.log("Ingredient updated successfully:", await response.json());
+          } catch (error) {
+            console.error("Erreur lors de la modification de l'ingrédient:", error);
+          }
+        }
+      }
+      
+      // Sauvegarder les opérations
+      for (const operation of operations) {
+        if (!operation.id || operation.id < 1000000) { // Nouvelle opération (ID temporaire)
+          try {
+            await apiRequest(`/api/recipes/${savedRecipe.id}/operations`, "POST", {
+              description: operation.description,
+              duration: operation.duration,
+              workStationId: operation.workStationId,
+              temperature: operation.temperature,
+              notes: operation.notes,
+              order: operation.order,
+            });
+          } catch (error) {
+            console.error("Erreur lors de la sauvegarde de l'opération:", error);
+          }
+        } else if (operation.id > 1000000) { // Opération existante à modifier
+          try {
+            await apiRequest(`/api/recipe-operations/${operation.id}`, "PUT", {
+              description: operation.description,
+              duration: operation.duration,
+              workStationId: operation.workStationId,
+              temperature: operation.temperature,
+              notes: operation.notes,
+              order: operation.order,
+            });
+          } catch (error) {
+            console.error("Erreur lors de la modification de l'opération:", error);
+          }
+        }
+      }
+    }
   };
 
   return (
@@ -277,7 +406,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                         <SelectValue placeholder="Sélectionner une unité" />
                       </SelectTrigger>
                       <SelectContent>
-                        {measurementUnits?.map((unit: any) => (
+                        {(measurementUnits as MeasurementUnit[]).map((unit: MeasurementUnit) => (
                           <SelectItem key={unit.id} value={unit.abbreviation}>
                             {unit.label} ({unit.abbreviation})
                           </SelectItem>
@@ -319,7 +448,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                         <SelectValue placeholder="Article" />
                       </SelectTrigger>
                       <SelectContent>
-                        {allArticles?.filter((art: Article) => art.type === 'ingredient' || (art.type === 'product' && form.watch("isSubRecipe")))
+                        {(allArticles as Article[]).filter((art: Article) => art.type === 'ingredient' || art.type === 'product')
                           .map((article: Article) => (
                           <SelectItem key={article.id} value={article.id.toString()}>
                             <div className="flex items-center gap-2">
@@ -349,7 +478,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                         <SelectValue placeholder="Unité" />
                       </SelectTrigger>
                       <SelectContent>
-                        {measurementUnits?.map((unit: any) => (
+                        {(measurementUnits as MeasurementUnit[]).map((unit: MeasurementUnit) => (
                           <SelectItem key={unit.id} value={unit.abbreviation}>
                             {unit.abbreviation}
                           </SelectItem>
@@ -357,7 +486,18 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                       </SelectContent>
                     </Select>
 
-                    <Button type="button" onClick={addIngredient} data-testid="button-add-ingredient">
+                    <Button 
+                      type="button" 
+                      onClick={(e) => {
+                        console.log("Button clicked");
+                        try {
+                          addIngredient();
+                        } catch (error) {
+                          console.error("Error in addIngredient:", error);
+                        }
+                      }} 
+                      data-testid="button-add-ingredient"
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -414,7 +554,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                           type="button" 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => removeIngredient(index)}
+                          onClick={() => removeIngredient(index).catch(console.error)}
                           data-testid={`button-remove-ingredient-${index}`}
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
@@ -477,7 +617,18 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                       className="flex-1"
                       data-testid="input-operation-notes"
                     />
-                    <Button type="button" onClick={addOperation} data-testid="button-add-operation">
+                    <Button 
+                      type="button" 
+                      onClick={(e) => {
+                        console.log("Operation button clicked");
+                        try {
+                          addOperation();
+                        } catch (error) {
+                          console.error("Error in addOperation:", error);
+                        }
+                      }} 
+                      data-testid="button-add-operation"
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -528,7 +679,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel }: RecipeFormProps) {
                           type="button" 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => removeOperation(index)}
+                          onClick={() => removeOperation(index).catch(console.error)}
                           data-testid={`button-remove-operation-${index}`}
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />

@@ -4,7 +4,8 @@ import {
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
-  invoices, invoiceItems, accountingEntries, accountingEntryLines, purchaseOrders, purchaseOrderItems,
+  invoices, invoiceItems, accountingEntries, accountingEntryLines,
+  inventory, type Inventory, type InsertInventory,
   type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -19,11 +20,10 @@ import {
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
   type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
-  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
-  type PurchaseOrder, type InsertPurchaseOrder, type PurchaseOrderItem, type InsertPurchaseOrderItem
+  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, gte, lte, isNull } from "drizzle-orm";
+import { eq, desc, lt, and, gte, lte, isNull, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -183,21 +183,11 @@ export interface IStorage {
   getLowStockIngredients(): Promise<Article[]>;
 
   // Purchase Orders (Achats Fournisseurs)
-  getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
-  getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined>;
-  getPurchaseOrdersBySupplier(supplierId: number): Promise<PurchaseOrder[]>;
-  getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrder[]>;
-  createPurchaseOrder(purchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder>;
-  updatePurchaseOrder(id: number, purchaseOrder: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder | undefined>;
-  deletePurchaseOrder(id: number): Promise<boolean>;
-  generatePurchaseOrderCode(): Promise<string>;
-
-  // Purchase Order Items
-  getPurchaseOrderItems(purchaseOrderId: number): Promise<PurchaseOrderItem[]>;
-  createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
-  updatePurchaseOrderItem(id: number, item: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem | undefined>;
-  deletePurchaseOrderItem(id: number): Promise<boolean>;
-  deletePurchaseOrderItems(purchaseOrderId: number): Promise<boolean>;
+  // Receptions (Achats) via Inventory
+  generateReceptionCode(): Promise<string>;
+  // Stock & cost updates
+  adjustArticleStockAndCost(articleId: number, deltaQuantity: number, newUnitCost: string | number): Promise<Article | undefined>;
+  getInventoryRowsByOperation(operationId: number): Promise<Inventory[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -801,6 +791,40 @@ export class DatabaseStorage implements IStorage {
     return recipe || undefined;
   }
 
+  // Aggregated stats for recipes
+  async getRecipeStats(): Promise<Array<{ recipeId: number; ingredientsCount: number; operationsCount: number; totalOperationDuration: number }>> {
+    // Count ingredients per recipe
+    const ingredientCounts = await db
+      .select({ recipeId: recipeIngredients.recipeId, cnt: sql<number>`COUNT(${recipeIngredients.id})` })
+      .from(recipeIngredients)
+      .groupBy(recipeIngredients.recipeId);
+
+    // Count operations per recipe and sum duration
+    const operationsAgg = await db
+      .select({
+        recipeId: recipeOperations.recipeId,
+        cnt: sql<number>`COUNT(${recipeOperations.id})`,
+        totalDur: sql<number>`COALESCE(SUM(${recipeOperations}.duration), 0)`,
+      })
+      .from(recipeOperations)
+      .groupBy(recipeOperations.recipeId);
+
+    const map: Record<number, { recipeId: number; ingredientsCount: number; operationsCount: number; totalOperationDuration: number }> = {};
+
+    for (const row of ingredientCounts) {
+      map[row.recipeId] = map[row.recipeId] || { recipeId: row.recipeId, ingredientsCount: 0, operationsCount: 0, totalOperationDuration: 0 };
+      map[row.recipeId].ingredientsCount = Number(row.cnt);
+    }
+
+    for (const row of operationsAgg) {
+      map[row.recipeId] = map[row.recipeId] || { recipeId: row.recipeId, ingredientsCount: 0, operationsCount: 0, totalOperationDuration: 0 };
+      map[row.recipeId].operationsCount = Number(row.cnt);
+      map[row.recipeId].totalOperationDuration = Number(row.totalDur || 0);
+    }
+
+    return Object.values(map);
+  }
+
   async createRecipe(insertRecipe: InsertRecipe): Promise<Recipe> {
     const [recipe] = await db.insert(recipes).values(insertRecipe).returning();
     return recipe;
@@ -1106,7 +1130,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============ OPERATIONS D'INVENTAIRE ============
-  
+  // Nouvelle table unique d'inventaire (journal des mouvements)
+  async getAllInventory(): Promise<Inventory[]> {
+    return await db.select().from(inventory).orderBy(desc(inventory.createdAt));
+  }
+
+  async getInventoryByType(type: string): Promise<Inventory[]> {
+    return await db.select().from(inventory).where(eq(inventory.type, type)).orderBy(desc(inventory.createdAt));
+  }
+
+  async createInventoryRow(insertRow: InsertInventory): Promise<Inventory> {
+    const [row] = await db.insert(inventory).values(insertRow).returning();
+    return row;
+  }
+
+  async updateInventoryRow(id: number, data: Partial<InsertInventory>): Promise<Inventory | undefined> {
+    const [row] = await db.update(inventory).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(inventory.id, id)).returning();
+    return row || undefined;
+  }
+
+  async deleteInventoryRow(id: number): Promise<boolean> {
+    const result = await db.delete(inventory).where(eq(inventory.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getInventoryRowsByOperation(operationId: number): Promise<Inventory[]> {
+    return await db.select().from(inventory).where(eq(inventory.operationId, operationId));
+  }
+
   async getAllInventoryOperations(): Promise<InventoryOperation[]> {
     return await db.select().from(inventoryOperations).orderBy(desc(inventoryOperations.createdAt));
   }
@@ -1185,6 +1236,22 @@ export class DatabaseStorage implements IStorage {
   async deleteInventoryOperationItem(id: number): Promise<boolean> {
     const result = await db.delete(inventoryOperationItems).where(eq(inventoryOperationItems.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  async adjustArticleStockAndCost(articleId: number, deltaQuantity: number, newUnitCost: string | number): Promise<Article | undefined> {
+    const article = await this.getArticle(articleId);
+    if (!article) return undefined;
+    const current = parseFloat(article.currentStock as unknown as string || '0');
+    const next = current + (Number.isFinite(deltaQuantity) ? deltaQuantity : 0);
+    const [updated] = await db
+      .update(articles)
+      .set({
+        currentStock: next.toString(),
+        costPerUnit: typeof newUnitCost === 'number' ? newUnitCost.toString() : newUnitCost,
+      })
+      .where(eq(articles.id, articleId))
+      .returning();
+    return updated || undefined;
   }
 
   // ============ LIVRAISONS ============
@@ -1302,87 +1369,12 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // ============ ACHATS FOURNISSEURS ============
-
-  async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
-    return await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
-  }
-
-  async getPurchaseOrder(id: number): Promise<PurchaseOrder | undefined> {
-    const [order] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
-    return order || undefined;
-  }
-
-  async getPurchaseOrdersBySupplier(supplierId: number): Promise<PurchaseOrder[]> {
-    return await db.select().from(purchaseOrders)
-      .where(eq(purchaseOrders.supplierId, supplierId))
-      .orderBy(desc(purchaseOrders.createdAt));
-  }
-
-  async getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrder[]> {
-    return await db.select().from(purchaseOrders)
-      .where(eq(purchaseOrders.status, status))
-      .orderBy(desc(purchaseOrders.createdAt));
-  }
-
-  async createPurchaseOrder(insertPurchaseOrder: InsertPurchaseOrder): Promise<PurchaseOrder> {
-    const code = await this.generatePurchaseOrderCode();
-    const orderData = {
-      ...insertPurchaseOrder,
-      code,
-    };
-    
-    const [order] = await db.insert(purchaseOrders).values(orderData).returning();
-    return order;
-  }
-
-  async updatePurchaseOrder(id: number, updateData: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder | undefined> {
-    const [order] = await db.update(purchaseOrders)
-      .set({ ...updateData, updatedAt: new Date().toISOString() })
-      .where(eq(purchaseOrders.id, id))
-      .returning();
-    return order || undefined;
-  }
-
-  async deletePurchaseOrder(id: number): Promise<boolean> {
-    const result = await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
-    return (result.rowCount || 0) > 0;
-  }
-
-  async generatePurchaseOrderCode(): Promise<string> {
-    const existingOrders = await this.getAllPurchaseOrders();
-    const nextNumber = existingOrders.length + 1;
-    return `ACH-${nextNumber.toString().padStart(6, '0')}`;
-  }
-
-  // Purchase Order Items
-  async getPurchaseOrderItems(purchaseOrderId: number): Promise<PurchaseOrderItem[]> {
-    return await db.select().from(purchaseOrderItems)
-      .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId))
-      .orderBy(purchaseOrderItems.id);
-  }
-
-  async createPurchaseOrderItem(insertItem: InsertPurchaseOrderItem): Promise<PurchaseOrderItem> {
-    const [item] = await db.insert(purchaseOrderItems).values(insertItem).returning();
-    return item;
-  }
-
-  async updatePurchaseOrderItem(id: number, updateData: Partial<InsertPurchaseOrderItem>): Promise<PurchaseOrderItem | undefined> {
-    const [item] = await db.update(purchaseOrderItems)
-      .set(updateData)
-      .where(eq(purchaseOrderItems.id, id))
-      .returning();
-    return item || undefined;
-  }
-
-  async deletePurchaseOrderItem(id: number): Promise<boolean> {
-    const result = await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.id, id));
-    return (result.rowCount || 0) > 0;
-  }
-
-  async deletePurchaseOrderItems(purchaseOrderId: number): Promise<boolean> {
-    const result = await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
-    return (result.rowCount || 0) > 0;
+  // ============ ACHATS VIA INVENTORY (aucune table purchase_*) ============
+  // Générateur de code pour réceptions
+  async generateReceptionCode(): Promise<string> {
+    const existingOps = await this.getInventoryOperationsByType('reception');
+    const nextNumber = existingOps.length + 1;
+    return `REC-${nextNumber.toString().padStart(6, '0')}`;
   }
 }
 

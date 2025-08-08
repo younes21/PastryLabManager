@@ -9,11 +9,11 @@ import * as schema from "@shared/schema";
 // neonConfig.webSocketConstructor = ws;
 dotenv.config();
 console.log("******************");
-if (!process.env.DATABASE_URL_COCKROACH) {
+if (!process.env.DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL_COCKROACH must be set. Did you forget to provision a database?"
+    "DATABASE_URL must be set. Did you forget to provision a database?"
   );
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL_COCKROACH });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
