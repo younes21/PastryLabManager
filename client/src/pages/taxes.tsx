@@ -188,7 +188,7 @@ export default function TaxesPage() {
                         <Input
                           {...field}
                           type="number"
-                          step="0.01"
+                          step="1"
                           min="0"
                           max="100"
                           placeholder="19.5"

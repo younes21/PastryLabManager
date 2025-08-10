@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Recipe, InsertRecipe, Article, RecipeIngredient, RecipeOperation, WorkStation, MeasurementUnit } from "@shared/schema";
 
 const recipeSchema = z.object({
+  designation: z.string().min(1, "La désignation est requise"),
   articleId: z.number(),
   description: z.string().optional(),
   quantity: z.string().min(1, "La quantité est requise"),
@@ -59,6 +60,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
     resolver: zodResolver(recipeSchema),
     defaultValues: {
       articleId: articleId ?? recipe?.articleId ?? 0,
+      designation: recipe?.designation || "",
       description: recipe?.description || "",
       quantity: recipe?.quantity || "",
       unit: recipe?.unit || "",
@@ -517,7 +519,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
           {/* Section Générale compacte */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Informations générales</h3>
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {/* Si pas de articleId, afficher le select produit */}
               {!articleId && (
                 <div className="col-span-2">
@@ -549,6 +551,19 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                   </span>
                 </div>
               )}
+              <div className="col-span-2 ">
+                <Label className="text-xs" htmlFor="designation">Désignation *</Label>
+                <Input
+                  className="h-8 text-sm"
+                  {...form.register("designation")}
+                  data-testid="input-designation"
+                />
+                {form.formState.errors.designation && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {form.formState.errors.designation.message}
+                  </p>
+                )}
+              </div>
 
               <div>
                 <Label htmlFor="quantity" className="text-xs">Quantité *</Label>

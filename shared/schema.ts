@@ -275,6 +275,7 @@ export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
   articleId: integer("article_id").references(() => articles.id).notNull().unique(),
   description: text("description"),
+  designation: text("designation"),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(), // Quantité/nombre de parts
   unit: text("unit").notNull(), // Unité de mesure
   isSubRecipe: boolean("is_sub_recipe").default(false), // Est sous recette ?
@@ -770,6 +771,10 @@ export const updateOrderWithItemsSchema = z.object({
 });
 export const insertInventoryOperationSchema = createInsertSchema(inventoryOperations).omit({ id: true, code: true, createdAt: true, updatedAt: true });
 export const insertInventoryOperationItemSchema = createInsertSchema(inventoryOperationItems).omit({ id: true, createdAt: true });
+export const updateInventoryOperationWithItemsSchema = z.object({
+  operation: insertInventoryOperationSchema.omit({ createdBy: true }).partial(),
+  items: z.array(insertInventoryOperationItemSchema).min(1, "Au moins un article est requis."),
+});
 export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true, code: true, createdAt: true, updatedAt: true });
 export const insertDeliveryPackageSchema = createInsertSchema(deliveryPackages).omit({ id: true, createdAt: true });
 export const insertDeliveryItemSchema = createInsertSchema(deliveryItems).omit({ id: true, createdAt: true });

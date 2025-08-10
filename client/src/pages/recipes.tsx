@@ -30,7 +30,7 @@ export default function RecipesPage() {
   // États locaux
   const [searchTerm, setSearchTerm] = useState("");
   const [filterUnit, setFilterUnit] = useState("");
-  const [sortBy, setSortBy] = useState<"quantity" | "createdAt">("quantity");
+  const [sortBy, setSortBy] = useState<"designation" | "quantity" | "createdAt">("designation");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -103,7 +103,7 @@ export default function RecipesPage() {
 
     const filteredAndSortedRecipes = recipes
     .filter((recipe) => {
-      const matchesSearch = getArticleName(recipe.articleId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      const matchesSearch = recipe.designation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
          recipe.description?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesUnit = !filterUnit || filterUnit === "all" || recipe.unit === filterUnit;
       return matchesSearch && matchesUnit;
@@ -261,6 +261,7 @@ export default function RecipesPage() {
                       <SelectValue placeholder="Trier par" />
                     </SelectTrigger>
                     <SelectContent>
+                     <SelectItem value="designation">Désignation</SelectItem>
                       <SelectItem value="quantity">Quantité</SelectItem>
                       <SelectItem value="createdAt">Date de création</SelectItem>
                     </SelectContent>

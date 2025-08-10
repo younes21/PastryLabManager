@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,8 @@ import {
   ArticleCategory,
   StorageZone,
   MeasurementUnit,
-  type Recipe 
+  type Recipe,
+  InsertRecipe
 } from "@shared/schema";
 import { RecipeDisplay } from "@/components/recipe-display";
 import { Layout } from "@/components/layout";
@@ -307,7 +308,8 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>Gérer la recette pour {recipeDialogProduct.name}</DialogTitle>
           </DialogHeader>
-          <RecipeForm articleId={recipeDialogProduct.id} onCancel={() => setRecipeDialogProduct(null)} />
+          {/* On charge la recette existante pour ce produit */}
+          <RecipeDialogRecipeLoader articleId={recipeDialogProduct.id} onCancel={() => setRecipeDialogProduct(null)} />
         </DialogContent>
       </Dialog>
     )}
@@ -607,7 +609,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                   <FormItem>
                     <FormLabel>Stock minimum</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-min-stock" />
+                      <Input {...field} type="number" step="1" placeholder="0.00" data-testid="input-min-stock" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -621,7 +623,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                   <FormItem>
                     <FormLabel>Stock maximum</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-max-stock" />
+                      <Input {...field} type="number" step="1" placeholder="0.00" data-testid="input-max-stock" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -781,7 +783,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                   <FormItem>
                     <FormLabel>Prix de vente (DA)</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} type="number" step="0.01" placeholder="0.00" data-testid="input-sale-price" />
+                      <Input {...field} value={field.value || ""} type="number" step="1" placeholder="0.00" data-testid="input-sale-price" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -885,4 +887,36 @@ function DeleteProductDialog({ productId, productName }: { productId: number; pr
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function RecipeDialogRecipeLoader({ articleId, onCancel }: { articleId: number; onCancel: () => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: recipe, isLoading } = useQuery({
+    queryKey: ["/api/articles", articleId, "recipe"],
+    queryFn: async () => {
+      const res = await fetch(`/api/articles/${articleId}/recipe`);
+      if (res.status === 404) return null;
+      return res.json();
+    }
+  });
+
+  // Fonction pour créer la recette
+  const handleSubmit = async (data: InsertRecipe) => {
+    try {
+      const response = await apiRequest("/api/recipes", "POST", data);
+      const responseData = await response.json();
+      if (responseData && responseData.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+        toast({ title: "Recette créée avec succès" });
+        onCancel();
+        return responseData;
+      }
+    } catch (error) {
+      toast({ title: "Erreur lors de la création", variant: "destructive" });
+    }
+  };
+
+  if (isLoading) return <div className="p-8 text-center">Chargement de la recette...</div>;
+  return <RecipeForm articleId={articleId} recipe={recipe || undefined} onCancel={onCancel} onSubmit={handleSubmit} />;
 }

@@ -46,6 +46,7 @@ import { Label } from "@/components/ui/label";
 import { Layout } from "@/components/layout";
 import { useState, lazy } from "react";
 import ClientOrdersPage from "./pages/orders-clients";
+import PreparationPage from "./pages/prepration";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -178,6 +179,7 @@ function ProtectedRouter() {
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/deliveries" component={DeliveriesPage} />
       <Route path="/catalog" component={ClientCatalog} />
+      <Route path="/preparation" component={PreparationPage} />
       <Route component={NotFound} />
     </Switch>
   );

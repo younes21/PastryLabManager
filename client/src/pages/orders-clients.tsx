@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery as useQueryTanstack } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import {
   ArrowLeft,
   Check,
   X,
+  DollarSign,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type {
@@ -29,6 +31,7 @@ import type {
   Tax,
 } from "@shared/schema";
 import { Layout } from "@/components/layout";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const orderStatusLabels = {
   draft: "Brouillon",
@@ -83,6 +86,7 @@ export default function ClientOrdersPage() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
   // Récupérer le client connecté via son userId
   const storedUser = localStorage.getItem("user");
@@ -466,14 +470,14 @@ export default function ClientOrdersPage() {
                           <Badge
                             variant={
                               orderStatusColors[
-                                order.status as keyof typeof orderStatusColors
+                              order.status as keyof typeof orderStatusColors
                               ] as any
                             }
                             className="text-xs px-2 py-1"
                           >
                             {
                               orderStatusLabels[
-                                order.status as keyof typeof orderStatusLabels
+                              order.status as keyof typeof orderStatusLabels
                               ]
                             }
                           </Badge>
@@ -506,14 +510,14 @@ export default function ClientOrdersPage() {
                           </div>
                           {parseFloat(order.totalTax?.toString() || "0") >
                             0 && (
-                            <div className="text-xs text-gray-500">
-                              dont TVA:{" "}
-                              {parseFloat(
-                                order.totalTax?.toString() || "0",
-                              ).toFixed(2)}{" "}
-                              DA
-                            </div>
-                          )}
+                              <div className="text-xs text-gray-500">
+                                dont TVA:{" "}
+                                {parseFloat(
+                                  order.totalTax?.toString() || "0",
+                                ).toFixed(2)}{" "}
+                                DA
+                              </div>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-1">
@@ -538,6 +542,17 @@ export default function ClientOrdersPage() {
                               </Button>
                             </>
                           )}
+                          {order.status !== "draft" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-gray-700 hover:text-orange-600"
+                              onClick={() => setViewingOrder(order)}
+                              title="Consulter la commande"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -547,6 +562,75 @@ export default function ClientOrdersPage() {
             )}
           </div>
         </div>
+        {/* Modale de consultation */}
+        <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
+          <DialogContent className="max-w-2xl p-0">
+            <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-6">
+              <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
+                <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
+              </DialogTitle>
+            </DialogHeader>
+            {viewingOrder && (
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-gray-700 flex items-center gap-2">
+                    <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
+                  </span>
+                  <Badge
+                    variant={orderStatusColors[viewingOrder.status as keyof typeof orderStatusColors] as any}
+                    className="text-xs px-3 py-1 rounded-full capitalize"
+                  >
+                    {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
+                  </Badge>
+                </div>
+                <hr className="my-2" />
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-orange-400" />
+                    <span>Date de création :</span>
+                  </div>
+                  <span>{formatDate(viewingOrder.createdAt)}</span>
+                  {viewingOrder.deliveryDate && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-orange-400" />
+                        <span>Date de livraison :</span>
+                      </div>
+                      <span>{formatDate(viewingOrder.deliveryDate)}</span>
+                    </>
+                  )}
+                  {viewingOrder.notes && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Edit className="w-4 h-4 text-orange-400" />
+                        <span>Notes :</span>
+                      </div>
+                      <span className="italic text-gray-500">{viewingOrder.notes}</span>
+                    </>
+                  )}
+                </div>
+                <hr className="my-2" />
+                <div className="mt-2">
+                  <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                  </div>
+                  <OrderItemsSummary orderId={viewingOrder.id} products={products} />
+                </div>
+                <hr className="my-2" />
+                <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
+                  <div className="flex items-center gap-2 text-orange-700">
+                    Total TTC
+                  </div>
+                  <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                  </div>
+                  <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -603,11 +687,10 @@ export default function ClientOrdersPage() {
                   <div className="space-y-2">
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                        !selectedCategory
+                      className={`w-full text-left px-4 py-3 rounded-lg transition-all ${!selectedCategory
                           ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
                           : "hover:bg-orange-50 text-gray-700"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <Package className="w-5 h-5" />
@@ -619,11 +702,10 @@ export default function ClientOrdersPage() {
                       <button
                         key={category.id}
                         onClick={() => setSelectedCategory(category.id)}
-                        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                          selectedCategory === category.id
+                        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${selectedCategory === category.id
                             ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
                             : "hover:bg-orange-50 text-gray-700"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <Package className="w-5 h-5" />
@@ -1009,7 +1091,7 @@ export default function ClientOrdersPage() {
                 className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3 rounded-xl font-semibold shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {createOrderMutation.isPending ||
-                updateOrderMutation.isPending ? (
+                  updateOrderMutation.isPending ? (
                   <div className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     {editingOrder ? "Modification..." : "Création..."}
@@ -1038,4 +1120,53 @@ export default function ClientOrdersPage() {
   }
 
   return <Layout title="Gestion des commandes"> {result} </Layout>;
+}
+
+function OrderItemsSummary({ orderId, products }: { orderId: number; products: Article[] }) {
+  const { data: items, isLoading } = useQueryTanstack({
+    queryKey: ["/api/orders", orderId, "items"],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${orderId}/items`);
+      return res.json();
+    },
+    enabled: !!orderId,
+  });
+  if (isLoading) return <div>Chargement des articles...</div>;
+  if (!items || items.length === 0) return <div className="text-gray-400 italic">Aucun article</div>;
+
+  // Calcul du total HT
+  const totalHT = items.reduce((sum: number, item: any) => sum + parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0"), 0);
+
+  return (
+    <>
+      <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-orange-100 sticky top-0 z-10">
+            <tr>
+              <th className="p-2 text-left font-semibold text-gray-700">Produit</th>
+              <th className="p-2 text-right font-semibold text-gray-700">Qté</th>
+              <th className="p-2 text-right font-semibold text-gray-700">PU</th>
+              <th className="p-2 text-right font-semibold text-gray-700">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item: any, idx: number) => {
+              const product = products.find((p) => p.id === item.articleId);
+              return (
+                <tr key={item.articleId}>
+                  <td className="p-2 font-semibold">{product ? product.name : item.articleId}</td>
+                  <td className="p-2 text-right">{item.quantity}</td>
+                  <td className="p-2 text-right">{parseFloat(item.unitPrice || "0").toFixed(2)} DA</td>
+                  <td className="p-2 text-right font-semibold">{(parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0")).toFixed(2)} DA</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-end mt-2">
+        <span className="text-sm text-gray-700 font-semibold bg-gray-50 rounded px-3 py-1">Total HT : {totalHT.toFixed(2)} DA</span>
+      </div>
+    </>
+  );
 }

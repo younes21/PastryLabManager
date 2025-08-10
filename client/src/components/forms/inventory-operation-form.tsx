@@ -449,7 +449,7 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.001"
+                                    step="1"
                                     min="0"
                                     {...field}
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
@@ -469,7 +469,7 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.001"
+                                    step="1"
                                     min="0"
                                     {...field}
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
@@ -489,7 +489,7 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.01"
+                                    step="1"
                                     min="0"
                                     {...field}
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}

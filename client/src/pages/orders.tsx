@@ -7,23 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Search, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
   ShoppingCart,
   Filter,
   SortAsc,
   SortDesc,
   Calendar,
-  User
+  User,
+  Package
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { OrderForm } from "@/components/forms/order-form";
 import type { Order, Client, Article } from "@shared/schema";
 import { Layout } from "@/components/layout";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useQuery as useQueryTanstack } from "@tanstack/react-query";
 
 const orderStatusLabels = {
   draft: "Brouillon",
@@ -48,7 +51,7 @@ const orderStatusColors = {
 export default function OrdersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // États locaux
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -56,6 +59,7 @@ export default function OrdersPage() {
   const [sortBy, setSortBy] = useState<"orderDate" | "code" | "totalTTC">("orderDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
   // Queries
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
@@ -71,20 +75,20 @@ export default function OrdersPage() {
     select: (data) => data?.filter((article: Article) => article.type === "product" && article.allowSale),
   });
 
-  // Mutations
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("/api/orders", "POST", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      setShowCreateForm(false);
-      toast({ title: "Commande créée avec succès" });
-    },
-    onError: () => {
-      toast({ title: "Erreur lors de la création", variant: "destructive" });
-    },
-  });
+  // // Mutations
+  // const createMutation = useMutation({
+  //   mutationFn: async (data: any) => {
+  //     return await apiRequest("/api/orders", "POST", data);
+  //   },
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+  //     setShowCreateForm(false);
+  //     toast({ title: "Commande créée avec succès" });
+  //   },
+  //   onError: () => {
+  //     toast({ title: "Erreur lors de la création", variant: "destructive" });
+  //   },
+  // });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -116,7 +120,7 @@ export default function OrdersPage() {
   const filteredAndSortedOrders = orders
     .filter((order) => {
       const matchesSearch = order.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           getClientName(order.clientId).toLowerCase().includes(searchTerm.toLowerCase());
+        getClientName(order.clientId).toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = !filterStatus || filterStatus === "all" || order.status === filterStatus;
       const matchesType = !filterType || filterType === "all" || order.type === filterType;
       return matchesSearch && matchesStatus && matchesType;
@@ -124,12 +128,12 @@ export default function OrdersPage() {
     .sort((a, b) => {
       let aValue: any = a[sortBy];
       let bValue: any = b[sortBy];
-      
+
       if (sortBy === "totalTTC") {
         aValue = parseFloat(aValue);
         bValue = parseFloat(bValue);
       }
-      
+
       if (sortOrder === "asc") {
         return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
       } else {
@@ -145,10 +149,10 @@ export default function OrdersPage() {
   const handleStatusChange = (order: Order, newStatus: string) => {
     // Vérifications de règles métier
     if (order.status === "confirmed" && newStatus === "draft") {
-      toast({ 
-        title: "Action non autorisée", 
+      toast({
+        title: "Action non autorisée",
         description: "Une commande confirmée ne peut pas revenir en brouillon",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
@@ -159,10 +163,10 @@ export default function OrdersPage() {
   const handleDelete = (order: Order) => {
     // Vérifications de règles métier
     if (order.status === "confirmed" || order.status === "delivered") {
-      toast({ 
-        title: "Action non autorisée", 
+      toast({
+        title: "Action non autorisée",
         description: "Une commande confirmée ou livrée ne peut pas être supprimée",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
@@ -174,7 +178,9 @@ export default function OrdersPage() {
 
   const getClientName = (clientId: number) => {
     const client = clients.find((c) => c.id === clientId);
-    return client ? `${client.firstName} ${client.lastName}` : "Client inconnu";
+    if (client?.type != 'societe') return client ? `${client.firstName} ${client.lastName}` : "Client inconnu";
+    else return client ? `${client.companyName}` : "Client inconnu";
+
   };
 
   const getClientPhone = (clientId: number) => {
@@ -206,8 +212,8 @@ export default function OrdersPage() {
               Créer une nouvelle commande ou devis client
             </p>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setShowCreateForm(false)}
           >
             Retour à la liste
@@ -229,7 +235,7 @@ export default function OrdersPage() {
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex justify-between items-center">
         <div>
-        
+
           <p className="text-muted-foreground">
             Gestion des commandes et devis clients
           </p>
@@ -259,7 +265,7 @@ export default function OrdersPage() {
                 data-testid="input-search-orders"
               />
             </div>
-            
+
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger data-testid="select-filter-status">
                 <SelectValue placeholder="Filtrer par statut" />
@@ -296,7 +302,7 @@ export default function OrdersPage() {
                   <SelectItem value="totalTTC">Montant</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               <Button
                 variant="outline"
                 size="icon"
@@ -322,7 +328,7 @@ export default function OrdersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead 
+                <TableHead
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => toggleSort("code")}
                 >
@@ -336,7 +342,7 @@ export default function OrdersPage() {
                 <TableHead>Type</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Téléphone</TableHead>
-                <TableHead 
+                <TableHead
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => toggleSort("orderDate")}
                 >
@@ -349,7 +355,7 @@ export default function OrdersPage() {
                   </div>
                 </TableHead>
                 <TableHead>Date livraison</TableHead>
-                <TableHead 
+                <TableHead
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => toggleSort("totalTTC")}
                 >
@@ -396,7 +402,7 @@ export default function OrdersPage() {
                     <TableCell>{formatDate(order.orderDate || null)}</TableCell>
                     <TableCell>{formatDate(order.deliveryDate || null)}</TableCell>
                     <TableCell className="font-semibold">
-                      {parseFloat(order.totalTTC).toFixed(2)} DA
+                      {parseFloat(order.totalTTC || "0").toFixed(2)} DA
                     </TableCell>
                     <TableCell>
                       <Select
@@ -423,6 +429,7 @@ export default function OrdersPage() {
                           variant="ghost"
                           size="sm"
                           data-testid={`button-view-order-${order.id}`}
+                          onClick={() => setViewingOrder(order)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -451,6 +458,122 @@ export default function OrdersPage() {
           </Table>
         </CardContent>
       </Card>
+      {/* Modale de consultation */}
+      <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
+        <DialogContent className="max-w-2xl p-0">
+          <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-6">
+            <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
+              <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
+            </DialogTitle>
+          </DialogHeader>
+          {viewingOrder && (
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-gray-700 flex items-center gap-2">
+                  <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
+                </span>
+                <Badge
+                  variant={orderStatusColors[viewingOrder.status as keyof typeof orderStatusColors] as any}
+                  className="text-xs px-3 py-1 rounded-full capitalize"
+                >
+                  {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
+                </Badge>
+              </div>
+              <hr className="my-2" />
+              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-orange-400" />
+                  <span>Date de création :</span>
+                </div>
+                <span>{formatDate(viewingOrder.orderDate || viewingOrder.createdAt)}</span>
+                {viewingOrder.deliveryDate && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-orange-400" />
+                      <span>Date de livraison :</span>
+                    </div>
+                    <span>{formatDate(viewingOrder.deliveryDate)}</span>
+                  </>
+                )}
+                {viewingOrder.notes && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Edit className="w-4 h-4 text-orange-400" />
+                      <span>Notes :</span>
+                    </div>
+                    <span className="italic text-gray-500">{viewingOrder.notes}</span>
+                  </>
+                )}
+              </div>
+              <hr className="my-2" />
+              <div className="mt-2">
+                <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                </div>
+                <OrderItemsSummary orderId={viewingOrder.id} products={products} />
+              </div>
+              <hr className="my-2" />
+              <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
+                <div className="flex items-center gap-2 text-orange-700">
+                  Total TTC
+                </div>
+                <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
+                <div className="flex items-center gap-2 text-amber-700">
+                  <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                </div>
+                <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-    </Layout>);
+  </Layout>);
+}
+
+function OrderItemsSummary({ orderId, products }: { orderId: number; products: Article[] }) {
+  const { data: items, isLoading } = useQueryTanstack({
+    queryKey: ["/api/orders", orderId, "items"],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${orderId}/items`);
+      return res.json();
+    },
+    enabled: !!orderId,
+  });
+  if (isLoading) return <div>Chargement des articles...</div>;
+  if (!items || items.length === 0) return <div className="text-gray-400 italic">Aucun article</div>;
+
+  const totalHT = items.reduce((sum: number, item: any) => sum + parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0"), 0);
+  return (
+    <>
+      <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-orange-100 sticky top-0 z-10">
+            <tr>
+              <th className="p-2 text-left font-semibold text-gray-700">Produit</th>
+              <th className="p-2 text-right font-semibold text-gray-700">Qté</th>
+              <th className="p-2 text-right font-semibold text-gray-700">PU</th>
+              <th className="p-2 text-right font-semibold text-gray-700">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item: any, idx: number) => {
+              const product = products.find((p) => p.id === item.articleId);
+              return (
+                <tr key={item.articleId}>
+                  <td className="p-2 font-semibold">{product ? product.name : item.articleId}</td>
+                  <td className="p-2 text-right">{item.quantity}</td>
+                  <td className="p-2 text-right">{parseFloat(item.unitPrice || "0").toFixed(2)} DA</td>
+                  <td className="p-2 text-right font-semibold">{(parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0")).toFixed(2)} DA</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-end mt-2">
+        <span className="text-sm text-gray-700 font-semibold bg-gray-50 rounded px-3 py-1">Total HT : {totalHT.toFixed(2)} DA</span>
+      </div>
+    </>
+  );
 }

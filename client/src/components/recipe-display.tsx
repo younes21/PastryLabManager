@@ -243,7 +243,7 @@ function RecipeForm({
               <FormItem>
                 <FormLabel>Quantité *</FormLabel>
                 <FormControl>
-                  <Input {...field} type="number" step="0.01" placeholder="Ex: 8" data-testid="input-recipe-quantity" />
+                  <Input {...field} type="number" step="1" placeholder="Ex: 8" data-testid="input-recipe-quantity" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

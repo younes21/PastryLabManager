@@ -26,6 +26,7 @@ import {
   insertOrderItemSchema,
   insertInventoryOperationSchema,
   insertInventoryOperationItemSchema,
+  updateInventoryOperationWithItemsSchema,
   insertInventorySchema,
   insertDeliverySchema,
   insertInvoiceSchema,
@@ -63,10 +64,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Users routes
   app.get("/api/users", async (req, res) => {
     try {
+      const { role } = req.query;
       const users = await storage.getAllUsers();
-      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      let filteredUsers = users;
+      
+      // Filter by role if specified
+      if (role) {
+        filteredUsers = users.filter(user => user.role === role);
+      }
+      
+      const usersWithoutPasswords = filteredUsers.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error) {
+      console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
     }
   });
@@ -1177,6 +1187,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orders/confirmed-with-products-to-prepare", async (req, res) => {
+    try {
+      const orders = await storage.getConfirmedOrdersWithProductsToPrepare();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching confirmed orders with products to prepare:", error);
+      res.status(500).json({ message: "Failed to fetch confirmed orders with products to prepare" });
+    }
+  });
+
   app.get("/api/orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1319,10 +1339,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/inventory-operations", async (req, res) => {
     try {
-      const { type } = req.query;
+      const { type, include_reliquat } = req.query;
       let operations;
       if (type) {
-        operations = await storage.getInventoryOperationsByType(type as string);
+        const includeReliquat = include_reliquat === 'true';
+        operations = await storage.getInventoryOperationsByType(type as string, includeReliquat);
       } else {
         operations = await storage.getAllInventoryOperations();
       }
@@ -1333,11 +1354,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/inventory-operations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const operation = await storage.getInventoryOperation(id);
+      if (!operation) {
+        return res.status(404).json({ message: "Inventory operation not found" });
+      }
+
+      // Get the items for this operation
+      const items = await storage.getInventoryOperationItems(id);
+      
+      // Return operation with items
+      res.json({
+        ...operation,
+        items: items
+      });
+    } catch (error) {
+      console.error("Error fetching inventory operation:", error);
+      res.status(500).json({ message: "Failed to fetch inventory operation" });
+    }
+  });
+
   app.post("/api/inventory-operations", async (req, res) => {
     try {
-      const operationData = insertInventoryOperationSchema.parse(req.body);
-      const operation = await storage.createInventoryOperation(operationData);
-      res.status(201).json(operation);
+      // Check if the request contains both operation and items
+      if (req.body.operation && req.body.items) {
+        // Use the new method that handles both operation and items
+        const operationData = insertInventoryOperationSchema.parse(req.body.operation);
+        const itemsData = req.body.items.map((item: any) => {
+          const validatedItem = insertInventoryOperationItemSchema.parse(item);
+          return {
+            ...validatedItem,
+            // Remove operationId if present, it will be set by the storage method
+            operationId: undefined
+          };
+        });
+        
+        const operation = await storage.createInventoryOperationWithItems(operationData, itemsData);
+        res.status(201).json(operation);
+      } else {
+        // Fallback to the old method for backward compatibility
+        const operationData = insertInventoryOperationSchema.parse(req.body);
+        const operation = await storage.createInventoryOperation(operationData);
+        res.status(201).json(operation);
+      }
     } catch (error) {
       console.error("Error creating inventory operation:", error);
       if (error instanceof z.ZodError) {
@@ -1349,6 +1414,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .status(500)
           .json({ message: "Failed to create inventory operation" });
       }
+    }
+  });
+
+  app.put("/api/inventory-operations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      // Check if the request contains both operation and items
+      if (req.body.operation && req.body.items) {
+        // Use the new method that handles both operation and items
+        const data = updateInventoryOperationWithItemsSchema.parse(req.body);
+        const { operation, items } = data;
+        
+        const updatedOperation = await storage.updateInventoryOperationWithItems(id, operation, items);
+        res.json({ message: "Inventory operation updated successfully", operation: updatedOperation });
+      } else {
+        // Fallback to updating just the operation header
+        const updateData = insertInventoryOperationSchema.partial().parse(req.body);
+        const operation = await storage.updateInventoryOperation(id, updateData);
+        
+        if (operation) {
+          res.json(operation);
+        } else {
+          res.status(404).json({ message: "Inventory operation not found" });
+        }
+      }
+    } catch (error) {
+      console.error("Error updating inventory operation:", error);
+      if (error instanceof z.ZodError) {
+        res
+          .status(400)
+          .json({ message: "Invalid operation data", errors: error.errors });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Failed to update inventory operation" });
+      }
+    }
+  });
+
+  // Inventory Operation Items
+  app.get("/api/inventory-operations/:operationId/items", async (req, res) => {
+    try {
+      const operationId = parseInt(req.params.operationId);
+      if (isNaN(operationId)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+      
+      const items = await storage.getInventoryOperationItems(operationId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching inventory operation items:", error);
+      res.status(500).json({ message: "Failed to fetch inventory operation items" });
     }
   });
 

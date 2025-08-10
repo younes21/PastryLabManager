@@ -182,7 +182,7 @@ export function PriceRuleForm({
                 <Input
                   id="fixedPrice"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   placeholder="0.00"
                   value={formData.fixedPrice}
@@ -200,7 +200,7 @@ export function PriceRuleForm({
                 <Input
                   id="discountPercent"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   max="100"
                   placeholder="0.00"
@@ -238,7 +238,7 @@ export function PriceRuleForm({
             <Input
               id="minQuantity"
               type="number"
-              step="0.001"
+              step="1"
               min="0"
               placeholder="1"
               value={formData.minQuantity}

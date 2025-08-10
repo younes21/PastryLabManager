@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { CalendarIcon, Plus, Trash2, ShoppingCart, User, Calculator } from "lucide-react";
-import type { Order, Client, Article } from "@shared/schema";
+import { type Order, type Client, type Article, orderItems, type Tax } from "@shared/schema";
 
 const orderFormSchema = z.object({
   type: z.enum(["order", "quote"]),
@@ -27,7 +27,7 @@ const orderFormSchema = z.object({
   deliveryNotes: z.string().optional(),
   items: z.array(z.object({
     articleId: z.number().min(1, "Article requis"),
-    quantity: z.number().min(0.001, "Quantité minimum 0.001"),
+    quantity: z.number().min(1, "Quantité minimum 1"),
     unitPrice: z.number().min(0, "Prix unitaire requis"),
     notes: z.string().optional()
   })).min(1, "Au moins un article requis")
@@ -39,6 +39,49 @@ interface OrderFormProps {
   order?: Order;
   trigger?: React.ReactNode;
   onSuccess?: () => void;
+}
+
+// Utilitaire pour générer le payload order/items comme dans orders-clients
+function buildOrderWithItemsPayload(data: OrderFormData, orderId: number, articles: Article[], taxes: Tax[]) {
+  const items = data.items.map((item) => {
+    const article = articles.find((a) => a.id === item.articleId);
+    let taxRate = 0;
+    if (article && article.taxId && taxes.length > 0) {
+      const tax = taxes.find((t) => t.id === article.taxId);
+      if (tax) {
+        taxRate = parseFloat(tax.rate?.toString() || "0");
+      }
+    }
+    const unitPrice = parseFloat(article?.salePrice || "0");
+    const taxAmount = (unitPrice * item.quantity * taxRate) / 100;
+    const totalPrice = unitPrice * item.quantity;
+    return {
+      orderId: orderId,
+      articleId:item.articleId,
+      quantity: item.quantity,
+      unitPrice,
+      totalPrice,
+      taxRate,
+      taxAmount,
+      notes: item.notes || ""
+    };
+  });
+  // Totaux
+  const subtotalHT = items.reduce((sum, i) => sum + i.totalPrice, 0);
+  const totalTax = items.reduce((sum, i) => sum + i.taxAmount, 0);
+  const totalTTC = subtotalHT + totalTax;
+  return {
+    order: {
+      ...data,
+      id: orderId,
+      orderDate: data.orderDate || new Date().toISOString(),
+      deliveryDate: data.deliveryDate || null,
+      subtotalHT: subtotalHT.toString(),
+      totalTax: totalTax.toString(),
+      totalTTC: totalTTC.toString(),
+    },
+    items,
+  };
 }
 
 export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
@@ -53,6 +96,10 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
 
   const { data: articles = [] } = useQuery<Article[]>({
     queryKey: ["/api/articles"],
+  });
+
+  const { data: taxes = [] } = useQuery<Tax[]>({
+    queryKey: ["/api/taxes"],
   });
 
   const form = useForm<OrderFormData>({
@@ -74,24 +121,18 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
   // Mutations
   const createMutation = useMutation({
     mutationFn: async (data: OrderFormData) => {
-      const orderData = {
-        ...data,
-        orderDate: data.orderDate || new Date().toISOString(),
-        deliveryDate: data.deliveryDate || null,
-        subtotalHT: calculateSubtotal(),
-        totalTax: calculateTax(),
-        totalTTC: calculateTotal()
-      };
-      
+
       if (order) {
-        return await apiRequest(`/api/orders/${order.id}`, "PUT", orderData);
+        const orderData = buildOrderWithItemsPayload(data, order.id, articles, taxes);
+        return await apiRequest(`/api/ordersWithItems/${order.id}`, "PUT", orderData);
       } else {
-        return await apiRequest("/api/orders", "POST", orderData);
+        const orderData = buildOrderWithItemsPayload(data, 0, articles, taxes);
+        return await apiRequest("/api/ordersWithItems", "POST", orderData);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({ 
+      toast({
         title: order ? "Commande mise à jour" : "Commande créée",
         description: "L'opération s'est déroulée avec succès"
       });
@@ -100,10 +141,10 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
       onSuccess?.();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Une erreur est survenue",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -116,7 +157,18 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
   };
 
   const calculateTax = () => {
-    return calculateSubtotal() * 0.20; // TVA 20%
+    return watchedItems.reduce((sum, item) => {
+      const article = articles.find((a) => a.id === item.articleId);
+      let taxRate = 0;
+      if (article && article.taxId && taxes.length > 0) {
+        const tax = taxes.find((t) => t.id === article.taxId);
+        if (tax) {
+          taxRate = parseFloat(tax.rate?.toString() || "0");
+        }
+      }
+      const itemTotal = item.quantity * item.unitPrice;
+      return sum + (itemTotal * taxRate) / 100;
+    }, 0);
   };
 
   const calculateTotal = () => {
@@ -197,7 +249,7 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="general">Général</TabsTrigger>
                 <TabsTrigger value="items">Articles</TabsTrigger>
-                <TabsTrigger value="summary">Résumé</TabsTrigger>
+
               </TabsList>
 
               <TabsContent value="general" className="space-y-4">
@@ -326,6 +378,34 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
               </TabsContent>
 
               <TabsContent value="items" className="space-y-4">
+                <Card>
+
+                  <CardContent className="space-y-4 p-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span>Sous-total HT:</span>
+                          <span className="font-medium">{calculateSubtotal().toFixed(2)} DA</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>TVA :</span>
+                          <span className="font-medium">{calculateTax().toFixed(2)} DA</span>
+                        </div>
+                        <div className="flex justify-between text-lg font-bold border-t pt-2">
+                          <span>Total TTC:</span>
+                          <span>{calculateTotal().toFixed(2)} DA</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+
+                        <div className="text-sm text-muted-foreground">Nombre d'articles: {watchedItems.length}</div>
+
+
+                        <div className="text-sm text-muted-foreground">Quantité totale: {watchedItems.reduce((sum, item) => sum + item.quantity, 0)}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Articles de la commande</h3>
                   <Button type="button" onClick={addItem} size="sm">
@@ -337,7 +417,7 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
                 <div className="space-y-4">
                   {watchedItems.map((item, index) => (
                     <Card key={index}>
-                      <CardContent className="pt-4">
+                      <CardContent className="pt-0 pb-2 ">
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                           <FormField
                             control={form.control}
@@ -345,12 +425,12 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Article *</FormLabel>
-                                <Select 
+                                <Select
                                   onValueChange={(value) => {
                                     const articleId = parseInt(value);
                                     field.onChange(articleId);
                                     updateItemPrice(index, articleId);
-                                  }} 
+                                  }}
                                   value={field.value?.toString()}
                                 >
                                   <FormControl>
@@ -380,7 +460,7 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.001"
+                                    step="1"
                                     min="0"
                                     {...field}
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
@@ -391,7 +471,9 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
                             )}
                           />
 
+
                           <FormField
+                            disabled={true}
                             control={form.control}
                             name={`items.${index}.unitPrice`}
                             render={({ field }) => (
@@ -400,16 +482,17 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.01"
+                                    step="1"
                                     min="0"
                                     {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    onChange={(e) => { }}
                                   />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
+
 
                           <FormField
                             control={form.control}
@@ -450,40 +533,7 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="summary" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calculator className="h-5 w-5" />
-                      Résumé financier
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span>Sous-total HT:</span>
-                          <span className="font-medium">{calculateSubtotal().toFixed(2)} DA</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>TVA (20%):</span>
-                          <span className="font-medium">{calculateTax().toFixed(2)} DA</span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold border-t pt-2">
-                          <span>Total TTC:</span>
-                          <span>{calculateTotal().toFixed(2)} DA</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="text-sm text-muted-foreground">
-                          <div>Nombre d'articles: {watchedItems.length}</div>
-                          <div>Quantité totale: {watchedItems.reduce((sum, item) => sum + item.quantity, 0)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+
             </Tabs>
 
             <div className="flex justify-end space-x-2 pt-4 border-t">

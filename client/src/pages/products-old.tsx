@@ -230,7 +230,7 @@ function RecipeForm({ articleId, recipeData, onSuccess }: {
               <FormItem>
                 <FormLabel>Quantité/Nombre de parts *</FormLabel>
                 <FormControl>
-                  <Input {...field} type="number" step="0.001" placeholder="1" data-testid="input-recipe-quantity" />
+                  <Input {...field} type="number" step="1" placeholder="1" data-testid="input-recipe-quantity" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -551,7 +551,7 @@ function ProductForm({ product, onSuccess }: { product?: Article; onSuccess: () 
                   <FormItem>
                     <FormLabel>Seuil d'alerte stock</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0" value={field.value || ""} data-testid="input-stock-alert" />
+                      <Input {...field} type="number" step="1" placeholder="0" value={field.value || ""} data-testid="input-stock-alert" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -622,7 +622,7 @@ function ProductForm({ product, onSuccess }: { product?: Article; onSuccess: () 
                   <FormItem>
                     <FormLabel>Prix de vente * (DA)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-sale-price" />
+                      <Input {...field} type="number" step="1" placeholder="0.00" data-testid="input-sale-price" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -661,7 +661,7 @@ function ProductForm({ product, onSuccess }: { product?: Article; onSuccess: () 
                   <FormItem>
                     <FormLabel>Taux TVA (%)</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" step="0.01" placeholder="0.00" value={field.value || ""} data-testid="input-tax" />
+                      <Input {...field} type="number" step="1" placeholder="0.00" value={field.value || ""} data-testid="input-tax" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1146,7 +1146,7 @@ function RecipeIngredientForm({
               <FormItem>
                 <FormLabel>Quantité *</FormLabel>
                 <FormControl>
-                  <Input {...field} type="number" step="0.001" placeholder="1" data-testid="input-ingredient-quantity" />
+                  <Input {...field} type="number" step="1" placeholder="1" data-testid="input-ingredient-quantity" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

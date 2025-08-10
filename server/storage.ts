@@ -23,7 +23,7 @@ import {
   type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, gte, lte, isNull, sql } from "drizzle-orm";
+import { eq, desc, lt, and, or, gte, lte, isNull, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -188,6 +188,16 @@ export interface IStorage {
   // Stock & cost updates
   adjustArticleStockAndCost(articleId: number, deltaQuantity: number, newUnitCost: string | number): Promise<Article | undefined>;
   getInventoryRowsByOperation(operationId: number): Promise<Inventory[]>;
+
+  // Inventory Operations
+  getAllInventoryOperations(): Promise<InventoryOperation[]>;
+  getInventoryOperation(id: number): Promise<InventoryOperation | undefined>;
+  getInventoryOperationsByType(type: string, includeReliquat: boolean): Promise<InventoryOperation[]>;
+  createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation>;
+  createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
+  updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined>;
+  updateInventoryOperationWithItems(operationId: number, updatedOperation: Partial<InsertInventoryOperation>, updatedItems: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
+  deleteInventoryOperation(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1008,6 +1018,81 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(orders.createdAt));
   }
 
+  async getConfirmedOrdersWithProductsToPrepare(): Promise<any[]> {
+    // Get confirmed orders with their items, articles, and client information
+    const confirmedOrders = await db
+      .select({
+        id: orders.id,
+        code: orders.code,
+        clientId: orders.clientId,
+        status: orders.status,
+        orderDate: orders.orderDate,
+        deliveryDate: orders.deliveryDate,
+        // Client info
+        clientFirstName: clients.firstName,
+        clientLastName: clients.lastName,
+        clientCompanyName: clients.companyName,
+      })
+      .from(orders)
+      .leftJoin(clients, eq(orders.clientId, clients.id))
+      .where(eq(orders.status, 'confirmed'))
+      .orderBy(desc(orders.orderDate));
+
+    // Get items for these orders with article info
+    const ordersWithItems = await Promise.all(
+      confirmedOrders.map(async (order) => {
+        const items = await db
+          .select({
+            id: orderItems.id,
+            articleId: orderItems.articleId,
+            quantity: orderItems.quantity,
+            quantityPrepared: orderItems.quantityPrepared,
+            // Article info
+            articleCode: articles.code,
+            articleName: articles.name,
+            articleType: articles.type,
+          })
+          .from(orderItems)
+          .leftJoin(articles, eq(orderItems.articleId, articles.id))
+          .where(and(
+            eq(orderItems.orderId, order.id),
+            eq(articles.type, 'product') // Only products
+          ));
+
+        // Filter items that still need preparation
+        const itemsNeedingPreparation = items.filter(item => {
+          const quantityOrdered = parseFloat(item.quantity);
+          const quantityPrepared = parseFloat(item.quantityPrepared || '0');
+          return quantityPrepared < quantityOrdered;
+        });
+
+        if (itemsNeedingPreparation.length > 0) {
+          return {
+            ...order,
+            client: {
+              firstName: order.clientFirstName,
+              lastName: order.clientLastName,
+              companyName: order.clientCompanyName,
+            },
+            items: itemsNeedingPreparation.map(item => ({
+              ...item,
+              article: {
+                id: item.articleId,
+                code: item.articleCode,
+                name: item.articleName,
+                type: item.articleType,
+              }
+            }))
+          };
+        }
+        return null;
+      })
+    );
+
+    // Filter out orders with no items needing preparation
+    return ordersWithItems.filter(order => order !== null);
+  }
+
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     // Generate automatic code
     const prefix = insertOrder.type === 'quote' ? 'DEV' : 'CMD';
@@ -1027,7 +1112,7 @@ export class DatabaseStorage implements IStorage {
   async createOrderWithItems(insertOrder: InsertOrder,items: InsertOrderItem[]): Promise<Order> {
         insertOrder.subtotalHT = items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();    
         insertOrder.totalTax = items.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
-        insertOrder.totalTTC = insertOrder.subtotalHT + insertOrder.totalTax ;
+        insertOrder.totalTTC = (parseFloat( insertOrder.subtotalHT) + parseFloat(insertOrder.totalTax) ).toString();
     
     return await db.transaction(async (tx) => {
       const prefix = insertOrder.type === "quote" ? "DEV" : "CMD";
@@ -1167,10 +1252,20 @@ export class DatabaseStorage implements IStorage {
     return operation || undefined;
   }
 
-  async getInventoryOperationsByType(type: string): Promise<InventoryOperation[]> {
-    return await db.select().from(inventoryOperations)
-      .where(eq(inventoryOperations.type, type))
-      .orderBy(desc(inventoryOperations.createdAt));
+  async getInventoryOperationsByType(type: string, includeReliquat: boolean = false): Promise<InventoryOperation[]> {
+    if (type === 'preparation' && includeReliquat) {
+      // Include both 'preparation' and 'preparation_reliquat' types
+      return await db.select().from(inventoryOperations)
+        .where(or(
+          eq(inventoryOperations.type, 'preparation'),
+          eq(inventoryOperations.type, 'preparation_reliquat')
+        ))
+        .orderBy(desc(inventoryOperations.createdAt));
+    } else {
+      return await db.select().from(inventoryOperations)
+        .where(eq(inventoryOperations.type, type))
+        .orderBy(desc(inventoryOperations.createdAt));
+    }
   }
 
   async createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation> {
@@ -1200,12 +1295,80 @@ export class DatabaseStorage implements IStorage {
     return operation;
   }
 
+  async createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: InsertInventoryOperationItem[]): Promise<InventoryOperation> {
+    return await db.transaction(async (tx) => {
+      // Generate automatic code based on type
+      const prefixes: Record<string, string> = {
+        'reception': 'REC',
+        'preparation': 'PREP',
+        'preparation_reliquat': 'PREL',
+        'ajustement': 'AJU',
+        'ajustement_rebut': 'REB',
+        'inventaire_initiale': 'INV',
+        'interne': 'INT',
+        'livraison': 'LIV'
+      };
+      
+      const prefix = prefixes[insertOperation.type] || 'OP';
+      const existingOps = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.type, insertOperation.type));
+      const nextNumber = existingOps.length + 1;
+      const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+
+      const [operation] = await tx
+        .insert(inventoryOperations)
+        .values({ ...insertOperation, code })
+        .returning();
+
+      const itemsToInsert = items.map((item) => ({
+        ...item,
+        operationId: operation.id,
+      }));
+
+      await tx.insert(inventoryOperationItems).values(itemsToInsert);
+                  
+      return operation;
+    });
+  }
+
   async updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined> {
     const [operation] = await db.update(inventoryOperations)
       .set({ ...updateData, updatedAt: new Date().toISOString() })
       .where(eq(inventoryOperations.id, id))
       .returning();
     return operation || undefined;
+  }
+
+  async updateInventoryOperationWithItems(
+    operationId: number,
+    updatedOperation: Partial<InsertInventoryOperation>,
+    updatedItems: InsertInventoryOperationItem[]
+  ): Promise<InventoryOperation> {
+    return await db.transaction(async (tx) => {
+      // Update the operation header
+      const [operation] = await tx.update(inventoryOperations)
+        .set({ ...updatedOperation, updatedAt: new Date().toISOString() })
+        .where(eq(inventoryOperations.id, operationId))
+        .returning();
+
+      if (!operation) {
+        throw new Error(`Inventory operation with ID ${operationId} not found`);
+      }
+
+      // Delete existing items
+      await tx.delete(inventoryOperationItems)
+        .where(eq(inventoryOperationItems.operationId, operationId));
+
+      // Insert new items
+      if (updatedItems.length > 0) {
+        const itemsToInsert = updatedItems.map(item => ({
+          ...item,
+          operationId: operationId
+        }));
+        await tx.insert(inventoryOperationItems).values(itemsToInsert);
+      }
+
+      return operation;
+    });
   }
 
   async deleteInventoryOperation(id: number): Promise<boolean> {

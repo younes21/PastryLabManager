@@ -333,7 +333,7 @@ export default function Ingredients() {
                   <Input
                     id="currentStock"
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={formData.currentStock}
                     onChange={(e) => setFormData({...formData, currentStock: e.target.value})}
                   />
@@ -344,7 +344,7 @@ export default function Ingredients() {
                   <Input
                     id="minStock"
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={formData.minStock}
                     onChange={(e) => setFormData({...formData, minStock: e.target.value})}
                   />
@@ -355,7 +355,7 @@ export default function Ingredients() {
                   <Input
                     id="maxStock"
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={formData.maxStock}
                     onChange={(e) => setFormData({...formData, maxStock: e.target.value})}
                   />
@@ -366,7 +366,7 @@ export default function Ingredients() {
                   <Input
                     id="costPerUnit"
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={formData.costPerUnit}
                     onChange={(e) => setFormData({...formData, costPerUnit: e.target.value})}
                   />

@@ -292,7 +292,7 @@ export function DeliveryForm({ delivery, trigger, onSuccess }: DeliveryFormProps
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}

@@ -438,7 +438,7 @@ export default function RecipesPage() {
                     <FormItem>
                       <FormLabel>Quantité</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" step="0.001" placeholder="1.0" data-testid="input-quantity" />
+                        <Input {...field} type="number" step="1" placeholder="1.0" data-testid="input-quantity" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
