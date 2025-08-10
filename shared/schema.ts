@@ -791,6 +791,7 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type InventoryOperation = typeof inventoryOperations.$inferSelect;
 export type InsertInventoryOperation = z.infer<typeof insertInventoryOperationSchema>;
 export type InventoryOperationItem = typeof inventoryOperationItems.$inferSelect;
+export type InventoryOperationWithItems = InventoryOperation & {  items: InventoryOperationItem[]; };
 export type InsertInventoryOperationItem = z.infer<typeof insertInventoryOperationItemSchema>;
 export type Delivery = typeof deliveries.$inferSelect;
 export type InsertDelivery = z.infer<typeof insertDeliverySchema>;

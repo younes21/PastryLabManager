@@ -1416,7 +1416,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
-
+  app.delete("/api/inventory-operations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      // Supprimer d'abord les items liés
+      const items = await storage.getInventoryOperationItems(id);
+      for (const item of items) {
+        await storage.deleteInventoryOperationItem(item.id);
+      }
+      const success = await storage.deleteInventoryOperation(id);
+      if (!success) {
+        return res.status(404).json({ message: "Préparation non trouvée" });
+      }
+      res.json({ message: "Préparation supprimée avec succès" });
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la préparation:", error);
+      res.status(500).json({ message: "Erreur lors de la suppression de la préparation" });
+    }
+  });
   app.put("/api/inventory-operations/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);

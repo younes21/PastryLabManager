@@ -41,6 +41,10 @@ export default {
           DEFAULT: "var(--accent)",
           foreground: "var(--accent-foreground)",
         },
+        'accent-hover': {
+          DEFAULT: "var(--accent-hover)",
+          foreground: "var(--accent-foreground)",
+        },
         destructive: {
           DEFAULT: "var(--destructive)",
           foreground: "var(--destructive-foreground)",

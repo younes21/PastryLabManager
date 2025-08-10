@@ -20,10 +20,12 @@ import {
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
   type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
-  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine
+  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
+  InventoryOperationWithItems
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, or, gte, lte, isNull, sql } from "drizzle-orm";
+import camelcaseKeys from 'camelcase-keys';
 
 export interface IStorage {
   // Users
@@ -1252,20 +1254,28 @@ export class DatabaseStorage implements IStorage {
     return operation || undefined;
   }
 
-  async getInventoryOperationsByType(type: string, includeReliquat: boolean = false): Promise<InventoryOperation[]> {
-    if (type === 'preparation' && includeReliquat) {
-      // Include both 'preparation' and 'preparation_reliquat' types
-      return await db.select().from(inventoryOperations)
-        .where(or(
-          eq(inventoryOperations.type, 'preparation'),
-          eq(inventoryOperations.type, 'preparation_reliquat')
-        ))
-        .orderBy(desc(inventoryOperations.createdAt));
-    } else {
-      return await db.select().from(inventoryOperations)
-        .where(eq(inventoryOperations.type, type))
-        .orderBy(desc(inventoryOperations.createdAt));
-    }
+  async getInventoryOperationsByType(type: string, includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
+    const condition =
+    type === 'preparation' && includeReliquat
+      ? sql`io.type IN ('preparation', 'preparation_reliquat')`
+      : sql`io.type = ${type}`;
+
+  const result = await db.execute(sql`
+    SELECT 
+      io.*,
+      COALESCE(
+        json_agg(iot.*) FILTER (WHERE iot.id IS NOT NULL),
+        '[]'
+      ) AS items
+    FROM inventory_operations io
+    LEFT JOIN inventory_operation_items iot
+      ON iot.operation_id = io.id
+    WHERE ${condition}
+    GROUP BY io.id
+    ORDER BY io.created_at DESC
+  `);
+
+  return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
   }
 
   async createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation> {

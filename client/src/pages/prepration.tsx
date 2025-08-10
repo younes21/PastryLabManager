@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, X, FileText, Trash2, Edit3, ChevronDown, ArrowLeft, Play, Clock, Filter, CheckCircle, AlertTriangle, Pause, Zap } from 'lucide-react';
+import { Plus, Save, X, FileText, Trash2, Edit3, ChevronDown, ArrowLeft, Play, Clock, Filter, CheckCircle, AlertTriangle, Pause, Zap, CirclePlus } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
 import ProductSelectionDialog from './dialog-prepration';
+import { useToast } from '@/hooks/use-toast';
 
 const PreparationPage = () => {
+  const { toast } = useToast();
   const [operations, setOperations] = useState<any[]>([]);
   const [currentOperation, setCurrentOperation] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -30,64 +32,68 @@ const PreparationPage = () => {
   const [operators, setOperators] = useState<any[]>([]);
   const [storageZones, setStorageZones] = useState<any[]>([]);
   const [articles, setArticles] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [recipeIngredients, setRecipeIngredients] = useState<any[]>([]);
   const [recipeOperations, setRecipeOperations] = useState<any[]>([]);
+  const [recipeMap, setrecipeMap] = useState<any>();
   const [workStations, setWorkStations] = useState<any[]>([]);
 
   // State for recipe details tabs
   const [activeRecipeTab, setActiveRecipeTab] = useState('ingredients');
 
   // Load initial data from API
+
+  const loadOperations = async () => {
+    const prepRes = await apiRequest('/api/inventory-operations?type=preparation&include_reliquat=true', 'GET');
+    const preparationsData = await prepRes.json();
+    setOperations(preparationsData || []);
+  };
+
   useEffect(() => {
     const loadAll = async () => {
       try {
-        console.log('Loading preparation page data...');
-        
-        const [opRes, zoneRes, artRes, recRes, prepRes, ordRes, wsRes] = await Promise.all([
+           
+        const [opRes, zoneRes, artRes, recRes, ordRes, wsRes] = await Promise.all([
           apiRequest('/api/users?role=preparateur', 'GET'),
           apiRequest('/api/storage-zones', 'GET'),
           apiRequest('/api/articles', 'GET'),
           apiRequest('/api/recipes', 'GET'),
-          apiRequest('/api/inventory-operations?type=preparation&include_reliquat=true', 'GET'),
           apiRequest('/api/orders/confirmed-with-products-to-prepare', 'GET'),
           apiRequest('/api/work-stations', 'GET'),
         ]);
+        loadOperations();
 
-        console.log('API responses received, parsing...');
 
         const operatorsData = await opRes.json();
         const zonesData = await zoneRes.json();
         const articlesData = await artRes.json();
         const recipesData = await recRes.json();
-        const preparationsData = await prepRes.json();
         const ordersData = await ordRes.json();
         const workStationsData = await wsRes.json();
-
-        console.log('Data loaded:', {
-          operators: operatorsData?.length || 0,
-          zones: zonesData?.length || 0,
-          articles: articlesData?.length || 0,
-          recipes: recipesData?.length || 0,
-          preparations: preparationsData?.length || 0,
-          orders: ordersData?.length || 0,
-          workStations: workStationsData?.length || 0
-        });
 
         setOperators(operatorsData || []);
         setStorageZones(zonesData || []);
         
         // Filter to products only (with recipes)
         const products = (articlesData || [])
-        //   .filter((a: any) => a.type === 'product')
+          .filter((a: any) => a.type === 'product')
           .map((a: any) => ({
             ...a,
             currentStock: a.currentStock?.toString() || '0',
           }));
-        setArticles(products);
-        
+        const allArticles = (articlesData || [])
+          .map((a: any) => ({
+            ...a,
+            currentStock: a.currentStock?.toString() || '0',
+          }));
+          
+          const recipesMap = new Map(recipesData.map(r => [r.articleId, r.designation]));
+
+        setProducts(products);
+        setArticles(allArticles);
         setRecipes(recipesData || []);
-        setOperations(preparationsData || []);
+        setrecipeMap(recipesMap);
         setOrders(ordersData || []);
         setWorkStations(workStationsData || []);
         
@@ -103,6 +109,7 @@ const PreparationPage = () => {
 
   // Debug useEffect to monitor state changes
   useEffect(() => {
+   
     if (isPartialMode) {
       console.log('🔄 Partial mode state changed:', {
         items: items,
@@ -179,7 +186,7 @@ const PreparationPage = () => {
       code: undefined,
       type: 'preparation',
       status: 'draft',
-      operatorId: '',
+      operatorId: null,
       storageZoneId: '',
       scheduledDate: '',
       notes: '',
@@ -214,7 +221,7 @@ const PreparationPage = () => {
         code: undefined,
         type: 'preparation_reliquat',
         status: 'draft',
-        operatorId: '',
+        operatorId: null,
         storageZoneId: '',
         scheduledDate: '',
         notes: '',
@@ -460,23 +467,33 @@ const PreparationPage = () => {
       return false;
     }
   };
+  const canUpdateOp= ()=> { return(currentOperation.status=='draft' || currentOperation.status=='programmed')}
 
   const saveOperation = async () => {
     if (!currentOperation) return;
 
-    try {
-      console.log('💾 Starting to save operation:', currentOperation);
-      console.log('📦 Items to save:', items);
-      
+    try {    
       // Validation
-      if (!currentOperation.operatorId || items.length === 0) {
-        alert('Sélectionnez un opérateur et au moins un produit.');
+      if ( items.length === 0) {
+        alert('Sélectionnez au moins un produit.');
         return;
       }
+      if ( currentOperation.scheduledDate == null) {
+        alert('Sélectionnez la date de préparation');
+        return;
+      }
+     
       
       const invalidLine = items.some((it) => (Number(it.quantity) || 0) <= 0);
       if (invalidLine) {
-        alert('Chaque ligne doit avoir une quantité > 0.');
+        toast({title:'la quantité doit etre > 0.',variant: "warning"});
+        return;
+      }
+      const parentQuantity = parentOperation?.items?.[0]?.quantity;
+      const reliquatQuantity = items?.[0]?.quantity;
+      if( currentOperation.type=='preparation_reliquat' && reliquatQuantity >= parentQuantity ){
+     
+        toast({title:'la quantité doit etre < '+ parentQuantity,variant: "warning"});
         return;
       }
 
@@ -503,7 +520,6 @@ const PreparationPage = () => {
         operationId:0
       }));
 
-      console.log('📤 Payload to send:', { operation: preparationHeader, items: itemsPayload });
 
       // Determine if this is a new operation or updating existing one
       const isNewOperation = !currentOperation.id ; // Temporary IDs are typically large numbers
@@ -516,12 +532,8 @@ const PreparationPage = () => {
         operation: preparationHeader,
         items: itemsPayload,
       });
-      
-      console.log('📥 API response received:', res);
-      
-      const data = await res.json();
-      console.log('📊 Parsed response data:', data);
-
+     const data = await res.json();
+     loadOperations();
       // Update operations list
       if (method === 'POST') {
         setOperations([data, ...operations]);
@@ -541,8 +553,7 @@ const PreparationPage = () => {
         createdAt: data.createdAt,
       });
 
-      console.log('✅ Operation saved successfully');
-      alert('Préparation sauvegardée');
+        alert('Préparation sauvegardée');
     } catch (e) {
       console.error('❌ Failed to save preparation:', e);
       console.error('Error details:', {
@@ -744,6 +755,7 @@ const PreparationPage = () => {
   // Filter operations with hierarchy support
   const getFilteredOperations = () => {
     let filtered = operations;
+    console.log(operations);
 
     if (filterDate) {
       const today = new Date();
@@ -890,6 +902,7 @@ const PreparationPage = () => {
                   </thead>
                   <tbody>
                     {getFilteredOperations().map((operation, index) => {
+                    
                       const operator = operators.find(o => o.id === operation.operatorId);
                       const totalQuantity = (operation.items || []).reduce((sum: number, item: any) => 
                         sum + parseFloat(item.quantity || 0), 0);
@@ -903,11 +916,10 @@ const PreparationPage = () => {
                         }
                       }
                       // Get recipe names for the operation, prefer item.recipe.designation if available
-                      const recipeNames = (operation.items || []).map((item: any) => {
-                        if (item.recipe && item.recipe.designation) return item.recipe.designation;
-                        const recipe = recipes.find(r => r.articleId === item.articleId);
-                        return recipe?.designation || 'Recette inconnue';
-                      }).join(', ');
+                      const recipeNames = (operation.items || [])
+                      .map(item => recipeMap.get(item.articleId) || 'Recette inconnue')
+                      .join(', ');
+                  
                       const isChild = operation.isChild;
                       const rowClass = isChild 
                         ? 'bg-blue-50 border-l-4 border-blue-300' 
@@ -948,7 +960,7 @@ const PreparationPage = () => {
                                   className="text-green-600 hover:text-green-800 p-1"
                                   title="Lancer tout"
                                 >
-                                  <Zap className="w-4 h-4" />
+                                  <Play className="w-4 h-4" />
                                 </button>
                               )}
                               
@@ -970,7 +982,7 @@ const PreparationPage = () => {
                                   className="text-orange-600 hover:text-orange-800 p-1"
                                   title="Créer préparation partielle"
                                 >
-                                  <AlertTriangle className="w-4 h-4" />
+                                  <CirclePlus className="w-4 h-4" />
                                 </button>
                               )}
                               
@@ -1060,7 +1072,7 @@ const PreparationPage = () => {
             </div>
           </div>
         </div>
-
+{/* *************************************** edition   *************************************  */}
         <div className="mx-auto px-4 py-4">
           {/* Configuration */}
           <div className="bg-white rounded-lg shadow-sm border mb-4">
@@ -1075,7 +1087,7 @@ const PreparationPage = () => {
                         <button
                           onClick={() => setShowProductSelect(!showProductSelect)}
                           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                          disabled={currentOperation?.status !== 'draft' || items.some(item => item.orderId)}
+                          disabled={!canUpdateOp()}
                         >
                           <span>{selectedArticle ? selectedArticle.name : items[0]?.article?.name || 'Sélectionner...'}</span>
                           <ChevronDown className="w-4 h-4" />
@@ -1091,7 +1103,7 @@ const PreparationPage = () => {
                                 className="w-full px-2 py-1 mb-2 border border-gray-200 rounded"
                               />
                               <div className="max-h-48 overflow-y-auto">
-                                {articles.filter(article =>
+                                {products.filter(article =>
                                   (article?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                   (article?.code || '').toLowerCase().includes(searchTerm.toLowerCase())
                                 ).map(article => (
@@ -1137,7 +1149,7 @@ const PreparationPage = () => {
                       <button
                         onClick={() => setShowProductDialog(true)}
                         className="w-full px-3 py-1.5 text-sm border border-blue-300 text-blue-600 rounded hover:bg-blue-50 flex items-center justify-center space-x-2"
-                        disabled={currentOperation?.status !== 'draft' || items.some(item => !item.orderId)}
+                        disabled={!canUpdateOp()}
                       >
                         <Clock className="w-4 h-4" />
                         <span>Choisir depuis commande</span>
@@ -1153,30 +1165,30 @@ const PreparationPage = () => {
                         onChange={e => items[0] && updateItemQuantity(items[0].id, e.target.value)}
                         min="1"
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        disabled={currentOperation?.status !== 'draft'}
+                        disabled={!canUpdateOp()}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Date programmée</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Date programmée *</label>
                       <input
                         type="date"
                         value={currentOperation?.scheduledDate || ''}
                         onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, scheduledDate: e.target.value }))}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        disabled={currentOperation?.status !== 'draft'}
+                        disabled={!canUpdateOp()}
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Opérateur *</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Opérateur</label>
                       <select
-                        value={currentOperation?.operatorId || ''}
+                        value={currentOperation?.operatorId || null}
                         onChange={e => setCurrentOperation((prev: any) => ({ ...prev, operatorId: parseInt(e.target.value) }))}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        disabled={currentOperation?.status !== 'draft'}
+                        disabled={!canUpdateOp()}
                       >
                         <option value="">Sélectionner...</option>
                         {operators.map(operator => (
@@ -1194,7 +1206,7 @@ const PreparationPage = () => {
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
                         rows={2}
                         placeholder="Notes sur cette préparation..."
-                        disabled={currentOperation?.status !== 'draft'}
+                        disabled={!canUpdateOp()}
                       />
                     </div>
                   </div>
@@ -1212,39 +1224,6 @@ const PreparationPage = () => {
                     </p>
                   </div>
 
-                
-
-                  {/* Affichage du produit à préparer */}
-                  {items[0]?.article && (
-                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="text-sm font-medium text-blue-800 mb-3">Produit à préparer</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">Produit:</span>
-                          <span className="ml-2 font-medium">{items[0].article.name}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Code:</span>
-                          <span className="ml-2 font-medium">{items[0].article.code}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Recette:</span>
-                          <span className="ml-2 font-medium">{items[0].recipe?.designation || '-'}</span>
-                        </div>
-                         <div>
-                    <span className="text-sm text-gray-600">Quantité:</span>
-                    <span className="ml-2 font-medium text-blue-600">{items[0]?.quantity} {items[0]?.article?.unit}</span>
-                  </div>
-                        <div>
-                          <span className="text-gray-600">Stock actuel:</span>
-                          <span className="ml-2 font-medium">{items[0].quantityBefore} {items[0].article.unit}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                
-
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Quantité à produire *</label>
@@ -1255,7 +1234,7 @@ const PreparationPage = () => {
                         min="1"
                         max={parentOperation?.items?.[0]?.quantity || 999}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        disabled={false}
+                        disabled={!canUpdateOp()}
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Max: {parentOperation?.items?.[0]?.quantity || 0} {items[0]?.article?.unit}
@@ -1268,7 +1247,7 @@ const PreparationPage = () => {
                         value={currentOperation?.storageZoneId || ''}
                         onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, storageZoneId: parseInt(e.target.value) }))}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        disabled={false}
+                        disabled={!canUpdateOp()}
                       >
                         <option value="">Sélectionner...</option>
                         {storageZones.map(zone => (
@@ -1282,7 +1261,7 @@ const PreparationPage = () => {
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Opérateur *</label>
                       <select
-                        value={currentOperation?.operatorId || ''}
+                        value={currentOperation?.operatorId }
                         onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, operatorId: parseInt(e.target.value) }))}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                         disabled={false}
@@ -1306,7 +1285,7 @@ const PreparationPage = () => {
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
                         rows={2}
                         placeholder="Notes sur cette préparation..."
-                        disabled={false}
+                        disabled={!canUpdateOp()}
                       />
                     </div>
                   </div>
@@ -1337,6 +1316,60 @@ const PreparationPage = () => {
                   )}
                 </>
               )}
+
+                {/* Affichage du produit à préparer */}
+                {items[0]?.article && (
+                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="text-sm font-medium text-blue-800 mb-3">Produit à préparer</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Produit:</span>
+                          <span className="ml-2 font-medium">{items[0].article.name}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Code:</span>
+                          <span className="ml-2 font-medium">{items[0].article.code}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Recette:</span>
+                          <span className="ml-2 font-medium">{items[0].recipe?.designation || '-'}</span>
+                        </div>
+                         <div>
+                    <span className="text-sm text-gray-600">Quantité:</span>
+                    <span className="ml-2 font-medium text-blue-600">{items[0]?.quantity} {items[0]?.article?.unit}</span>
+                  </div>
+                        <div>
+                          <span className="text-gray-600">Stock actuel:</span>
+                          <span className="ml-2 font-medium">{items[0].quantityBefore} {items[0].article.unit}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                   {/* Affichage des dates de commande si depuis commande */}
+                   {items[0]?.orderId && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <h4 className="text-sm font-medium text-blue-800 mb-2">Informations de la commande</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Date de création:</span>
+                          <span className="ml-2 font-medium">
+                            {orders.find(o => o.id === items[0].orderId)?.orderDate 
+                              ? new Date(orders.find(o => o.id === items[0].orderId)?.orderDate).toLocaleDateString('fr-FR')
+                              : '-'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Date prévue de livraison:</span>
+                          <span className="ml-2 font-medium">
+                            {orders.find(o => o.id === items[0].orderId)?.deliveryDate
+                              ? new Date(orders.find(o => o.id === items[0].orderId)?.deliveryDate).toLocaleDateString('fr-FR')
+                              : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
             </div>
           </div>
 
@@ -1344,7 +1377,7 @@ const PreparationPage = () => {
           <div className="bg-white rounded-lg shadow-sm border mb-4">
             <div className="p-4">
               <div className="flex items-center justify-end space-x-3">
-                {currentOperation?.status === 'draft' && (
+                {canUpdateOp() && (
                   <>
                     <button
                       onClick={() => setIsEditing(false)}
@@ -1387,10 +1420,9 @@ const PreparationPage = () => {
             </div>
           </div>
 
-       
-
-          {/* Recipe Details Table for Partial Mode */}
-          {isPartialMode && items.length > 0 && items[0]?.recipe && (
+      
+          {/* Recipe Details Table  */}
+          { items.length > 0 && items[0]?.recipe && (
             <div className="bg-white rounded-lg shadow-sm border mb-4">
               <div className="p-4">
                 <h3 className="font-semibold text-gray-700 mb-3">Détail de la recette</h3>

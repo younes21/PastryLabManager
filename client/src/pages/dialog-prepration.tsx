@@ -198,7 +198,7 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-green-500 text-white">
+        <div className="flex items-center justify-between p-4 border-b  ">
           <div className="flex items-center space-x-2">
             <ShoppingCart className="w-5 h-5" />
             <h2 className="text-lg font-semibold">Produits Commandés à Préparer</h2>
@@ -310,13 +310,13 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                                   <button
                                     onClick={() => handleSelectFromSummary(summary)}
                                     disabled={selectedQuantity <= 0 || selectedQuantity > summary.totalQuantityRemaining}
-                                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                    className="px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary-hover disabled:bg-gray-300 disabled:cursor-not-allowed"
                                   >
                                     Sélectionner
                                   </button>
                                   <button
                                     onClick={() => showProductDetail(summary)}
-                                    className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                                    className="px-3 py-1 bg-accent text-white text-sm rounded hover:bg-accent-hover"
                                     title="Voir le détail des commandes"
                                   >
                                     Détail
@@ -346,7 +346,7 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                           </div>
                           <button
                             onClick={() => setActiveTab('summary')}
-                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                            className="px-3 py-1 bg-accent text-white text-sm rounded hover:bg-accent-hover"
                           >
                             Retour au résumé
                           </button>
@@ -408,7 +408,7 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                                     <button
                                       onClick={() => handleSelectProduct(product)}
                                       disabled={selectedQuantity <= 0 || selectedQuantity > product.quantityRemaining}
-                                      className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                      className="px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary-hover disabled:bg-gray-300 disabled:cursor-not-allowed"
                                     >
                                       Sélectionner
                                     </button>
