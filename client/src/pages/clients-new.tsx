@@ -628,7 +628,7 @@ export default function Clients() {
           <CardTitle className="text-2xl font-bold">Clients</CardTitle>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setSelectedClient(undefined)} data-testid="button-add">
+              <Button className="bg-accent hover:bg-accent-hover" onClick={() => setSelectedClient(undefined)} data-testid="button-add">
                 <Plus className="mr-2 h-4 w-4" />
                 Nouveau Client
               </Button>

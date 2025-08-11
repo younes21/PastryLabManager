@@ -278,7 +278,7 @@ export default function MeasurementUnitsPage() {
               <DialogTrigger asChild>
                 <Button 
                   onClick={resetCategoryForm} 
-                  className="h-10 px-4 text-base font-medium"
+                  className="bg-accent hover:bg-accent-hover" 
                   data-testid="button-add-category"
                 >
                   <Plus className="h-4 w-4 mr-2" />

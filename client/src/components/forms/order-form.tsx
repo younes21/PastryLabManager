@@ -229,7 +229,7 @@ export function OrderForm({ order, trigger, onSuccess }: OrderFormProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button data-testid="button-create-order">
+          <Button className="bg-accent hover:bg-accent-hover"  data-testid="button-create-order">
             <Plus className="h-4 w-4 mr-2" />
             {order ? "Modifier" : "Nouvelle commande"}
           </Button>

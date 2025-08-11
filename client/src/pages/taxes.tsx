@@ -144,7 +144,7 @@ export default function TaxesPage() {
           <DialogTrigger asChild>
             <Button 
               onClick={handleNewTax}
-              className="h-12 px-6 text-lg"
+              className="bg-accent hover:bg-accent-hover" 
               data-testid="button-add-tax"
             >
               <Plus className="mr-2 h-5 w-5" />

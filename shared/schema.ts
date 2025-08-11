@@ -14,14 +14,6 @@ export const users = pgTable("users", {
   active: boolean("active").default(true),
 });
 
-export const storageLocations = pgTable("storage_locations", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  temperature: decimal("temperature", { precision: 5, scale: 2 }).notNull(),
-  capacity: decimal("capacity", { precision: 10, scale: 2 }),
-  unit: text("unit").notNull(), // 'kg', 'l', 'm3'
-});
-
 export const measurementCategories = pgTable("measurement_categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
@@ -132,7 +124,6 @@ export const storageZones = pgTable("storage_zones", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
   code: text("code").notNull().unique(), // ZON-000001
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
   description: text("description"),
   capacity: decimal("capacity", { precision: 10, scale: 2 }),
   unit: text("unit"), // 'kg', 'l', 'm3', 'pieces'
@@ -236,7 +227,7 @@ export const articles = pgTable("articles", {
   
   // Gestion de stock
   managedInStock: boolean("managed_in_stock").default(true),
-  storageLocationId: integer("storage_location_id").references(() => storageLocations.id),
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
   categoryId: integer("category_id").references(() => articleCategories.id),
   unit: text("unit").notNull(),
   
@@ -344,7 +335,6 @@ export const recipesRelations = relations(recipes, ({ one, many }) => ({
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true });
 export const insertMeasurementCategorySchema = createInsertSchema(measurementCategories).omit({ id: true });
 export const insertMeasurementUnitSchema = createInsertSchema(measurementUnits).omit({ id: true });
 export const insertArticleCategorySchema = createInsertSchema(articleCategories).omit({ id: true, createdAt: true });
@@ -395,8 +385,6 @@ export const insertClientSchema = createInsertSchema(clients).omit({ id: true, c
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type StorageLocation = typeof storageLocations.$inferSelect;
-export type InsertStorageLocation = z.infer<typeof insertStorageLocationSchema>;
 export type MeasurementCategory = typeof measurementCategories.$inferSelect;
 export type InsertMeasurementCategory = z.infer<typeof insertMeasurementCategorySchema>;
 export type MeasurementUnit = typeof measurementUnits.$inferSelect;

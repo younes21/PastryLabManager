@@ -779,7 +779,7 @@ export default function Products() {
           <CardTitle className="text-2xl font-bold">Produits</CardTitle>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setSelectedProduct(undefined)} data-testid="button-add">
+              <Button className="bg-accent hover:bg-accent-hover"  onClick={() => setSelectedProduct(undefined)} data-testid="button-add">
                 <Plus className="mr-2 h-4 w-4" />
                 Nouveau Produit
               </Button>

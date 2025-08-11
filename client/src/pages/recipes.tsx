@@ -209,14 +209,14 @@ export default function RecipesPage() {
                   Gérer les recettes et fiches techniques de votre laboratoire
                 </p>
               </div>
-              <button
+              <Button
                 onClick={handleCreate}
-                className="bg-primary hover:bg-primary-hover text-white font-bold px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center space-x-2"
+                className="bg-accent hover:bg-accent-hover" 
                 data-testid="button-create-recipe"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nouvelle recette</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>

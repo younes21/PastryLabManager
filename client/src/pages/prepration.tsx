@@ -88,7 +88,7 @@ const PreparationPage = () => {
             currentStock: a.currentStock?.toString() || '0',
           }));
           
-          const recipesMap = new Map(recipesData.map(r => [r.articleId, r.designation]));
+          const recipesMap = new Map(recipesData.map((r:any) => [r.articleId, r.designation]));
 
         setProducts(products);
         setArticles(allArticles);
@@ -917,7 +917,7 @@ const PreparationPage = () => {
                       }
                       // Get recipe names for the operation, prefer item.recipe.designation if available
                       const recipeNames = (operation.items || [])
-                      .map(item => recipeMap.get(item.articleId) || 'Recette inconnue')
+                      .map((item:any) => recipeMap.get(item.articleId) || 'Recette inconnue')
                       .join(', ');
                   
                       const isChild = operation.isChild;

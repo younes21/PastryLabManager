@@ -146,7 +146,7 @@ export default function PriceListsPage() {
           <h1 className="text-2xl font-bold">Listes de Prix</h1>
           <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-new-price-list">
+            <Button className="bg-accent hover:bg-accent-hover"  data-testid="button-new-price-list">
               <Plus className="w-4 h-4 mr-2" />
               Nouvelle Liste
             </Button>

@@ -140,7 +140,7 @@ export default function Products() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={handleCreateProduct} data-testid="button-create-product">
+            <Button className="bg-accent hover:bg-accent-hover"  onClick={handleCreateProduct} data-testid="button-create-product">
               <Plus className="mr-2 h-4 w-4" />
               Nouveau Produit
             </Button>
@@ -215,7 +215,7 @@ export default function Products() {
               ) : (
                 filteredProducts.map((product) => {
                   // Récupérer les données des zones de stockage
-                  const storageZone = storageZones?.find((zone: StorageZone) => zone.id === product.storageLocationId);
+                  const storageZone = storageZones?.find((zone: StorageZone) => zone.id === product.storageZoneId);
                   
                   return (
                   <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
@@ -330,7 +330,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       description: product?.description || "",
       unit: product?.unit || "pièce",
       managedInStock: Boolean(product?.managedInStock ?? true),
-      storageLocationId: product?.storageLocationId || undefined,
+      storageZoneId: product?.storageZoneId || undefined,
       categoryId: product?.categoryId || undefined,
       allowSale: Boolean(product?.allowSale ?? true),
       saleCategoryId: product?.saleCategoryId || undefined,
@@ -340,7 +340,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       minStock: product?.minStock ? product.minStock.toString() : "",
       maxStock: product?.maxStock ? product.maxStock.toString() : "",
       isPerishable: Boolean(product?.isPerishable ?? false),
-      shelfLife: product?.shelfLife ? product.shelfLife.toString() : "",
+      shelfLife: product?.shelfLife ? product.shelfLife.toString() : "0",
       storageConditions: product?.storageConditions || "",
       active: Boolean(product?.active ?? true),
       photo: product?.photo || "",
@@ -359,6 +359,10 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     queryKey: ["/api/measurement-units"],
   });
 
+  const { data: taxes } = useQuery({
+    queryKey: ["/api/taxes"],
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: ProductForm) => {
       console.log("🔥 CREATE PRODUCT - Données envoyées:", data);
@@ -366,7 +370,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
-      toast({ title: "Produit créé avec succès" });
+      toast({ title: "Produit créé avec succès",variant:'success' });
       onSuccess();
     },
     onError: (error) => {
@@ -382,7 +386,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
-      toast({ title: "Produit modifié avec succès" });
+      toast({ title: "Produit modifié avec succès",variant:'success' });
       onSuccess();
     },
     onError: (error) => {
@@ -573,7 +577,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
 
               <FormField
                 control={form.control}
-                name="storageLocationId"
+                name="storageZoneId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Zone de stockage</FormLabel>
@@ -797,7 +801,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                   <FormItem>
                     <FormLabel>TVA</FormLabel>
                     <Select 
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))} 
                       value={field.value?.toString() || "none"}
                     >
                       <FormControl>
@@ -806,10 +810,13 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">Aucune TVA</SelectItem>
-                        <SelectItem value="1">TVA 19%</SelectItem>
-                        <SelectItem value="2">TVA 9%</SelectItem>
-                      </SelectContent>
+                                    <SelectItem value="none">Aucune TVA</SelectItem>
+                                    {(taxes as any[])?.map((tax: any) => (
+                                      <SelectItem key={tax.id} value={tax.id.toString()}>
+                                        {tax.designation} ({tax.rate}%)
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>

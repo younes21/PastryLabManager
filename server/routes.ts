@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import {
   insertUserSchema,
-  insertStorageLocationSchema,
   insertMeasurementCategorySchema,
   insertMeasurementUnitSchema,
   insertArticleCategorySchema,
@@ -92,23 +91,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Storage Locations routes
-  app.get("/api/storage-locations", async (req, res) => {
+  // Storage Zones routes (replacing Storage Locations)
+  app.get("/api/storage-zones", async (req, res) => {
     try {
-      const locations = await storage.getAllStorageLocations();
-      res.json(locations);
+      const zones = await storage.getAllStorageZones();
+      res.json(zones);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch storage locations" });
+      res.status(500).json({ message: "Failed to fetch storage zones" });
     }
   });
 
-  app.post("/api/storage-locations", async (req, res) => {
+  app.post("/api/storage-zones", async (req, res) => {
     try {
-      const locationData = insertStorageLocationSchema.parse(req.body);
-      const location = await storage.createStorageLocation(locationData);
-      res.status(201).json(location);
+      const zoneData = insertStorageZoneSchema.parse(req.body);
+      const zone = await storage.createStorageZone(zoneData);
+      res.status(201).json(zone);
     } catch (error) {
-      res.status(400).json({ message: "Invalid storage location data" });
+      res.status(400).json({ message: "Invalid storage zone data" });
     }
   });
 
@@ -603,26 +602,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(account);
     } catch (error) {
       res.status(400).json({ message: "Invalid accounting account data" });
-    }
-  });
-
-  // Storage Zones routes
-  app.get("/api/storage-zones", async (req, res) => {
-    try {
-      const zones = await storage.getAllStorageZones();
-      res.json(zones);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch storage zones" });
-    }
-  });
-
-  app.post("/api/storage-zones", async (req, res) => {
-    try {
-      const zoneData = insertStorageZoneSchema.parse(req.body);
-      const zone = await storage.createStorageZone(zoneData);
-      res.status(201).json(zone);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid storage zone data" });
     }
   });
 

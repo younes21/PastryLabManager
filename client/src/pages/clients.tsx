@@ -822,7 +822,7 @@ export default function Clients() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => { setSelectedClient(undefined); setViewMode("edit"); }} data-testid="button-add-client">
+            <Button className="bg-accent hover:bg-accent-hover"  onClick={() => { setSelectedClient(undefined); setViewMode("edit"); }} data-testid="button-add-client">
               <Plus className="mr-2 h-4 w-4" />
               Nouveau Client
             </Button>

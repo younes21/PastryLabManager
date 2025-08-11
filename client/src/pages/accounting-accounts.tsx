@@ -147,7 +147,7 @@ export default function AccountingAccountsPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Comptes Comptables
           </h1>
-          <Button onClick={openCreateDialog} data-testid="button-create-account">
+          <Button className="bg-accent hover:bg-accent-hover" onClick={openCreateDialog} data-testid="button-create-account">
             <Plus className="mr-2 h-4 w-4" />
             Nouveau Compte
           </Button>

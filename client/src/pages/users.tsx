@@ -192,7 +192,7 @@ export default function Users() {
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Gestion des Utilisateurs</h1>
-          <Button onClick={() => openModal()}>
+          <Button className="bg-accent hover:bg-accent-hover"  onClick={() => openModal()}>
             <i className="fas fa-plus mr-2"></i>
             Nouvel Utilisateur
           </Button>

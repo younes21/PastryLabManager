@@ -18,8 +18,8 @@
   --primary-foreground: hsl(210, 40%, 98%);
   --secondary: hsl(60, 4.8%, 95.9%);
   --secondary-foreground: hsl(24, 9.8%, 10%);
-  --accent: hsl(206, 70%, 45%);
-  --accent-hover: hsl(206, 100%, 32%);
+  --accent: hsl(221.21deg 83.19% 53.33%);
+  --accent-hover: hsl(221, 100%, 45%);
   --accent-foreground: hsl(24, 9.8%, 10%);
   --destructive: hsl(0, 84.2%, 60.2%);
   --destructive-foreground: hsl(60, 9.1%, 97.8%);

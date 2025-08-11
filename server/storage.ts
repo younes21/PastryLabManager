@@ -1,12 +1,12 @@
 import {
-  users, storageLocations,
+  users,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
   invoices, invoiceItems, accountingEntries, accountingEntryLines,
   inventory, type Inventory, type InsertInventory,
-  type User, type InsertUser, type StorageLocation, type InsertStorageLocation,
+  type User, type InsertUser,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
   type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
@@ -36,13 +36,6 @@ export interface IStorage {
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: number): Promise<boolean>;
   getAllUsers(): Promise<User[]>;
-
-  // Storage Locations
-  getStorageLocation(id: number): Promise<StorageLocation | undefined>;
-  getAllStorageLocations(): Promise<StorageLocation[]>;
-  createStorageLocation(location: InsertStorageLocation): Promise<StorageLocation>;
-  updateStorageLocation(id: number, location: Partial<InsertStorageLocation>): Promise<StorageLocation | undefined>;
-  deleteStorageLocation(id: number): Promise<boolean>;
 
   // Ingredients supprimés - utiliser articles avec type="ingredient"
 
@@ -139,7 +132,6 @@ export interface IStorage {
   // Storage Zones
   getAllStorageZones(): Promise<StorageZone[]>;
   getStorageZone(id: number): Promise<StorageZone | undefined>;
-  getStorageZonesByLocation(locationId: number): Promise<StorageZone[]>;
   createStorageZone(zone: InsertStorageZone): Promise<StorageZone>;
   updateStorageZone(id: number, zone: Partial<InsertStorageZone>): Promise<StorageZone | undefined>;
   deleteStorageZone(id: number): Promise<boolean>;
@@ -238,34 +230,6 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
-  }
-
-  // Storage Locations
-  async getStorageLocation(id: number): Promise<StorageLocation | undefined> {
-    const [location] = await db.select().from(storageLocations).where(eq(storageLocations.id, id));
-    return location || undefined;
-  }
-
-  async getAllStorageLocations(): Promise<StorageLocation[]> {
-    return await db.select().from(storageLocations);
-  }
-
-  async createStorageLocation(insertLocation: InsertStorageLocation): Promise<StorageLocation> {
-    const [location] = await db.insert(storageLocations).values(insertLocation).returning();
-    return location;
-  }
-
-  async updateStorageLocation(id: number, updateData: Partial<InsertStorageLocation>): Promise<StorageLocation | undefined> {
-    const [location] = await db.update(storageLocations)
-      .set(updateData)
-      .where(eq(storageLocations.id, id))
-      .returning();
-    return location || undefined;
-  }
-
-  async deleteStorageLocation(id: number): Promise<boolean> {
-    const result = await db.delete(storageLocations).where(eq(storageLocations.id, id));
-    return (result.rowCount || 0) > 0;
   }
 
   // Ingredients (filtrage des articles par type="ingredient")
@@ -426,7 +390,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllArticles(): Promise<Article[]> {
-    return await db.select().from(articles);
+    return await db.select().from(articles).orderBy(articles.name);
   }
 
   async getActiveArticles(): Promise<Article[]> {
@@ -714,10 +678,6 @@ export class DatabaseStorage implements IStorage {
   async getStorageZone(id: number): Promise<StorageZone | undefined> {
     const [zone] = await db.select().from(storageZones).where(eq(storageZones.id, id));
     return zone || undefined;
-  }
-
-  async getStorageZonesByLocation(locationId: number): Promise<StorageZone[]> {
-    return await db.select().from(storageZones).where(eq(storageZones.storageLocationId, locationId));
   }
 
   async createStorageZone(insertZone: InsertStorageZone): Promise<StorageZone> {

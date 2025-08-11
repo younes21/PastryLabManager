@@ -148,7 +148,7 @@ export default function CurrenciesPage() {
           <DialogTrigger asChild>
             <Button 
               onClick={handleNewCurrency}
-              className="h-12 px-6 text-lg"
+              className="bg-accent hover:bg-accent-hover" 
               data-testid="button-add-currency"
             >
               <Plus className="mr-2 h-5 w-5" />

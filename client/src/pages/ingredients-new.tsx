@@ -18,7 +18,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Article } from "@shared/schema";
+import type { Article, MeasurementUnit } from "@shared/schema";
+import { Ingredient } from "@shared/schema-old";
 
 // Schema pour les ingrédients selon spécifications exactes
 const ingredientSchema = z.object({
@@ -42,6 +43,7 @@ type IngredientFormData = z.infer<typeof ingredientSchema>;
 export default function IngredientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Article | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -60,6 +62,11 @@ export default function IngredientsPage() {
 
   const { data: taxes } = useQuery({
     queryKey: ["/api/taxes"],
+  });
+
+  // Récupération des unités de mesure depuis l'API
+  const { data: measurementUnits = [] } = useQuery<MeasurementUnit[]>({
+    queryKey: ["/api/measurement-units/active"],
   });
 
   const form = useForm<IngredientFormData>({
@@ -120,7 +127,7 @@ export default function IngredientsPage() {
       name: ingredient.name,
       description: ingredient.description || "",
       managedInStock: (ingredient as any).managedInStock ?? true,
-      storageLocationId: ingredient.storageLocationId || undefined,
+      storageLocationId: ingredient.storageZoneId || undefined,
       categoryId: ingredient.categoryId || undefined,
       unit: ingredient.unit || "kg",
       minStock: Number((ingredient as any).minStock) || 0,
@@ -158,28 +165,20 @@ export default function IngredientsPage() {
         <Card>
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            {/* Actions principales */}
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setIsDialogOpen(true)} data-testid="button-add-ingredient">
-                <Plus className="w-4 h-4 mr-2" />
-                Nouvel Ingrédient
-              </Button>
-              <Button variant="outline" onClick={() => window.location.reload()}>
+              
+            {/* Recherche et filtres */}
+            <div className="flex flex-wrap gap-2 items-center">
+            <Button variant="outline" onClick={() => window.location.reload()}>
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Actualiser
               </Button>
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Exporter
-              </Button>
-            </div>
-
-            {/* Recherche et filtres */}
-            <div className="flex flex-wrap gap-2 items-center">
               <div className="relative">
+                
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher un ingrédient..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 w-64"
                   data-testid="input-search-ingredients"
                 />
@@ -207,6 +206,15 @@ export default function IngredientsPage() {
                   <SelectItem value="inactive">Inactifs</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              
+              
+              <Button className="bg-accent hover:bg-accent-hover" onClick={() => setIsDialogOpen(true)} data-testid="button-add-ingredient">
+                <Plus className="w-4 h-4 mr-2" />
+                Nouvel Ingrédient
+              </Button>
+             
             </div>
           </div>
 
@@ -306,12 +314,11 @@ export default function IngredientsPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="kg">Kilogramme (kg)</SelectItem>
-                              <SelectItem value="g">Gramme (g)</SelectItem>
-                              <SelectItem value="l">Litre (l)</SelectItem>
-                              <SelectItem value="ml">Millilitre (ml)</SelectItem>
-                              <SelectItem value="pièce">Pièce</SelectItem>
-                              <SelectItem value="paquet">Paquet</SelectItem>
+                              {measurementUnits.map((unit) => (
+                                <SelectItem key={unit.id} value={unit.abbreviation}>
+                                  {unit.label} ({unit.abbreviation})
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -463,12 +470,11 @@ export default function IngredientsPage() {
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    <SelectItem value="kg">Kilogramme (kg)</SelectItem>
-                                    <SelectItem value="g">Gramme (g)</SelectItem>
-                                    <SelectItem value="l">Litre (l)</SelectItem>
-                                    <SelectItem value="ml">Millilitre (ml)</SelectItem>
-                                    <SelectItem value="pièce">Pièce</SelectItem>
-                                    <SelectItem value="paquet">Paquet</SelectItem>
+                                    {measurementUnits.map((unit) => (
+                                      <SelectItem key={unit.id} value={unit.abbreviation}>
+                                        {unit.label} ({unit.abbreviation})
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -618,15 +624,16 @@ export default function IngredientsPage() {
               <TableRow>
                 <TableHead>Photo</TableHead>
                 <TableHead>Actif</TableHead>
-                <TableHead>Catégorie</TableHead>
                 <TableHead>Désignation</TableHead>
+                <TableHead>Catégorie</TableHead>
                 <TableHead>PMP</TableHead>
                 <TableHead>Stock Min</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ingredients?.map((ingredient) => (
+              {ingredients?.filter(ingredient=>   ingredient.name?.toLowerCase().includes(searchTerm?.toLowerCase()))
+                           ?.map((ingredient) => (
                 <TableRow key={ingredient.id} data-testid={`row-ingredient-${ingredient.id}`}>
                   <TableCell className="font-medium">
                     {ingredient.photo ?(<img
@@ -640,13 +647,14 @@ export default function IngredientsPage() {
                       {ingredient.active ? "Actif" : "Inactif"}
                     </Badge>
                   </TableCell>
+                 
+                  <TableCell className="font-medium">{ingredient.name}</TableCell>
                   <TableCell>
                     {ingredient.categoryId 
                       ? (categories as any[])?.find((c: any) => c.id === ingredient.categoryId)?.designation || "Sans catégorie" 
                       : "Sans catégorie"
                     }
                   </TableCell>
-                  <TableCell className="font-medium">{ingredient.name}</TableCell>
                   <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
                   <TableCell>{Number(ingredient.minStock) || 0}</TableCell>
                   <TableCell>

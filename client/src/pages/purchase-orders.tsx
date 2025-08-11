@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Save, X, FileText, CreditCard, Trash2, Edit3, ChevronDown, ArrowLeft, Banknote } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
 
 const ReceptionAchatInterface = () => {
   const [operations, setOperations] = useState<any[]>([]);
@@ -362,23 +363,23 @@ const ReceptionAchatInterface = () => {
       <div >
         {/* Header */}
         
-          <div className=" mx-auto px-4 py-3">
+          <div className=" mx-auto px-6 py-6">
             <div className="flex items-center justify-between">
               <p className='text-gray-600 dark:text-gray-400 mt-2'>gerer les achat de vos ingrédients depuis vos fournisseur </p>
-            <button
+            <Button 
                 onClick={createNewOperation}
-                className="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg  flex items-center space-x-2"
+                className="bg-accent hover:bg-accent-hover  "
               >
                 <Plus className="w-4 h-4" />
                 <span>Nouvelle Réception</span>
-              </button>
+              </Button>
               
             </div>
           </div>
        
 
         {/* Operations List */}
-        <div className=" mx-auto px-4 py-6">
+        <div className=" mx-auto px-6 py-6">
           <div className="bg-white rounded-lg shadow-sm border">
             <div className="overflow-x-auto rounded-lg">
               <table className="w-full">
