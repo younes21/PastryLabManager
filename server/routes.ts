@@ -942,11 +942,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getRecipeStats().catch(() => []),
       ]);
       const statsMap = new Map(stats.map((s: any) => [s.recipeId, s]));
-      const enriched = recipes.map((r: any) => ({
-        ...r,
-        ingredientsCount: statsMap.get(r.id)?.ingredientsCount || 0,
-        operationsCount: statsMap.get(r.id)?.operationsCount || 0,
-        totalOperationDuration: statsMap.get(r.id)?.totalOperationDuration || 0,
+      // Charger les ingrédients pour chaque recette
+      const enriched = await Promise.all(recipes.map(async (r: any) => {
+        const ingredients = await storage.getRecipeIngredients(r.id);
+        return {
+          ...r,
+          ingredients,
+          ingredientsCount: statsMap.get(r.id)?.ingredientsCount || 0,
+          operationsCount: statsMap.get(r.id)?.operationsCount || 0,
+          totalOperationDuration: statsMap.get(r.id)?.totalOperationDuration || 0,
+        };
       }));
       res.json(enriched);
     } catch (error) {
@@ -962,7 +967,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!recipe) {
         return res.status(404).json({ message: "Recipe not found" });
       }
-      res.json(recipe);
+      const ingredients = await storage.getRecipeIngredients(recipe.id);
+      res.json({ ...recipe, ingredients });
     } catch (error) {
       console.error("Error fetching recipe:", error);
       res.status(500).json({ message: "Failed to fetch recipe" });

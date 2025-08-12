@@ -38,9 +38,26 @@ const PreparationPage = () => {
   const [recipeOperations, setRecipeOperations] = useState<any[]>([]);
   const [recipeMap, setrecipeMap] = useState<any>();
   const [workStations, setWorkStations] = useState<any[]>([]);
+  const [measurementUnits, setMeasurementUnits] = useState<any[]>([]);
 
   // State for recipe details tabs
   const [activeRecipeTab, setActiveRecipeTab] = useState('ingredients');
+
+  // Ajoute l'état pour gérer l'expansion des sous-ingrédients
+  const [expandedIngredients, setExpandedIngredients] = useState<Set<number>>(new Set());
+
+  // Fonction pour toggle l'affichage des sous-ingrédients
+  const toggleSubIngredients = (ingredientId: number) => {
+    setExpandedIngredients(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(ingredientId)) {
+        newSet.delete(ingredientId);
+      } else {
+        newSet.add(ingredientId);
+      }
+      return newSet;
+    });
+  };
 
   // Load initial data from API
 
@@ -54,13 +71,14 @@ const PreparationPage = () => {
     const loadAll = async () => {
       try {
            
-        const [opRes, zoneRes, artRes, recRes, ordRes, wsRes] = await Promise.all([
+        const [opRes, zoneRes, artRes, recRes, ordRes, wsRes, muRes] = await Promise.all([
           apiRequest('/api/users?role=preparateur', 'GET'),
           apiRequest('/api/storage-zones', 'GET'),
           apiRequest('/api/articles', 'GET'),
           apiRequest('/api/recipes', 'GET'),
           apiRequest('/api/orders/confirmed-with-products-to-prepare', 'GET'),
           apiRequest('/api/work-stations', 'GET'),
+          apiRequest('/api/measurement-units', 'GET'),
         ]);
         loadOperations();
 
@@ -71,6 +89,7 @@ const PreparationPage = () => {
         const recipesData = await recRes.json();
         const ordersData = await ordRes.json();
         const workStationsData = await wsRes.json();
+        const measurementUnitsData = await muRes.json();
 
         setOperators(operatorsData || []);
         setStorageZones(zonesData || []);
@@ -96,6 +115,7 @@ const PreparationPage = () => {
         setrecipeMap(recipesMap);
         setOrders(ordersData || []);
         setWorkStations(workStationsData || []);
+        setMeasurementUnits(measurementUnitsData || []);
         
         console.log('State updated successfully');
       } catch (error) {
@@ -124,7 +144,7 @@ const PreparationPage = () => {
   }, [isPartialMode, items, recipeIngredients, recipeOperations]);
 
   // Load recipe details when recipe is selected
-  const loadRecipeDetails = async (recipeId: number) => {
+  const loadRecipeDetails = async (recipeId: number, productionQuantity?: number) => {
     try {
       console.log('🔍 Loading recipe details for recipe ID:', recipeId);
       
@@ -140,7 +160,24 @@ const PreparationPage = () => {
 
       console.log('📊 Parsed data:', { ingredientsData, operationsData });
 
-      setRecipeIngredients(ingredientsData || []);
+      // Scale ingredients based on production quantity if provided
+      let scaledIngredients = ingredientsData || [];
+      if (productionQuantity !== undefined && ingredientsData) {
+        const originalRecipe = recipes.find(r => r.id === recipeId);
+        if (originalRecipe) {
+          const originalQuantity = parseFloat(originalRecipe.quantity || 1);
+          const ratio = productionQuantity / originalQuantity;
+          
+          scaledIngredients = ingredientsData.map((ingredient: any) => ({
+            ...ingredient,
+            quantity: (parseFloat(ingredient.quantity || 0) * ratio).toString()
+          }));
+          
+          console.log(`Scaled recipe ingredients with ratio ${ratio} (${originalQuantity} → ${productionQuantity})`);
+        }
+      }
+
+      setRecipeIngredients(scaledIngredients);
       setRecipeOperations(operationsData || []);
       
       console.log('✅ Recipe details loaded successfully');
@@ -257,7 +294,7 @@ const PreparationPage = () => {
         // Load recipe details from parent operation
         if (enrichedItem.recipe) {
           console.log('Loading recipe details for recipe ID:', enrichedItem.recipe.id);
-          loadRecipeDetails(enrichedItem.recipe.id);
+          loadRecipeDetails(enrichedItem.recipe.id, enrichedItem.quantity);
         } else {
           console.log('No recipe found in parent item');
         }
@@ -313,7 +350,7 @@ const PreparationPage = () => {
       
       // Load recipe details if there's a recipe
       if (mappedItems.length > 0 && mappedItems[0].recipe) {
-        loadRecipeDetails(mappedItems[0].recipe.id);
+        loadRecipeDetails(mappedItems[0].recipe.id, mappedItems[0].quantity);
       }
       
       setIsEditing(true);
@@ -381,7 +418,7 @@ const PreparationPage = () => {
         setSearchTerm('');
         
         // Load recipe details for this product
-        loadRecipeDetails(recipe.id);
+        loadRecipeDetails(recipe.id, newItem.quantity);
         return;
       }
 
@@ -391,7 +428,7 @@ const PreparationPage = () => {
       setSearchTerm('');
       
       // Load recipe details for this product
-      loadRecipeDetails(recipe.id);
+      loadRecipeDetails(recipe.id, newItem.quantity);
     }
   };
 
@@ -424,13 +461,13 @@ const PreparationPage = () => {
       setSelectedArticle(productData.article);
       
       // Load recipe details for this product
-      loadRecipeDetails(recipe.id);
+      loadRecipeDetails(recipe.id, newItem.quantity);
     } else {
       // En mode normal, on peut ajouter plusieurs produits
       setItems([...items, newItem]);
       
       // Load recipe details for this product
-      loadRecipeDetails(recipe.id);
+      loadRecipeDetails(recipe.id, newItem.quantity);
     }
     
     setShowProductDialog(false);
@@ -441,17 +478,35 @@ const PreparationPage = () => {
   };
 
   const updateItemQuantity = (itemId: number, newQuantity: any) => {
+    const newQuantityValue = parseFloat(newQuantity || 0);
+    
     setItems(items.map(item => {
       if (item.id === itemId) {
-        const quantity = parseFloat(newQuantity || 0);
         return {
           ...item,
-          quantity,
-          quantityAfter: item.quantityBefore + quantity
+          quantity: newQuantityValue,
+          quantityAfter: item.quantityBefore + newQuantityValue
         };
       }
       return item;
     }));
+
+    // Update recipe ingredients quantities based on the new production quantity
+    if (items.length > 0 && items[0]?.recipe?.id) {
+      const originalRecipe = recipes.find(r => r.id === items[0].recipe.id);
+      if (originalRecipe && originalRecipe.ingredients) {
+        const originalQuantity = parseFloat(originalRecipe.quantity || 1);
+        const ratio = newQuantityValue / originalQuantity;
+        
+        const updatedIngredients = originalRecipe.ingredients.map((ingredient: any) => ({
+          ...ingredient,
+          quantity: (parseFloat(ingredient.quantity || 0) * ratio).toString()
+        }));
+        
+        setRecipeIngredients(updatedIngredients);
+        console.log(`Updated recipe ingredients quantities with ratio ${ratio} (${originalQuantity} → ${newQuantityValue})`);
+      }
+    }
   };
 
   // Check ingredient availability
@@ -823,6 +878,260 @@ const PreparationPage = () => {
     return organized;
   };
 
+  // Fonction pour obtenir les informations d'une unité de mesure
+  const getMeasurementUnit = (unit: string) => {
+    return measurementUnits.find(u => u.abbreviation === unit);
+  };
+
+  // Fonction pour obtenir une description lisible de la conversion
+  const getConversionDescription = (fromUnit: string, toUnit: string): string => {
+    const fromUnitData = getMeasurementUnit(fromUnit);
+    const toUnitData = getMeasurementUnit(toUnit);
+    
+    if (!fromUnitData || !toUnitData) {
+      return `${fromUnit}→${toUnit}`;
+    }
+    
+    if (fromUnit === toUnit) {
+      return `${fromUnit}`;
+    }
+    
+    const fromFactor = parseFloat(fromUnitData.factor);
+    const toFactor = parseFloat(toUnitData.factor);
+    
+    if (fromUnitData.type === 'reference' && toUnitData.type === 'smaller') {
+      return `${fromUnit}→${toUnit} (×${(1/toFactor).toFixed(0)})`;
+    } else if (fromUnitData.type === 'smaller' && toUnitData.type === 'reference') {
+      return `${fromUnit}→${toUnit} (÷${(1/fromFactor).toFixed(0)})`;
+    } else if (fromUnitData.type === 'reference' && toUnitData.type === 'larger') {
+      return `${fromUnit}→${toUnit} (÷${toFactor.toFixed(0)})`;
+    } else if (fromUnitData.type === 'larger' && toUnitData.type === 'reference') {
+      return `${fromUnit}→${toUnit} (×${fromFactor.toFixed(0)})`;
+    } else {
+      return `${fromUnit}→${toUnit}`;
+    }
+  };
+
+  // Fonction pour obtenir le facteur de conversion d'une unité
+  const getUnitConversionFactor = (unit: string): number => {
+    const measurementUnit = getMeasurementUnit(unit);
+    return measurementUnit ? parseFloat(measurementUnit.factor) : 1;
+  };
+
+
+  const convertCost = (cost: number, fromUnit: string, toUnit: string): number => {
+    const fromUnitData = getMeasurementUnit(fromUnit);
+    const toUnitData = getMeasurementUnit(toUnit);
+  
+    if (!fromUnitData || !toUnitData) {
+      console.warn(`Unit not found: fromUnit=${fromUnit}, toUnit=${toUnit}`);
+      return cost;
+    }
+  
+    if (fromUnit === toUnit) return cost;
+  
+    const fromFactor = parseFloat(fromUnitData.factor);
+    const toFactor = parseFloat(toUnitData.factor);
+  
+    if (fromFactor <= 0 || toFactor <= 0) {
+      console.warn(`Invalid factor: fromFactor=${fromFactor}, toFactor=${toFactor}`);
+      return cost;
+    }
+  
+    let conversionFactor = 1;
+  
+    // Logique en fonction du type
+    if (fromUnitData.type === "reference") {
+      conversionFactor = (toUnitData.type === "smaller")
+        ? 1 / toFactor
+        : (toUnitData.type === "larger")
+          ? toFactor
+          : 1;
+    }
+    else if (toUnitData.type === "reference") {
+      conversionFactor = (fromUnitData.type === "smaller")
+        ? toFactor
+        : (fromUnitData.type === "larger")
+          ? 1 / fromFactor
+          : 1;
+    }
+    else if (fromUnitData.type === "smaller" && toUnitData.type === "larger") {
+      conversionFactor = toFactor / fromFactor; // plus grande baisse de prix
+    }
+    else if (fromUnitData.type === "larger" && toUnitData.type === "smaller") {
+      conversionFactor = 1 / (fromFactor / toFactor); // forte hausse de prix
+    }
+    else {
+      // fallback
+      conversionFactor = toFactor / fromFactor;
+    }
+  
+    const result = cost * conversionFactor;
+    console.log(`Converting ${cost} from ${fromUnit} (${fromUnitData.type}, factor=${fromFactor}) to ${toUnit} (${toUnitData.type}, factor=${toFactor}) = ${result}`);
+    return result;
+  };
+  
+
+  // Fonction récursive pour calculer le coût d'un sous-produit basé sur ses ingrédients (incluant les sous-sous-produits)
+  const calculateSubProductCost = (subIngredients: any[], subProductQuantity: number): number => {
+    return subIngredients.reduce((totalCost, subIngredient) => {
+      const subArticle = articles.find(a => a.id === subIngredient.articleId);
+      const subIngredientQuantity = parseFloat(subIngredient.quantity || '0');
+      
+      // Multiplier la quantité du sous-ingrédient par la quantité du sous-produit dans la recette
+      const adjustedQuantity = subIngredientQuantity * subProductQuantity;
+      
+      if (subArticle?.type === 'product') {
+        // Si c'est un sous-sous-produit, calculer récursivement son coût
+        const subSubRecipe = recipes.find(r => r.articleId === subArticle.id);
+        if (subSubRecipe && Array.isArray(subSubRecipe.ingredients)) {
+          const subSubIngredients = subSubRecipe.ingredients || [];
+          const subSubProductCost = calculateSubProductCost(subSubIngredients, adjustedQuantity);
+          console.log(`Sub-sub-product cost: ${subArticle?.name} - ${subSubProductCost} (recursive calculation)`);
+          return totalCost + subSubProductCost;
+        }
+      }
+      
+      // Pour un ingrédient normal, convertir le coût selon les unités
+      const subArticleCost = parseFloat(subArticle?.costPerUnit || '0');
+      const convertedCost = convertCost(subArticleCost, subArticle?.unit || 'kg', subIngredient.unit || 'kg');
+      
+      const ingredientCost = convertedCost * adjustedQuantity;
+      console.log(`Sub-ingredient cost: ${subArticle?.name} - ${subArticleCost} ${subArticle?.unit} → ${convertedCost} ${subIngredient.unit} × ${adjustedQuantity} (${subIngredientQuantity} × ${subProductQuantity}) = ${ingredientCost}`);
+      
+      return totalCost + ingredientCost;
+    }, 0);
+  };
+
+  // Fonction pour calculer le coût total de la recette (récursivement)
+  const calculateTotalRecipeCost = (ingredientsList: any[]): number => {
+    return ingredientsList.reduce((totalCost, ingredient) => {
+      const article = articles.find(a => a.id === ingredient.articleId);
+      
+      if (article?.type === 'product') {
+        // Pour un sous-produit, calculer le coût basé sur ses ingrédients (récursivement)
+        const subRecipe = recipes.find(r => r.articleId === article.id);
+        if (subRecipe && Array.isArray(subRecipe.ingredients)) {
+          const subIngredients = subRecipe.ingredients || [];
+          const subProductQuantity = parseFloat(ingredient.quantity || '0');
+          const subProductCost = calculateSubProductCost(subIngredients, subProductQuantity);
+          console.log(`Sub-product total cost: ${article?.name} - ${subProductCost} (recursive calculation)`);
+          return totalCost + subProductCost;
+        }
+      }
+      
+      // Pour un ingrédient normal, convertir le coût selon l'unité de la recette
+      const originalCost = parseFloat(article?.costPerUnit || '0');
+      const unitCost = convertCost(originalCost, article?.unit || 'kg', ingredient.unit || 'kg');
+      const ingredientCost = unitCost * parseFloat(ingredient.quantity || '0');
+      console.log(`Ingredient cost: ${article?.name} - ${ingredientCost}`);
+      
+      return totalCost + ingredientCost;
+    }, 0);
+  };
+
+  // Fonction récursive pour afficher les ingrédients et sous-ingrédients (multi-niveaux)
+  const renderIngredientsRecursive = (ingredientsList: any[], level = 0, expandedSet: Set<number>, toggleFn: (id: number) => void): React.ReactNode[] => {
+    if (!ingredientsList || ingredientsList.length === 0 || level > 5) return []; // Augmenté à 5 niveaux pour supporter plus de profondeur
+    return ingredientsList.flatMap((ingredient, index) => {
+      const article = articles.find(a => a.id === ingredient.articleId);
+      const stockDispo = article?.currentStock || 0;
+      
+      // Chercher la recette du sous-produit si c'est un produit
+      let subRecipe = null;
+      let subIngredients: any[] = [];
+      if (article?.type === 'product') {
+        subRecipe = recipes.find(r => r.articleId === article.id);
+        if (subRecipe && Array.isArray(subRecipe.ingredients)) {
+          subIngredients = subRecipe.ingredients || [];
+        }
+      }
+      
+      // Calculer le coût approprié avec conversion d'unités
+      let displayCost = 0;
+      let unitCost = 0;
+      
+      if (article?.type === 'product' && subRecipe && subIngredients.length > 0) {
+        // Pour un sous-produit, calculer le coût basé sur ses ingrédients
+        const subProductQuantity = parseFloat(ingredient.quantity || '0');
+        unitCost = calculateSubProductCost(subIngredients, subProductQuantity);
+        displayCost = unitCost; // Le coût total est déjà calculé avec la quantité
+      } else {
+        // Pour un ingrédient normal, convertir le coût selon l'unité de la recette
+        const originalCost = parseFloat(article?.costPerUnit || '0');
+        unitCost = convertCost(originalCost, article?.unit || 'kg', ingredient.unit || 'kg');
+        displayCost = unitCost * parseFloat(ingredient.quantity || '0');
+      }
+      
+      const hasSubIngredients = article?.type === 'product' && subRecipe && subIngredients.length > 0;
+      const isExpanded = expandedSet.has(ingredient.id);
+      
+      return [
+        <tr key={ingredient.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+          <td className="px-3 py-2 text-xs text-gray-600">
+            {article?.type === 'ingredient' ? 'Ingrédient' : 'Produit'}
+          </td>
+          <td className="px-3 py-2 text-xs font-medium text-gray-800" style={{paddingLeft: `${level * 24}px`}}>
+            <div className="flex items-center">
+              {level > 0 && <span className="text-gray-400 mr-1">{Array(level).fill('—').join('')}</span>}
+              {article?.name || 'Article inconnu'}
+              {hasSubIngredients && (
+                <button
+                  onClick={() => toggleFn(ingredient.id)}
+                  className="ml-2 p-1 hover:bg-gray-100 rounded transition-colors"
+                  title={isExpanded ? "Masquer les sous-ingrédients" : "Afficher les sous-ingrédients"}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-3 h-3 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3 text-gray-500 transform rotate-[-90deg]" />
+                  )}
+                </button>
+              )}
+            </div>
+          </td>
+          <td className="px-3 py-2 text-center text-xs text-gray-600">
+            {article?.costPerUnit}DA/{article?.unit}
+            {hasSubIngredients && (
+              <div className="text-xs text-gray-400">(calculé)</div>
+            )}
+            {!hasSubIngredients && article?.unit !== ingredient.unit && (
+              <div className="text-xs text-gray-400">
+                {unitCost.toFixed(3)} /{ ingredient.unit}
+              </div>
+            )}
+          </td>
+          <td className="px-3 py-2 text-center text-xs font-semibold">
+            {parseFloat(ingredient.quantity).toFixed(3)}
+          </td>
+          <td className="px-3 py-2 text-center text-xs text-gray-600">
+            {ingredient.unit}
+          </td>
+          <td className="px-3 py-2 text-center text-xs font-semibold text-green-600">
+            {displayCost.toFixed(2)}
+          </td>
+          <td className="px-3 py-2 text-center text-xs">
+            <span className={`font-medium ${stockDispo > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {parseFloat(stockDispo.toString()).toFixed(3)} {article?.unit}
+            </span>
+          </td>
+        </tr>,
+        // Affichage récursif des sous-ingrédients seulement si expandé
+        (hasSubIngredients && isExpanded)
+          ? renderIngredientsRecursive(
+              subIngredients.map(subIng => ({
+                ...subIng,
+                quantity: (parseFloat(subIng.quantity || '0') * parseFloat(ingredient.quantity || '0')).toString()
+              })), 
+              level + 1, 
+              expandedSet, 
+              toggleFn
+            )
+          : null
+      ];
+    });
+  };
+
   if (!isEditing) {
     return (
       <Layout title='Préparations de Produits'>
@@ -1131,7 +1440,7 @@ const PreparationPage = () => {
                                         notes: '',
                                       };
                                       setItems([newItem]);
-                                      loadRecipeDetails(recipe.id);
+                                      loadRecipeDetails(recipe.id, newItem.quantity);
                                     }}
                                   >
                                     <span className="font-medium">{article.name}</span>
@@ -1161,9 +1470,9 @@ const PreparationPage = () => {
                       <label className="block text-xs font-medium text-gray-700 mb-1">Quantité à produire *</label>
                       <input
                         type="number"
-                        value={items[0]?.quantity || 1}
+                        value={items[0]?.quantity || 0}
                         onChange={e => items[0] && updateItemQuantity(items[0].id, e.target.value)}
-                        min="1"
+                        min="0.0000001"
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                         disabled={!canUpdateOp()}
                       />
@@ -1453,63 +1762,44 @@ const PreparationPage = () => {
 
                 {/* Ingredients Tab */}
                 {activeRecipeTab === 'ingredients' && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-100 border-b">
-                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Type Article</th>
-                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Nom Article</th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Prix d'achat (DA)</th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Quantité</th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Unité</th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Coût (DA)</th>
-                          <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">En Stock Dispo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recipeIngredients.length > 0 ? (
-                          recipeIngredients.map((ingredient, index) => {
-                            const article = articles.find(a => a.id === ingredient.articleId);
-                            const stockDispo = article?.currentStock || 0;
-                            const cout = (parseFloat(ingredient.quantity) || 0) * (parseFloat(article?.costPerUnit || '0') || 0);
-                            
-                            return (
-                              <tr key={ingredient.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="px-3 py-2 text-xs text-gray-600">
-                                  {article?.type === 'ingredient' ? 'Ingrédient' : 'Produit'}
-                                </td>
-                                <td className="px-3 py-2 text-xs font-medium text-gray-800">
-                                  {article?.name || 'Article inconnu'}
-                                </td>
-                                <td className="px-3 py-2 text-center text-xs text-gray-600">
-                                  {parseFloat(article?.costPerUnit || '0').toFixed(2)} 
-                                </td>
-                                <td className="px-3 py-2 text-center text-xs font-semibold">
-                                  {parseFloat(ingredient.quantity).toFixed(3)}
-                                </td>
-                                <td className="px-3 py-2 text-center text-xs text-gray-600">
-                                  {ingredient.unit}
-                                </td>
-                                <td className="px-3 py-2 text-center text-xs font-semibold text-green-600">
-                                  {cout.toFixed(2)} 
-                                </td>
-                                <td className="px-3 py-2 text-center text-xs">
-                                  <span className={`font-medium ${stockDispo > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {parseFloat(stockDispo.toString()).toFixed(3)} {article?.unit}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        ) : (
-                          <tr className="bg-gray-50">
-                            <td className="px-3 py-2 text-xs text-gray-600" colSpan={7}>
-                              <em>Chargement des ingrédients...</em>
-                            </td>
+                  <div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-100 border-b">
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Type Article</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Nom Article</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Prix d'achat (DA)</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Quantité</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Unité</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Coût (DA)</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">En Stock Dispo</th>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {recipeIngredients.length > 0 ? renderIngredientsRecursive(recipeIngredients, 0, expandedIngredients, toggleSubIngredients) : (
+                            <tr className="bg-gray-50">
+                              <td className="px-3 py-2 text-xs text-gray-600" colSpan={7}>
+                                <em>Chargement des ingrédients...</em>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Affichage du coût total de la recette */}
+                    {recipeIngredients.length > 0 && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-blue-800">Coût total de la recette :</span>
+                          <span className="text-lg font-bold text-blue-900">
+                            {calculateTotalRecipeCost(recipeIngredients).toFixed(2)} DA
+                          </span>
+                        </div>
+                                              
+                      </div>
+                    )}
                   </div>
                 )}
 

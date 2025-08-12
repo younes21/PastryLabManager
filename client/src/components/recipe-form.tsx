@@ -576,28 +576,9 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
 
               <div>
                 <Label htmlFor="unit" className="text-xs">Unité *</Label>
-                <Select
-                  value={form.watch("unit")}
-                  onValueChange={(value) => form.setValue("unit", value)}
-                  data-testid="select-unit"
-                  disabled={!selectedArticle}
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder={selectedArticle ? "Unité" : "Sélectionnez d'abord un produit"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {compatibleUnits.map((unit: MeasurementUnit) => (
-                      <SelectItem key={unit.id} value={unit.abbreviation}>
-                        {unit.label} ({unit.abbreviation})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedArticle && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Unité de l'article: {selectedArticle.unit}
-                  </p>
-                )}
+                
+               <div className="px-3 py-2 border h-8 flex items-center  border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
+                 Unité de l'article:  <b className="ml-2">{selectedArticle?.unit}</b></div>
               </div>
 
               <div className="flex items-center space-x-2 ">
@@ -684,41 +665,24 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                       />
                       <div className="flex gap-2">
                         <div>
-                          <Select
-                            value={currentIngredient.unit}
-                            onValueChange={(value) => setCurrentIngredient(prev => ({ ...prev, unit: value }))}
-                            data-testid="select-ingredient-unit"
-                            disabled={!currentIngredient.articleId}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder={currentIngredient.articleId ? "Unité" : "Sélectionnez d'abord un ingrédient"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(() => {
-                                const selectedIngredientArticle = (allArticles as Article[]).find((art: Article) => art.id === parseInt(currentIngredient.articleId));
-                                const compatibleIngredientUnits = selectedIngredientArticle
-                                  ? (measurementUnits as MeasurementUnit[]).filter((unit: MeasurementUnit) =>
-                                    unit.abbreviation === selectedIngredientArticle.unit ||
-                                    unit.categoryId === (measurementUnits as MeasurementUnit[]).find(u => u.abbreviation === selectedIngredientArticle.unit)?.categoryId
-                                  )
-                                  : (measurementUnits as MeasurementUnit[]);
-
-                                return compatibleIngredientUnits.map((unit: MeasurementUnit) => (
-                                  <SelectItem key={unit.id} value={unit.abbreviation}>
-                                    {unit.label} ({unit.abbreviation})
-                                  </SelectItem>
-                                ));
-                              })()}
-                            </SelectContent>
-                          </Select>
-                          {currentIngredient.articleId && (() => {
-                            const selectedIngredientArticle = (allArticles as Article[]).find((art: Article) => art.id === parseInt(currentIngredient.articleId));
-                            return selectedIngredientArticle && (
+                          {currentIngredient.articleId ? (
+                            <div className="flex flex-col">
+                              <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
+                                {(() => {
+                                  const selectedIngredientArticle = (allArticles as Article[]).find((art: Article) => art.id === parseInt(currentIngredient.articleId));
+                                  return selectedIngredientArticle ? selectedIngredientArticle.unit : "Unité";
+                                })()}
+                              </div>
                               <p className="text-xs text-gray-500 mt-1">
-                                Unité de l'article: {selectedIngredientArticle.unit}
+                                Unité imposée de l'article
                               </p>
-                            );
-                          })()}</div>
+                            </div>
+                          ) : (
+                            <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-sm text-gray-400">
+                              Sélectionnez d'abord un ingrédient
+                            </div>
+                          )}
+                        </div>
                         <Button
                           type="button"
                           className="rounded-full w-10 h-10"
