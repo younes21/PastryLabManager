@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -27,15 +27,35 @@ import {
   Mail,
   Leaf,
   FileText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    new Set(["Principal"]) // Principal group expanded by default
+  );
 
-  const { data: storageLocations } = useQuery<any[]>({
-    queryKey: ["/api/storage-locations"],
-  });
+  // Keep the group expanded if it contains the active item
+  const shouldGroupBeExpanded = (groupItems: typeof filteredNavItems, groupName: string) => {
+    return expandedGroups.has(groupName);
+  };
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => {
+      if (prev.has(groupName)) {
+        // Si le groupe est déjà ouvert, le fermer
+        const newExpanded = new Set(prev);
+        newExpanded.delete(groupName);
+        return newExpanded;
+      } else {
+        // Ouvrir uniquement ce groupe (fermer tous les autres)
+        return new Set([groupName]);
+      }
+    });
+  };
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -64,8 +84,6 @@ export function Sidebar() {
       order: 0,
       group: "Inventaire",
     },
-    // Ingrédients supprimés - utiliser Articles avec filtrage
-    // Modules temporairement supprimés - à réimplémenter
     {
       path: "/recipes",
       label: "Recettes",
@@ -74,7 +92,6 @@ export function Sidebar() {
       order: 0,
       group: "Inventaire",
     },
-    // { path: "/production", label: "Production", icon: "fas fa-industry", lucideIcon: Factory },  order: 0, group: "admin",
     {
       path: "/orders",
       label: "Commandes",
@@ -259,6 +276,14 @@ export function Sidebar() {
       order: 0,
       group: "Production",
     },
+    {
+      path: "/preparation",
+      label: "Planif. Préparations",
+      icon: "fas fa-chef-hat",
+      lucideIcon: ChefHat,
+      order: 0,
+      group: "Production",
+    },
   ];
 
   // Filter navigation based on user role
@@ -267,15 +292,14 @@ export function Sidebar() {
 
     switch (user.role) {
       case "client":
-        return ["/", "/client_orders"].includes(item.path); // Only dashboard for clients
+        return ["/", "/client_orders"].includes(item.path);
       case "livreur":
-        return ["/"].includes(item.path); // Only dashboard for deliverers
+        return ["/"].includes(item.path);
       case "preparateur":
         return ["/production", "/orders", "/preparateur-preparations"].includes(item.path);
       case "admin":
-        return true; // admin has access to everything
+        return true;
       case "gerant":
-        // gerant has access to most features except email config
         return !["/email-config"].includes(item.path);
       default:
         return false;
@@ -308,6 +332,11 @@ export function Sidebar() {
     }
   };
 
+  // Check if any item in a group is active
+  const isGroupActive = (groupItems: typeof filteredNavItems) => {
+    return groupItems.some(item => isActive(item.path));
+  };
+
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
       <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-white border-r border-gray-200">
@@ -333,12 +362,10 @@ export function Sidebar() {
                   <stop offset="100%" stopColor="#eab308" />
                 </linearGradient>
               </defs>
-              {/* Chef hat */}
               <path
                 d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z"
                 fill="url(#logoGradient)"
               />
-              {/* Chef hat band */}
               <rect
                 x="8"
                 y="18"
@@ -348,7 +375,6 @@ export function Sidebar() {
                 opacity="0.8"
                 rx="1"
               />
-              {/* Decorative dots */}
               <circle cx="12" cy="12" r="1" fill="white" opacity="0.6" />
               <circle cx="17" cy="10" r="1" fill="white" opacity="0.6" />
               <circle cx="22" cy="12" r="1" fill="white" opacity="0.6" />
@@ -381,48 +407,84 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Navigation */}
-        <nav className="mt-6 flex-1 px-2 space-y-1">
-          {sortedGroupEntries.map(([groupName, groupItems]) => (
-            <div key={groupName} className="mb-4">
-              {/* Group header */}
-              {groupName !== "Principal" && (
-                <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {getGroupDisplayName(groupName)}
+        {/* Navigation avec Accordéon */}
+        <nav className="mt-6 flex-1 px-2 space-y-2">
+          {sortedGroupEntries.map(([groupName, groupItems]) => {
+            const isExpanded = shouldGroupBeExpanded(groupItems, groupName);
+            const groupActive = isGroupActive(groupItems);
+            
+            return (
+              <div key={groupName} className="mb-2">
+                {/* Group Header - Accordéon */}
+                <button
+                  onClick={() => toggleGroup(groupName)}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${
+                    groupActive 
+                      ? "bg-blue-50 text-blue-700" 
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="uppercase tracking-wider text-xs">
+                    {getGroupDisplayName(groupName)}
+                  </span>
+                  <div className="flex items-center">
+                    {groupActive && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    )}
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+                    )}
+                  </div>
+                </button>
+                
+                {/* Group Items - Collapsible */}
+                <div 
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                    isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="space-y-1 mt-1 ml-2">
+                    {groupItems.map((item) => (
+                      <div key={item.path}>
+                        <Link href={item.path}>
+                          <div
+                            className={`relative flex items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${
+                              isActive(item.path)
+                                ? "bg-blue-100 text-blue-900 shadow-sm"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            {/* Active indicator */}
+                            {isActive(item.path) && (
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r"></div>
+                            )}
+                            
+                            <item.lucideIcon
+                              className={`h-4 w-4 mr-3 transition-colors duration-150 ${
+                                isActive(item.path) ? "text-blue-600" : "text-gray-400"
+                              }`}
+                            />
+                            <span className="font-medium">{item.label}</span>
+                          </div>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
-              
-              {/* Group items */}
-              <div className="space-y-1">
-                {groupItems.map((item) => (
-                  <Link key={item.path} href={item.path}>
-                    <div
-                      className={`${
-                        isActive(item.path)
-                          ? "bg-blue-700/10 border-r-4 border-primary text-blue-900 group flex items-center px-2 py-2 text-sm font-medium rounded-l-md cursor-pointer"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer"
-                      }`}
-                    >
-                      <item.lucideIcon
-                        className={`h-5 w-5 mr-3 ${isActive(item.path) ? "text-primary" : ""}`}
-                      />
-                      {item.label}
-                    </div>
-                  </Link>
-                ))}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
-        {/* Storage Temperature Status */}
-        <div className="px-4 pb-4">
-          {/* Logout button */}
+        {/* Logout Button */}
+        <div className="px-4 pb-4 border-t border-gray-200 pt-4">
           <button
             onClick={logout}
-            className="mt-4 w-full text-left text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded flex items-center"
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors duration-150 ease-in-out"
           >
-            <LogOut className="h-4 w-4 mr-2" />
+            <LogOut className="h-4 w-4 mr-3" />
             Déconnexion
           </button>
         </div>

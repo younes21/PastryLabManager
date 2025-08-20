@@ -9,8 +9,8 @@ export default function Inventory() {
     queryKey: ["/api/ingredients"],
   });
 
-  const { data: storageLocations, isLoading: storageLoading } = useQuery({
-    queryKey: ["/api/storage-locations"],
+  const { data: storageZones, isLoading: storageLoading } = useQuery({
+    queryKey: ["/api/storage-zones"],
   });
 
   const getStockLevel = (current: string, min: string, max: string) => {
@@ -43,10 +43,10 @@ export default function Inventory() {
     <Layout title="Gestion de Stock">
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         {/* Storage Locations Overview */}
-        <div className="mb-8">
+        {/* <div className="mb-8">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Emplacements de Stockage</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {storageLocations?.map((location: any) => (
+            {storageZones?.map((location: any) => (
               <Card key={location.id}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center justify-between">
@@ -67,7 +67,7 @@ export default function Inventory() {
               </Card>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* Ingredients Inventory */}
         <div>
@@ -110,7 +110,7 @@ export default function Inventory() {
                         ingredient.maxStock
                       );
                       const stockValue = parseFloat(ingredient.currentStock || "0") * parseFloat(ingredient.costPerUnit || "0");
-                      const storageLocation = storageLocations?.find((loc: any) => loc.id === ingredient.storageLocationId);
+                      const storageLocation = storageZones?.find((loc: any) => loc.id === ingredient.storageZoneId);
 
                       return (
                         <tr key={ingredient.id}>
@@ -148,7 +148,7 @@ export default function Inventory() {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {storageLocation?.name || "Non défini"}
+                            {storageLocation?.designation || "Non défini"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {ingredient.costPerUnit}DA

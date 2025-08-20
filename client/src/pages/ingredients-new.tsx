@@ -26,7 +26,7 @@ const ingredientSchema = z.object({
   name: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
   managedInStock: z.boolean().default(true),
-  storageLocationId: z.number().optional(),
+  storageZoneId: z.number().optional(),
   categoryId: z.number().optional(),
   unit: z.string().min(1, "L'unité de mesure est requise"),
   minStock: z.number().min(0, "Le stock minimum doit être positif").optional(),
@@ -127,7 +127,7 @@ export default function IngredientsPage() {
       name: ingredient.name,
       description: ingredient.description || "",
       managedInStock: (ingredient as any).managedInStock ?? true,
-      storageLocationId: ingredient.storageZoneId || undefined,
+      storageZoneId: ingredient.storageZoneId || undefined,
       categoryId: ingredient.categoryId || undefined,
       unit: ingredient.unit || "kg",
       minStock: Number((ingredient as any).minStock) || 0,
@@ -353,7 +353,7 @@ export default function IngredientsPage() {
 
                     <FormField
                       control={form.control}
-                      name="storageLocationId"
+                      name="storageZoneId"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Zone de stockage</FormLabel>
@@ -370,7 +370,7 @@ export default function IngredientsPage() {
                               <SelectItem value="no-zone">Aucune zone</SelectItem>
                               {(StorageZones as any[])?.map((zone: any) => (
                                 <SelectItem key={zone.id} value={zone.id.toString()}>
-                                  {zone.name}
+                                  {zone.designation}
                                 </SelectItem>
                               ))}
                             </SelectContent>
