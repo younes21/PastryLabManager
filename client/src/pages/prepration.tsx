@@ -5,6 +5,18 @@ import { apiRequest } from '@/lib/queryClient';
 import ProductSelectionDialog from './dialog-prepration';
 import { useToast } from '@/hooks/use-toast';
 
+// Ajout utilitaire pour charger les stocks de tous les articles d'une recette
+async function fetchStockDetails(articleIds: number[]): Promise<Record<number, any>> {
+  const results: Record<number, any> = {};
+  await Promise.all(articleIds.map(async (id) => {
+    const res = await fetch(`/api/articles/${id}/stock-details`);
+    if (res.ok) {
+      results[id] = await res.json();
+    }
+  }));
+  return results;
+}
+
 const PreparationPage = () => {
   const { toast } = useToast();
   const [operations, setOperations] = useState<any[]>([]);
@@ -39,6 +51,7 @@ const PreparationPage = () => {
   const [recipeMap, setrecipeMap] = useState<any>();
   const [workStations, setWorkStations] = useState<any[]>([]);
   const [measurementUnits, setMeasurementUnits] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
 
   // State for recipe details tabs
   const [activeRecipeTab, setActiveRecipeTab] = useState('ingredients');
@@ -65,6 +78,17 @@ const PreparationPage = () => {
     const prepRes = await apiRequest('/api/inventory-operations?type=preparation&include_reliquat=true', 'GET');
     const preparationsData = await prepRes.json();
     setOperations(preparationsData || []);
+  };
+
+  const loadReservations = async (operationId: number) => {
+    try {
+      const res = await apiRequest(`/api/inventory-operations/${operationId}/reservations`, 'GET');
+      const reservationsData = await res.json();
+      setReservations(reservationsData || []);
+    } catch (error) {
+      console.error('Error loading reservations:', error);
+      setReservations([]);
+    }
   };
 
   useEffect(() => {
@@ -241,6 +265,9 @@ const PreparationPage = () => {
     // Reset recipe details
     setRecipeIngredients([]);
     setRecipeOperations([]);
+    
+    // Clear reservations for new operation
+    setReservations([]);
   };
 
   const createPartialOperation = async (parentOp: any) => {
@@ -353,6 +380,15 @@ const PreparationPage = () => {
         loadRecipeDetails(mappedItems[0].recipe.id, mappedItems[0].quantity);
       }
       
+      // Load reservations for this operation
+      if (data.id) {
+        if (data.status === 'programmed') {
+          loadReservations(data.id);
+        } else {
+          setReservations([]);
+        }
+      }
+      
       setIsEditing(true);
       
       // Determine modes
@@ -377,6 +413,7 @@ const PreparationPage = () => {
           setCurrentOperation(null);
           setItems([]);
           setIsEditing(false);
+          setReservations([]);
         }
       } catch (e) {
         console.error('Failed to delete operation', e);
@@ -509,16 +546,93 @@ const PreparationPage = () => {
     }
   };
 
-  // Check ingredient availability
+  // Check ingredient availability recursively
   const checkIngredientAvailability = async (recipeId: number, quantity: number) => {
     try {
-      const res = await apiRequest(`/api/recipes/${recipeId}/check-ingredients`, 'POST', {
-        quantity: quantity
-      });
-      const data = await res.json();
-      return data.available;
-    } catch (e) {
-      console.error('Failed to check ingredients', e);
+      console.log(`🔍 Checking ingredient availability for recipe ${recipeId} with quantity ${quantity}`);
+      
+      // Get recipe details
+      const recipe = recipes.find(r => r.id === recipeId);
+      if (!recipe) {
+        console.error(`Recipe ${recipeId} not found`);
+        return false;
+      }
+
+      // Get recipe ingredients
+      const ingredientsRes = await apiRequest(`/api/recipes/${recipeId}/ingredients`, 'GET');
+      const ingredientsData = await ingredientsRes.json();
+      
+      if (!ingredientsData || ingredientsData.length === 0) {
+        console.log(`No ingredients found for recipe ${recipeId}`);
+        return true; // No ingredients means no availability issues
+      }
+
+      // Calculate ratio based on production quantity vs recipe base quantity
+      const originalQuantity = parseFloat(recipe.quantity || 1);
+      const ratio = quantity / originalQuantity;
+
+      // Check each ingredient recursively
+      const checkIngredientRecursive = async (ingredient: any, level: number = 0): Promise<boolean> => {
+        const article = articles.find(a => a.id === ingredient.articleId);
+        if (!article) {
+          console.error(`Article ${ingredient.articleId} not found`);
+          return false;
+        }
+
+        // Calculate required quantity for this ingredient
+        const baseIngredientQuantity = parseFloat(ingredient.quantity || 0);
+        const requiredQuantity = baseIngredientQuantity * ratio;
+        const currentStock = parseFloat(article.currentStock || 0);
+
+        console.log(`${'  '.repeat(level)}📦 ${article.name}: required=${requiredQuantity.toFixed(3)} ${ingredient.unit}, available=${currentStock.toFixed(3)} ${article.unit}`);
+
+        // Check if this ingredient has sufficient stock
+        const stockDifference = currentStock - requiredQuantity;
+        if (stockDifference < 0) {
+          console.log(`${'  '.repeat(level)}❌ ${article.name}: insufficient stock (${stockDifference.toFixed(3)} ${article.unit} short)`);
+          return false;
+        }
+
+        // If this is a sub-product, check its ingredients recursively
+        if (article.type === 'product') {
+          const subRecipe = recipes.find(r => r.articleId === article.id);
+          if (subRecipe) {
+            console.log(`${'  '.repeat(level)}🔍 Checking sub-product: ${article.name}`);
+            
+            // Get sub-recipe ingredients
+            const subIngredientsRes = await apiRequest(`/api/recipes/${subRecipe.id}/ingredients`, 'GET');
+            const subIngredientsData = await subIngredientsRes.json();
+            
+            if (subIngredientsData && subIngredientsData.length > 0) {
+              // Check each sub-ingredient recursively
+              for (const subIngredient of subIngredientsData) {
+                const subIngredientAvailable = await checkIngredientRecursive(subIngredient, level + 1);
+                if (!subIngredientAvailable) {
+                  console.log(`${'  '.repeat(level)}❌ Sub-product ${article.name} has insufficient ingredients`);
+                  return false;
+                }
+              }
+            }
+          }
+        }
+
+        console.log(`${'  '.repeat(level)}✅ ${article.name}: sufficient stock`);
+        return true;
+      };
+
+      // Check all ingredients
+      for (const ingredient of ingredientsData) {
+        const ingredientAvailable = await checkIngredientRecursive(ingredient);
+        if (!ingredientAvailable) {
+          console.log(`❌ Recipe ${recipeId} has insufficient ingredients`);
+          return false;
+        }
+      }
+
+      console.log(`✅ Recipe ${recipeId} has sufficient ingredients for quantity ${quantity}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error checking ingredient availability:', error);
       return false;
     }
   };
@@ -526,6 +640,12 @@ const PreparationPage = () => {
 
   const saveOperation = async () => {
     if (!currentOperation) return;
+
+    // Prevent saving completed operations
+    if (currentOperation.status === 'completed') {
+      alert('Impossible de modifier une opération terminée.');
+      return;
+    }
 
     try {    
       // Validation
@@ -608,6 +728,11 @@ const PreparationPage = () => {
         createdAt: data.createdAt,
       });
 
+      // Load reservations if the operation is now programmed
+      if (data.status === 'programmed' && data.id) {
+        loadReservations(data.id);
+      }
+
         alert('Préparation sauvegardée');
     } catch (e) {
       console.error('❌ Failed to save preparation:', e);
@@ -624,6 +749,12 @@ const PreparationPage = () => {
   const startPreparation = async () => {
     if (!currentOperation?.id) {
       alert('Veuillez sauvegarder avant de lancer la préparation.');
+      return;
+    }
+
+    // Prevent starting completed operations
+    if (currentOperation.status === 'completed') {
+      alert('Impossible de lancer une opération terminée.');
       return;
     }
 
@@ -649,6 +780,9 @@ const PreparationPage = () => {
       ));
       setCurrentOperation({ ...currentOperation, status: 'in_progress' });
       
+      // Clear reservations when operation starts
+      setReservations([]);
+      
       alert('Préparation lancée');
     } catch (e) {
       console.error('Failed to start preparation', e);
@@ -661,6 +795,12 @@ const PreparationPage = () => {
       // Check ingredients availability first
       const operation = operations.find(op => op.id === operationId);
       if (!operation) return;
+
+      // Prevent starting completed operations
+      if (operation.status === 'completed') {
+        alert('Impossible de lancer une opération terminée.');
+        return;
+      }
 
       for (const item of operation.items || []) {
         const recipe = recipes.find(r => r.articleId === item.articleId);
@@ -692,6 +832,12 @@ const PreparationPage = () => {
   const openCompletionDialog = (operationId: number) => {
     const operation = operations.find(op => op.id === operationId);
     if (!operation) return;
+
+    // Prevent completing already completed operations
+    if (operation.status === 'completed') {
+      alert('Cette opération est déjà terminée.');
+      return;
+    }
 
     // Get total planned quantity
     const totalPlanned = (operation.items || []).reduce((sum: number, item: any) => 
@@ -764,6 +910,12 @@ const PreparationPage = () => {
   const completeOperation = async () => {
     if (!currentOperation?.id) return;
     
+    // Prevent completing already completed operations
+    if (currentOperation.status === 'completed') {
+      alert('Cette opération est déjà terminée.');
+      return;
+    }
+    
     try {
       await apiRequest(`/api/inventory-operations/${currentOperation.id}`, 'PATCH', { 
         status: 'completed',
@@ -774,6 +926,9 @@ const PreparationPage = () => {
         op.id === currentOperation.id ? { ...op, status: 'completed' } : op
       ));
       setCurrentOperation({ ...currentOperation, status: 'completed' });
+      
+      // Clear reservations when operation is completed
+      setReservations([]);
       
       // Refresh articles to show updated stock
       try {
@@ -792,6 +947,12 @@ const PreparationPage = () => {
   const cancelOperation = async () => {
     if (!currentOperation?.id) return;
     
+    // Prevent canceling completed operations
+    if (currentOperation.status === 'completed') {
+      alert('Impossible d\'annuler une opération terminée.');
+      return;
+    }
+    
     try {
       await apiRequest(`/api/inventory-operations/${currentOperation.id}`, 'PATCH', { 
         status: 'cancelled' 
@@ -801,6 +962,9 @@ const PreparationPage = () => {
         op.id === currentOperation.id ? { ...op, status: 'cancelled' } : op
       ));
       setCurrentOperation({ ...currentOperation, status: 'cancelled' });
+      
+      // Clear reservations when operation is cancelled
+      setReservations([]);
     } catch (e) {
       console.error('Failed to cancel preparation', e);
       alert('Erreur lors de l\'annulation');
@@ -1111,9 +1275,27 @@ const PreparationPage = () => {
             {displayCost.toFixed(2)}
           </td>
           <td className="px-3 py-2 text-center text-xs">
-            <span className={`font-medium ${stockDispo > 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {parseFloat(stockDispo.toString()).toFixed(3)} {article?.unit}
-            </span>
+            {(() => {
+              const stock = ingredientStocks[ingredient.articleId];
+              if (!stock) return <span className="text-gray-400">-</span>;
+              return <span>{stock.totalStock}</span>;
+            })()}
+          </td>
+          <td className="px-3 py-2 text-center text-xs">
+            {(() => {
+              const stock = ingredientStocks[ingredient.articleId];
+              const article = articles.find(a => a.id === ingredient.articleId);
+              if (!stock) return <span className="text-gray-400">-</span>;
+        //      const isSubProduct = article?.type === "product" || article?.type === "semi-fini";
+              const required = parseFloat(ingredient.quantity || "0");
+              const stockDispo = stock.availableStock;
+              const isAlert =  stockDispo < required;
+              return (
+                <span className={isAlert ? "text-red-600 font-bold" : ""}>
+                  {stockDispo.toFixed(3)}
+                </span>
+              );
+            })()}
           </td>
         </tr>,
         // Affichage récursif des sous-ingrédients seulement si expandé
@@ -1131,6 +1313,14 @@ const PreparationPage = () => {
       ];
     });
   };
+
+  const [ingredientStocks, setIngredientStocks] = useState<Record<number, any>>({});
+
+  useEffect(() => {
+    if (!recipeIngredients || recipeIngredients.length === 0) return;
+    const articleIds = recipeIngredients.map((ing: any) => ing.articleId);
+    fetchStockDetails(articleIds).then(setIngredientStocks);
+  }, [recipeIngredients]);
 
   if (!isEditing) {
     return (
@@ -1298,8 +1488,9 @@ const PreparationPage = () => {
                               {/* Modifier */}
                               <button
                                 onClick={() => editOperation(operation)}
-                                className="text-blue-600 hover:text-blue-800 p-1"
-                                title="Modifier"
+                                disabled={operation.status === 'completed'}
+                                className="text-blue-600 hover:text-blue-800 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={operation.status === 'completed' ? "Impossible de modifier une opération terminée" : "Modifier"}
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
@@ -1679,6 +1870,8 @@ const PreparationPage = () => {
                       </div>
                     </div>
                   )}
+
+
             </div>
           </div>
 
@@ -1698,13 +1891,14 @@ const PreparationPage = () => {
                     
                     <button
                       onClick={saveOperation}
-                      className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg flex items-center space-x-2"
+                      disabled={currentOperation?.status === 'completed'}
+                      className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="w-4 h-4" />
                       <span>Sauvegarder</span>
                     </button>
                     
-                    {currentOperation?.id && (
+                    {currentOperation?.id && currentOperation?.status !== 'completed' && (
                       <button
                         onClick={startPreparation}
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center space-x-2"
@@ -1773,13 +1967,14 @@ const PreparationPage = () => {
                             <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Quantité</th>
                             <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Unité</th>
                             <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Coût (DA)</th>
-                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">En Stock Dispo</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Stock réel</th>
+                            <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Stock dispo</th>
                           </tr>
                         </thead>
                         <tbody>
                           {recipeIngredients.length > 0 ? renderIngredientsRecursive(recipeIngredients, 0, expandedIngredients, toggleSubIngredients) : (
                             <tr className="bg-gray-50">
-                              <td className="px-3 py-2 text-xs text-gray-600" colSpan={7}>
+                              <td className="px-3 py-2 text-xs text-gray-600" colSpan={8}>
                                 <em>Chargement des ingrédients...</em>
                               </td>
                             </tr>

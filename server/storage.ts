@@ -5,7 +5,10 @@ import {
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
   invoices, invoiceItems, accountingEntries, accountingEntryLines,
-  inventory, type Inventory, type InsertInventory,
+  inventory,
+  // New stock management tables
+  stockMoves, stockLots, stockLotMoves, stockAdjustments, stockReservations,
+  type Inventory, type InsertInventory,
   type User, type InsertUser,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -21,7 +24,13 @@ import {
   type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
   type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
-  InventoryOperationWithItems
+  InventoryOperationWithItems,
+  // New types for stock management
+  type StockMove, type InsertStockMove,
+  type StockLot, type InsertStockLot,
+  type StockLotMove, type InsertStockLotMove,
+  type StockAdjustment, type InsertStockAdjustment,
+  type StockReservation, type InsertStockReservation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, or, gte, lte, isNull, sql } from "drizzle-orm";
@@ -192,6 +201,53 @@ export interface IStorage {
   updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined>;
   updateInventoryOperationWithItems(operationId: number, updatedOperation: Partial<InsertInventoryOperation>, updatedItems: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
   deleteInventoryOperation(id: number): Promise<boolean>;
+
+  // ============ GESTION AVANCEE DES STOCKS ============
+
+  // Générer un code unique pour les mouvements de stock
+  generateStockMoveCode(): Promise<string>;
+  // Générer un code unique pour les lots
+  generateStockLotCode(): Promise<string>;
+  // Générer un code unique pour les ajustements
+  generateStockAdjustmentCode(): Promise<string>;
+  // Créer un mouvement de stock avec traçabilité complète
+  createStockMove(moveData: InsertStockMove): Promise<StockMove>;
+  // Confirmer un mouvement de stock
+  confirmStockMove(moveId: number, confirmedBy: number): Promise<StockMove>;
+  // Valider un mouvement de stock (le rendre effectif)
+  validateStockMove(moveId: number, doneBy: number): Promise<StockMove>;
+  // Créer un lot avec traçabilité
+  createStockLot(lotData: InsertStockLot): Promise<StockLot>;
+  // Créer un mouvement de lot
+  createStockLotMove(lotMoveData: InsertStockLotMove): Promise<StockLotMove>;
+  // Créer un ajustement de stock
+  createStockAdjustment(adjustmentData: InsertStockAdjustment): Promise<StockAdjustment>;
+  // Confirmer un ajustement de stock
+  confirmStockAdjustment(adjustmentId: number, confirmedBy: number): Promise<StockAdjustment>;
+  // Créer une réservation de stock
+  createStockReservation(reservationData: InsertStockReservation): Promise<StockReservation>;
+  // Libérer une réservation de stock
+  releaseStockReservation(reservationId: number): Promise<StockReservation>;
+  // Créer des réservations d'ingrédients pour une préparation
+  createIngredientReservationsForPreparation(operationId: number, items: InventoryOperationItem[]): Promise<StockReservation[]>;
+  // Libérer toutes les réservations d'une opération d'inventaire
+  releaseAllReservationsForOperation(operationId: number): Promise<boolean>;
+  // Obtenir les réservations d'une opération d'inventaire
+  getReservationsForOperation(operationId: number): Promise<StockReservation[]>;
+  // Obtenir l'historique des mouvements d'un article
+  getArticleStockHistory(articleId: number, limit: number): Promise<StockMove[]>;
+  // Obtenir l'historique des mouvements d'un article par zone
+  getArticleStockHistoryByZone(articleId: number, storageZoneId: number, limit: number): Promise<StockMove[]>;
+  // Obtenir le stock disponible par zone
+  getArticleStockByZone(articleId: number): Promise<any[]>;
+  // Obtenir les lots d'un article
+  getArticleLots(articleId: number): Promise<StockLot[]>;
+  // Obtenir les réservations d'un article
+  getArticleReservations(articleId: number): Promise<StockReservation[]>;
+  // Calculer le stock disponible (stock total - réservations)
+  getAvailableStock(articleId: number): Promise<number>;
+  // Obtenir le rapport de traçabilité d'un article
+  getArticleTraceabilityReport(articleId: number, startDate?: string, endDate?: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1238,6 +1294,61 @@ export class DatabaseStorage implements IStorage {
   return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
   }
 
+  async getInventoryOperationsByOperator(operatorId: number): Promise<InventoryOperationWithItems[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          io.*,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', iot.id,
+                'operationId', iot.operation_id,
+                'articleId', iot.article_id,
+                'quantity', iot.quantity,
+                'unitCost', iot.unit_cost,
+                'totalCost', iot.total_cost,
+                'notes', iot.notes,
+                'createdAt', iot.created_at,
+                'article', CASE 
+                  WHEN a.id IS NOT NULL THEN json_build_object(
+                    'id', a.id,
+                    'code', a.code,
+                    'name', a.name,
+                    'type', a.type,
+                    'description', a.description,
+                    'costPerUnit', a.cost_per_unit,
+                    'price', a.price,
+                    'currentStock', a.current_stock,
+                    'minStock', a.min_stock,
+                    'maxStock', a.max_stock,
+                    'active', a.active,
+                    'createdAt', a.created_at
+                  )
+                  ELSE NULL
+                END
+              )
+            ) FILTER (WHERE iot.id IS NOT NULL),
+            '[]'
+          ) AS items
+        FROM inventory_operations io
+        LEFT JOIN inventory_operation_items iot
+          ON iot.operation_id = io.id
+        LEFT JOIN articles a
+          ON a.id = iot.article_id
+        WHERE io.operator_id = ${operatorId}
+          AND io.type IN ('preparation', 'preparation_reliquat')
+        GROUP BY io.id, io.code, io.type, io.status, io.operator_id, io.scheduled_date, io.started_at, io.completed_at, io.notes, io.created_at, io.updated_at
+        ORDER BY io.created_at DESC
+      `);
+
+      return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+    } catch (error) {
+      console.error('Error in getInventoryOperationsByOperator:', error);
+      throw error;
+    }
+  }
+
   async createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation> {
     // Generate automatic code based on type
     const prefixes: Record<string, string> = {
@@ -1295,6 +1406,45 @@ export class DatabaseStorage implements IStorage {
       }));
 
       await tx.insert(inventoryOperationItems).values(itemsToInsert);
+
+      // Gérer les réservations automatiquement pour les nouvelles opérations
+      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        if (operation.status === 'programmed' && itemsToInsert.length > 0) {
+          for (const item of itemsToInsert) {
+            const article = await this.getArticle(item.articleId);
+            if (!article) continue;
+
+            // Trouver la recette pour ce produit
+            const recipe = await this.getRecipeByArticleId(article.id);
+            if (!recipe) continue;
+
+            const recipeIngredients = await this.getRecipeIngredients(recipe.id);
+            const plannedQuantity = parseFloat(item.quantity || '0');
+            const recipeQuantity = parseFloat(recipe.quantity || '1');
+            const ratio = plannedQuantity / recipeQuantity;
+
+            for (const ingredient of recipeIngredients) {
+              const ingredientArticle = await this.getArticle(ingredient.articleId);
+              if (!ingredientArticle) continue;
+
+              const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+              const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+
+              if (currentStock < requiredQuantity) {
+                throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+              }
+
+              await tx.insert(stockReservations).values({
+                articleId: ingredientArticle.id,
+                inventoryOperationId: operation.id,
+                reservedQuantity: requiredQuantity.toString(),
+                reservationType: 'preparation' as const,
+                notes: `Réservation pour préparation ${operation.id} - Produit: ${article.name}`,
+              });
+            }
+          }
+        }
+      }
                   
       return operation;
     });
@@ -1314,6 +1464,15 @@ export class DatabaseStorage implements IStorage {
     updatedItems: InsertInventoryOperationItem[]
   ): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
+      // Get current operation to check status changes
+      const [currentOperation] = await tx.select()
+        .from(inventoryOperations)
+        .where(eq(inventoryOperations.id, operationId));
+
+      if (!currentOperation) {
+        throw new Error(`Inventory operation with ID ${operationId} not found`);
+      }
+
       // Update the operation header
       const [operation] = await tx.update(inventoryOperations)
         .set({ ...updatedOperation, updatedAt: new Date().toISOString() })
@@ -1337,13 +1496,81 @@ export class DatabaseStorage implements IStorage {
         await tx.insert(inventoryOperationItems).values(itemsToInsert);
       }
 
+      // Gérer les réservations automatiquement
+      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        // Si le statut devient "programmed", créer les réservations
+        if (operation.status === 'programmed' && currentOperation.status !== 'programmed') {
+          // Libérer d'abord les anciennes réservations si elles existent
+          await tx.update(stockReservations)
+            .set({ status: 'cancelled' })
+            .where(eq(stockReservations.inventoryOperationId, operationId));
+
+          // Créer de nouvelles réservations pour les nouveaux items
+          if (updatedItems.length > 0) {
+            for (const item of updatedItems) {
+              const article = await this.getArticle(item.articleId);
+              if (!article) continue;
+
+              // Trouver la recette pour ce produit
+              const recipe = await this.getRecipeByArticleId(article.id);
+              if (!recipe) continue;
+
+              // Obtenir les ingrédients de la recette
+              const recipeIngredients = await this.getRecipeIngredients(recipe.id);
+              
+              // Calculer la consommation basée sur la quantité planifiée
+              const plannedQuantity = parseFloat(item.quantity || '0');
+              const recipeQuantity = parseFloat(recipe.quantity || '1');
+              const ratio = plannedQuantity / recipeQuantity;
+
+              // Créer des réservations pour chaque ingrédient
+              for (const ingredient of recipeIngredients) {
+                const ingredientArticle = await this.getArticle(ingredient.articleId);
+                if (!ingredientArticle) continue;
+
+                const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+                
+                // Vérifier si assez de stock est disponible
+                const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+                if (currentStock < requiredQuantity) {
+                  throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+                }
+
+                // Créer la réservation directement dans la transaction
+                await tx.insert(stockReservations).values({
+                  articleId: ingredientArticle.id,
+                  inventoryOperationId: operationId,
+                  reservedQuantity: requiredQuantity.toString(),
+                  reservationType: 'preparation' as const,
+                  notes: `Réservation pour préparation ${operationId} - Produit: ${article.name}`,
+                });
+              }
+            }
+          }
+        }
+        // Si le statut n'est plus "programmed", libérer les réservations
+        else if (operation.status !== 'programmed' && currentOperation.status === 'programmed') {
+          await tx.update(stockReservations)
+            .set({ status: 'cancelled' })
+            .where(eq(stockReservations.inventoryOperationId, operationId));
+        }
+      }
+
       return operation;
     });
   }
 
   async deleteInventoryOperation(id: number): Promise<boolean> {
-    const result = await db.delete(inventoryOperations).where(eq(inventoryOperations.id, id));
-    return (result.rowCount || 0) > 0;
+    return await db.transaction(async (tx) => {
+      // Libérer d'abord toutes les réservations liées à cette opération
+      await tx.update(stockReservations)
+        .set({ status: 'cancelled' })
+        .where(eq(stockReservations.inventoryOperationId, id));
+
+      // Supprimer l'opération
+      const result = await tx.delete(inventoryOperations).where(eq(inventoryOperations.id, id));
+      return (result.rowCount || 0) > 0;
+    });
   }
 
   // Inventory Operation Items
@@ -1508,6 +1735,567 @@ export class DatabaseStorage implements IStorage {
     const existingOps = await this.getInventoryOperationsByType('reception');
     const nextNumber = existingOps.length + 1;
     return `REC-${nextNumber.toString().padStart(6, '0')}`;
+  }
+
+  // ============ GESTION AVANCEE DES STOCKS ============
+
+  // Générer un code unique pour les mouvements de stock
+  async generateStockMoveCode(): Promise<string> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*) as count FROM stock_moves
+    `);
+    const count = parseInt(String(result.rows[0].count)) + 1;
+    return `MOVE-${count.toString().padStart(6, '0')}`;
+  }
+
+  // Générer un code unique pour les lots
+  async generateStockLotCode(): Promise<string> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*) as count FROM stock_lots
+    `);
+    const count = parseInt(String(result.rows[0].count)) + 1;
+    return `LOT-${count.toString().padStart(6, '0')}`;
+  }
+
+  // Générer un code unique pour les ajustements
+  async generateStockAdjustmentCode(): Promise<string> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*) as count FROM stock_adjustments
+    `);
+    const count = parseInt(String(result.rows[0].count)) + 1;
+    return `ADJ-${count.toString().padStart(6, '0')}`;
+  }
+
+  // Créer un mouvement de stock avec traçabilité complète
+  async createStockMove(moveData: InsertStockMove): Promise<StockMove> {
+    const code = await this.generateStockMoveCode();
+    
+    // Récupérer le stock actuel de l'article
+    const article = await this.getArticle(moveData.articleId);
+    if (!article) {
+      throw new Error(`Article ${moveData.articleId} not found`);
+    }
+    
+    const currentStock = parseFloat(article.currentStock || '0');
+    const moveQuantity = parseFloat(moveData.quantity);
+    
+    // Calculer le stock après le mouvement
+    let stockAfter = currentStock;
+    if (moveData.type === 'in') {
+      stockAfter = currentStock + moveQuantity;
+    } else if (moveData.type === 'out') {
+      stockAfter = currentStock - moveQuantity;
+    }
+    
+    // Vérifier que le stock ne devient pas négatif
+    if (stockAfter < 0) {
+      throw new Error(`Insufficient stock for article ${article.name || 'Unknown'}. Available: ${currentStock}, Required: ${moveQuantity}`);
+    }
+    
+    const [newMove] = await db.insert(stockMoves).values({
+      ...moveData,
+      code,
+      stockBefore: currentStock.toString(),
+      stockAfter: stockAfter.toString(),
+    }).returning();
+    
+    // Mettre à jour le stock de l'article
+    await db.update(articles)
+      .set({ currentStock: stockAfter.toString() })
+      .where(eq(articles.id, moveData.articleId));
+    
+    return newMove;
+  }
+
+  // Confirmer un mouvement de stock
+  async confirmStockMove(moveId: number, confirmedBy: number): Promise<StockMove> {
+    const [updatedMove] = await db.update(stockMoves)
+      .set({ 
+        status: 'confirmed',
+        confirmedBy,
+        confirmedAt: new Date().toISOString()
+      })
+      .where(eq(stockMoves.id, moveId))
+      .returning();
+    
+    return updatedMove;
+  }
+
+  // Valider un mouvement de stock (le rendre effectif)
+  async validateStockMove(moveId: number, doneBy: number): Promise<StockMove> {
+    const [updatedMove] = await db.update(stockMoves)
+      .set({ 
+        status: 'done',
+        doneBy,
+        doneAt: new Date().toISOString()
+      })
+      .where(eq(stockMoves.id, moveId))
+      .returning();
+    
+    return updatedMove;
+  }
+
+  // Créer un lot avec traçabilité
+  async createStockLot(lotData: InsertStockLot): Promise<StockLot> {
+    const code = await this.generateStockLotCode();
+    
+    const [newLot] = await db.insert(stockLots).values({
+      ...lotData,
+      code,
+    }).returning();
+    
+    return newLot;
+  }
+
+  // Créer un mouvement de lot
+  async createStockLotMove(lotMoveData: InsertStockLotMove): Promise<StockLotMove> {
+    // Récupérer le lot
+    const lot = await db.select().from(stockLots).where(eq(stockLots.id, lotMoveData.lotId)).limit(1);
+    if (!lot.length) {
+      throw new Error(`Lot ${lotMoveData.lotId} not found`);
+    }
+    
+    const currentLotStock = parseFloat(lot[0].currentQuantity);
+    const moveQuantity = parseFloat(lotMoveData.quantity);
+    
+    // Calculer le stock après le mouvement
+    const lotStockAfter = currentLotStock - moveQuantity;
+    
+    if (lotStockAfter < 0) {
+      throw new Error(`Insufficient lot stock. Available: ${currentLotStock}, Required: ${moveQuantity}`);
+    }
+    
+    const [newLotMove] = await db.insert(stockLotMoves).values({
+      ...lotMoveData,
+      lotStockBefore: currentLotStock.toString(),
+      lotStockAfter: lotStockAfter.toString(),
+    }).returning();
+    
+    // Mettre à jour le stock du lot
+    await db.update(stockLots)
+      .set({ currentQuantity: lotStockAfter.toString() })
+      .where(eq(stockLots.id, lotMoveData.lotId));
+    
+    return newLotMove;
+  }
+
+  // Créer un ajustement de stock
+  async createStockAdjustment(adjustmentData: InsertStockAdjustment): Promise<StockAdjustment> {
+    const code = await this.generateStockAdjustmentCode();
+    
+    const [newAdjustment] = await db.insert(stockAdjustments).values({
+      ...adjustmentData,
+      code,
+    }).returning();
+    
+    return newAdjustment;
+  }
+
+  // Confirmer un ajustement de stock
+  async confirmStockAdjustment(adjustmentId: number, confirmedBy: number): Promise<StockAdjustment> {
+    const adjustment = await db.select().from(stockAdjustments).where(eq(stockAdjustments.id, adjustmentId)).limit(1);
+    if (!adjustment.length) {
+      throw new Error(`Adjustment ${adjustmentId} not found`);
+    }
+    
+    const adj = adjustment[0];
+    const difference = parseFloat(adj.difference);
+    
+    // Créer un mouvement de stock pour l'ajustement
+    const moveData: InsertStockMove = {
+      type: difference > 0 ? 'in' : 'out',
+      status: 'done',
+      articleId: adj.articleId,
+      quantity: Math.abs(difference).toString(),
+      unit: 'kg', // À adapter selon l'article
+      fromStorageZoneId: difference > 0 ? null : adj.storageZoneId,
+      toStorageZoneId: difference > 0 ? adj.storageZoneId : null,
+      reason: `Ajustement: ${adj.reason}`,
+      notes: adj.description,
+      createdBy: adj.createdBy,
+      doneBy: confirmedBy,
+    };
+    
+    await this.createStockMove(moveData);
+    
+    // Confirmer l'ajustement
+    const [updatedAdjustment] = await db.update(stockAdjustments)
+      .set({ 
+        status: 'confirmed',
+        confirmedBy,
+        confirmedAt: new Date().toISOString()
+      })
+      .where(eq(stockAdjustments.id, adjustmentId))
+      .returning();
+    
+    return updatedAdjustment;
+  }
+
+  // Créer une réservation de stock
+  async createStockReservation(reservationData: InsertStockReservation): Promise<StockReservation> {
+    // Vérifier la disponibilité du stock
+    const article = await this.getArticle(reservationData.articleId);
+    if (!article) {
+      throw new Error(`Article ${reservationData.articleId} not found`);
+    }
+    
+    const availableStock = parseFloat(article.currentStock || '0');
+    const reservedQuantity = parseFloat(reservationData.reservedQuantity);
+    
+    if (availableStock < reservedQuantity) {
+      throw new Error(`Insufficient stock for reservation. Available: ${availableStock}, Required: ${reservedQuantity}`);
+    }
+    
+    const [newReservation] = await db.insert(stockReservations).values(reservationData).returning();
+    
+    return newReservation;
+  }
+
+  // Libérer une réservation de stock
+  async releaseStockReservation(reservationId: number): Promise<StockReservation> {
+    const [updatedReservation] = await db.update(stockReservations)
+      .set({ status: 'cancelled' })
+      .where(eq(stockReservations.id, reservationId))
+      .returning();
+    
+    return updatedReservation;
+  }
+
+  // Créer des réservations d'ingrédients pour une préparation
+  async createIngredientReservationsForPreparation(operationId: number, items: InventoryOperationItem[]): Promise<StockReservation[]> {
+    const reservations: StockReservation[] = [];
+    
+    for (const item of items) {
+      const article = await this.getArticle(item.articleId);
+      if (!article) continue;
+
+      // Trouver la recette pour ce produit
+      const recipe = await this.getRecipeByArticleId(article.id);
+      if (!recipe) continue;
+
+      // Obtenir les ingrédients de la recette
+      const recipeIngredients = await this.getRecipeIngredients(recipe.id);
+      
+      // Calculer la consommation basée sur la quantité planifiée
+      const plannedQuantity = parseFloat(item.quantity || '0');
+      const recipeQuantity = parseFloat(recipe.quantity || '1');
+      const ratio = plannedQuantity / recipeQuantity;
+
+      // Créer des réservations pour chaque ingrédient
+      for (const ingredient of recipeIngredients) {
+        const ingredientArticle = await this.getArticle(ingredient.articleId);
+        if (!ingredientArticle) continue;
+
+        const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+        
+        // Vérifier si assez de stock est disponible
+        const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+        if (currentStock < requiredQuantity) {
+          throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+        }
+
+        // Créer la réservation
+        const reservationData = {
+          articleId: ingredientArticle.id,
+          inventoryOperationId: operationId,
+          reservedQuantity: requiredQuantity.toString(),
+          reservationType: 'preparation' as const,
+          notes: `Réservation pour préparation ${operationId} - Produit: ${article.name}`,
+        };
+
+        const reservation = await this.createStockReservation(reservationData);
+        reservations.push(reservation);
+      }
+    }
+    
+    return reservations;
+  }
+
+  // Libérer toutes les réservations d'une opération d'inventaire
+  async releaseAllReservationsForOperation(operationId: number): Promise<boolean> {
+    const result = await db.update(stockReservations)
+      .set({ status: 'cancelled' })
+      .where(eq(stockReservations.inventoryOperationId, operationId));
+    
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Obtenir les réservations d'une opération d'inventaire
+  async getReservationsForOperation(operationId: number): Promise<StockReservation[]> {
+    return await db.select()
+      .from(stockReservations)
+      .where(eq(stockReservations.inventoryOperationId, operationId));
+  }
+
+  // Obtenir l'historique des mouvements d'un article
+  async getArticleStockHistory(articleId: number, limit: number = 50): Promise<StockMove[]> {
+    const moves = await db.select()
+      .from(stockMoves)
+      .where(eq(stockMoves.articleId, articleId))
+      .orderBy(desc(stockMoves.createdAt))
+      .limit(limit);
+    
+    return moves;
+  }
+
+  // Obtenir l'historique des mouvements d'un article par zone
+  async getArticleStockHistoryByZone(articleId: number, storageZoneId: number, limit: number = 50): Promise<StockMove[]> {
+    const moves = await db.select()
+      .from(stockMoves)
+      .where(
+        and(
+          eq(stockMoves.articleId, articleId),
+          or(
+            eq(stockMoves.fromStorageZoneId, storageZoneId),
+            eq(stockMoves.toStorageZoneId, storageZoneId)
+          )
+        )
+      )
+      .orderBy(desc(stockMoves.createdAt))
+      .limit(limit);
+    
+    return moves;
+  }
+
+  // Obtenir le stock disponible par zone
+  async getArticleStockByZone(articleId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        sz.id as zone_id,
+        sz.designation as zone_name,
+        COALESCE(SUM(
+          CASE 
+            WHEN sm.type = 'in' AND sm.to_storage_zone_id = sz.id THEN sm.quantity::numeric
+            WHEN sm.type = 'out' AND sm.from_storage_zone_id = sz.id THEN -sm.quantity::numeric
+            ELSE 0
+          END
+        ), 0) as stock_quantity
+      FROM storage_zones sz
+      LEFT JOIN stock_moves sm ON 
+        (sm.to_storage_zone_id = sz.id OR sm.from_storage_zone_id = sz.id)
+        AND sm.article_id = ${articleId}
+        AND sm.status = 'done'
+      WHERE sz.active = true
+      GROUP BY sz.id, sz.designation
+      HAVING COALESCE(SUM(
+        CASE 
+          WHEN sm.type = 'in' AND sm.to_storage_zone_id = sz.id THEN sm.quantity::numeric
+          WHEN sm.type = 'out' AND sm.from_storage_zone_id = sz.id THEN -sm.quantity::numeric
+          ELSE 0
+        END
+      ), 0) > 0
+      ORDER BY sz.designation
+    `);
+    
+    return result.rows;
+  }
+
+  // Obtenir les lots d'un article
+  async getArticleLots(articleId: number): Promise<StockLot[]> {
+    const lots = await db.select()
+      .from(stockLots)
+      .where(eq(stockLots.articleId, articleId))
+      .orderBy(desc(stockLots.createdAt));
+    
+    return lots;
+  }
+
+  // Obtenir les réservations d'un article
+  async getArticleReservations(articleId: number): Promise<StockReservation[]> {
+    const reservations = await db.select()
+      .from(stockReservations)
+      .where(
+        and(
+          eq(stockReservations.articleId, articleId),
+          eq(stockReservations.status, 'reserved')
+        )
+      )
+      .orderBy(desc(stockReservations.reservedAt));
+    
+    return reservations;
+  }
+
+  // Obtenir les réservations actives d'un article (avec plus de détails)
+  async getActiveArticleReservations(articleId: number): Promise<StockReservation[]> {
+    const reservations = await db.select()
+      .from(stockReservations)
+      .where(
+        and(
+          eq(stockReservations.articleId, articleId),
+          eq(stockReservations.status, 'reserved')
+        )
+      )
+      .orderBy(desc(stockReservations.reservedAt));
+    
+    return reservations;
+  }
+
+  // Calculer le stock disponible (stock total - réservations)
+  async getAvailableStock(articleId: number): Promise<number> {
+    const article = await this.getArticle(articleId);
+    if (!article) return 0;
+    
+    const totalStock = parseFloat(article.currentStock || '0');
+    
+    // Calculer les réservations actives
+    const reservations = await this.getArticleReservations(articleId);
+    const reservedQuantity = reservations.reduce((sum, res) => 
+      sum + parseFloat(res.reservedQuantity) - parseFloat(res.deliveredQuantity || '0'), 0
+    );
+    
+    return Math.max(0, totalStock - reservedQuantity);
+  }
+
+  // Vérifier si un article a suffisamment de stock disponible pour une quantité donnée
+  async hasEnoughAvailableStock(articleId: number, requiredQuantity: number): Promise<boolean> {
+    const availableStock = await this.getAvailableStock(articleId);
+    return availableStock >= requiredQuantity;
+  }
+
+  // Obtenir le détail complet de la disponibilité d'un article
+  async getArticleStockDetails(articleId: number): Promise<{
+    totalStock: number;
+    reservedQuantity: number;
+    deliveredQuantity: number;
+    availableStock: number;
+    reservations: StockReservation[];
+  }> {
+    const article = await this.getArticle(articleId);
+    if (!article) {
+      return {
+        totalStock: 0,
+        reservedQuantity: 0,
+        deliveredQuantity: 0,
+        availableStock: 0,
+        reservations: []
+      };
+    }
+    
+    const totalStock = parseFloat(article.currentStock || '0');
+    const reservations = await this.getArticleReservations(articleId);
+    
+    const reservedQuantity = reservations.reduce((sum, res) => 
+      sum + parseFloat(res.reservedQuantity), 0
+    );
+    
+    const deliveredQuantity = reservations.reduce((sum, res) => 
+      sum + parseFloat(res.deliveredQuantity || '0'), 0
+    );
+    
+    const availableStock = Math.max(0, totalStock - reservedQuantity + deliveredQuantity);
+    
+    return {
+      totalStock,
+      reservedQuantity,
+      deliveredQuantity,
+      availableStock,
+      reservations
+    };
+  }
+
+  // Vérifier la disponibilité de tous les ingrédients d'une recette
+  async checkRecipeIngredientsAvailability(recipeId: number, plannedQuantity: number): Promise<{
+    available: boolean;
+    missingIngredients: Array<{
+      articleId: number;
+      articleName: string;
+      requiredQuantity: number;
+      availableStock: number;
+      shortfall: number;
+    }>;
+    totalReservations: number;
+  }> {
+    const recipe = await this.getRecipe(recipeId);
+    if (!recipe) {
+      return {
+        available: false,
+        missingIngredients: [],
+        totalReservations: 0
+      };
+    }
+
+    const recipeIngredients = await this.getRecipeIngredients(recipeId);
+    const recipeQuantity = parseFloat(recipe.quantity || '1');
+    const ratio = plannedQuantity / recipeQuantity;
+    
+    let allAvailable = true;
+    const missingIngredients: Array<{
+      articleId: number;
+      articleName: string;
+      requiredQuantity: number;
+      availableStock: number;
+      shortfall: number;
+    }> = [];
+    
+    let totalReservations = 0;
+
+    for (const ingredient of recipeIngredients) {
+      const ingredientArticle = await this.getArticle(ingredient.articleId);
+      if (!ingredientArticle) continue;
+
+      const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+      const availableStock = await this.getAvailableStock(ingredient.articleId);
+      
+      // Compter les réservations pour cet ingrédient
+      const reservations = await this.getArticleReservations(ingredient.articleId);
+      const reservedQuantity = reservations.reduce((sum, res) => 
+        sum + parseFloat(res.reservedQuantity) - parseFloat(res.deliveredQuantity || '0'), 0
+      );
+      totalReservations += reservedQuantity;
+
+      if (availableStock < requiredQuantity) {
+        allAvailable = false;
+        missingIngredients.push({
+          articleId: ingredient.articleId,
+          articleName: ingredientArticle.name,
+          requiredQuantity,
+          availableStock,
+          shortfall: requiredQuantity - availableStock
+        });
+      }
+    }
+
+    return {
+      available: allAvailable,
+      missingIngredients,
+      totalReservations
+    };
+  }
+
+  // Obtenir le rapport de traçabilité d'un article
+  async getArticleTraceabilityReport(articleId: number, startDate?: string, endDate?: string): Promise<any> {
+    let query = sql`
+      SELECT 
+        sm.*,
+        a.name as article_name,
+        a.code as article_code,
+        sz_from.designation as from_zone,
+        sz_to.designation as to_zone,
+        u_created.first_name || ' ' || u_created.last_name as created_by_name,
+        u_confirmed.first_name || ' ' || u_confirmed.last_name as confirmed_by_name,
+        u_done.first_name || ' ' || u_done.last_name as done_by_name
+      FROM stock_moves sm
+      LEFT JOIN articles a ON a.id = sm.article_id
+      LEFT JOIN storage_zones sz_from ON sz_from.id = sm.from_storage_zone_id
+      LEFT JOIN storage_zones sz_to ON sz_to.id = sm.to_storage_zone_id
+      LEFT JOIN users u_created ON u_created.id = sm.created_by
+      LEFT JOIN users u_confirmed ON u_confirmed.id = sm.confirmed_by
+      LEFT JOIN users u_done ON u_done.id = sm.done_by
+      WHERE sm.article_id = ${articleId}
+    `;
+    
+    if (startDate) {
+      query = sql`${query} AND sm.created_at >= ${startDate}`;
+    }
+    
+    if (endDate) {
+      query = sql`${query} AND sm.created_at <= ${endDate}`;
+    }
+    
+    query = sql`${query} ORDER BY sm.created_at DESC`;
+    
+    const result = await db.execute(query);
+    return result.rows;
   }
 }
 

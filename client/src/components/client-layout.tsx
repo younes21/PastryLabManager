@@ -13,7 +13,7 @@ export function ClientLayout({ children, title = "Espace Client" }: ClientLayout
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50">
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className=" mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -40,8 +40,8 @@ export function ClientLayout({ children, title = "Espace Client" }: ClientLayout
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+      <main className=" mx-auto py-4 sm:px-4 lg:px-4">
+        <div >
           {children}
         </div>
       </main>

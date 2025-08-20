@@ -56,8 +56,8 @@ export default function IngredientsPage() {
     queryKey: ["/api/article-categories"],
   });
 
-  const { data: storageLocations } = useQuery({
-    queryKey: ["/api/storage-locations"],
+  const { data: StorageZones } = useQuery({
+    queryKey: ["/api/storage-zones"],
   });
 
   const { data: taxes } = useQuery({
@@ -368,9 +368,9 @@ export default function IngredientsPage() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="no-zone">Aucune zone</SelectItem>
-                              {(storageLocations as any[])?.map((location: any) => (
-                                <SelectItem key={location.id} value={location.id.toString()}>
-                                  {location.name}
+                              {(StorageZones as any[])?.map((zone: any) => (
+                                <SelectItem key={zone.id} value={zone.id.toString()}>
+                                  {zone.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>

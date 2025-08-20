@@ -26,6 +26,7 @@ import {
   insertInventoryOperationSchema,
   insertInventoryOperationItemSchema,
   updateInventoryOperationWithItemsSchema,
+  type InsertInventoryOperation,
   insertInventorySchema,
   insertDeliverySchema,
   insertInvoiceSchema,
@@ -1324,11 +1325,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/inventory-operations", async (req, res) => {
     try {
-      const { type, include_reliquat } = req.query;
+      const { type, include_reliquat, operator_id } = req.query;
       let operations;
       if (type) {
         const includeReliquat = include_reliquat === 'true';
         operations = await storage.getInventoryOperationsByType(type as string, includeReliquat);
+      } else if (operator_id) {
+        // Filter operations by operator ID
+        const operatorId = parseInt(operator_id as string);
+        if (isNaN(operatorId)) {
+          return res.status(400).json({ message: "Invalid operator ID" });
+        }
+        operations = await storage.getInventoryOperationsByOperator(operatorId);
       } else {
         operations = await storage.getAllInventoryOperations();
       }
@@ -1456,6 +1464,289 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .status(500)
           .json({ message: "Failed to update inventory operation" });
       }
+    }
+  });
+
+  // PATCH endpoint for inventory operations (for status updates)
+  app.patch("/api/inventory-operations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const updateData = insertInventoryOperationSchema.partial().parse(req.body);
+      const operation = await storage.updateInventoryOperation(id, updateData);
+      
+      if (operation) {
+        res.json(operation);
+      } else {
+        res.status(404).json({ message: "Inventory operation not found" });
+      }
+    } catch (error) {
+      console.error("Error updating inventory operation:", error);
+      if (error instanceof z.ZodError) {
+        res
+          .status(400)
+          .json({ message: "Invalid operation data", errors: error.errors });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Failed to update inventory operation" });
+      }
+    }
+  });
+
+  // Start preparation endpoint - consumes ingredients
+  app.patch("/api/inventory-operations/:id/start", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const { status, startedAt } = req.body;
+
+      // Validate required fields
+      if (status !== 'in_progress') {
+        return res.status(400).json({ message: "Status must be 'in_progress'" });
+      }
+
+      if (!startedAt) {
+        return res.status(400).json({ message: "startedAt is required" });
+      }
+
+      // Get the operation to check if it can be started
+      const operation = await storage.getInventoryOperation(id);
+      if (!operation) {
+        return res.status(404).json({ message: "Inventory operation not found" });
+      }
+
+      if (operation.status === 'completed' || operation.status === 'cancelled') {
+        return res.status(400).json({ message: "Operation cannot be started" });
+      }
+
+      if (operation.status === 'in_progress') {
+        return res.status(400).json({ message: "Operation is already in progress" });
+      }
+      // Get operation items to consume ingredients
+      const items = await storage.getInventoryOperationItems(id);
+      
+      // For preparation operations, consume ingredients based on recipe and create stock moves
+      if (operation.type === 'preparation') {
+        for (const item of items) {
+          const article = await storage.getArticle(item.articleId);
+          if (!article) continue;
+
+          // Find the recipe for this product
+          const recipe = await storage.getRecipeByArticleId(article.id);
+          if (!recipe) continue;
+
+          // Get recipe ingredients
+          const recipeIngredients = await storage.getRecipeIngredients(recipe.id);
+          
+          // Calculate consumption based on planned quantity
+          const plannedQuantity = parseFloat(item.quantity || '0');
+          const recipeQuantity = parseFloat(recipe.quantity || '1');
+          const ratio = plannedQuantity / recipeQuantity;
+
+          // Consume each ingredient and create stock moves
+          for (const ingredient of recipeIngredients) {
+            const ingredientArticle = await storage.getArticle(ingredient.articleId);
+            if (!ingredientArticle) continue;
+
+            const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+            
+            // Check if enough stock is available
+            const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+            if (currentStock < requiredQuantity) {
+              return res.status(400).json({ 
+                message: `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}` 
+              });
+            }
+
+            // Create stock move for ingredient consumption
+            const stockMoveData = {
+              type: 'out',
+              status: 'done',
+              articleId: ingredientArticle.id,
+              quantity: requiredQuantity.toString(),
+              unit: ingredient.unit || ingredientArticle.unit,
+              fromStorageZoneId: ingredientArticle.storageZoneId,
+              toStorageZoneId: null,
+              reason: `Consommation pour préparation ${operation.code}`,
+              notes: `Consommation de ${ingredientArticle.name} pour produire ${article.name}`,
+              operationId: operation.id,
+              operationItemId: item.id,
+              createdBy: operation.operatorId,
+              doneBy: operation.operatorId,
+            };
+
+            await storage.createStockMove(stockMoveData);
+          }
+        }
+      }
+
+      // Update operation status
+      const updateData: Partial<InsertInventoryOperation> = {
+        status: 'in_progress',
+        startedAt: startedAt
+      };
+
+    const updatedOperation = await storage.updateInventoryOperation(id, updateData);
+    if (!updatedOperation) {
+      return res.status(404).json({ message: "Failed to update operation" });
+    }
+      // Libérer les réservations d'ingrédients une fois que la préparation commence
+      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        await storage.releaseAllReservationsForOperation(id);
+      }
+
+      
+
+      res.json(updatedOperation);
+    } catch (error) {
+      console.error("Error starting inventory operation:", error);
+      res.status(500).json({ message: "Failed to start inventory operation" });
+    }
+  });
+
+  // Completion endpoint for inventory operations
+  app.patch("/api/inventory-operations/:id/complete", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const { status, completedAt, conformQuantity, wasteReason } = req.body;
+
+      // Validate required fields
+      if (status !== 'completed') {
+        return res.status(400).json({ message: "Status must be 'completed'" });
+      }
+
+      if (!completedAt) {
+        return res.status(400).json({ message: "completedAt is required" });
+      }
+
+      // Get the operation to check if it's already completed
+      const operation = await storage.getInventoryOperation(id);
+      if (!operation) {
+        return res.status(404).json({ message: "Inventory operation not found" });
+      }
+
+      if (operation.status === 'completed') {
+        return res.status(400).json({ message: "Operation is already completed and cannot be modified" });
+      }
+
+      // Update operation status
+      const updateData: Partial<InsertInventoryOperation> = {
+        status: 'completed',
+        completedAt: completedAt,
+        completedBy: req.body.completedBy || null
+      };
+
+      const updatedOperation = await storage.updateInventoryOperation(id, updateData);
+      if (!updatedOperation) {
+        return res.status(404).json({ message: "Failed to update operation" });
+      }
+
+      // Get operation items to update inventory
+      const items = await storage.getInventoryOperationItems(id);
+      
+      // Calculate the ratio of conform quantity to planned quantity
+      const totalPlanned = items.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
+      const conformQty = parseFloat(conformQuantity || totalPlanned.toString());
+      const ratio = totalPlanned > 0 ? conformQty / totalPlanned : 1;
+      
+      // For preparation operations, add the actual produced quantity to inventory and create stock moves
+      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        for (const item of items) {
+          const article = await storage.getArticle(item.articleId);
+          if (!article) continue;
+
+          const plannedQuantity = parseFloat(item.quantity || '0');
+          const actualQuantity = plannedQuantity * ratio; // Apply the conform ratio
+          
+          // Create stock move for produced quantity
+          const stockMoveData = {
+            type: 'in',
+            status: 'done',
+            articleId: article.id,
+            quantity: actualQuantity.toString(),
+            unit: article.unit,
+            fromStorageZoneId: null,
+            toStorageZoneId: article.storageZoneId,
+            reason: `Production par préparation ${operation.code}`,
+            notes: `Production de ${article.name} - Quantité conforme: ${actualQuantity}`,
+            operationId: operation.id,
+            operationItemId: item.id,
+            createdBy: operation.operatorId,
+            doneBy: operation.operatorId,
+          };
+
+          await storage.createStockMove(stockMoveData);
+        }
+      }
+
+      // Create waste operation if there's waste
+      if (conformQty < totalPlanned && operation.type === 'preparation') {
+        const wasteQuantity = totalPlanned - conformQty;
+        
+        const wasteOperation = {
+          type: 'ajustement_rebut',
+          status: 'completed',
+          operatorId: operation.operatorId,
+          scheduledDate: new Date().toISOString(),
+          notes: `Rebut de préparation ${operation.code}: ${wasteReason || 'Aucune raison spécifiée'}`
+        };
+
+        const wasteItems = items.map((item) => {
+          const plannedQuantity = parseFloat(item.quantity || '0');
+          const wasteItemQuantity = (plannedQuantity * wasteQuantity) / totalPlanned;
+          
+          return {
+            articleId: item.articleId,
+            quantity: wasteItemQuantity.toString(),
+            unitCost: item.unitCost || '0',
+            totalCost: (parseFloat(item.unitCost || '0') * wasteItemQuantity).toString(),
+            notes: `Rebut de préparation ${operation.code}`,
+            wasteReason: wasteReason || 'Aucune raison spécifiée',
+            operationId: 0 // Sera remplacé automatiquement par createInventoryOperationWithItems
+          };
+        });
+
+        const wasteOp = await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
+        
+        // Create stock moves for waste
+        for (const wasteItem of wasteItems) {
+          const wasteArticle = await storage.getArticle(wasteItem.articleId);
+          if (!wasteArticle) continue;
+
+          const wasteMoveData = {
+            type: 'out',
+            status: 'done',
+            articleId: wasteArticle.id,
+            quantity: wasteItem.quantity,
+            unit: wasteArticle.unit,
+            fromStorageZoneId: wasteArticle.storageZoneId,
+            toStorageZoneId: null,
+            reason: `Rebut de préparation ${operation.code}`,
+            notes: `Rebut: ${wasteReason || 'Aucune raison spécifiée'}`,
+            operationId: wasteOp.id,
+            createdBy: operation.operatorId,
+            doneBy: operation.operatorId,
+          };
+
+          await storage.createStockMove(wasteMoveData);
+        }
+      }
+
+      res.json(updatedOperation);
+    } catch (error) {
+      console.error("Error completing inventory operation:", error);
+      res.status(500).json({ message: "Failed to complete inventory operation" });
     }
   });
 
@@ -1665,6 +1956,411 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting reception:", error);
       res.status(500).json({ message: "Failed to delete reception" });
+    }
+  });
+
+  // ============ ENDPOINTS POUR LA GESTION AVANCEE DES STOCKS ============
+
+  // Obtenir l'historique des mouvements d'un article
+  app.get("/api/articles/:id/stock-history", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const moves = await storage.getArticleStockHistory(id, limit);
+      
+      res.json(moves);
+    } catch (error) {
+      console.error("Error fetching article stock history:", error);
+      res.status(500).json({ message: "Failed to fetch stock history" });
+    }
+  });
+
+  // Obtenir le stock par zone pour un article
+  app.get("/api/articles/:id/stock-by-zone", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const stockByZone = await storage.getArticleStockByZone(id);
+      res.json(stockByZone);
+    } catch (error) {
+      console.error("Error fetching article stock by zone:", error);
+      res.status(500).json({ message: "Failed to fetch stock by zone" });
+    }
+  });
+
+  // Obtenir les lots d'un article
+  app.get("/api/articles/:id/lots", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const lots = await storage.getArticleLots(id);
+      res.json(lots);
+    } catch (error) {
+      console.error("Error fetching article lots:", error);
+      res.status(500).json({ message: "Failed to fetch lots" });
+    }
+  });
+
+  // Obtenir les réservations d'un article
+  app.get("/api/articles/:id/reservations", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const reservations = await storage.getArticleReservations(id);
+      res.json(reservations);
+    } catch (error) {
+      console.error("Error fetching article reservations:", error);
+      res.status(500).json({ message: "Failed to fetch reservations" });
+    }
+  });
+
+  // Obtenir le stock disponible d'un article
+  app.get("/api/articles/:id/available-stock", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const availableStock = await storage.getAvailableStock(id);
+      res.json({ availableStock });
+    } catch (error) {
+      console.error("Error fetching available stock:", error);
+      res.status(500).json({ message: "Failed to fetch available stock" });
+    }
+  });
+
+  // Obtenir le rapport de traçabilité d'un article
+  app.get("/api/articles/:id/traceability", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const { startDate, endDate } = req.query;
+      const report = await storage.getArticleTraceabilityReport(
+        id, 
+        startDate as string, 
+        endDate as string
+      );
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching traceability report:", error);
+      res.status(500).json({ message: "Failed to fetch traceability report" });
+    }
+  });
+
+  // Créer un mouvement de stock
+  app.post("/api/stock-moves", async (req, res) => {
+    try {
+      const moveData = req.body;
+      
+      // Validation des données requises
+      if (!moveData.articleId || !moveData.type || !moveData.quantity || !moveData.unit) {
+        return res.status(400).json({ 
+          message: "Missing required fields: articleId, type, quantity, unit" 
+        });
+      }
+
+      const newMove = await storage.createStockMove(moveData);
+      res.status(201).json(newMove);
+    } catch (error) {
+      console.error("Error creating stock move:", error);
+      res.status(500).json({ message: "Failed to create stock move" });
+    }
+  });
+
+  // Confirmer un mouvement de stock
+  app.patch("/api/stock-moves/:id/confirm", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid move ID" });
+      }
+
+      const { confirmedBy } = req.body;
+      if (!confirmedBy) {
+        return res.status(400).json({ message: "confirmedBy is required" });
+      }
+
+      const updatedMove = await storage.confirmStockMove(id, confirmedBy);
+      res.json(updatedMove);
+    } catch (error) {
+      console.error("Error confirming stock move:", error);
+      res.status(500).json({ message: "Failed to confirm stock move" });
+    }
+  });
+
+  // Valider un mouvement de stock
+  app.patch("/api/stock-moves/:id/validate", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid move ID" });
+      }
+
+      const { doneBy } = req.body;
+      if (!doneBy) {
+        return res.status(400).json({ message: "doneBy is required" });
+      }
+
+      const updatedMove = await storage.validateStockMove(id, doneBy);
+      res.json(updatedMove);
+    } catch (error) {
+      console.error("Error validating stock move:", error);
+      res.status(500).json({ message: "Failed to validate stock move" });
+    }
+  });
+
+  // Créer un lot
+  app.post("/api/stock-lots", async (req, res) => {
+    try {
+      const lotData = req.body;
+      
+      // Validation des données requises
+      if (!lotData.articleId || !lotData.lotNumber || !lotData.initialQuantity || !lotData.unit) {
+        return res.status(400).json({ 
+          message: "Missing required fields: articleId, lotNumber, initialQuantity, unit" 
+        });
+      }
+
+      const newLot = await storage.createStockLot(lotData);
+      res.status(201).json(newLot);
+    } catch (error) {
+      console.error("Error creating stock lot:", error);
+      res.status(500).json({ message: "Failed to create stock lot" });
+    }
+  });
+
+  // Créer un mouvement de lot
+  app.post("/api/stock-lot-moves", async (req, res) => {
+    try {
+      const lotMoveData = req.body;
+      
+      // Validation des données requises
+      if (!lotMoveData.lotId || !lotMoveData.moveId || !lotMoveData.quantity) {
+        return res.status(400).json({ 
+          message: "Missing required fields: lotId, moveId, quantity" 
+        });
+      }
+
+      const newLotMove = await storage.createStockLotMove(lotMoveData);
+      res.status(201).json(newLotMove);
+    } catch (error) {
+      console.error("Error creating stock lot move:", error);
+      res.status(500).json({ message: "Failed to create stock lot move" });
+    }
+  });
+
+  // Créer un ajustement de stock
+  app.post("/api/stock-adjustments", async (req, res) => {
+    try {
+      const adjustmentData = req.body;
+      
+      // Validation des données requises
+      if (!adjustmentData.articleId || !adjustmentData.type || !adjustmentData.systemQuantity || 
+          !adjustmentData.actualQuantity || !adjustmentData.reason) {
+        return res.status(400).json({ 
+          message: "Missing required fields: articleId, type, systemQuantity, actualQuantity, reason" 
+        });
+      }
+
+      // Calculer la différence
+      const systemQty = parseFloat(adjustmentData.systemQuantity);
+      const actualQty = parseFloat(adjustmentData.actualQuantity);
+      adjustmentData.difference = (actualQty - systemQty).toString();
+
+      const newAdjustment = await storage.createStockAdjustment(adjustmentData);
+      res.status(201).json(newAdjustment);
+    } catch (error) {
+      console.error("Error creating stock adjustment:", error);
+      res.status(500).json({ message: "Failed to create stock adjustment" });
+    }
+  });
+
+  // Confirmer un ajustement de stock
+  app.patch("/api/stock-adjustments/:id/confirm", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid adjustment ID" });
+      }
+
+      const { confirmedBy } = req.body;
+      if (!confirmedBy) {
+        return res.status(400).json({ message: "confirmedBy is required" });
+      }
+
+      const updatedAdjustment = await storage.confirmStockAdjustment(id, confirmedBy);
+      res.json(updatedAdjustment);
+    } catch (error) {
+      console.error("Error confirming stock adjustment:", error);
+      res.status(500).json({ message: "Failed to confirm stock adjustment" });
+    }
+  });
+
+  // Créer une réservation de stock
+  app.post("/api/stock-reservations", async (req, res) => {
+    try {
+      const reservationData = req.body;
+      
+      // Validation des données requises
+      if (!reservationData.articleId || !reservationData.orderId || !reservationData.reservedQuantity) {
+        return res.status(400).json({ 
+          message: "Missing required fields: articleId, orderId, reservedQuantity" 
+        });
+      }
+
+      const newReservation = await storage.createStockReservation(reservationData);
+      res.status(201).json(newReservation);
+    } catch (error) {
+      console.error("Error creating stock reservation:", error);
+      res.status(500).json({ message: "Failed to create stock reservation" });
+    }
+  });
+
+  // Libérer une réservation de stock
+  app.patch("/api/stock-reservations/:id/release", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid reservation ID" });
+      }
+
+      const updatedReservation = await storage.releaseStockReservation(id);
+      res.json(updatedReservation);
+    } catch (error) {
+      console.error("Error releasing stock reservation:", error);
+      res.status(500).json({ message: "Failed to release stock reservation" });
+    }
+  });
+
+  // Obtenir les réservations d'une opération d'inventaire
+  app.get("/api/inventory-operations/:id/reservations", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const reservations = await storage.getReservationsForOperation(id);
+      res.json(reservations);
+    } catch (error) {
+      console.error("Error getting operation reservations:", error);
+      res.status(500).json({ message: "Failed to get operation reservations" });
+    }
+  });
+
+  // Créer des réservations d'ingrédients pour une préparation
+  app.post("/api/inventory-operations/:id/reservations", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const operation = await storage.getInventoryOperation(id);
+      if (!operation) {
+        return res.status(404).json({ message: "Inventory operation not found" });
+      }
+
+      if (operation.type !== 'preparation' && operation.type !== 'preparation_reliquat') {
+        return res.status(400).json({ message: "Operation must be a preparation type" });
+      }
+
+      const items = await storage.getInventoryOperationItems(id);
+      const reservations = await storage.createIngredientReservationsForPreparation(id, items);
+      
+      res.status(201).json({ 
+        message: "Ingredient reservations created successfully", 
+        reservations 
+      });
+    } catch (error) {
+      console.error("Error creating ingredient reservations:", error);
+      res.status(500).json({ 
+        message: "Failed to create ingredient reservations",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Endpoint pour vérifier la disponibilité d'un article
+  app.get("/api/articles/:id/stock-details", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const stockDetails = await storage.getArticleStockDetails(id);
+      res.json(stockDetails);
+    } catch (error) {
+      console.error("Error getting article stock details:", error);
+      res.status(500).json({ message: "Failed to get article stock details" });
+    }
+  });
+
+  // Endpoint pour vérifier la disponibilité des ingrédients d'une recette
+  app.post("/api/recipes/:id/check-availability", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid recipe ID" });
+      }
+
+      const { plannedQuantity } = req.body;
+      if (!plannedQuantity || isNaN(parseFloat(plannedQuantity))) {
+        return res.status(400).json({ message: "Invalid planned quantity" });
+      }
+
+      const availability = await storage.checkRecipeIngredientsAvailability(id, parseFloat(plannedQuantity));
+      res.json(availability);
+    } catch (error) {
+      console.error("Error checking recipe availability:", error);
+      res.status(500).json({ message: "Failed to check recipe availability" });
+    }
+  });
+
+  // Endpoint pour vérifier si un article a suffisamment de stock
+  app.post("/api/articles/:id/check-stock", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const { requiredQuantity } = req.body;
+      if (!requiredQuantity || isNaN(parseFloat(requiredQuantity))) {
+        return res.status(400).json({ message: "Invalid required quantity" });
+      }
+
+      const hasEnough = await storage.hasEnoughAvailableStock(id, parseFloat(requiredQuantity));
+      const availableStock = await storage.getAvailableStock(id);
+      
+      res.json({
+        hasEnough,
+        availableStock,
+        requiredQuantity: parseFloat(requiredQuantity),
+        shortfall: Math.max(0, parseFloat(requiredQuantity) - availableStock)
+      });
+    } catch (error) {
+      console.error("Error checking article stock:", error);
+      res.status(500).json({ message: "Failed to check article stock" });
     }
   });
 

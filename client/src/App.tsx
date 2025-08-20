@@ -47,6 +47,7 @@ import { Layout } from "@/components/layout";
 import { useState, lazy } from "react";
 import ClientOrdersPage from "./pages/orders-clients";
 import PreparationPage from "./pages/prepration";
+import PreparateurPreparationsPage from "./pages/preparateur-preparations";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -180,6 +181,7 @@ function ProtectedRouter() {
       <Route path="/deliveries" component={DeliveriesPage} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route path="/preparation" component={PreparationPage} />
+      <Route path="/preparateur-preparations" component={PreparateurPreparationsPage} />
       <Route component={NotFound} />
     </Switch>
   );

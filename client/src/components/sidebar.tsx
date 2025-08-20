@@ -28,15 +28,12 @@ import {
   Leaf,
   FileText,
 } from "lucide-react";
-import { storageLocations } from "@/../../shared/schema";
-
-type StorageLocation = typeof storageLocations.$inferSelect;
 
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const { data: storageLocations } = useQuery<StorageLocation[]>({
+  const { data: storageLocations } = useQuery<any[]>({
     queryKey: ["/api/storage-locations"],
   });
 
@@ -254,6 +251,14 @@ export function Sidebar() {
       order: 0,
       group: "Achats",
     },
+    {
+      path: "/preparateur-preparations",
+      label: "Mes Préparations",
+      icon: "fas fa-chef-hat",
+      lucideIcon: ChefHat,
+      order: 0,
+      group: "Production",
+    },
   ];
 
   // Filter navigation based on user role
@@ -266,7 +271,7 @@ export function Sidebar() {
       case "livreur":
         return ["/"].includes(item.path); // Only dashboard for deliverers
       case "preparateur":
-        return ["/production", "/orders"].includes(item.path);
+        return ["/production", "/orders", "/preparateur-preparations"].includes(item.path);
       case "admin":
         return true; // admin has access to everything
       case "gerant":
@@ -288,7 +293,7 @@ export function Sidebar() {
   }, {} as Record<string, typeof filteredNavItems>);
 
   // Define group order for consistent display
-  const groupOrder = ["Principal", "Ventes", "Achats", "Inventaire", "admin"];
+  const groupOrder = ["Principal", "Ventes", "Achats", "Inventaire", "Production", "admin"];
   const sortedGroupEntries = Object.entries(groupedMenu).sort(([a], [b]) => {
     const indexA = groupOrder.indexOf(a);
     const indexB = groupOrder.indexOf(b);

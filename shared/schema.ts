@@ -758,7 +758,7 @@ export const updateOrderWithItemsSchema = z.object({
   items: z.array(insertOrderItemSchema).min(1, "Au moins un article est requis."),
 });
 export const insertInventoryOperationSchema = createInsertSchema(inventoryOperations).omit({ id: true, code: true, createdAt: true, updatedAt: true });
-export const insertInventoryOperationItemSchema = createInsertSchema(inventoryOperationItems).omit({ id: true, createdAt: true });
+export const insertInventoryOperationItemSchema = createInsertSchema(inventoryOperationItems).omit({ id: true, operationId: true, createdAt: true });
 export const updateInventoryOperationWithItemsSchema = z.object({
   operation: insertInventoryOperationSchema.omit({ createdBy: true }).partial(),
   items: z.array(insertInventoryOperationItemSchema).min(1, "Au moins un article est requis."),
@@ -795,3 +795,311 @@ export type AccountingEntry = typeof accountingEntries.$inferSelect;
 export type InsertAccountingEntry = z.infer<typeof insertAccountingEntrySchema>;
 export type AccountingEntryLine = typeof accountingEntryLines.$inferSelect;
 export type InsertAccountingEntryLine = z.infer<typeof insertAccountingEntryLineSchema>;
+
+// ============ MOUVEMENTS DE STOCK (TRACABILITE COMPLETE) ============
+
+// Table pour la traçabilité complète des mouvements de stock (comme Odoo)
+export const stockMoves = pgTable("stock_moves", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // MOVE-000001
+  type: text("type").notNull(), // 'in', 'out', 'internal', 'adjustment'
+  status: text("status").notNull().default("draft"), // 'draft', 'confirmed', 'done', 'cancelled'
+  
+  // Article et quantités
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  unit: text("unit").notNull(),
+  
+  // Zones de stockage (origine et destination)
+  fromStorageZoneId: integer("from_storage_zone_id").references(() => storageZones.id),
+  toStorageZoneId: integer("to_storage_zone_id").references(() => storageZones.id),
+  
+  // Stock avant et après le mouvement
+  stockBefore: decimal("stock_before", { precision: 10, scale: 3 }),
+  stockAfter: decimal("stock_after", { precision: 10, scale: 3 }),
+  
+  // Coûts et valorisation
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }),
+  
+  // Références aux opérations
+  operationId: integer("operation_id").references(() => inventoryOperations.id),
+  operationItemId: integer("operation_item_id").references(() => inventoryOperationItems.id),
+  orderId: integer("order_id").references(() => orders.id),
+  orderItemId: integer("order_item_id"), // Référence aux lignes de commande
+  
+  // Informations de traçabilité
+  lotNumber: text("lot_number"), // Numéro de lot
+  expiryDate: timestamp("expiry_date", { mode: 'string' }), // Date d'expiration
+  productionDate: timestamp("production_date", { mode: 'string' }), // Date de production
+  
+  // Raisons et notes
+  reason: text("reason"), // Raison du mouvement (réception, préparation, ajustement, etc.)
+  notes: text("notes"),
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  confirmedBy: integer("confirmed_by").references(() => users.id),
+  doneBy: integer("done_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  confirmedAt: timestamp("confirmed_at", { mode: 'string' }),
+  doneAt: timestamp("done_at", { mode: 'string' }),
+});
+
+// Table pour les lots/séries (traçabilité par lot)
+export const stockLots = pgTable("stock_lots", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // LOT-000001
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  lotNumber: text("lot_number").notNull(),
+  
+  // Informations du lot
+  productionDate: timestamp("production_date", { mode: 'string' }),
+  expiryDate: timestamp("expiry_date", { mode: 'string' }),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  
+  // Quantités
+  initialQuantity: decimal("initial_quantity", { precision: 10, scale: 3 }).notNull(),
+  currentQuantity: decimal("current_quantity", { precision: 10, scale: 3 }).notNull(),
+  unit: text("unit").notNull(),
+  
+  // Zone de stockage
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
+  
+  // Coût
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  
+  // Statut
+  status: text("status").notNull().default("active"), // 'active', 'expired', 'consumed'
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Table pour les mouvements de lots
+export const stockLotMoves = pgTable("stock_lot_moves", {
+  id: serial("id").primaryKey(),
+  lotId: integer("lot_id").references(() => stockLots.id).notNull(),
+  moveId: integer("move_id").references(() => stockMoves.id).notNull(),
+  
+  // Quantités
+  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  
+  // Stock avant et après
+  lotStockBefore: decimal("lot_stock_before", { precision: 10, scale: 3 }),
+  lotStockAfter: decimal("lot_stock_after", { precision: 10, scale: 3 }),
+  
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// Table pour les ajustements de stock (inventaire physique)
+export const stockAdjustments = pgTable("stock_adjustments", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // ADJ-000001
+  type: text("type").notNull(), // 'inventory', 'adjustment', 'waste', 'loss'
+  status: text("status").notNull().default("draft"), // 'draft', 'confirmed', 'done'
+  
+  // Article et quantités
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
+  
+  // Quantités système vs réel
+  systemQuantity: decimal("system_quantity", { precision: 10, scale: 3 }).notNull(),
+  actualQuantity: decimal("actual_quantity", { precision: 10, scale: 3 }).notNull(),
+  difference: decimal("difference", { precision: 10, scale: 3 }).notNull(), // actual - system
+  
+  // Raison de l'ajustement
+  reason: text("reason").notNull(), // 'inventory', 'waste', 'loss', 'error', 'other'
+  description: text("description"),
+  
+  // Audit
+  createdBy: integer("created_by").references(() => users.id),
+  confirmedBy: integer("confirmed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+  confirmedAt: timestamp("confirmed_at", { mode: 'string' }),
+});
+
+// Table pour les réservations de stock (pour les commandes et préparations)
+export const stockReservations = pgTable("stock_reservations", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+  
+  // Références (peut être une commande OU une opération d'inventaire)
+  orderId: integer("order_id").references(() => orders.id), // Optionnel pour les préparations
+  orderItemId: integer("order_item_id"), // Référence à la ligne de commande
+  inventoryOperationId: integer("inventory_operation_id").references(() => inventoryOperations.id, { onDelete: 'cascade' }), // Pour les préparations
+  
+  // Quantités
+  reservedQuantity: decimal("reserved_quantity", { precision: 10, scale: 3 }).notNull(),
+  deliveredQuantity: decimal("delivered_quantity", { precision: 10, scale: 3 }).default("0.00"),
+  
+  // Statut
+  status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
+  
+  // Type de réservation
+  reservationType: text("reservation_type").notNull().default("order"), // 'order', 'preparation'
+  
+  // Dates
+  reservedAt: timestamp("reserved_at", { mode: 'string' }).defaultNow(),
+  expiresAt: timestamp("expires_at", { mode: 'string' }), // Expiration de la réservation
+  
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+});
+
+// ============ RELATIONS ============
+
+export const stockMovesRelations = relations(stockMoves, ({ one, many }) => ({
+  article: one(articles, {
+    fields: [stockMoves.articleId],
+    references: [articles.id],
+  }),
+  fromStorageZone: one(storageZones, {
+    fields: [stockMoves.fromStorageZoneId],
+    references: [storageZones.id],
+  }),
+  toStorageZone: one(storageZones, {
+    fields: [stockMoves.toStorageZoneId],
+    references: [storageZones.id],
+  }),
+  operation: one(inventoryOperations, {
+    fields: [stockMoves.operationId],
+    references: [inventoryOperations.id],
+  }),
+  order: one(orders, {
+    fields: [stockMoves.orderId],
+    references: [orders.id],
+  }),
+  createdByUser: one(users, {
+    fields: [stockMoves.createdBy],
+    references: [users.id],
+  }),
+  confirmedByUser: one(users, {
+    fields: [stockMoves.confirmedBy],
+    references: [users.id],
+  }),
+  doneByUser: one(users, {
+    fields: [stockMoves.doneBy],
+    references: [users.id],
+  }),
+  lotMoves: many(stockLotMoves),
+}));
+
+export const stockLotsRelations = relations(stockLots, ({ one, many }) => ({
+  article: one(articles, {
+    fields: [stockLots.articleId],
+    references: [articles.id],
+  }),
+  storageZone: one(storageZones, {
+    fields: [stockLots.storageZoneId],
+    references: [storageZones.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [stockLots.supplierId],
+    references: [suppliers.id],
+  }),
+  lotMoves: many(stockLotMoves),
+}));
+
+export const stockLotMovesRelations = relations(stockLotMoves, ({ one }) => ({
+  lot: one(stockLots, {
+    fields: [stockLotMoves.lotId],
+    references: [stockLots.id],
+  }),
+  move: one(stockMoves, {
+    fields: [stockLotMoves.moveId],
+    references: [stockMoves.id],
+  }),
+}));
+
+export const stockAdjustmentsRelations = relations(stockAdjustments, ({ one }) => ({
+  article: one(articles, {
+    fields: [stockAdjustments.articleId],
+    references: [articles.id],
+  }),
+  storageZone: one(storageZones, {
+    fields: [stockAdjustments.storageZoneId],
+    references: [storageZones.id],
+  }),
+  createdByUser: one(users, {
+    fields: [stockAdjustments.createdBy],
+    references: [users.id],
+  }),
+  confirmedByUser: one(users, {
+    fields: [stockAdjustments.confirmedBy],
+    references: [users.id],
+  }),
+}));
+
+export const stockReservationsRelations = relations(stockReservations, ({ one }) => ({
+  article: one(articles, {
+    fields: [stockReservations.articleId],
+    references: [articles.id],
+  }),
+  order: one(orders, {
+    fields: [stockReservations.orderId],
+    references: [orders.id],
+  }),
+  inventoryOperation: one(inventoryOperations, {
+    fields: [stockReservations.inventoryOperationId],
+    references: [inventoryOperations.id],
+    // Cascade delete is handled at the database level with onDelete: 'cascade'
+  }),
+}));
+
+// ============ SCHEMAS D'INSERTION ============
+
+export const insertStockMoveSchema = createInsertSchema(stockMoves).omit({ 
+  id: true, 
+  code: true, 
+  createdAt: true, 
+  confirmedAt: true, 
+  doneAt: true 
+});
+
+export const insertStockLotSchema = createInsertSchema(stockLots).omit({ 
+  id: true, 
+  code: true, 
+  createdAt: true 
+});
+
+export const insertStockLotMoveSchema = createInsertSchema(stockLotMoves).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export const insertStockAdjustmentSchema = createInsertSchema(stockAdjustments).omit({ 
+  id: true, 
+  code: true, 
+  createdAt: true, 
+  confirmedAt: true 
+});
+
+export const insertStockReservationSchema = createInsertSchema(stockReservations).omit({ 
+  id: true, 
+  createdAt: true 
+}).extend({
+  // Validation : soit orderId soit inventoryOperationId doit être présent
+  orderId: z.union([z.number(), z.null()]).optional(),
+  inventoryOperationId: z.union([z.number(), z.null()]).optional(),
+  reservationType: z.enum(['order', 'preparation']).default('order'),
+}).refine((data) => {
+  // Au moins une des références doit être présente
+  return data.orderId !== null || data.inventoryOperationId !== null;
+}, {
+  message: "Either orderId or inventoryOperationId must be provided",
+  path: ["orderId", "inventoryOperationId"]
+});
+
+// ============ TYPES ============
+
+export type StockMove = typeof stockMoves.$inferSelect;
+export type InsertStockMove = z.infer<typeof insertStockMoveSchema>;
+export type StockLot = typeof stockLots.$inferSelect;
+export type InsertStockLot = z.infer<typeof insertStockLotSchema>;
+export type StockLotMove = typeof stockLotMoves.$inferSelect;
+export type InsertStockLotMove = z.infer<typeof insertStockLotMoveSchema>;
+export type StockAdjustment = typeof stockAdjustments.$inferSelect;
+export type InsertStockAdjustment = z.infer<typeof insertStockAdjustmentSchema>;
+export type StockReservation = typeof stockReservations.$inferSelect;
+export type InsertStockReservation = z.infer<typeof insertStockReservationSchema>;
