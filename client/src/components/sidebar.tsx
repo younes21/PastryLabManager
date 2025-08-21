@@ -408,7 +408,7 @@ export function Sidebar() {
         )}
 
         {/* Navigation avec Accordéon */}
-        <nav className="mt-6 flex-1 px-2 space-y-2">
+        <nav className="mt-6 flex-1 px-2 space-y-2 overflow-y-auto">
           {sortedGroupEntries.map(([groupName, groupItems]) => {
             const isExpanded = shouldGroupBeExpanded(groupItems, groupName);
             const groupActive = isGroupActive(groupItems);
@@ -441,10 +441,10 @@ export function Sidebar() {
                 
                 {/* Group Items - Collapsible */}
                 <div 
-                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                  isExpanded ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
+                }`}
+>
                   <div className="space-y-1 mt-1 ml-2">
                     {groupItems.map((item) => (
                       <div key={item.path}>

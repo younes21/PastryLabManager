@@ -13,6 +13,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Tax, InsertTax } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const taxFormSchema = z.object({
   designation: z.string().min(1, "La désignation est requise"),
@@ -117,7 +118,7 @@ export default function TaxesPage() {
     });
     setDialogOpen(true);
   };
-
+  usePageTitle('Gestion des Taxes');
   if (isLoading) {
     return (
       <div className="p-6">
@@ -133,8 +134,7 @@ export default function TaxesPage() {
     );
   }
 
-  return (
-    <Layout title="Gestion des Taxes">
+ return (
       <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -327,6 +327,6 @@ export default function TaxesPage() {
         )}
       </div>
       </div>
-    </Layout>
+    
   );
 }

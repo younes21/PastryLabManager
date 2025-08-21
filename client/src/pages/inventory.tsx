@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function Inventory() {
   const { data: ingredients, isLoading: ingredientsLoading } = useQuery({
@@ -29,18 +30,18 @@ export default function Inventory() {
     return Math.min((currentStock / maxStock) * 100, 100);
   };
 
+  usePageTitle('Gestion de Stock');
   if (ingredientsLoading || storageLoading) {
     return (
-      <Layout title="Gestion de Stock">
+    
         <div className="px-4 sm:px-6 lg:px-8 pt-8">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
+     
     );
   }
 
-  return (
-    <Layout title="Gestion de Stock">
+ return (
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         {/* Storage Locations Overview */}
         {/* <div className="mb-8">
@@ -166,6 +167,6 @@ export default function Inventory() {
           </Card>
         </div>
       </div>
-    </Layout>
+    
   );
 }

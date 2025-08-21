@@ -14,12 +14,13 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DeliveryMethod, InsertDeliveryMethod } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const deliveryMethodFormSchema = z.object({
   code: z.string().optional(),
   designation: z.string().min(1, "La désignation est requise"),
   description: z.string().optional(),
-  cost: z.string().min(0, "Le coût doit être positif"),
+  price: z.string().min(0, "Le coût doit être positif"),
   estimatedDuration: z.string().optional(),
   active: z.boolean().default(true),
 });
@@ -39,7 +40,7 @@ export default function DeliveryMethodsPage() {
     defaultValues: {
       designation: "",
       description: "",
-      cost: "0",
+      price: "0",
       estimatedDuration: "",
       active: true,
     },
@@ -87,7 +88,7 @@ export default function DeliveryMethodsPage() {
   const onSubmit = (data: z.infer<typeof deliveryMethodFormSchema>) => {
     const formattedData = {
       ...data,
-      cost: data.cost,
+      price: data.price,
     };
 
     if (editingMethod) {
@@ -102,8 +103,7 @@ export default function DeliveryMethodsPage() {
     form.reset({
       designation: method.designation,
       description: method.description || "",
-      cost: method.cost || "0",
-      estimatedDuration: method.estimatedDuration || "",
+      price: method.price || "0",
       active: method.active !== false,
     });
     setDialogOpen(true);
@@ -114,25 +114,22 @@ export default function DeliveryMethodsPage() {
     form.reset({
       designation: "",
       description: "",
-      cost: "0",
+      price: "0",
       estimatedDuration: "",
       active: true,
     });
     setDialogOpen(true);
   };
-
+  usePageTitle('Gestion des Méthodes de Livraison'); 
   if (isLoading) {
     return (
-      <Layout title="Gestion des Méthodes de Livraison">
         <div className="p-6">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
     );
   }
 
-  return (
-    <Layout title="Gestion des Méthodes de Livraison">
+return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -183,31 +180,19 @@ export default function DeliveryMethodsPage() {
 
                 <FormField
                   control={form.control}
-                  name="cost"
+                  name="price"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Coût (DA)</FormLabel>
                       <FormControl>
-                        <Input {...field} type="text" data-testid="input-cost" />
+                        <Input {...field} type="text" data-testid="input-price" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="estimatedDuration"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Durée Estimée</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Ex: 24-48h" data-testid="input-duration" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              
 
                 <FormField
                   control={form.control}
@@ -289,16 +274,12 @@ export default function DeliveryMethodsPage() {
                       <span className="font-medium">Description:</span> {method.description}
                     </p>
                   )}
-                  {method.cost && (
+                  {method.price && (
                     <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Coût:</span> {method.cost} DA
+                      <span className="font-medium">Coût:</span> {method.price} DA
                     </p>
                   )}
-                  {method.estimatedDuration && (
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Durée:</span> {method.estimatedDuration}
-                    </p>
-                  )}
+                 
                   <p className="text-gray-600 dark:text-gray-300">
                     <span className="font-medium">Statut:</span>{" "}
                     <span className={method.active !== false ? "text-green-600" : "text-red-600"}>
@@ -311,6 +292,6 @@ export default function DeliveryMethodsPage() {
           )}
         </div>
       </div>
-    </Layout>
+    
   );
 }

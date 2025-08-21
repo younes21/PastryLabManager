@@ -22,6 +22,7 @@ import { RecipeForm } from "@/components/recipe-form";
 import { apiRequest } from "@/lib/queryClient";
 import type { Recipe, InsertRecipe, Article } from "@shared/schema";
 import { Layout } from "@/components/layout";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function RecipesPage() {
   const { toast } = useToast();
@@ -182,22 +183,21 @@ export default function RecipesPage() {
       setSortOrder("asc");
     }
   };
-
+  usePageTitle('Recettes');
   // Affichage du formulaire en dialog
   if (showCreateForm || showEditForm) {
     return (
-      <Layout title="Recettes">
+    
         <RecipeForm
           recipe={selectedRecipe || undefined}
           onSubmit={handleSubmit}
           onCancel={handleCancel}
         />
-      </Layout>
+   
     );
   }
 
-  return (
-    <Layout title="Recettes">
+ return (
       <div>
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
@@ -381,6 +381,6 @@ export default function RecipesPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    
   );
 }

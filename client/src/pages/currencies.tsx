@@ -13,6 +13,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Currency, InsertCurrency } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const currencyFormSchema = z.object({
   code: z.string().min(3, "Le code doit contenir au moins 3 caractères").max(3, "Le code doit contenir exactement 3 caractères"),
@@ -96,7 +97,7 @@ export default function CurrenciesPage() {
       code: currency.code,
       name: currency.name,
       symbol: currency.symbol,
-      rate: parseFloat(currency.exchangeRate || '1'),
+      rate: parseFloat(currency.rate || '1'),
       isBase: currency.isBase || false,
       active: currency.active || true,
     });
@@ -121,7 +122,7 @@ export default function CurrenciesPage() {
     });
     setDialogOpen(true);
   };
-
+  usePageTitle('Gestion des Devises');
   if (isLoading) {
     return (
       <div className="p-6">
@@ -137,8 +138,7 @@ export default function CurrenciesPage() {
     );
   }
 
-  return (
-    <Layout title="Gestion des Devises">
+ return (
       <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -312,7 +312,7 @@ export default function CurrenciesPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {currencies?.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <p className="text-lg">Aucune devise configurée</p>
@@ -344,7 +344,7 @@ export default function CurrenciesPage() {
                     )}
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Taux: {parseFloat(currency.exchangeRate || '1').toFixed(4)}
+                    Taux: {parseFloat(currency.rate || '1').toFixed(4)}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -373,6 +373,6 @@ export default function CurrenciesPage() {
         )}
       </div>
       </div>
-    </Layout>
+    
   );
 }

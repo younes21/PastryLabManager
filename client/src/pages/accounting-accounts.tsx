@@ -15,10 +15,11 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { AccountingAccount, InsertAccountingAccount } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const accountFormSchema = z.object({
   designation: z.string().min(1, "La désignation est requise"),
-  code: z.string().min(1, "Le code est requis"),
+  number: z.string().min(1, "Le code est requis"),
   description: z.string().optional(),
   type: z.string().min(1, "Le type est requis"),
   nature: z.string().min(1, "La nature est requise"),
@@ -51,7 +52,7 @@ export default function AccountingAccountsPage() {
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
       designation: "",
-      code: "",
+      number: "",
       description: "",
       type: "",
       nature: "",
@@ -130,18 +131,20 @@ export default function AccountingAccountsPage() {
     setDialogOpen(true);
   };
 
+  usePageTitle('Gestion des Comptes Comptables');
+
   if (isLoading) {
     return (
-      <Layout title="Gestion des Comptes Comptables">
+      
         <div className="p-6">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
+     
     );
   }
 
-  return (
-    <Layout title="Gestion des Comptes Comptables">
+
+ return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -178,7 +181,7 @@ export default function AccountingAccountsPage() {
 
                 <FormField
                   control={form.control}
-                  name="code"
+                  name="number"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Code comptable</FormLabel>
@@ -327,7 +330,7 @@ export default function AccountingAccountsPage() {
                 </div>
                 <div className="space-y-1 text-sm">
                   <p className="text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Code:</span> {account.code}
+                    <span className="font-medium">Code:</span> {account.number}
                   </p>
                   {account.description && (
                     <p className="text-gray-600 dark:text-gray-300">
@@ -352,6 +355,6 @@ export default function AccountingAccountsPage() {
           )}
         </div>
       </div>
-    </Layout>
+    
   );
 }

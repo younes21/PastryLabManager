@@ -15,6 +15,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { AccountingJournal, InsertAccountingJournal } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const journalFormSchema = z.object({
   code: z.string().optional(),
@@ -120,19 +121,16 @@ export default function AccountingJournalsPage() {
     });
     setDialogOpen(true);
   };
-
+  usePageTitle('Gestion des Journaux Comptables'); 
   if (isLoading) {
     return (
-      <Layout title="Gestion des Journaux Comptables">
         <div className="p-6">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
     );
   }
 
-  return (
-    <Layout title="Gestion des Journaux Comptables">
+return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -301,6 +299,6 @@ export default function AccountingJournalsPage() {
           )}
         </div>
       </div>
-    </Layout>
+    
   );
 }

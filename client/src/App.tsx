@@ -48,6 +48,7 @@ import { useState, lazy } from "react";
 import ClientOrdersPage from "./pages/orders-clients";
 import PreparationPage from "./pages/prepration";
 import PreparateurPreparationsPage from "./pages/preparateur-preparations";
+import { LayoutProvider } from "./contexts/LayoutContext";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -201,7 +202,16 @@ function AppContent() {
     );
   }
 
-  return user ? <ProtectedRouter /> : <LoginPage />;
+  return user ?  
+            <Switch> 
+              <LayoutProvider>
+                <Layout>
+                <ProtectedRouter /> 
+                </Layout>
+              </LayoutProvider>
+          </Switch> 
+  
+         : <LoginPage />;
 }
 
 function App() {

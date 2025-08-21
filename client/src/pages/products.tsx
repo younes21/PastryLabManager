@@ -55,6 +55,7 @@ import {
 import { RecipeDisplay } from "@/components/recipe-display";
 import { Layout } from "@/components/layout";
 import { RecipeForm } from "@/components/recipe-form";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Schéma de validation pour les produits
 const productSchema = insertArticleSchema.extend({
@@ -120,7 +121,7 @@ export default function Products() {
     setSelectedProduct(null);
     setIsEditing(false);
   };
-
+  usePageTitle('Gestion des produits'); 
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -130,8 +131,9 @@ export default function Products() {
       </div>
     );
   }
-  return (<Layout title="Gestion des produits">  
   
+  return (  
+  <>
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -313,7 +315,8 @@ export default function Products() {
         </DialogContent>
       </Dialog>
     )}
-  </Layout>);
+    </>
+  );
 }
 
 function ProductForm({ product, onSuccess }: { product?: Article | null; onSuccess: () => void }) {

@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
-import { ClientLayout } from '@/components/client-layout';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 
 const PreparateurPreparationsPage = () => {
@@ -925,19 +925,19 @@ const PreparateurPreparationsPage = () => {
 
   if (!user) {
     return (
-      <Layout>
+ 
         <div className="p-6">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900">Accès non autorisé</h1>
             <p className="text-gray-600 mt-2">Vous devez être connecté pour accéder à cette page.</p>
           </div>
         </div>
-      </Layout>
+      
     );
   }
-
+    usePageTitle('Mes Préparations');
   return (
-    <ClientLayout title='Mes Préparations'>
+   
       <div className="p-4">
     
 
@@ -1298,7 +1298,7 @@ const PreparateurPreparationsPage = () => {
           </div>
         )}
       </div>
-    </ClientLayout>
+
   );
 };
 

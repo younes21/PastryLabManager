@@ -15,6 +15,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WorkStation, InsertWorkStation } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const workStationFormSchema = z.object({
   code: z.string().optional(),
@@ -128,18 +129,19 @@ export default function WorkStationsPage() {
     setDialogOpen(true);
   };
 
+  usePageTitle('Gestion des Postes de Travail');
+
   if (isLoading) {
     return (
-      <Layout title="Gestion des Postes de Travail">
+    
         <div className="p-6">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
+
     );
   }
 
-  return (
-    <Layout title="Gestion des Postes de Travail">
+ return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -327,6 +329,6 @@ export default function WorkStationsPage() {
           )}
         </div>
       </div>
-    </Layout>
+    
   );
 }

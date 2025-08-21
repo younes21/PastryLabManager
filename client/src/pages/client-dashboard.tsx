@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { RecipeImage } from "@/components/recipe-image";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function ClientDashboard() {
   const { user } = useAuth();
@@ -144,8 +145,8 @@ export default function ClientDashboard() {
       .reduce((total: number, order: any) => total + parseFloat(order.totalAmount), 0) || 0;
   };
 
-  return (
-    <Layout title="Espace Client">
+usePageTitle('Espace Client');
+ return (
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -361,6 +362,6 @@ export default function ClientDashboard() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    
   );
 }

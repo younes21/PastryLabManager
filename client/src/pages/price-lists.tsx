@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PriceRuleForm } from "@/components/price-rule-form";
 import { Layout } from "@/components/layout";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function PriceListsPage() {
   const { toast } = useToast();
@@ -136,14 +137,13 @@ export default function PriceListsPage() {
       default: return <span className="w-4 h-4 text-center font-bold text-xs">{currency}</span>;
     }
   };
-
+  usePageTitle('Listes de Prix');
   if (priceListsLoading) return <div>Chargement...</div>;
 
-  return (
-    <Layout title="Listes de Prix">
+ return (
       <div className="container mx-auto p-4 space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Listes de Prix</h1>
+        <p >  <span className="hidden md:block ">Creer des prix personnalisé pour vos clients fidèles </span> </p>
           <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-accent hover:bg-accent-hover"  data-testid="button-new-price-list">
@@ -176,8 +176,8 @@ export default function PriceListsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
-                    <SelectItem value="EUR">EUR (Euro)</SelectItem>
-                    <SelectItem value="USD">USD (Dollar)</SelectItem>
+                    {/* <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                    <SelectItem value="USD">USD (Dollar)</SelectItem> */}
                   </SelectContent>
                 </Select>
               </div>
@@ -199,9 +199,9 @@ export default function PriceListsPage() {
       </div>
 
       <Tabs defaultValue="lists" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="lists">Listes de Prix</TabsTrigger>
-          <TabsTrigger value="rules" disabled={!selectedPriceListId}>
+        <TabsList className="grid w-full grid-cols-2 h-12">
+          <TabsTrigger value="lists" className="h-10">Listes de Prix</TabsTrigger>
+          <TabsTrigger value="rules" className="h-10"  disabled={!selectedPriceListId}>
             Règles {selectedPriceListId && `(${priceLists.find(p => p.id === selectedPriceListId)?.designation})`}
           </TabsTrigger>
         </TabsList>
@@ -217,7 +217,7 @@ export default function PriceListsPage() {
                 onClick={() => setSelectedPriceListId(priceList.id)}
                 data-testid={`card-price-list-${priceList.id}`}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="p-4 pb-1">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center space-x-2">
                       <CardTitle className="text-lg">{priceList.designation}</CardTitle>
@@ -255,7 +255,7 @@ export default function PriceListsPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pb-4">
                   <p className="text-sm text-gray-600">
                     Créée le {new Date(priceList.createdAt!).toLocaleDateString("fr-FR")}
                   </p>
@@ -398,8 +398,7 @@ export default function PriceListsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
-                    <SelectItem value="EUR">EUR (Euro)</SelectItem>
-                    <SelectItem value="USD">USD (Dollar)</SelectItem>
+                    
                   </SelectContent>
                 </Select>
               </div>
@@ -420,6 +419,6 @@ export default function PriceListsPage() {
         </DialogContent>
       </Dialog>
       </div>
-    </Layout>
+    
   );
 }

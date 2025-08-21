@@ -601,8 +601,7 @@ export default function SuppliersPage() {
   );
 });
 
-  return (
-    <Layout title="Gestion des Fournisseurs">
+usePageTitle('Gestion des Fournisseurs'); return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -807,6 +806,6 @@ export default function SuppliersPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </Layout>
+    
   );
 }

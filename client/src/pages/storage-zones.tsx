@@ -14,6 +14,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { StorageZone, InsertStorageZone } from "@shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const storageZoneFormSchema = z.object({
   designation: z.string().min(1, "La désignation est requise"),
@@ -118,19 +119,18 @@ export default function StorageZonesPage() {
     });
     setDialogOpen(true);
   };
-
+  usePageTitle('Gestion des Zones de Stockage');
   if (isLoading) {
     return (
-      <Layout title="Gestion des Zones de Stockage">
+    
         <div className="p-6">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
+   
     );
   }
 
-  return (
-    <Layout title="Gestion des Zones de Stockage">
+ return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -309,6 +309,6 @@ export default function StorageZonesPage() {
           )}
         </div>
       </div>
-    </Layout>
+    
   );
 }

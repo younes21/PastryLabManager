@@ -18,6 +18,7 @@ import { z } from "zod";
 import { insertSupplierSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Types pour les fournisseurs
 type Supplier = {
@@ -675,8 +676,8 @@ export default function SuppliersPage() {
     return matchesSearch && matchesType;
   });
 
-  return (
-    <Layout title="Gestion des Fournisseurs">
+usePageTitle('Gestion des Fournisseurs');
+ return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -861,6 +862,6 @@ export default function SuppliersPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </Layout>
+    
   );
 }

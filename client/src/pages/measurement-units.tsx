@@ -15,6 +15,7 @@ import { Plus, Edit, Trash2, Scale } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { MeasurementCategory, MeasurementUnit, InsertMeasurementCategory, InsertMeasurementUnit } from "@/../../shared/schema";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function MeasurementUnitsPage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -221,14 +222,13 @@ export default function MeasurementUnitsPage() {
       : true
   );
 
+  usePageTitle(' Unités de Mesure');
+
   return (
-    <Layout>
       <div className="p-8 space-y-8" data-testid="page-measurement-units">
         <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
-            Unités de Mesure
-          </h1>
+         
           <p className="text-lg text-gray-600">
             Configuration des unités pour le laboratoire
           </p>
@@ -261,7 +261,7 @@ export default function MeasurementUnitsPage() {
         </div>
 
         <Tabs defaultValue="categories" className="space-y-8">
-        <TabsList className="grid w-full grid-cols-2 h-12" data-testid="tabs-list">
+        <TabsList className="grid w-full grid-cols-2 h-12 w-1/2 m-auto" data-testid="tabs-list">
           <TabsTrigger value="categories" className="text-lg font-medium" data-testid="tab-categories">
             Catégories ({categories.length})
           </TabsTrigger>
@@ -345,7 +345,7 @@ export default function MeasurementUnitsPage() {
                 className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
                 data-testid={`card-category-${category.id}`}
               >
-                <CardContent className="p-4">
+               <CardContent className="px-4 py-2">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-800 mb-1">
@@ -425,7 +425,7 @@ export default function MeasurementUnitsPage() {
               <DialogTrigger asChild>
                 <Button 
                   onClick={resetUnitForm} 
-                  className="h-10 px-4 text-base font-medium"
+                  className="bg-accent hover:bg-accent-hover" 
                   data-testid="button-add-unit"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -547,7 +547,7 @@ export default function MeasurementUnitsPage() {
                   className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
                   data-testid={`card-unit-${unit.id}`}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="px-4 py-2">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-1">
@@ -615,6 +615,6 @@ export default function MeasurementUnitsPage() {
         </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    
   );
 }

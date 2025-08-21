@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function Dashboard() {
   const [isProductionModalOpen, setIsProductionModalOpen] = useState(false);
@@ -91,8 +92,8 @@ export default function Dashboard() {
     });
   };
 
-  return (
-    <Layout title="Tableau de bord">
+usePageTitle('Tableau de bord');
+ return (<>
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -352,6 +353,6 @@ export default function Dashboard() {
         isOpen={isProductionModalOpen} 
         onClose={() => setIsProductionModalOpen(false)} 
       />
-    </Layout>
+    </>
   );
 }

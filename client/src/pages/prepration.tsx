@@ -4,6 +4,7 @@ import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
 import ProductSelectionDialog from './dialog-prepration';
 import { useToast } from '@/hooks/use-toast';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 // Ajout utilitaire pour charger les stocks de tous les articles d'une recette
 async function fetchStockDetails(articleIds: number[]): Promise<Record<number, any>> {
@@ -1323,8 +1324,9 @@ const PreparationPage = () => {
   }, [recipeIngredients]);
 
   if (!isEditing) {
+    usePageTitle('Préparations de Produits'); 
     return (
-      <Layout title='Préparations de Produits'>
+    <>
         <div>
           {/* Header */}
           <div className="mx-auto px-4 py-3">
@@ -1536,7 +1538,7 @@ const PreparationPage = () => {
             onSelect={addItemFromDialog}
           />
         )}
-      </Layout>
+      </>
     );
   }
 
@@ -1546,8 +1548,9 @@ const PreparationPage = () => {
     return currentOperation?.code ? `Modifier ${currentOperation.code}` : 'Nouvelle Préparation';
   };
 
+  usePageTitle(`Préparations de Produits > ${getEditTitle()}`); 
   return (
-    <Layout title={`Préparations de Produits > ${getEditTitle()}`}>
+  
       <div>
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
@@ -2123,7 +2126,7 @@ const PreparationPage = () => {
           </div>
         )}
       </div>
-    </Layout>
+    
   );
 };
 

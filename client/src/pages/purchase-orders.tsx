@@ -3,6 +3,7 @@ import { Plus, Save, X, FileText, CreditCard, Trash2, Edit3, ChevronDown, ArrowL
 import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const ReceptionAchatInterface = () => {
   const [operations, setOperations] = useState<any[]>([]);
@@ -356,10 +357,11 @@ const ReceptionAchatInterface = () => {
       </span>
     );
   };
-
+ 
   if (!isEditing) {
+    usePageTitle('Réceptions des achats founisseurs'); 
     return (
-      <Layout title='Réceptions des achats founisseurs'>
+     
       <div >
         {/* Header */}
         
@@ -459,12 +461,12 @@ const ReceptionAchatInterface = () => {
           </div>
         </div>
       </div>
-      </Layout>
+      
     );
   }
-
+  usePageTitle('Réceptions des achats founisseurs > Ajouter des achats founisseurs'); 
   return (
-    <Layout title='Réceptions des achats founisseurs > Ajouter des achats founisseurs'>
+ 
     <div>
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
@@ -761,7 +763,7 @@ const ReceptionAchatInterface = () => {
           </div>
         </div>
       </div>
-    </div></Layout>
+    </div>
   );
 };
 

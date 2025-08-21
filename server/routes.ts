@@ -91,7 +91,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: "Invalid user data" });
     }
   });
+  app.put("/api/users/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userData = req.body;
+      const user = await storage.updateUser(id, userData);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteUser(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
   // Storage Zones routes (replacing Storage Locations)
   app.get("/api/storage-zones", async (req, res) => {
     try {
@@ -565,52 +595,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: "Invalid delivery method data" });
     }
   });
-
-  // Accounting Journals routes
-  app.get("/api/accounting-journals", async (req, res) => {
+  app.put("/api/delivery-methods/:id", async (req, res) => {
     try {
-      const journals = await storage.getAllAccountingJournals();
-      res.json(journals);
+      const id = parseInt(req.params.id);
+      const methodData = req.body;
+      const method = await storage.updateDeliveryMethod(id, methodData);
+      if (!method) {
+        return res.status(404).json({ message: "Delivery method not found" });
+      }
+      res.json(method);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch accounting journals" });
+      res.status(400).json({ message: "Failed to update delivery method" });
     }
   });
 
-  app.post("/api/accounting-journals", async (req, res) => {
+  app.delete("/api/delivery-methods/:id", async (req, res) => {
     try {
-      const journalData = insertAccountingJournalSchema.parse(req.body);
-      const journal = await storage.createAccountingJournal(journalData);
-      res.status(201).json(journal);
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteDeliveryMethod(id);
+      if (!success) {
+        return res.status(404).json({ message: "Delivery method not found" });
+      }
+      res.json({ message: "Delivery method deleted successfully" });
     } catch (error) {
-      res.status(400).json({ message: "Invalid accounting journal data" });
+      res.status(500).json({ message: "Failed to delete delivery method" });
     }
   });
 
-  // Accounting Accounts routes
-  app.get("/api/accounting-accounts", async (req, res) => {
-    try {
-      const accounts = await storage.getAllAccountingAccounts();
-      res.json(accounts);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch accounting accounts" });
-    }
-  });
+// ===== ACCOUNTING JOURNALS ROUTES =====
+app.get("/api/accounting-journals", async (req, res) => {
+  try {
+    const journals = await storage.getAllAccountingJournals();
+    res.json(journals);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch accounting journals" });
+  }
+});
 
-  app.post("/api/accounting-accounts", async (req, res) => {
-    try {
-      const accountData = insertAccountingAccountSchema.parse(req.body);
-      const account = await storage.createAccountingAccount(accountData);
-      res.status(201).json(account);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid accounting account data" });
-    }
-  });
+app.post("/api/accounting-journals", async (req, res) => {
+  try {
+    const journalData = insertAccountingJournalSchema.parse(req.body);
+    const journal = await storage.createAccountingJournal(journalData);
+    res.status(201).json(journal);
+  } catch (error) {
+    res.status(400).json({ message: "Invalid accounting journal data" });
+  }
+});
 
-  // Work Stations routes
+app.put("/api/accounting-journals/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const journalData = req.body;
+    const journal = await storage.updateAccountingJournal(id, journalData);
+    if (!journal) {
+      return res.status(404).json({ message: "Accounting journal not found" });
+    }
+    res.json(journal);
+  } catch (error) {
+    res.status(400).json({ message: "Failed to update accounting journal" });
+  }
+});
+
+app.delete("/api/accounting-journals/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const success = await storage.deleteAccountingJournal(id);
+    if (!success) {
+      return res.status(404).json({ message: "Accounting journal not found" });
+    }
+    res.json({ message: "Accounting journal deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete accounting journal" });
+  }
+});
+
+// ===== ACCOUNTING ACCOUNTS ROUTES =====
+app.get("/api/accounting-accounts", async (req, res) => {
+  try {
+    const accounts = await storage.getAllAccountingAccounts();
+    res.json(accounts);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch accounting accounts" });
+  }
+});
+
+app.post("/api/accounting-accounts", async (req, res) => {
+  try {
+    console.log("Account data received:", req.body);
+    const accountData = insertAccountingAccountSchema.parse(req.body);
+    console.log("Account data parsed:", accountData);
+    const account = await storage.createAccountingAccount(accountData);
+    res.status(201).json(account);
+  } catch (error:any) {
+    console.error("Account creation error:", error);
+    res.status(400).json({ message: "Invalid accounting account data", error: error.message });
+  }
+});
+
+app.put("/api/accounting-accounts/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const accountData = req.body;
+    const account = await storage.updateAccountingAccount(id, accountData);
+    if (!account) {
+      return res.status(404).json({ message: "Accounting account not found" });
+    }
+    res.json(account);
+  } catch (error) {
+    res.status(400).json({ message: "Failed to update accounting account" });
+  }
+});
+
+app.delete("/api/accounting-accounts/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const success = await storage.deleteAccountingAccount(id);
+    if (!success) {
+      return res.status(404).json({ message: "Accounting account not found" });
+    }
+    res.json({ message: "Accounting account deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete accounting account" });
+  }
+});
+
+  // ===== WORK STATIONS ROUTES =====
   app.get("/api/work-stations", async (req, res) => {
     try {
-      const workStations = await storage.getAllWorkStations();
-      res.json(workStations);
+      const stations = await storage.getAllWorkStations();
+      res.json(stations);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch work stations" });
     }
@@ -618,11 +731,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/work-stations", async (req, res) => {
     try {
-      const workStationData = insertWorkStationSchema.parse(req.body);
-      const workStation = await storage.createWorkStation(workStationData);
-      res.status(201).json(workStation);
+      const stationData = insertWorkStationSchema.parse(req.body);
+      const station = await storage.createWorkStation(stationData);
+      res.status(201).json(station);
     } catch (error) {
       res.status(400).json({ message: "Invalid work station data" });
+    }
+  });
+
+  app.put("/api/work-stations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const stationData = req.body;
+      const station = await storage.updateWorkStation(id, stationData);
+      if (!station) {
+        return res.status(404).json({ message: "Work station not found" });
+      }
+      res.json(station);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update work station" });
+    }
+  });
+
+  app.delete("/api/work-stations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteWorkStation(id);
+      if (!success) {
+        return res.status(404).json({ message: "Work station not found" });
+      }
+      res.json({ message: "Work station deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete work station" });
     }
   });
 

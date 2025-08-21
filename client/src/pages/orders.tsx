@@ -27,6 +27,7 @@ import type { Order, Client, Article } from "@shared/schema";
 import { Layout } from "@/components/layout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery as useQueryTanstack } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const orderStatusLabels = {
   draft: "Brouillon",
@@ -230,8 +231,9 @@ export default function OrdersPage() {
       </div>
     );
   }
+  usePageTitle('Gestion des commandes'); 
+  return (
 
-  return (<Layout title="Gestion des commandes">
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex justify-between items-center">
         <div>
@@ -528,7 +530,7 @@ export default function OrdersPage() {
         </DialogContent>
       </Dialog>
     </div>
-  </Layout>);
+  );
 }
 
 function OrderItemsSummary({ orderId, products }: { orderId: number; products: Article[] }) {

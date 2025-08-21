@@ -18,7 +18,7 @@ import { insertClientSchema, type Client, type InsertClient, type PriceList, typ
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ClientLayout } from "@/components/client-layout";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => void }) {
   const { toast } = useToast();
@@ -801,17 +801,17 @@ export default function Clients() {
     setIsDialogOpen(false);
     setSelectedClient(undefined);
   };
-
+  usePageTitle('Gestion des Clients'); 
   if (isLoading) {
     return (
-      <ClientLayout>
+     
         <div className="p-6">Chargement...</div>
-      </ClientLayout>
+    
     );
   }
 
   return (
-    <ClientLayout title="Gestion des Clients">
+ 
       <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -935,6 +935,6 @@ export default function Clients() {
         </CardContent>
       </Card>
       </div>
-    </ClientLayout>
+   
   );
 }

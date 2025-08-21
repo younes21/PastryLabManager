@@ -15,6 +15,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, AlertTriangle, Settings, Users, Package } from "lucide-react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const testEmailSchema = z.object({
   to: z.string().email("Email invalide"),
@@ -126,8 +127,8 @@ export default function EmailConfigPage() {
     { value: "livreur", label: "Livreurs" },
   ];
 
-  return (
-    <Layout title="Configuration Email">
+usePageTitle('Configuration Email'); 
+return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -459,6 +460,6 @@ export default function EmailConfigPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    
   );
 }

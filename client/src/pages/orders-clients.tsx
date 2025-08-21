@@ -30,8 +30,9 @@ import type {
   ArticleCategory,
   Tax,
 } from "@shared/schema";
-import { Layout } from "@/components/layout";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const orderStatusLabels = {
   draft: "Brouillon",
@@ -1118,8 +1119,8 @@ export default function ClientOrdersPage() {
       </div>
     );
   }
-
-  return <Layout title="Gestion des commandes"> {result} </Layout>;
+  usePageTitle('Gestion des commandes'); 
+  return (result) ;
 }
 
 function OrderItemsSummary({ orderId, products }: { orderId: number; products: Article[] }) {

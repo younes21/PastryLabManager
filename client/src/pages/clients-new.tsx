@@ -18,6 +18,7 @@ import { insertClientSchema, type Client, type InsertClient, type PriceList, typ
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 const algerianWilayas = [
   "01 - Adrar", "02 - Chlef", "03 - Laghouat", "04 - Oum El Bouaghi", "05 - Batna",
@@ -611,17 +612,17 @@ export default function Clients() {
     setIsDialogOpen(false);
     setSelectedClient(undefined);
   };
-
+  usePageTitle('Gestion des Clients'); 
   if (isLoading) {
     return (
-      <Layout>
+   
         <div className="p-6">Chargement...</div>
-      </Layout>
+      
     );
   }
 
-  return (
-    <Layout title="Gestion des Clients">
+
+return (
       <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -752,6 +753,6 @@ export default function Clients() {
         </CardContent>
       </Card>
       </div>
-    </Layout>
+    
   );
 }

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { RecipeImage } from "@/components/recipe-image";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function ClientCatalog() {
   const [cart, setCart] = useState<any[]>([]);
@@ -161,18 +162,16 @@ export default function ClientCatalog() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  usePageTitle('Catalogue'); 
   if (isLoading) {
     return (
-      <Layout title="Catalogue">
-        <div className="px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="p-6">
           <div className="text-center">Chargement...</div>
         </div>
-      </Layout>
     );
   }
 
-  return (
-    <Layout title="Catalogue">
+return (
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Catalogue de Pâtisseries</h1>
@@ -433,6 +432,6 @@ export default function ClientCatalog() {
           </DialogContent>
         </Dialog>
       </div>
-    </Layout>
+    
   );
 }

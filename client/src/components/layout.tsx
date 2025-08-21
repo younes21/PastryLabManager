@@ -1,14 +1,21 @@
+
+// ===================================================
+
+// 2. Modifier votre Layout existant
+// components/Layout.tsx
+import { useLayout } from "@/contexts/LayoutContext";
 import { Sidebar } from "./sidebar";
 import { useAuth } from "@/lib/auth";
 import { Menu, Bell } from "lucide-react";
 
+
 interface LayoutProps {
   children: React.ReactNode;
-  title?: string;
 }
 
-export function Layout({ children, title = "Tableau de bord" }: LayoutProps) {
+export function Layout({ children }: LayoutProps) {
   const { user } = useAuth();
+  const { title } = useLayout(); // Récupérer le titre depuis le context
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -26,6 +33,7 @@ export function Layout({ children, title = "Tableau de bord" }: LayoutProps) {
               <button className="lg:hidden -mr-2 p-2 text-gray-400 hover:text-gray-600">
                 <Menu className="h-6 w-6" />
               </button>
+              {/* Le titre vient maintenant du context */}
               <h2 className="ml-4 text-2xl font-semibold text-gray-900">{title}</h2>
             </div>
             
@@ -53,7 +61,7 @@ export function Layout({ children, title = "Tableau de bord" }: LayoutProps) {
         </div>
 
         {/* Main Content Area */}
-        <main className="flex-1 min-h-[calc(100vh-73px)] pb-8 bg-gradient-to-br from-orange-50 to-amber-50 ">
+        <main className="flex-1 min-h-[calc(100vh-73px)] pb-8 bg-gradient-to-br from-orange-50 to-amber-50">
           {children}
         </main>
       </div>

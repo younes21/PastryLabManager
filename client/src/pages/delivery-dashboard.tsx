@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export default function DeliveryDashboard() {
   const { user } = useAuth();
@@ -189,8 +190,8 @@ export default function DeliveryDashboard() {
     </div>
   );
 
-  return (
-    <Layout title="Espace Livreur">
+usePageTitle('Espace Livreur');
+ return (
       <div className="px-4 sm:px-6 lg:px-8 pt-8">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -298,6 +299,6 @@ export default function DeliveryDashboard() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    
   );
 }

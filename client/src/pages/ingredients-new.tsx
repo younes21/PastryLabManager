@@ -20,6 +20,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Article, MeasurementUnit } from "@shared/schema";
 import { Ingredient } from "@shared/schema-old";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 // Schema pour les ingrédients selon spécifications exactes
 const ingredientSchema = z.object({
@@ -153,12 +154,14 @@ export default function IngredientsPage() {
     form.reset();
   };
 
+  usePageTitle('Gestion des Ingrédients');
+
   if (isLoading) {
     return <div>Chargement...</div>;
   }
 
-  return (
-    <Layout title="Gestion des Ingrédients">
+
+ return (
       <div className="container mx-auto p-6 space-y-6">
        
         {/* Barre de menu/toolbar */}
@@ -684,6 +687,6 @@ export default function IngredientsPage() {
         </CardContent>
       </Card>
       </div>
-    </Layout>
+    
   );
 }
