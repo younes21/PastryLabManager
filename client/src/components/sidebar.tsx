@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLayout } from "@/contexts/LayoutContext";
 import {
   LayoutDashboard,
   Package,
@@ -34,9 +35,17 @@ import {
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { closeSidebar } = useLayout();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["Principal"]) // Principal group expanded by default
   );
+
+  // Fermer la sidebar sur mobile après navigation
+  const handleNavigation = () => {
+    if (window.innerWidth < 1366) { // lg breakpoint
+       closeSidebar();
+    }
+  };
 
   // Keep the group expanded if it contains the active item
   const shouldGroupBeExpanded = (groupItems: typeof filteredNavItems, groupName: string) => {
@@ -317,7 +326,7 @@ export function Sidebar() {
   }, {} as Record<string, typeof filteredNavItems>);
 
   // Define group order for consistent display
-  const groupOrder = ["Principal", "Ventes", "Achats", "Inventaire", "Production", "admin"];
+  const groupOrder = ["admin","Principal", "Inventaire","Ventes", "Achats",  "Production"];
   const sortedGroupEntries = Object.entries(groupedMenu).sort(([a], [b]) => {
     const indexA = groupOrder.indexOf(a);
     const indexB = groupOrder.indexOf(b);
@@ -338,155 +347,211 @@ export function Sidebar() {
   };
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex flex-col flex-grow pt-5 overflow-y-auto bg-white border-r border-gray-200">
-        {/* Logo */}
-        <div className="flex items-center flex-shrink-0 px-4">
-          <div className="mr-3">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 32 32"
-              className="text-primary"
-            >
-              <defs>
-                <linearGradient
-                  id="logoGradient"
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor="#ec4899" />
-                  <stop offset="50%" stopColor="#f97316" />
-                  <stop offset="100%" stopColor="#eab308" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z"
-                fill="url(#logoGradient)"
-              />
-              <rect
-                x="8"
-                y="18"
-                width="16"
-                height="2"
-                fill="white"
-                opacity="0.8"
-                rx="1"
-              />
-              <circle cx="12" cy="12" r="1" fill="white" opacity="0.6" />
-              <circle cx="17" cy="10" r="1" fill="white" opacity="0.6" />
-              <circle cx="22" cy="12" r="1" fill="white" opacity="0.6" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">PâtissLab</h1>
-            <p className="text-xs text-gray-500 font-medium">Gestion Pro</p>
-          </div>
-        </div>
-
-        {/* User Info */}
-        {user && (
-          <div className="mt-6 px-4">
-            <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
-                    {getInitials(user.firstName, user.lastName)}
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">
-                  {user.firstName} {user.lastName}
-                </p>
-                <p className="text-xs text-gray-500 capitalize">{user.role}</p>
-              </div>
+    <div className="h-full bg-white border-r border-gray-200 shadow-xl xl:shadow-none">
+      <div className="flex flex-col h-full">
+        {/* Header mobile avec bouton de fermeture */}
+        <div className=" flex items-center justify-between  h-[73px] border-b border-gray-200 bg-white">
+          <div className="flex items-center ml-6">
+            <div className="mr-3">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 32 32"
+                className="text-primary"
+              >
+                <defs>
+                  <linearGradient
+                    id="logoGradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop offset="0%" stopColor="#ec4899" />
+                    <stop offset="50%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="#eab308" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z"
+                  fill="url(#logoGradient)"
+                />
+                <rect
+                  x="8"
+                  y="18"
+                  width="16"
+                  height="2"
+                  fill="white"
+                  opacity="0.8"
+                  rx="1"
+                />
+                <circle cx="12" cy="12" r="1" fill="white" opacity="0.6" />
+                <circle cx="17" cy="10" r="1" fill="white" opacity="0.6" />
+                <circle cx="22" cy="12" r="1" fill="white" opacity="0.6" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">PâtissLab</h1>
+              <p className="text-xs text-gray-500 font-medium">Gestion Pro</p>
             </div>
           </div>
-        )}
+          <button
+            onClick={closeSidebar}
+            className=" xl:hidden p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+            aria-label="Fermer le menu"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-        {/* Navigation avec Accordéon */}
-        <nav className="mt-6 flex-1 px-2 space-y-2 overflow-y-auto">
-          {sortedGroupEntries.map(([groupName, groupItems]) => {
-            const isExpanded = shouldGroupBeExpanded(groupItems, groupName);
-            const groupActive = isGroupActive(groupItems);
-            
-            return (
-              <div key={groupName} className="mb-2">
-                {/* Group Header - Accordéon */}
-                <button
-                  onClick={() => toggleGroup(groupName)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${
-                    groupActive 
-                      ? "bg-blue-50 text-blue-700" 
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <span className="uppercase tracking-wider text-xs">
-                    {getGroupDisplayName(groupName)}
-                  </span>
-                  <div className="flex items-center">
-                    {groupActive && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                    )}
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 transition-transform duration-200" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 transition-transform duration-200" />
-                    )}
-                  </div>
-                </button>
-                
-                {/* Group Items - Collapsible */}
-                <div 
-                className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  isExpanded ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
-                }`}
->
-                  <div className="space-y-1 mt-1 ml-2">
-                    {groupItems.map((item) => (
-                      <div key={item.path}>
-                        <Link href={item.path}>
-                          <div
-                            className={`relative flex items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${
-                              isActive(item.path)
-                                ? "bg-blue-100 text-blue-900 shadow-sm"
-                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                            }`}
-                          >
-                            {/* Active indicator */}
-                            {isActive(item.path) && (
-                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r"></div>
-                            )}
-                            
-                            <item.lucideIcon
-                              className={`h-4 w-4 mr-3 transition-colors duration-150 ${
-                                isActive(item.path) ? "text-blue-600" : "text-gray-400"
-                              }`}
-                            />
-                            <span className="font-medium">{item.label}</span>
-                          </div>
-                        </Link>
-                      </div>
-                    ))}
+        {/* Contenu principal de la sidebar */}
+        <div className="flex flex-col flex-grow  overflow-y-auto">
+          {/* Logo desktop */}
+        {/* <div className="flex items-center ml-6">
+            <div className="mr-3">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 32 32"
+                className="text-primary"
+              >
+                <defs>
+                  <linearGradient
+                    id="logoGradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
+                    <stop offset="0%" stopColor="#ec4899" />
+                    <stop offset="50%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="#eab308" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M8 14c0-2.5 1.5-4.5 4-5.5C12.5 6.5 14.5 5 17 5s4.5 1.5 5 3.5c2.5 1 4 3 4 5.5v2c0 1-0.5 2-1.5 2.5v6c0 1.5-1 2.5-2.5 2.5h-12c-1.5 0-2.5-1-2.5-2.5v-6C7.5 18 7 17 7 16v-2z"
+                  fill="url(#logoGradient)"
+                />
+                <rect
+                  x="8"
+                  y="18"
+                  width="16"
+                  height="2"
+                  fill="white"
+                  opacity="0.8"
+                  rx="1"
+                />
+                <circle cx="12" cy="12" r="1" fill="white" opacity="0.6" />
+                <circle cx="17" cy="10" r="1" fill="white" opacity="0.6" />
+                <circle cx="22" cy="12" r="1" fill="white" opacity="0.6" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">PâtissLab</h1>
+              <p className="text-xs text-gray-500 font-medium">Gestion Pro</p>
+            </div>
+          </div> */}
+
+          {/* User Info */}
+          {user && (
+            <div className="mt-2 px-4">
+              <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {getInitials(user.firstName, user.lastName)}
+                    </span>
                   </div>
                 </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user.firstName} {user.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                </div>
               </div>
-            );
-          })}
-        </nav>
+            </div>
+          )}
 
-        {/* Logout Button */}
-        <div className="px-4 pb-4 border-t border-gray-200 pt-4">
-          <button
-            onClick={logout}
-            className="w-full flex items-center px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors duration-150 ease-in-out"
-          >
-            <LogOut className="h-4 w-4 mr-3" />
-            Déconnexion
-          </button>
+          {/* Navigation avec Accordéon */}
+          <nav className="mt-6 flex-1 px-2 space-y-2 overflow-y-auto">
+            {sortedGroupEntries.map(([groupName, groupItems]) => {
+              const isExpanded = shouldGroupBeExpanded(groupItems, groupName);
+              const groupActive = isGroupActive(groupItems);
+              
+              return (
+                <div key={groupName} className="mb-2">
+                  {/* Group Header - Accordéon */}
+                  <button
+                    onClick={() => toggleGroup(groupName)}
+                    className={`w-full flex items-center justify-between px-3 py-4 border-gray-100 border bg-slate-50   text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${
+                      groupActive 
+                        ? " text-blue-700" 
+                        : "text-gray-700 hover:bg-blue-200"
+                    }`}
+                  >
+                    <span className="uppercase tracking-wider text-xs">
+                      {getGroupDisplayName(groupName)}
+                    </span>
+                    <div className="flex items-center">
+                      {groupActive && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                      )}
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 transition-transform duration-200" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Group Items */}
+                  {isExpanded && (
+                    <div className="ml-4 space-y-1 mt-1">
+                      {groupItems.map((item) => (
+                        <div key={item.path}>
+                          <Link href={item.path} onClick={handleNavigation}>
+                            <div
+                              className={`relative flex border border-gray-50 items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${
+                                isActive(item.path)
+                                  ? "bg-blue-200 text-blue-700 font-semibold shadow-sm"
+                                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                              }`}
+                            >
+                              {item.lucideIcon && (
+                                <item.lucideIcon
+                                  className={`mr-3 h-4 w-4 ${
+                                    isActive(item.path) ? "text-white" : "text-gray-400"
+                                  }`}
+                                />
+                              )}
+                              <span className="truncate">{item.label}</span>
+                              {isActive(item.path) && (
+                                <div className="absolute right-2 w-2 h-2 bg-white rounded-full"></div>
+                              )}
+                            </div>
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* Logout Button */}
+          <div className="p-4 border-t border-gray-200">
+            <button
+              onClick={logout}
+              className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <LogOut className="mr-3 h-4 w-4" />
+              Déconnexion
+            </button>
+          </div>
         </div>
       </div>
     </div>
