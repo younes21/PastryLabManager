@@ -351,7 +351,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
   });
 
   const { data: categories } = useQuery<ArticleCategory[]>({
-    queryKey: ["/api/article-categories"],
+    queryKey: ["/api/article-categories/produit"],
   });
 
   const { data: storageZones } = useQuery<StorageZone[]>({

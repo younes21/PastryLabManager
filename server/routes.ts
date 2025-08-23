@@ -67,12 +67,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { role } = req.query;
       const users = await storage.getAllUsers();
       let filteredUsers = users;
-      
+
       // Filter by role if specified
       if (role) {
         filteredUsers = users.filter(user => user.role === role);
       }
-      
+
       const usersWithoutPasswords = filteredUsers.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
     } catch (error) {
@@ -96,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const userData = req.body;
       const user = await storage.updateUser(id, userData);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -112,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteUser(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -157,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           article.type === "ingredient" &&
           article.managedInStock &&
           parseFloat(article.currentStock || "0") <
-            parseFloat(article.minStock || "0"),
+          parseFloat(article.minStock || "0"),
       ).length;
 
       res.json({
@@ -296,9 +296,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Article Categories routes
-  app.get("/api/article-categories", async (req, res) => {
+  app.get("/api/article-categories/:type?", async (req, res) => {
     try {
-      const categories = await storage.getAllArticleCategories();
+
+      const categories = await storage.getAllArticleCategories(req.params.type as ("produit" | "ingredient" | "service" | undefined));
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch article categories" });
@@ -307,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/article-categories", async (req, res) => {
     try {
-      const categoryData = insertArticleCategorySchema.parse(req.body);
+      const categoryData = req.body;
       const category = await storage.createArticleCategory(categoryData);
       res.status(201).json(category);
     } catch (error) {
@@ -368,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/price-lists/:id", async (req, res) => {
     try {
       const priceListData = insertPriceListSchema.parse(req.body);
-      const priceList = await storage.updatePriceList(parseInt(req.params.id),priceListData);
+      const priceList = await storage.updatePriceList(parseInt(req.params.id), priceListData);
       res.status(201).json(priceList);
     } catch (error) {
       res.status(400).json({ message: "Invalid price list data" });
@@ -622,102 +623,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-// ===== ACCOUNTING JOURNALS ROUTES =====
-app.get("/api/accounting-journals", async (req, res) => {
-  try {
-    const journals = await storage.getAllAccountingJournals();
-    res.json(journals);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch accounting journals" });
-  }
-});
-
-app.post("/api/accounting-journals", async (req, res) => {
-  try {
-    const journalData = insertAccountingJournalSchema.parse(req.body);
-    const journal = await storage.createAccountingJournal(journalData);
-    res.status(201).json(journal);
-  } catch (error) {
-    res.status(400).json({ message: "Invalid accounting journal data" });
-  }
-});
-
-app.put("/api/accounting-journals/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const journalData = req.body;
-    const journal = await storage.updateAccountingJournal(id, journalData);
-    if (!journal) {
-      return res.status(404).json({ message: "Accounting journal not found" });
+  // ===== ACCOUNTING JOURNALS ROUTES =====
+  app.get("/api/accounting-journals", async (req, res) => {
+    try {
+      const journals = await storage.getAllAccountingJournals();
+      res.json(journals);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch accounting journals" });
     }
-    res.json(journal);
-  } catch (error) {
-    res.status(400).json({ message: "Failed to update accounting journal" });
-  }
-});
+  });
 
-app.delete("/api/accounting-journals/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const success = await storage.deleteAccountingJournal(id);
-    if (!success) {
-      return res.status(404).json({ message: "Accounting journal not found" });
+  app.post("/api/accounting-journals", async (req, res) => {
+    try {
+      const journalData = insertAccountingJournalSchema.parse(req.body);
+      const journal = await storage.createAccountingJournal(journalData);
+      res.status(201).json(journal);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid accounting journal data" });
     }
-    res.json({ message: "Accounting journal deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to delete accounting journal" });
-  }
-});
+  });
 
-// ===== ACCOUNTING ACCOUNTS ROUTES =====
-app.get("/api/accounting-accounts", async (req, res) => {
-  try {
-    const accounts = await storage.getAllAccountingAccounts();
-    res.json(accounts);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch accounting accounts" });
-  }
-});
-
-app.post("/api/accounting-accounts", async (req, res) => {
-  try {
-    console.log("Account data received:", req.body);
-    const accountData = insertAccountingAccountSchema.parse(req.body);
-    console.log("Account data parsed:", accountData);
-    const account = await storage.createAccountingAccount(accountData);
-    res.status(201).json(account);
-  } catch (error:any) {
-    console.error("Account creation error:", error);
-    res.status(400).json({ message: "Invalid accounting account data", error: error.message });
-  }
-});
-
-app.put("/api/accounting-accounts/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const accountData = req.body;
-    const account = await storage.updateAccountingAccount(id, accountData);
-    if (!account) {
-      return res.status(404).json({ message: "Accounting account not found" });
+  app.put("/api/accounting-journals/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const journalData = req.body;
+      const journal = await storage.updateAccountingJournal(id, journalData);
+      if (!journal) {
+        return res.status(404).json({ message: "Accounting journal not found" });
+      }
+      res.json(journal);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update accounting journal" });
     }
-    res.json(account);
-  } catch (error) {
-    res.status(400).json({ message: "Failed to update accounting account" });
-  }
-});
+  });
 
-app.delete("/api/accounting-accounts/:id", async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    const success = await storage.deleteAccountingAccount(id);
-    if (!success) {
-      return res.status(404).json({ message: "Accounting account not found" });
+  app.delete("/api/accounting-journals/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteAccountingJournal(id);
+      if (!success) {
+        return res.status(404).json({ message: "Accounting journal not found" });
+      }
+      res.json({ message: "Accounting journal deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete accounting journal" });
     }
-    res.json({ message: "Accounting account deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to delete accounting account" });
-  }
-});
+  });
+
+  // ===== ACCOUNTING ACCOUNTS ROUTES =====
+  app.get("/api/accounting-accounts", async (req, res) => {
+    try {
+      const accounts = await storage.getAllAccountingAccounts();
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch accounting accounts" });
+    }
+  });
+
+  app.post("/api/accounting-accounts", async (req, res) => {
+    try {
+      console.log("Account data received:", req.body);
+      const accountData = insertAccountingAccountSchema.parse(req.body);
+      console.log("Account data parsed:", accountData);
+      const account = await storage.createAccountingAccount(accountData);
+      res.status(201).json(account);
+    } catch (error: any) {
+      console.error("Account creation error:", error);
+      res.status(400).json({ message: "Invalid accounting account data", error: error.message });
+    }
+  });
+
+  app.put("/api/accounting-accounts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const accountData = req.body;
+      const account = await storage.updateAccountingAccount(id, accountData);
+      if (!account) {
+        return res.status(404).json({ message: "Accounting account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update accounting account" });
+    }
+  });
+
+  app.delete("/api/accounting-accounts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteAccountingAccount(id);
+      if (!success) {
+        return res.status(404).json({ message: "Accounting account not found" });
+      }
+      res.json({ message: "Accounting account deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete accounting account" });
+    }
+  });
 
   // ===== WORK STATIONS ROUTES =====
   app.get("/api/work-stations", async (req, res) => {
@@ -1138,16 +1139,16 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
         "🔥 CREATE RECIPE - Request body:",
         JSON.stringify(req.body, null, 2),
       );
-      
+
       // Vérifier si une recette existe déjà pour cet article
       const existingRecipe = await storage.getRecipeByArticleId(req.body.articleId);
       if (existingRecipe) {
         console.log("❌ CREATE RECIPE - Recipe already exists for article:", req.body.articleId);
-        return res.status(409).json({ 
-          message: "Une recette existe déjà pour ce produit. Vous ne pouvez pas créer plusieurs recettes pour le même produit." 
+        return res.status(409).json({
+          message: "Une recette existe déjà pour ce produit. Vous ne pouvez pas créer plusieurs recettes pour le même produit."
         });
       }
-      
+
       const newRecipe = await storage.createRecipe(req.body);
       console.log(
         "✅ CREATE RECIPE - Success:",
@@ -1501,7 +1502,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       // Get the items for this operation
       const items = await storage.getInventoryOperationItems(id);
-      
+
       // Return operation with items
       res.json({
         ...operation,
@@ -1527,7 +1528,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
             operationId: undefined
           };
         });
-        
+
         const operation = await storage.createInventoryOperationWithItems(operationData, itemsData);
         res.status(201).json(operation);
       } else {
@@ -1579,14 +1580,14 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
         // Use the new method that handles both operation and items
         const data = updateInventoryOperationWithItemsSchema.parse(req.body);
         const { operation, items } = data;
-        
+
         const updatedOperation = await storage.updateInventoryOperationWithItems(id, operation, items);
         res.json({ message: "Inventory operation updated successfully", operation: updatedOperation });
       } else {
         // Fallback to updating just the operation header
         const updateData = insertInventoryOperationSchema.partial().parse(req.body);
         const operation = await storage.updateInventoryOperation(id, updateData);
-        
+
         if (operation) {
           res.json(operation);
         } else {
@@ -1617,7 +1618,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       const updateData = insertInventoryOperationSchema.partial().parse(req.body);
       const operation = await storage.updateInventoryOperation(id, updateData);
-      
+
       if (operation) {
         res.json(operation);
       } else {
@@ -1671,7 +1672,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
       }
       // Get operation items to consume ingredients
       const items = await storage.getInventoryOperationItems(id);
-      
+
       // For preparation operations, consume ingredients based on recipe and create stock moves
       if (operation.type === 'preparation') {
         for (const item of items) {
@@ -1684,7 +1685,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
           // Get recipe ingredients
           const recipeIngredients = await storage.getRecipeIngredients(recipe.id);
-          
+
           // Calculate consumption based on planned quantity
           const plannedQuantity = parseFloat(item.quantity || '0');
           const recipeQuantity = parseFloat(recipe.quantity || '1');
@@ -1696,12 +1697,12 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
             if (!ingredientArticle) continue;
 
             const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-            
+
             // Check if enough stock is available
             const currentStock = parseFloat(ingredientArticle.currentStock || '0');
             if (currentStock < requiredQuantity) {
-              return res.status(400).json({ 
-                message: `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}` 
+              return res.status(400).json({
+                message: `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`
               });
             }
 
@@ -1733,16 +1734,16 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
         startedAt: startedAt
       };
 
-    const updatedOperation = await storage.updateInventoryOperation(id, updateData);
-    if (!updatedOperation) {
-      return res.status(404).json({ message: "Failed to update operation" });
-    }
+      const updatedOperation = await storage.updateInventoryOperation(id, updateData);
+      if (!updatedOperation) {
+        return res.status(404).json({ message: "Failed to update operation" });
+      }
       // Libérer les réservations d'ingrédients une fois que la préparation commence
       if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
         await storage.releaseAllReservationsForOperation(id);
       }
 
-      
+
 
       res.json(updatedOperation);
     } catch (error) {
@@ -1794,12 +1795,12 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       // Get operation items to update inventory
       const items = await storage.getInventoryOperationItems(id);
-      
+
       // Calculate the ratio of conform quantity to planned quantity
       const totalPlanned = items.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
       const conformQty = parseFloat(conformQuantity || totalPlanned.toString());
       const ratio = totalPlanned > 0 ? conformQty / totalPlanned : 1;
-      
+
       // For preparation operations, add the actual produced quantity to inventory and create stock moves
       if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
         for (const item of items) {
@@ -1808,7 +1809,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
           const plannedQuantity = parseFloat(item.quantity || '0');
           const actualQuantity = plannedQuantity * ratio; // Apply the conform ratio
-          
+
           // Create stock move for produced quantity
           const stockMoveData = {
             type: 'in',
@@ -1833,7 +1834,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
       // Create waste operation if there's waste
       if (conformQty < totalPlanned && operation.type === 'preparation') {
         const wasteQuantity = totalPlanned - conformQty;
-        
+
         const wasteOperation = {
           type: 'ajustement_rebut',
           status: 'completed',
@@ -1845,7 +1846,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
         const wasteItems = items.map((item) => {
           const plannedQuantity = parseFloat(item.quantity || '0');
           const wasteItemQuantity = (plannedQuantity * wasteQuantity) / totalPlanned;
-          
+
           return {
             articleId: item.articleId,
             quantity: wasteItemQuantity.toString(),
@@ -1858,7 +1859,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
         });
 
         const wasteOp = await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
-        
+
         // Create stock moves for waste
         for (const wasteItem of wasteItems) {
           const wasteArticle = await storage.getArticle(wasteItem.articleId);
@@ -1897,7 +1898,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
       if (isNaN(operationId)) {
         return res.status(400).json({ message: "Invalid operation ID" });
       }
-      
+
       const items = await storage.getInventoryOperationItems(operationId);
       res.json(items);
     } catch (error) {
@@ -2111,7 +2112,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       const limit = parseInt(req.query.limit as string) || 50;
       const moves = await storage.getArticleStockHistory(id, limit);
-      
+
       res.json(moves);
     } catch (error) {
       console.error("Error fetching article stock history:", error);
@@ -2193,11 +2194,11 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       const { startDate, endDate } = req.query;
       const report = await storage.getArticleTraceabilityReport(
-        id, 
-        startDate as string, 
+        id,
+        startDate as string,
         endDate as string
       );
-      
+
       res.json(report);
     } catch (error) {
       console.error("Error fetching traceability report:", error);
@@ -2209,11 +2210,11 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
   app.post("/api/stock-moves", async (req, res) => {
     try {
       const moveData = req.body;
-      
+
       // Validation des données requises
       if (!moveData.articleId || !moveData.type || !moveData.quantity || !moveData.unit) {
-        return res.status(400).json({ 
-          message: "Missing required fields: articleId, type, quantity, unit" 
+        return res.status(400).json({
+          message: "Missing required fields: articleId, type, quantity, unit"
         });
       }
 
@@ -2271,11 +2272,11 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
   app.post("/api/stock-lots", async (req, res) => {
     try {
       const lotData = req.body;
-      
+
       // Validation des données requises
       if (!lotData.articleId || !lotData.lotNumber || !lotData.initialQuantity || !lotData.unit) {
-        return res.status(400).json({ 
-          message: "Missing required fields: articleId, lotNumber, initialQuantity, unit" 
+        return res.status(400).json({
+          message: "Missing required fields: articleId, lotNumber, initialQuantity, unit"
         });
       }
 
@@ -2291,11 +2292,11 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
   app.post("/api/stock-lot-moves", async (req, res) => {
     try {
       const lotMoveData = req.body;
-      
+
       // Validation des données requises
       if (!lotMoveData.lotId || !lotMoveData.moveId || !lotMoveData.quantity) {
-        return res.status(400).json({ 
-          message: "Missing required fields: lotId, moveId, quantity" 
+        return res.status(400).json({
+          message: "Missing required fields: lotId, moveId, quantity"
         });
       }
 
@@ -2311,12 +2312,12 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
   app.post("/api/stock-adjustments", async (req, res) => {
     try {
       const adjustmentData = req.body;
-      
+
       // Validation des données requises
-      if (!adjustmentData.articleId || !adjustmentData.type || !adjustmentData.systemQuantity || 
-          !adjustmentData.actualQuantity || !adjustmentData.reason) {
-        return res.status(400).json({ 
-          message: "Missing required fields: articleId, type, systemQuantity, actualQuantity, reason" 
+      if (!adjustmentData.articleId || !adjustmentData.type || !adjustmentData.systemQuantity ||
+        !adjustmentData.actualQuantity || !adjustmentData.reason) {
+        return res.status(400).json({
+          message: "Missing required fields: articleId, type, systemQuantity, actualQuantity, reason"
         });
       }
 
@@ -2358,11 +2359,11 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
   app.post("/api/stock-reservations", async (req, res) => {
     try {
       const reservationData = req.body;
-      
+
       // Validation des données requises
       if (!reservationData.articleId || !reservationData.orderId || !reservationData.reservedQuantity) {
-        return res.status(400).json({ 
-          message: "Missing required fields: articleId, orderId, reservedQuantity" 
+        return res.status(400).json({
+          message: "Missing required fields: articleId, orderId, reservedQuantity"
         });
       }
 
@@ -2425,14 +2426,14 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       const items = await storage.getInventoryOperationItems(id);
       const reservations = await storage.createIngredientReservationsForPreparation(id, items);
-      
-      res.status(201).json({ 
-        message: "Ingredient reservations created successfully", 
-        reservations 
+
+      res.status(201).json({
+        message: "Ingredient reservations created successfully",
+        reservations
       });
     } catch (error) {
       console.error("Error creating ingredient reservations:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to create ingredient reservations",
         error: error instanceof Error ? error.message : String(error)
       });
@@ -2491,7 +2492,7 @@ app.delete("/api/accounting-accounts/:id", async (req, res) => {
 
       const hasEnough = await storage.hasEnoughAvailableStock(id, parseFloat(requiredQuantity));
       const availableStock = await storage.getAvailableStock(id);
-      
+
       res.json({
         hasEnough,
         availableStock,

@@ -53,7 +53,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 
   const hasMatchingDescendant = (cat: ArticleCategory, allCategories: ArticleCategory[], term: string): boolean => {
     const directChildren = allCategories.filter(c => c.parentId === cat.id);
-    return directChildren.some(child => 
+    return directChildren.some(child =>
       matchesSearch(child, term) || hasMatchingDescendant(child, allCategories, term)
     );
   };
@@ -86,7 +86,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                   <div className="w-2 h-2 rounded-full bg-gray-300"></div>
                 </div>
               )}
-              
+
               <div className="flex items-center mr-3">
                 {hasChildren ? (
                   isExpanded ? <FolderOpen className="h-5 w-5 text-blue-500" /> : <Folder className="h-5 w-5 text-blue-600" />
@@ -105,7 +105,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                       Pour vente
                     </Badge>
                   )}
-                  <Badge 
+                  <Badge
                     variant={category.active ? "default" : "secondary"}
                     className="px-2 py-0.5 text-xs font-medium"
                   >
@@ -119,7 +119,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
@@ -184,11 +184,12 @@ export default function ArticleCategories() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ArticleCategory | null>(null);
   const [parentForNewCategory, setParentForNewCategory] = useState<ArticleCategory | null>(null);
-  const [categoryForm, setCategoryForm] = useState<InsertArticleCategory>({
+  const [categoryForm, setCategoryForm] = useState<InsertArticleCategory & { type?: "produit" | "ingredient" | "service" }>({
     designation: "",
     parentId: undefined,
     forSale: false,
     active: true,
+    type: "produit",
   });
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set([]));
 
@@ -228,12 +229,12 @@ export default function ArticleCategories() {
       queryClient.invalidateQueries({ queryKey: ["/api/article-categories"] });
       setDialogOpen(false);
       resetForm();
-      
+
       // Si une sous-catégorie a été créée, ouvrir automatiquement le parent
       if (variables.parentId) {
         setExpandedNodes(prev => new Set([...prev, variables.parentId!]));
       }
-      
+
       toast({
         title: "Catégorie créée",
         description: "La catégorie d'article a été créée avec succès.",
@@ -298,6 +299,7 @@ export default function ArticleCategories() {
       parentId: undefined,
       forSale: false,
       active: true,
+      type:'produit'
     });
     setEditingCategory(null);
     setParentForNewCategory(null);
@@ -305,7 +307,7 @@ export default function ArticleCategories() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingCategory) {
       updateCategoryMutation.mutate({ id: editingCategory.id, data: categoryForm });
     } else {
@@ -321,6 +323,7 @@ export default function ArticleCategories() {
       parentId: category.parentId || undefined,
       forSale: category.forSale,
       active: category.active,
+      type: category.type || undefined
     });
     setDialogOpen(true);
   };
@@ -333,6 +336,7 @@ export default function ArticleCategories() {
       parentId: parentCategory.id,
       forSale: parentCategory.forSale, // Hérite des propriétés du parent par défaut
       active: true,
+      type: parentCategory.type || undefined,
     });
     setDialogOpen(true);
   };
@@ -345,6 +349,7 @@ export default function ArticleCategories() {
       parentId: undefined,
       forSale: false,
       active: true,
+      type: 'produit',
     });
     setDialogOpen(true);
   };
@@ -353,19 +358,19 @@ export default function ArticleCategories() {
   const buildCategoryPath = (category: ArticleCategory, allCategories: ArticleCategory[]): string => {
     const path: string[] = [];
     let current: ArticleCategory | undefined = category;
-    
+
     while (current) {
       path.unshift(current.designation);
       current = current.parentId ? allCategories.find(c => c.id === current!.parentId) : undefined;
     }
-    
+
     return path.join(" > ");
   };
 
   // Get available parent categories (excluding self and descendants)
   const getAvailableParents = (excludeId?: number): ArticleCategory[] => {
     if (!excludeId) return categories;
-    
+
     const isDescendant = (categoryId: number, potentialAncestorId: number): boolean => {
       const category = categories.find(c => c.id === categoryId);
       if (!category) return false;
@@ -373,15 +378,15 @@ export default function ArticleCategories() {
       if (category.parentId) return isDescendant(category.parentId, potentialAncestorId);
       return false;
     };
-    
-    return categories.filter(c => 
+
+    return categories.filter(c =>
       c.id !== excludeId && !isDescendant(c.id, excludeId)
     );
   };
 
   // Filter categories based on search
   const filteredCategories = categories.filter((category: ArticleCategory) =>
-    searchTerm === "" || 
+    searchTerm === "" ||
     category.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
     buildCategoryPath(category, categories).toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -405,7 +410,7 @@ export default function ArticleCategories() {
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          
+
           <p className="text-lg text-gray-600 mt-2">
             Gérez les catégories pour vos produits, ingrédients et services
           </p>
@@ -431,16 +436,16 @@ export default function ArticleCategories() {
             Liste des Catégories ({categories.length})
           </h2>
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={expandAll}
               className="text-blue-600 hover:text-blue-700"
             >
               Tout développer
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={collapseAll}
               className="text-blue-600 hover:text-blue-700"
@@ -451,8 +456,8 @@ export default function ArticleCategories() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
-              onClick={handleAddNewCategory} 
+            <Button
+              onClick={handleAddNewCategory}
               className="bg-green-600 hover:bg-green-700"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -462,15 +467,15 @@ export default function ArticleCategories() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingCategory 
-                  ? "Modifier la Catégorie" 
-                  : parentForNewCategory 
+                {editingCategory
+                  ? "Modifier la Catégorie"
+                  : parentForNewCategory
                     ? `Nouvelle Sous-catégorie de "${parentForNewCategory.designation}"`
                     : "Nouvelle Catégorie"
                 }
               </DialogTitle>
               <DialogDescription>
-                {editingCategory 
+                {editingCategory
                   ? "Modifiez les informations de cette catégorie d'article."
                   : parentForNewCategory
                     ? `Créez une nouvelle sous-catégorie pour "${parentForNewCategory.designation}".`
@@ -484,19 +489,35 @@ export default function ArticleCategories() {
                 <Input
                   id="designation"
                   value={categoryForm.designation}
-                  onChange={(e) => setCategoryForm({...categoryForm, designation: e.target.value})}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, designation: e.target.value })}
                   placeholder="Ex: Pâtisseries, Ingrédients de base..."
                   required
                 />
               </div>
+              <div>
+                <Label htmlFor="type">Type</Label>
+                <Select
+                  value={categoryForm.type || "produit"}
+                  onValueChange={(value) => setCategoryForm({ ...categoryForm, type: value as "produit" | "ingredient" | "service" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="produit">Produit</SelectItem>
+                    <SelectItem value="ingredient">Ingrédient</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {!parentForNewCategory && (
                 <div>
                   <Label htmlFor="parent">Catégorie parent (optionnel)</Label>
-                  <Select 
-                    value={categoryForm.parentId?.toString() || "none"} 
+                  <Select
+                    value={categoryForm.parentId?.toString() || "none"}
                     onValueChange={(value) => {
                       setCategoryForm({
-                        ...categoryForm, 
+                        ...categoryForm,
                         parentId: value === "none" ? undefined : parseInt(value)
                       });
                     }}
@@ -528,16 +549,16 @@ export default function ArticleCategories() {
               <div className="flex items-center space-x-2">
                 <Switch
                   id="for-sale"
-                  checked={categoryForm.forSale}
-                  onCheckedChange={(checked) => setCategoryForm({...categoryForm, forSale: checked})}
+                  checked={categoryForm.forSale || false}
+                  onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, forSale: checked })}
                 />
                 <Label htmlFor="for-sale">Catégorie pour la vente</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
                   id="active"
-                  checked={categoryForm.active}
-                  onCheckedChange={(checked) => setCategoryForm({...categoryForm, active: checked})}
+                  checked={categoryForm.active || false}
+                  onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, active: checked })}
                 />
                 <Label htmlFor="active">Catégorie active</Label>
               </div>

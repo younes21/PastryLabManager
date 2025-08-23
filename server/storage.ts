@@ -1,14 +1,13 @@
 import {
   users,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
-  taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations, 
+  taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
   invoices, invoiceItems, accountingEntries, accountingEntryLines,
-  inventory,
   // New stock management tables
   stockMoves, stockLots, stockLotMoves, stockAdjustments, stockReservations,
-  type Inventory, type InsertInventory,
+
   type User, type InsertUser,
   type Client, type InsertClient,
   type MeasurementCategory, type InsertMeasurementCategory,
@@ -70,7 +69,7 @@ export interface IStorage {
 
   // Article Categories
   getArticleCategory(id: number): Promise<ArticleCategory | undefined>;
-  getAllArticleCategories(): Promise<ArticleCategory[]>;
+  getAllArticleCategories(type: "produit" | "ingredient" | "service" | undefined): Promise<ArticleCategory[]>;
   getActiveArticleCategories(): Promise<ArticleCategory[]>;
   createArticleCategory(category: InsertArticleCategory): Promise<ArticleCategory>;
   updateArticleCategory(id: number, category: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined>;
@@ -303,13 +302,13 @@ export class DatabaseStorage implements IStorage {
     const existingIngredients = await this.getAllIngredients();
     const nextNumber = existingIngredients.length + 1;
     const code = `ING-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const articleData = {
       ...insertArticle,
       type: "ingredient" as const,
       code,
     };
-    
+
     const [article] = await db.insert(articles).values([articleData]).returning();
     return article;
   }
@@ -318,7 +317,7 @@ export class DatabaseStorage implements IStorage {
     // Vérifier que c'est bien un ingrédient
     const ingredient = await this.getIngredient(id);
     if (!ingredient) return undefined;
-    
+
     return this.updateArticle(id, updateData);
   }
 
@@ -413,7 +412,10 @@ export class DatabaseStorage implements IStorage {
     return category || undefined;
   }
 
-  async getAllArticleCategories(): Promise<ArticleCategory[]> {
+  async getAllArticleCategories(type: "produit" | "ingredient" | "service" | undefined): Promise<ArticleCategory[]> {
+    if (type) {
+      return await db.select().from(articleCategories).where(eq(articleCategories.type, type));
+    }
     return await db.select().from(articleCategories);
   }
 
@@ -554,12 +556,12 @@ export class DatabaseStorage implements IStorage {
     const existingTaxes = await this.getAllTaxes();
     const nextNumber = existingTaxes.length + 1;
     const code = `TVA-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const taxData = {
       ...insertTax,
       code,
     };
-    
+
     const [tax] = await db.insert(taxes).values(taxData).returning();
     return tax;
   }
@@ -595,7 +597,7 @@ export class DatabaseStorage implements IStorage {
   async setBaseCurrency(id: number): Promise<Currency | undefined> {
     // Retirer le statut de base de toutes les devises
     await db.update(currencies).set({ isBase: false });
-    
+
     // Définir la nouvelle devise de base
     const [currency] = await db.update(currencies)
       .set({ isBase: true })
@@ -637,12 +639,12 @@ export class DatabaseStorage implements IStorage {
     const existingMethods = await this.getAllDeliveryMethods();
     const nextNumber = existingMethods.length + 1;
     const code = `LIV-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const methodData = {
       ...insertDeliveryMethod,
       code,
     };
-    
+
     const [deliveryMethod] = await db.insert(deliveryMethods).values(methodData).returning();
     return deliveryMethod;
   }
@@ -675,12 +677,12 @@ export class DatabaseStorage implements IStorage {
     const existingJournals = await this.getAllAccountingJournals();
     const nextNumber = existingJournals.length + 1;
     const code = `JRN-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const journalData = {
       ...insertJournal,
       code,
     };
-    
+
     const [journal] = await db.insert(accountingJournals).values(journalData).returning();
     return journal;
   }
@@ -741,12 +743,12 @@ export class DatabaseStorage implements IStorage {
     const existingZones = await this.getAllStorageZones();
     const nextNumber = existingZones.length + 1;
     const code = `ZON-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const zoneData = {
       ...insertZone,
       code,
     };
-    
+
     const [zone] = await db.insert(storageZones).values(zoneData).returning();
     return zone;
   }
@@ -779,12 +781,12 @@ export class DatabaseStorage implements IStorage {
     const existingStations = await this.getAllWorkStations();
     const nextNumber = existingStations.length + 1;
     const code = `PST-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const stationData = {
       ...insertWorkStation,
       code,
     };
-    
+
     const [workStation] = await db.insert(workStations).values(stationData).returning();
     return workStation;
   }
@@ -953,12 +955,12 @@ export class DatabaseStorage implements IStorage {
     const existingSuppliers = await this.getAllSuppliers();
     const nextNumber = existingSuppliers.length + 1;
     const code = `FRN-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const supplierData = {
       ...insertSupplier,
       code,
     };
-    
+
     const [supplier] = await db.insert(suppliers).values(supplierData).returning();
     return supplier;
   }
@@ -985,9 +987,9 @@ export class DatabaseStorage implements IStorage {
     const [client] = await db.select().from(clients).where(eq(clients.id, id));
     return client || undefined;
   }
-  
+
   async getClientIdByUserId(id: number): Promise<number | undefined> {
-     const [client]= await db.select({idClient:clients.id}).from(clients).where(eq(clients.userId, id));
+    const [client] = await db.select({ idClient: clients.id }).from(clients).where(eq(clients.userId, id));
     return client?.idClient || undefined;
   }
 
@@ -996,12 +998,12 @@ export class DatabaseStorage implements IStorage {
     const existingClients = await this.getAllClients();
     const nextNumber = existingClients.length + 1;
     const code = `CLI-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const clientData = {
       ...insertClient,
       code,
     };
-    
+
     const [client] = await db.insert(clients).values(clientData).returning();
     return client;
   }
@@ -1020,7 +1022,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============ COMMANDES & DEVIS ============
-  
+
   async getAllOrders(): Promise<Order[]> {
     return await db.select().from(orders).orderBy(desc(orders.createdAt));
   }
@@ -1117,21 +1119,21 @@ export class DatabaseStorage implements IStorage {
     const existingOrders = await this.getAllOrders();
     const nextNumber = existingOrders.length + 1;
     const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const orderData = {
       ...insertOrder,
       code,
     };
-    
+
     const [order] = await db.insert(orders).values(orderData).returning();
     return order;
   }
-  
-  async createOrderWithItems(insertOrder: InsertOrder,items: InsertOrderItem[]): Promise<Order> {
-        insertOrder.subtotalHT = items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();    
-        insertOrder.totalTax = items.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
-        insertOrder.totalTTC = (parseFloat( insertOrder.subtotalHT) + parseFloat(insertOrder.totalTax) ).toString();
-    
+
+  async createOrderWithItems(insertOrder: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
+    insertOrder.subtotalHT = items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();
+    insertOrder.totalTax = items.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
+    insertOrder.totalTTC = (parseFloat(insertOrder.subtotalHT) + parseFloat(insertOrder.totalTax)).toString();
+
     return await db.transaction(async (tx) => {
       const prefix = insertOrder.type === "quote" ? "DEV" : "CMD";
       const existingOrders = await tx.select().from(orders);
@@ -1149,12 +1151,12 @@ export class DatabaseStorage implements IStorage {
       }));
 
       await tx.insert(orderItems).values(orderItemsToInsert);
-                  
+
       return order;
     });
   }
 
-  
+
   async updateOrderWithItems(
     orderId: number,
     updatedOrder: Partial<InsertOrder>,
@@ -1169,9 +1171,9 @@ export class DatabaseStorage implements IStorage {
       if (!existing) {
         throw new Error("Commande introuvable");
       }
-      updatedOrder.subtotalHT = updatedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();    
+      updatedOrder.subtotalHT = updatedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();
       updatedOrder.totalTax = updatedItems.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
-      updatedOrder.totalTTC = (parseFloat( updatedOrder.subtotalHT) + parseFloat(updatedOrder.totalTax) ).toString();
+      updatedOrder.totalTTC = (parseFloat(updatedOrder.subtotalHT) + parseFloat(updatedOrder.totalTax)).toString();
       // 2. Mise à jour de la commande
       await tx.update(orders)
         .set({ ...updatedOrder, updatedAt: new Date().toISOString() })
@@ -1232,35 +1234,6 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // ============ OPERATIONS D'INVENTAIRE ============
-  // Nouvelle table unique d'inventaire (journal des mouvements)
-  async getAllInventory(): Promise<Inventory[]> {
-    return await db.select().from(inventory).orderBy(desc(inventory.createdAt));
-  }
-
-  async getInventoryByType(type: string): Promise<Inventory[]> {
-    return await db.select().from(inventory).where(eq(inventory.type, type)).orderBy(desc(inventory.createdAt));
-  }
-
-  async createInventoryRow(insertRow: InsertInventory): Promise<Inventory> {
-    const [row] = await db.insert(inventory).values(insertRow).returning();
-    return row;
-  }
-
-  async updateInventoryRow(id: number, data: Partial<InsertInventory>): Promise<Inventory | undefined> {
-    const [row] = await db.update(inventory).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(inventory.id, id)).returning();
-    return row || undefined;
-  }
-
-  async deleteInventoryRow(id: number): Promise<boolean> {
-    const result = await db.delete(inventory).where(eq(inventory.id, id));
-    return (result.rowCount || 0) > 0;
-  }
-
-  async getInventoryRowsByOperation(operationId: number): Promise<Inventory[]> {
-    return await db.select().from(inventory).where(eq(inventory.operationId, operationId));
-  }
-
   async getAllInventoryOperations(): Promise<InventoryOperation[]> {
     return await db.select().from(inventoryOperations).orderBy(desc(inventoryOperations.createdAt));
   }
@@ -1272,11 +1245,11 @@ export class DatabaseStorage implements IStorage {
 
   async getInventoryOperationsByType(type: string, includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
     const condition =
-    type === 'preparation' && includeReliquat
-      ? sql`io.type IN ('preparation', 'preparation_reliquat')`
-      : sql`io.type = ${type}`;
+      type === 'preparation' && includeReliquat
+        ? sql`io.type IN ('preparation', 'preparation_reliquat')`
+        : sql`io.type = ${type}`;
 
-  const result = await db.execute(sql`
+    const result = await db.execute(sql`
     SELECT 
       io.*,
       COALESCE(
@@ -1291,7 +1264,7 @@ export class DatabaseStorage implements IStorage {
     ORDER BY io.created_at DESC
   `);
 
-  return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+    return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
   }
 
   async getInventoryOperationsByOperator(operatorId: number): Promise<InventoryOperationWithItems[]> {
@@ -1361,17 +1334,17 @@ export class DatabaseStorage implements IStorage {
       'interne': 'INT',
       'livraison': 'LIV'
     };
-    
+
     const prefix = prefixes[insertOperation.type] || 'OP';
     const existingOps = await this.getInventoryOperationsByType(insertOperation.type);
     const nextNumber = existingOps.length + 1;
     const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const operationData = {
       ...insertOperation,
       code,
     };
-    
+
     const [operation] = await db.insert(inventoryOperations).values(operationData).returning();
     return operation;
   }
@@ -1389,7 +1362,7 @@ export class DatabaseStorage implements IStorage {
         'interne': 'INT',
         'livraison': 'LIV'
       };
-      
+
       const prefix = prefixes[insertOperation.type] || 'OP';
       const existingOps = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.type, insertOperation.type));
       const nextNumber = existingOps.length + 1;
@@ -1445,7 +1418,7 @@ export class DatabaseStorage implements IStorage {
           }
         }
       }
-                  
+
       return operation;
     });
   }
@@ -1517,7 +1490,7 @@ export class DatabaseStorage implements IStorage {
 
               // Obtenir les ingrédients de la recette
               const recipeIngredients = await this.getRecipeIngredients(recipe.id);
-              
+
               // Calculer la consommation basée sur la quantité planifiée
               const plannedQuantity = parseFloat(item.quantity || '0');
               const recipeQuantity = parseFloat(recipe.quantity || '1');
@@ -1529,7 +1502,7 @@ export class DatabaseStorage implements IStorage {
                 if (!ingredientArticle) continue;
 
                 const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-                
+
                 // Vérifier si assez de stock est disponible
                 const currentStock = parseFloat(ingredientArticle.currentStock || '0');
                 if (currentStock < requiredQuantity) {
@@ -1615,7 +1588,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============ LIVRAISONS ============
-  
+
   async getAllDeliveries(): Promise<Delivery[]> {
     return await db.select().from(deliveries).orderBy(desc(deliveries.createdAt));
   }
@@ -1636,12 +1609,12 @@ export class DatabaseStorage implements IStorage {
     const existingDeliveries = await this.getAllDeliveries();
     const nextNumber = existingDeliveries.length + 1;
     const code = `LIV-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const deliveryData = {
       ...insertDelivery,
       code,
     };
-    
+
     const [delivery] = await db.insert(deliveries).values(deliveryData).returning();
     return delivery;
   }
@@ -1660,7 +1633,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============ FACTURATION ============
-  
+
   async getAllInvoices(): Promise<Invoice[]> {
     return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
   }
@@ -1681,12 +1654,12 @@ export class DatabaseStorage implements IStorage {
     const existingInvoices = await this.getAllInvoices();
     const nextNumber = existingInvoices.length + 1;
     const code = `FAC-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     const invoiceData = {
       ...insertInvoice,
       code,
     };
-    
+
     const [invoice] = await db.insert(invoices).values(invoiceData).returning();
     return invoice;
   }
@@ -1769,16 +1742,16 @@ export class DatabaseStorage implements IStorage {
   // Créer un mouvement de stock avec traçabilité complète
   async createStockMove(moveData: InsertStockMove): Promise<StockMove> {
     const code = await this.generateStockMoveCode();
-    
+
     // Récupérer le stock actuel de l'article
     const article = await this.getArticle(moveData.articleId);
     if (!article) {
       throw new Error(`Article ${moveData.articleId} not found`);
     }
-    
+
     const currentStock = parseFloat(article.currentStock || '0');
     const moveQuantity = parseFloat(moveData.quantity);
-    
+
     // Calculer le stock après le mouvement
     let stockAfter = currentStock;
     if (moveData.type === 'in') {
@@ -1786,64 +1759,64 @@ export class DatabaseStorage implements IStorage {
     } else if (moveData.type === 'out') {
       stockAfter = currentStock - moveQuantity;
     }
-    
+
     // Vérifier que le stock ne devient pas négatif
     if (stockAfter < 0) {
       throw new Error(`Insufficient stock for article ${article.name || 'Unknown'}. Available: ${currentStock}, Required: ${moveQuantity}`);
     }
-    
+
     const [newMove] = await db.insert(stockMoves).values({
       ...moveData,
       code,
       stockBefore: currentStock.toString(),
       stockAfter: stockAfter.toString(),
     }).returning();
-    
+
     // Mettre à jour le stock de l'article
     await db.update(articles)
       .set({ currentStock: stockAfter.toString() })
       .where(eq(articles.id, moveData.articleId));
-    
+
     return newMove;
   }
 
   // Confirmer un mouvement de stock
   async confirmStockMove(moveId: number, confirmedBy: number): Promise<StockMove> {
     const [updatedMove] = await db.update(stockMoves)
-      .set({ 
+      .set({
         status: 'confirmed',
         confirmedBy,
         confirmedAt: new Date().toISOString()
       })
       .where(eq(stockMoves.id, moveId))
       .returning();
-    
+
     return updatedMove;
   }
 
   // Valider un mouvement de stock (le rendre effectif)
   async validateStockMove(moveId: number, doneBy: number): Promise<StockMove> {
     const [updatedMove] = await db.update(stockMoves)
-      .set({ 
+      .set({
         status: 'done',
         doneBy,
         doneAt: new Date().toISOString()
       })
       .where(eq(stockMoves.id, moveId))
       .returning();
-    
+
     return updatedMove;
   }
 
   // Créer un lot avec traçabilité
   async createStockLot(lotData: InsertStockLot): Promise<StockLot> {
     const code = await this.generateStockLotCode();
-    
+
     const [newLot] = await db.insert(stockLots).values({
       ...lotData,
       code,
     }).returning();
-    
+
     return newLot;
   }
 
@@ -1854,40 +1827,40 @@ export class DatabaseStorage implements IStorage {
     if (!lot.length) {
       throw new Error(`Lot ${lotMoveData.lotId} not found`);
     }
-    
+
     const currentLotStock = parseFloat(lot[0].currentQuantity);
     const moveQuantity = parseFloat(lotMoveData.quantity);
-    
+
     // Calculer le stock après le mouvement
     const lotStockAfter = currentLotStock - moveQuantity;
-    
+
     if (lotStockAfter < 0) {
       throw new Error(`Insufficient lot stock. Available: ${currentLotStock}, Required: ${moveQuantity}`);
     }
-    
+
     const [newLotMove] = await db.insert(stockLotMoves).values({
       ...lotMoveData,
       lotStockBefore: currentLotStock.toString(),
       lotStockAfter: lotStockAfter.toString(),
     }).returning();
-    
+
     // Mettre à jour le stock du lot
     await db.update(stockLots)
       .set({ currentQuantity: lotStockAfter.toString() })
       .where(eq(stockLots.id, lotMoveData.lotId));
-    
+
     return newLotMove;
   }
 
   // Créer un ajustement de stock
   async createStockAdjustment(adjustmentData: InsertStockAdjustment): Promise<StockAdjustment> {
     const code = await this.generateStockAdjustmentCode();
-    
+
     const [newAdjustment] = await db.insert(stockAdjustments).values({
       ...adjustmentData,
       code,
     }).returning();
-    
+
     return newAdjustment;
   }
 
@@ -1897,10 +1870,10 @@ export class DatabaseStorage implements IStorage {
     if (!adjustment.length) {
       throw new Error(`Adjustment ${adjustmentId} not found`);
     }
-    
+
     const adj = adjustment[0];
     const difference = parseFloat(adj.difference);
-    
+
     // Créer un mouvement de stock pour l'ajustement
     const moveData: InsertStockMove = {
       type: difference > 0 ? 'in' : 'out',
@@ -1915,19 +1888,19 @@ export class DatabaseStorage implements IStorage {
       createdBy: adj.createdBy,
       doneBy: confirmedBy,
     };
-    
+
     await this.createStockMove(moveData);
-    
+
     // Confirmer l'ajustement
     const [updatedAdjustment] = await db.update(stockAdjustments)
-      .set({ 
+      .set({
         status: 'confirmed',
         confirmedBy,
         confirmedAt: new Date().toISOString()
       })
       .where(eq(stockAdjustments.id, adjustmentId))
       .returning();
-    
+
     return updatedAdjustment;
   }
 
@@ -1938,16 +1911,16 @@ export class DatabaseStorage implements IStorage {
     if (!article) {
       throw new Error(`Article ${reservationData.articleId} not found`);
     }
-    
+
     const availableStock = parseFloat(article.currentStock || '0');
     const reservedQuantity = parseFloat(reservationData.reservedQuantity);
-    
+
     if (availableStock < reservedQuantity) {
       throw new Error(`Insufficient stock for reservation. Available: ${availableStock}, Required: ${reservedQuantity}`);
     }
-    
+
     const [newReservation] = await db.insert(stockReservations).values(reservationData).returning();
-    
+
     return newReservation;
   }
 
@@ -1957,14 +1930,14 @@ export class DatabaseStorage implements IStorage {
       .set({ status: 'cancelled' })
       .where(eq(stockReservations.id, reservationId))
       .returning();
-    
+
     return updatedReservation;
   }
 
   // Créer des réservations d'ingrédients pour une préparation
   async createIngredientReservationsForPreparation(operationId: number, items: InventoryOperationItem[]): Promise<StockReservation[]> {
     const reservations: StockReservation[] = [];
-    
+
     for (const item of items) {
       const article = await this.getArticle(item.articleId);
       if (!article) continue;
@@ -1975,7 +1948,7 @@ export class DatabaseStorage implements IStorage {
 
       // Obtenir les ingrédients de la recette
       const recipeIngredients = await this.getRecipeIngredients(recipe.id);
-      
+
       // Calculer la consommation basée sur la quantité planifiée
       const plannedQuantity = parseFloat(item.quantity || '0');
       const recipeQuantity = parseFloat(recipe.quantity || '1');
@@ -1987,7 +1960,7 @@ export class DatabaseStorage implements IStorage {
         if (!ingredientArticle) continue;
 
         const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-        
+
         // Vérifier si assez de stock est disponible
         const currentStock = parseFloat(ingredientArticle.currentStock || '0');
         if (currentStock < requiredQuantity) {
@@ -2007,7 +1980,7 @@ export class DatabaseStorage implements IStorage {
         reservations.push(reservation);
       }
     }
-    
+
     return reservations;
   }
 
@@ -2016,7 +1989,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.update(stockReservations)
       .set({ status: 'cancelled' })
       .where(eq(stockReservations.inventoryOperationId, operationId));
-    
+
     return (result.rowCount || 0) > 0;
   }
 
@@ -2034,7 +2007,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stockMoves.articleId, articleId))
       .orderBy(desc(stockMoves.createdAt))
       .limit(limit);
-    
+
     return moves;
   }
 
@@ -2053,7 +2026,7 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(stockMoves.createdAt))
       .limit(limit);
-    
+
     return moves;
   }
 
@@ -2086,7 +2059,7 @@ export class DatabaseStorage implements IStorage {
       ), 0) > 0
       ORDER BY sz.designation
     `);
-    
+
     return result.rows;
   }
 
@@ -2096,7 +2069,7 @@ export class DatabaseStorage implements IStorage {
       .from(stockLots)
       .where(eq(stockLots.articleId, articleId))
       .orderBy(desc(stockLots.createdAt));
-    
+
     return lots;
   }
 
@@ -2111,7 +2084,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(stockReservations.reservedAt));
-    
+
     return reservations;
   }
 
@@ -2126,7 +2099,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(stockReservations.reservedAt));
-    
+
     return reservations;
   }
 
@@ -2134,15 +2107,15 @@ export class DatabaseStorage implements IStorage {
   async getAvailableStock(articleId: number): Promise<number> {
     const article = await this.getArticle(articleId);
     if (!article) return 0;
-    
+
     const totalStock = parseFloat(article.currentStock || '0');
-    
+
     // Calculer les réservations actives
     const reservations = await this.getArticleReservations(articleId);
-    const reservedQuantity = reservations.reduce((sum, res) => 
+    const reservedQuantity = reservations.reduce((sum, res) =>
       sum + parseFloat(res.reservedQuantity) - parseFloat(res.deliveredQuantity || '0'), 0
     );
-    
+
     return Math.max(0, totalStock - reservedQuantity);
   }
 
@@ -2170,20 +2143,20 @@ export class DatabaseStorage implements IStorage {
         reservations: []
       };
     }
-    
+
     const totalStock = parseFloat(article.currentStock || '0');
     const reservations = await this.getArticleReservations(articleId);
-    
-    const reservedQuantity = reservations.reduce((sum, res) => 
+
+    const reservedQuantity = reservations.reduce((sum, res) =>
       sum + parseFloat(res.reservedQuantity), 0
     );
-    
-    const deliveredQuantity = reservations.reduce((sum, res) => 
+
+    const deliveredQuantity = reservations.reduce((sum, res) =>
       sum + parseFloat(res.deliveredQuantity || '0'), 0
     );
-    
+
     const availableStock = Math.max(0, totalStock - reservedQuantity + deliveredQuantity);
-    
+
     return {
       totalStock,
       reservedQuantity,
@@ -2217,7 +2190,7 @@ export class DatabaseStorage implements IStorage {
     const recipeIngredients = await this.getRecipeIngredients(recipeId);
     const recipeQuantity = parseFloat(recipe.quantity || '1');
     const ratio = plannedQuantity / recipeQuantity;
-    
+
     let allAvailable = true;
     const missingIngredients: Array<{
       articleId: number;
@@ -2226,7 +2199,7 @@ export class DatabaseStorage implements IStorage {
       availableStock: number;
       shortfall: number;
     }> = [];
-    
+
     let totalReservations = 0;
 
     for (const ingredient of recipeIngredients) {
@@ -2235,10 +2208,10 @@ export class DatabaseStorage implements IStorage {
 
       const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
       const availableStock = await this.getAvailableStock(ingredient.articleId);
-      
+
       // Compter les réservations pour cet ingrédient
       const reservations = await this.getArticleReservations(ingredient.articleId);
-      const reservedQuantity = reservations.reduce((sum, res) => 
+      const reservedQuantity = reservations.reduce((sum, res) =>
         sum + parseFloat(res.reservedQuantity) - parseFloat(res.deliveredQuantity || '0'), 0
       );
       totalReservations += reservedQuantity;
@@ -2283,17 +2256,17 @@ export class DatabaseStorage implements IStorage {
       LEFT JOIN users u_done ON u_done.id = sm.done_by
       WHERE sm.article_id = ${articleId}
     `;
-    
+
     if (startDate) {
       query = sql`${query} AND sm.created_at >= ${startDate}`;
     }
-    
+
     if (endDate) {
       query = sql`${query} AND sm.created_at <= ${endDate}`;
     }
-    
+
     query = sql`${query} ORDER BY sm.created_at DESC`;
-    
+
     const result = await db.execute(query);
     return result.rows;
   }

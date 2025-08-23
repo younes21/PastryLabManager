@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -34,7 +34,8 @@ export const measurementUnits = pgTable("measurement_units", {
 export const articleCategories = pgTable("article_categories", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
-  parentId: integer("parent_id"),
+  type: text("type").$type<"produit" | "ingredient" | "service">(),
+  parentId: integer("parent_id").references((): AnyPgColumn => articleCategories.id), 
   forSale: boolean("for_sale").default(false),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
@@ -114,7 +115,7 @@ export const accountingAccounts = pgTable("accounting_accounts", {
   designation: text("designation").notNull(),
   type: text("type").notNull(), // 'actif', 'passif', 'charge', 'produit'
   nature: text("nature").notNull().default("debit"), // 'debit', 'credit'
-  parentId: integer("parent_id"), // Comptes hiérarchiques
+  parentId: integer("parent_id").references((): AnyPgColumn => accountingAccounts.id), // Comptes hiérarchiques
   description: text("description"),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
@@ -481,33 +482,40 @@ export const orderItems = pgTable("order_items", {
 
 export const inventoryOperations = pgTable("inventory_operations", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // REC-000001, PREP-000001, etc.
-  type: text("type").notNull(), // reception, preparation, preparation_reliquat, ajustement, ajustement_rebut, inventaire_initiale, interne, livraison
-  status: text("status").notNull().default("draft"), // draft, pending, ready, completed, cancelled, programmed, in_progress
-  
+  code: text("code").notNull().unique(), // ex: REC-000001, PREP-000001
+  type: text("type").notNull(), // reception, livraison, ajustement, inventaire, fabrication...
+  status: text("status").notNull().default("draft"), // draft, pending, ready, completed, cancelled, etc.
+
   // Références
-  supplierId: integer("supplier_id").references(() => suppliers.id), // Pour réceptions
-  orderId: integer("order_id").references(() => orders.id), // Pour préparations/livraisons
-  // purchaseOrderId removed: we don't use purchase_* tables
-  parentOperationId: integer("parent_operation_id"), // Pour reliquats et rectifications
+  supplierId: integer("supplier_id").references(() => suppliers.id), // si réception
+  clientId: integer("customer_id").references(() => clients.id), // si livraison
+  orderId: integer("order_id").references(() => orders.id), // lien avec commande
+  parentOperationId: integer("parent_operation_id").references((): AnyPgColumn => inventoryOperations.id), 
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
-  operatorId: integer("operator_id").references(() => users.id), // Préparateur/opérateur
-  
+  operatorId: integer("operator_id").references(() => users.id),
+
   // Dates
   scheduledDate: timestamp("scheduled_date", { mode: 'string' }),
   startedAt: timestamp("started_at", { mode: 'string' }),
   completedAt: timestamp("completed_at", { mode: 'string' }),
-  
-  // Montants (pour réceptions)
-  subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).default("0.00"),
-  totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
-  totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).default("0.00"),
-  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
-  
+  validatedAt: timestamp("validated_at", { mode: 'string' }), // quand verrouillé
+
+  // Montants (pour réceptions/ventes)
+  currency: text("currency").default("DZD"), 
+  subtotalHT: decimal("subtotal_ht", { precision: 12, scale: 2 }).default("0.00"),
+  totalTax: decimal("total_tax", { precision: 12, scale: 2 }).default("0.00"),
+  totalTTC: decimal("total_ttc", { precision: 12, scale: 2 }).default("0.00"),
+  discount: decimal("discount", { precision: 12, scale: 2 }).default("0.00"),
+
+  // Documents
+  externalRef: text("external_ref"), // numéro bon fournisseur / BL client
+  linkedInvoiceId: integer("linked_invoice_id"), // future liaison facturation
+
   // Divers
   notes: text("notes"),
   cancellationReason: text("cancellation_reason"),
-  
+  isValidated: boolean("is_validated").default(false),
+
   // Audit
   createdBy: integer("created_by").references(() => users.id),
   completedBy: integer("completed_by").references(() => users.id),
@@ -519,67 +527,84 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
   id: serial("id").primaryKey(),
   operationId: integer("operation_id").references(() => inventoryOperations.id, { onDelete: 'cascade' }).notNull(),
   articleId: integer("article_id").references(() => articles.id).notNull(),
-  
+
   // Quantités
-  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
-  quantityBefore: decimal("quantity_before", { precision: 10, scale: 3 }), // Stock avant opération
-  quantityAfter: decimal("quantity_after", { precision: 10, scale: 3 }), // Stock après opération
-  
-  // Prix (pour réceptions)
-  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).default("0.00"),
-  totalCost: decimal("total_cost", { precision: 10, scale: 2 }).default("0.00"),
+  quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull(),
+  quantityBefore: decimal("quantity_before", { precision: 12, scale: 3 }),
+  quantityAfter: decimal("quantity_after", { precision: 12, scale: 3 }),
+
+  // Prix
+  unitCost: decimal("unit_cost", { precision: 12, scale: 2 }).default("0.00"), // coût d’achat
+  unitPriceSale: decimal("unit_price_sale", { precision: 12, scale: 2 }).default("0.00"), // prix de vente (si vente)
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }).default("0.00"),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0.00"),
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0.00"),
-  
-  // Zone de stockage
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).default("0.00"),
+
+  // Traçabilité
+  lotId: integer("lot_id").references(() => lots.id),
+  serialNumber: text("serial_number"),
+  expiryDate: timestamp("expiry_date", { mode: 'string' }),
+
+  // Stockage
   fromStorageZoneId: integer("from_storage_zone_id").references(() => storageZones.id),
   toStorageZoneId: integer("to_storage_zone_id").references(() => storageZones.id),
-  
+
   // Rebuts
-  wasteReason: text("waste_reason"), // pour ajustement_rebut
+  wasteReason: text("waste_reason"),
   wasteLocationId: integer("waste_location_id").references(() => storageZones.id),
-  
+
+  // Suivi
+  lineStatus: text("line_status").default("pending"), // pending, delivered, cancelled
+
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
 });
 
-// ======= INVENTORY (single table, mixed approach: header + line details in one row) =======
-export const inventory = pgTable("inventory", {
+export const stock = pgTable("stock", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull(),
-  type: text("type").notNull(), // reception, preparation, ajustement, interne, livraison, etc.
-  status: text("status").notNull().default("draft"),
-
-  // Contexte opération
-  operationDate: timestamp("operation_date", { mode: 'string' }).defaultNow(),
-  operationId: integer("operation_id").references(() => inventoryOperations.id),
-  supplierId: integer("supplier_id").references(() => suppliers.id),
-  orderId: integer("order_id").references(() => orders.id),
-  // purchaseOrderId removed: we don't use purchase_* tables
-  operatorId: integer("operator_id").references(() => users.id),
-
-  // Mouvement/Article
   articleId: integer("article_id").references(() => articles.id).notNull(),
-  fromStorageZoneId: integer("from_storage_zone_id").references(() => storageZones.id),
-  toStorageZoneId: integer("to_storage_zone_id").references(() => storageZones.id),
-  quantityBefore: decimal("quantity_before", { precision: 10, scale: 3 }),
-  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
-  quantityAfter: decimal("quantity_after", { precision: 10, scale: 3 }),
-
-  // Coûts/Taxes (pour réceptions)
-  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
-  totalCost: decimal("total_cost", { precision: 10, scale: 2 }),
-  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }),
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
-
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id).notNull(),
+  lotId: integer("lot_id").references(() => lots.id),       // optionnel pour traçabilité
+  serialNumber: text("serial_number"),  // optionnel pour traçabilité
+  quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull().default("0.000"),
+  createdAt: timestamp("createdAt", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow()
 });
 
-export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true, createdAt: true, updatedAt: true });
-export type Inventory = typeof inventory.$inferSelect;
-export type InsertInventory = z.infer<typeof insertInventorySchema>;
+export const lots = pgTable("lots", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").references(() => articles.id).notNull(),
+
+  // Identification
+  code: text("code").notNull().unique(),
+
+  // Dates de vie
+  manufacturingDate: timestamp("manufacturing_date", { mode: "string" }),
+  useDate: timestamp("use_date", { mode: "string" }),     // DLC / date limite d’utilisation
+  expirationDate: timestamp("expiration_date", { mode: "string" }), // date de péremption stricte
+  alertDate: timestamp("alert_date", { mode: "string" }), // pour générer des alertes
+
+  // Origine
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow()
+});
+
+export const operationLots = pgTable("operation_lots", {
+  id: serial("id").primaryKey(),
+  operationId: integer("operation_id")
+    .references(() => inventoryOperations.id, { onDelete: 'cascade' })
+    .notNull(),
+  lotId: integer("lot_id")
+    .references(() => lots.id, { onDelete: 'cascade' })
+    .notNull(),
+  
+  producedQuantity: decimal("produced_quantity", { precision: 10, scale: 3 }).notNull(),
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow()
+});
 
 // ============ LIVRAISONS ============
 

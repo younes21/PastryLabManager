@@ -54,7 +54,7 @@ export default function IngredientsPage() {
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["/api/article-categories"],
+    queryKey: ["/api/article-categories/ingredient"],
   });
 
   const { data: StorageZones } = useQuery({
