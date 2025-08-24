@@ -2052,26 +2052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.adjustArticleStockAndCost(l.articleId, qty, l.unitCost || '0');
           // Si le journal n'existe pas déjà pour cette ligne, on peut écrire
           // (simple): toujours écrire une ligne supplémentaire de confirmation
-          await storage.createInventoryRow({
-            code: op.code,
-            type: 'reception',
-            status: 'completed',
-            operationId: op.id,
-            operationDate: new Date().toISOString(),
-            supplierId: op.supplierId || null,
-            operatorId: null,
-            articleId: l.articleId,
-            fromStorageZoneId: null,
-            toStorageZoneId: l.toStorageZoneId || null,
-            quantityBefore: l.quantityBefore || '0',
-            quantity: l.quantity,
-            quantityAfter: l.quantityAfter || '0',
-            unitCost: l.unitCost || '0',
-            totalCost: l.totalCost || '0',
-            taxRate: l.taxRate || '0',
-            taxAmount: l.taxAmount || '0',
-            notes: `Validation ${op.code}`,
-          } as any);
+        
         }
       }
       res.json(op);

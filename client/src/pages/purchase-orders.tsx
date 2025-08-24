@@ -150,7 +150,8 @@ const ReceptionAchatInterface = () => {
         totalPrice,
         taxRate: taxRate,
         taxAmount: taxAmount,
-         currentStock: parseFloat((articleToAdd.currentStock ?? 0).toString())
+        currentStock: parseFloat((articleToAdd.currentStock ?? 0).toString()),
+        toStorageZoneId: currentOperation?.storageZoneId || (storageZones.length > 0 ? storageZones[0].id : null),
       };
 
       setItems([...items, newItem]);
@@ -615,6 +616,8 @@ const ReceptionAchatInterface = () => {
                   <th className="px-3 py-2 text-center text-xs font-semibold">U.M</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold">PRIX (DA)</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold">MNT HT</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">Zone de stockage</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold">Lot</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -658,7 +661,39 @@ const ReceptionAchatInterface = () => {
                     <td className="px-3 py-2 text-center text-xs font-semibold">
                        {item.totalPrice.toFixed(2)} DA
                     </td>
+                   
                     <td className="px-3 py-2 text-center">
+                      <select
+                        value={item.storageZoneId || currentOperation?.storageZoneId || ''}
+                        onChange={(e) => {
+                          const newItems = [...items];
+                          const itemIndex = newItems.findIndex(i => i.id === item.id);
+                          if (itemIndex > -1) {
+                            newItems[itemIndex] = { ...newItems[itemIndex], storageZoneId: parseInt(e.target.value) };
+                            setItems(newItems);
+                          }
+                        }}
+                        className="w-32 px-1 py-0.5 text-center text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        disabled={currentOperation?.status !== 'draft'}
+                      >
+                        <option value="">Sélectionner...</option>
+                        {storageZones.map(zone => (
+                          <option key={zone.id} value={zone.id}>
+                            {zone.designation}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => alert('Ajouter lot pour ' + item.article?.name)} // Placeholder action
+                        className="text-blue-600 hover:text-blue-800 p-1"
+                        title="Ajouter lot"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </td>
+                     <td className="px-3 py-2 text-center">
                       {currentOperation?.status === 'draft' && (
                         <button
                           onClick={() => removeItem(item.id)}
