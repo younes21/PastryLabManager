@@ -79,6 +79,12 @@ const ReceptionAchatInterface = () => {
 
   const editOperation = async (op: any) => {
     try {
+      // Vérifier si la réception peut être modifiée
+      if (op.status === 'completed') {
+        alert('Impossible de modifier une réception déjà complétée.');
+        return;
+      }
+
       // Fetch full order with items
       const res = await apiRequest(`/api/purchase-orders/${op.id}`, 'GET');
       const data = await res.json();
@@ -117,13 +123,23 @@ const ReceptionAchatInterface = () => {
     }
   };
 
-  const deleteOperation = (opId: number) => {
+  const deleteOperation = async (opId: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette opération ?')) {
-      setOperations(operations.filter(op => op.id !== opId));
-      if (currentOperation?.id === opId) {
-        setCurrentOperation(null);
-        setItems([]);
-        setIsEditing(false);
+      try {
+        await apiRequest(`/api/purchase-orders/${opId}`, 'DELETE');
+        
+        // Mettre à jour l'état local
+        setOperations(operations.filter(op => op.id !== opId));
+        if (currentOperation?.id === opId) {
+          setCurrentOperation(null);
+          setItems([]);
+          setIsEditing(false);
+        }
+        
+        alert('Réception supprimée avec succès');
+      } catch (e) {
+        console.error('Failed to delete purchase order', e);
+        alert('Erreur lors de la suppression');
       }
     }
   };
@@ -219,6 +235,12 @@ const ReceptionAchatInterface = () => {
     if (!currentOperation) return;
 
     try {
+      // Vérifier si la réception peut être modifiée
+      if (currentOperation.id && currentOperation.status === 'completed') {
+        alert('Impossible de modifier une réception déjà complétée.');
+        return;
+      }
+
       // Validation stricte: fournisseur, zone et articles requis, lignes valides
       if (!currentOperation.supplierId || !currentOperation.storageZoneId || items.length === 0) {
         alert('Sélectionnez un fournisseur, une zone de stockage et au moins un article.');
@@ -254,14 +276,38 @@ const ReceptionAchatInterface = () => {
         notes: it.notes || undefined,
       }));
 
-      const res = await apiRequest('/api/purchase-orders', 'POST', {
+      const payload = {
         purchaseOrder: receptionHeader,
         items: itemsPayload,
-      });
-      const data = await res.json();
+      };
 
-      // Update list and current operation from server response
-      setOperations((prev) => [data, ...prev]);
+      let res;
+      let data;
+
+      // Détecter si c'est une modification (ID existe) ou création
+      if (currentOperation.id && typeof currentOperation.id === 'number') {
+        // Modification - utiliser PUT
+        console.log('Modification de la réception:', currentOperation.id);
+        res = await apiRequest(`/api/purchase-orders/${currentOperation.id}`, 'PUT', payload);
+        data = await res.json();
+        
+        // Mettre à jour la liste des opérations
+        setOperations((prev) => 
+          prev.map(op => op.id === currentOperation.id ? data : op)
+        );
+        alert('Réception modifiée avec succès');
+      } else {
+        // Création - utiliser POST
+        console.log('Création d\'une nouvelle réception');
+        res = await apiRequest('/api/purchase-orders', 'POST', payload);
+        data = await res.json();
+        
+        // Ajouter à la liste des opérations
+        setOperations((prev) => [data, ...prev]);
+        alert('Réception créée avec succès');
+      }
+
+      // Update current operation from server response
       setCurrentOperation({
         id: data.id,
         code: data.code,
@@ -273,7 +319,9 @@ const ReceptionAchatInterface = () => {
         totalTTC: parseFloat(data.totalTTC || '0'),
         notes: data.notes || '',
         createdAt: data.createdAt,
+        storageZoneId: data.storageZoneId || '',
       });
+
       // Map depuis inventory_operation_items pour éviter les 0
       setItems((data.items || []).map((it: any) => ({
         id: it.id,
@@ -295,7 +343,6 @@ const ReceptionAchatInterface = () => {
         const articlesData = await artRes.json();
         setArticles((articlesData || []).filter((a: any) => a.type === 'ingredient'));
       } catch {}
-      alert('Réception sauvegardée');
     } catch (e) {
       console.error('Failed to save purchase order', e);
       alert('Erreur lors de la sauvegarde');
@@ -369,9 +416,9 @@ const ReceptionAchatInterface = () => {
           <div className=" mx-auto px-6 py-6">
             <div className="flex items-center justify-between">
               <p className='text-gray-600 dark:text-gray-400 mt-2'>gerer les achat de vos ingrédients depuis vos fournisseur </p>
-            <Button 
+                          <Button 
                 onClick={createNewOperation}
-                className="bg-accent hover:bg-accent-hover  "
+                className="bg-accent hover:bg-accent-hover"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nouvelle Réception</span>
@@ -426,8 +473,9 @@ const ReceptionAchatInterface = () => {
                           <div className="flex items-center justify-center space-x-2">
                             <button
                               onClick={() => editOperation(operation)}
-                              className="text-blue-600 hover:text-blue-800 p-1"
-                              title="Modifier"
+                              disabled={operation.status === 'completed'}
+                              className="text-blue-600 hover:text-blue-800 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={operation.status === 'completed' ? 'Impossible de modifier une réception complétée' : 'Modifier'}
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
@@ -484,6 +532,11 @@ const ReceptionAchatInterface = () => {
               <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
                 {currentOperation?.code || 'Nouveau'}
               </span>
+              {currentOperation?.id && (
+                <span className="px-3 py-1 bg-orange-100 text-orange-800 text-sm font-medium rounded-full">
+                  Mode Modification
+                </span>
+              )}
               {currentOperation?.status && getStatusBadge(currentOperation.status)}
             </div>
             <div className="text-sm text-gray-500">

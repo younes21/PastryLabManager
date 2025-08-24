@@ -2062,6 +2062,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Modification complète d'une réception (PUT)
+  app.put("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const body = req.body as any;
+      
+      // Vérifier que la réception existe et est de type reception
+      const existingOp = await storage.getInventoryOperation(id);
+      if (!existingOp || existingOp.type !== 'reception') {
+        return res.status(404).json({ message: "Reception not found" });
+      }
+
+      // Mettre à jour l'opération principale
+      const updatedOp = await storage.updateInventoryOperation(id, {
+        status: body?.purchaseOrder?.status ?? existingOp.status,
+        supplierId: body?.purchaseOrder?.supplierId ?? existingOp.supplierId,
+        storageZoneId: body?.items?.[0]?.storageZoneId ?? existingOp.storageZoneId,
+        notes: body?.purchaseOrder?.notes ?? existingOp.notes,
+        subtotalHT: body?.purchaseOrder?.subtotalHT ?? existingOp.subtotalHT,
+        totalTax: body?.purchaseOrder?.totalTax ?? existingOp.totalTax,
+        totalTTC: body?.purchaseOrder?.totalTTC ?? existingOp.totalTTC,
+        discount: body?.purchaseOrder?.discount ?? existingOp.discount,
+      } as any);
+
+      // Supprimer les anciennes lignes
+      const existingItems = await storage.getInventoryOperationItems(id);
+      for (const item of existingItems) {
+        await storage.deleteInventoryOperationItem(item.id);
+      }
+
+      // Créer les nouvelles lignes
+      const items: any[] = [];
+      for (const it of body.items ?? []) {
+        const line = await storage.createInventoryOperationItem({
+          operationId: id,
+          articleId: it.articleId,
+          quantity: it.quantityOrdered,
+          quantityBefore: it.currentStock,
+          quantityAfter: (parseFloat(it.currentStock || '0') + parseFloat(it.quantityOrdered || '0')).toString(),
+          unitCost: it.unitPrice,
+          totalCost: it.totalPrice,
+          taxRate: it.taxRate,
+          taxAmount: it.taxAmount,
+          toStorageZoneId: it.storageZoneId ?? null,
+          notes: it.notes ?? null,
+        } as any);
+        items.push(line);
+      }
+
+      res.json({ ...updatedOp, items });
+    } catch (error) {
+      console.error("Error updating reception:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid data", errors: error.errors });
+      } else {
+        res.status(500).json({ message: "Failed to update reception" });
+      }
+    }
+  });
+
   app.delete("/api/purchase-orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);

@@ -1,32 +1,10 @@
 
 ## Overview
-
 This is a comprehensive bakery laboratory management system (ERP) built with React and Express.js, inspired by Odoo. The application provides full CRUD functionality for managing professional bakery operations including sales, purchasing, accounting, production, inventory, and administration. It features role-based access control with interfaces adapted for point-of-sale systems.
-
-### Business Rules
-- **Articles** can be: products, ingredients, or services
-- **Default currency**: DA (Algerian Dinar)
-- **Automatic codes** for main entities: `{prefix(5 chars max)}-{000000-999999}` (e.g., `frt-000021`)
-- **Administrator** has all privileges by default
-- **Event tracking table** for change monitoring (activatable/deactivatable)
-- **Audit fields** required: `createdAt`, `creatorId`, etc.
-- **Measurement Units**: L'unité de mesure d'une recette doit être dans la même catégorie que l'unité de mesure de l'article associé
-
-### Core Modules
-1. **Sales Management**: Clients, Products/Recipes, Quotes/Orders, Product/Ingredient Sales
-2. **Purchase Management**: Suppliers, Ingredients, Ingredient Purchases
-3. **Billing & Accounting**: Journals/Entries, Delivery/Invoicing, Supplier/Client Payments  
-4. **Production (Laboratory)**: Technical Sheets (Recipes), Preparation Planning, Preparations
-5. **Inventory (Stock)**: Operations (transfers, adjustments, provisioning), Product/Ingredient tracking
-6. **Dashboard**: Overview and analytics
-7. **User Management**: Users, Roles, Permissions
-8. **Administration**: Users, Measurement Units, Product Categories, Price Lists, Delivery Methods, Taxes, Storage Zones, Currencies, Work Stations, Accounting Journals
-
 
 ### Backend Dependencies
 - **Express.js**: Web framework
 - **Drizzle ORM**: Database toolkit
-- **@neondatabase/serverless**: PostgreSQL driver for Neon
 - **connect-pg-simple**: PostgreSQL session store
 - **zod**: Runtime type validation
 
@@ -45,17 +23,6 @@ This is a comprehensive bakery laboratory management system (ERP) built with Rea
 - **ESBuild**: Production bundling
 - **drizzle-kit**: Database migrations and introspection
 
-## Deployment Strategy
-
-### Build Process
-- Frontend: Vite builds React app to `dist/public/`
-- Backend: ESBuild bundles server code to `dist/index.js`
-- Single artifact deployment with static file serving
-
-### Environment Configuration
-- Database connection via `DATABASE_URL` environment variable
-- Development mode with hot reloading
-- Production mode with optimized builds
 
 ### Development Workflow
 - `npm run dev`: Start development server with hot reloading
@@ -79,15 +46,6 @@ The application is designed to be deployed as a single Node.js application that 
 - Frontend auth context for managing user state
 - Protected routes based on user roles
 
-### Database Schema
-The application uses a comprehensive schema with the following main entities:
-- **Users**: User accounts with role-based permissions
-- **Storage Locations**: Physical storage areas with temperature and capacity tracking
-- **Ingredients**: Inventory items with stock levels and storage location references
-- **Recipes**: Product recipes with ingredients, preparation time, and pricing
-- **Production**: Production scheduling and tracking
-- **Orders**: Customer orders with items and delivery information
-- **Deliveries**: Delivery assignments and tracking
 
 ### UI Components
 - Consistent design system using shadcn/ui components
@@ -96,9 +54,7 @@ The application uses a comprehensive schema with the following main entities:
 - Modal dialogs for forms and detailed views
 - Data tables with sorting and filtering capabilities
 
-## Data Flow
-
-### Client-Server Communication
+## Client-Server Communication
 - RESTful API endpoints under `/api/` prefix
 - JSON request/response format
 - TanStack Query for data fetching, caching, and synchronization
@@ -128,9 +84,3 @@ The application uses a comprehensive schema with the following main entities:
    - Add detailed logs to track function execution and results
    - Launch functions from frontend and verify proper execution
    - Verify results before providing final implementation to eliminate manual fixes
-5. **Interfaces must be adapted for POS (Point of Sale)** systems with:
-   - Large, touch-friendly buttons and inputs
-   - Clear typography and high contrast
-   - Efficient workflows for commercial use
-   - Quick search and filtering capabilities
-   - Visual feedback and status indicators
