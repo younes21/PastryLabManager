@@ -27,12 +27,12 @@ import {
   insertInventoryOperationItemSchema,
   updateInventoryOperationWithItemsSchema,
   type InsertInventoryOperation,
-  insertInventorySchema,
   insertDeliverySchema,
   insertInvoiceSchema,
   insertInvoiceItemSchema,
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
+  InventoryOperation,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1691,40 +1691,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const recipeQuantity = parseFloat(recipe.quantity || '1');
           const ratio = plannedQuantity / recipeQuantity;
 
-          // Consume each ingredient and create stock moves
-          for (const ingredient of recipeIngredients) {
-            const ingredientArticle = await storage.getArticle(ingredient.articleId);
-            if (!ingredientArticle) continue;
-
-            const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-
-            // Check if enough stock is available
-            const currentStock = parseFloat(ingredientArticle.currentStock || '0');
-            if (currentStock < requiredQuantity) {
-              return res.status(400).json({
-                message: `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`
-              });
-            }
-
-            // Create stock move for ingredient consumption
-            const stockMoveData = {
-              type: 'out',
-              status: 'done',
-              articleId: ingredientArticle.id,
-              quantity: requiredQuantity.toString(),
-              unit: ingredient.unit || ingredientArticle.unit,
-              fromStorageZoneId: ingredientArticle.storageZoneId,
-              toStorageZoneId: null,
-              reason: `Consommation pour préparation ${operation.code}`,
-              notes: `Consommation de ${ingredientArticle.name} pour produire ${article.name}`,
-              operationId: operation.id,
-              operationItemId: item.id,
-              createdBy: operation.operatorId,
-              doneBy: operation.operatorId,
-            };
-
-            await storage.createStockMove(stockMoveData);
-          }
         }
       }
 
@@ -1801,35 +1767,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conformQty = parseFloat(conformQuantity || totalPlanned.toString());
       const ratio = totalPlanned > 0 ? conformQty / totalPlanned : 1;
 
-      // For preparation operations, add the actual produced quantity to inventory and create stock moves
-      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
-        for (const item of items) {
-          const article = await storage.getArticle(item.articleId);
-          if (!article) continue;
-
-          const plannedQuantity = parseFloat(item.quantity || '0');
-          const actualQuantity = plannedQuantity * ratio; // Apply the conform ratio
-
-          // Create stock move for produced quantity
-          const stockMoveData = {
-            type: 'in',
-            status: 'done',
-            articleId: article.id,
-            quantity: actualQuantity.toString(),
-            unit: article.unit,
-            fromStorageZoneId: null,
-            toStorageZoneId: article.storageZoneId,
-            reason: `Production par préparation ${operation.code}`,
-            notes: `Production de ${article.name} - Quantité conforme: ${actualQuantity}`,
-            operationId: operation.id,
-            operationItemId: item.id,
-            createdBy: operation.operatorId,
-            doneBy: operation.operatorId,
-          };
-
-          await storage.createStockMove(stockMoveData);
-        }
-      }
 
       // Create waste operation if there's waste
       if (conformQty < totalPlanned && operation.type === 'preparation') {
@@ -1858,30 +1795,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         });
 
-        const wasteOp = await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
+      await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
 
-        // Create stock moves for waste
-        for (const wasteItem of wasteItems) {
-          const wasteArticle = await storage.getArticle(wasteItem.articleId);
-          if (!wasteArticle) continue;
-
-          const wasteMoveData = {
-            type: 'out',
-            status: 'done',
-            articleId: wasteArticle.id,
-            quantity: wasteItem.quantity,
-            unit: wasteArticle.unit,
-            fromStorageZoneId: wasteArticle.storageZoneId,
-            toStorageZoneId: null,
-            reason: `Rebut de préparation ${operation.code}`,
-            notes: `Rebut: ${wasteReason || 'Aucune raison spécifiée'}`,
-            operationId: wasteOp.id,
-            createdBy: operation.operatorId,
-            doneBy: operation.operatorId,
-          };
-
-          await storage.createStockMove(wasteMoveData);
-        }
+     
       }
 
       res.json(updatedOperation);
@@ -2037,37 +1953,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.patch("/api/purchase-orders/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { status } = req.body;
+
+    if (!["completed", "cancelled"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status transition" });
+    }
+
     try {
-      const id = parseInt(req.params.id);
-      const updateData = req.body;
-      const op = await storage.updateInventoryOperation(id, updateData);
-      if (!op || op.type !== 'reception') {
-        return res.status(404).json({ message: "Reception not found" });
-      }
-      // Si on valide (completed), recalcul/mise à jour des stocks et journal si nécessaire
-      if (updateData?.status === 'completed') {
-        const lines = await storage.getInventoryOperationItems(id);
-        for (const l of lines) {
-          const qty = parseFloat(l.quantity as unknown as string || '0');
-          await storage.adjustArticleStockAndCost(l.articleId, qty, l.unitCost || '0');
-          // Si le journal n'existe pas déjà pour cette ligne, on peut écrire
-          // (simple): toujours écrire une ligne supplémentaire de confirmation
-        
-        }
-      }
-      res.json(op);
+      const result = await storage.updateInventoryOperationStatus(id, status);
+
+      // pour plutart (ingregration comptabilité)
+      // await storage.createAccountingEntryFromOperation(result as InventoryOperation);
+
+      res.json(result);
+
     } catch (error) {
       console.error("Error updating reception:", error);
       res.status(500).json({ message: "Failed to update reception" });
     }
+
   });
+
 
   // Modification complète d'une réception (PUT)
   app.put("/api/purchase-orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const body = req.body as any;
-      
+
       // Vérifier que la réception existe et est de type reception
       const existingOp = await storage.getInventoryOperation(id);
       if (!existingOp || existingOp.type !== 'reception') {
@@ -2143,56 +2057,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============ ENDPOINTS POUR LA GESTION AVANCEE DES STOCKS ============
 
-  // Obtenir l'historique des mouvements d'un article
-  app.get("/api/articles/:id/stock-history", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid article ID" });
-      }
-
-      const limit = parseInt(req.query.limit as string) || 50;
-      const moves = await storage.getArticleStockHistory(id, limit);
-
-      res.json(moves);
-    } catch (error) {
-      console.error("Error fetching article stock history:", error);
-      res.status(500).json({ message: "Failed to fetch stock history" });
-    }
-  });
-
-  // Obtenir le stock par zone pour un article
-  app.get("/api/articles/:id/stock-by-zone", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid article ID" });
-      }
-
-      const stockByZone = await storage.getArticleStockByZone(id);
-      res.json(stockByZone);
-    } catch (error) {
-      console.error("Error fetching article stock by zone:", error);
-      res.status(500).json({ message: "Failed to fetch stock by zone" });
-    }
-  });
-
-  // Obtenir les lots d'un article
-  app.get("/api/articles/:id/lots", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid article ID" });
-      }
-
-      const lots = await storage.getArticleLots(id);
-      res.json(lots);
-    } catch (error) {
-      console.error("Error fetching article lots:", error);
-      res.status(500).json({ message: "Failed to fetch lots" });
-    }
-  });
-
   // Obtenir les réservations d'un article
   app.get("/api/articles/:id/reservations", async (req, res) => {
     try {
@@ -2247,154 +2111,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Créer un mouvement de stock
-  app.post("/api/stock-moves", async (req, res) => {
-    try {
-      const moveData = req.body;
-
-      // Validation des données requises
-      if (!moveData.articleId || !moveData.type || !moveData.quantity || !moveData.unit) {
-        return res.status(400).json({
-          message: "Missing required fields: articleId, type, quantity, unit"
-        });
-      }
-
-      const newMove = await storage.createStockMove(moveData);
-      res.status(201).json(newMove);
-    } catch (error) {
-      console.error("Error creating stock move:", error);
-      res.status(500).json({ message: "Failed to create stock move" });
-    }
-  });
-
-  // Confirmer un mouvement de stock
-  app.patch("/api/stock-moves/:id/confirm", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid move ID" });
-      }
-
-      const { confirmedBy } = req.body;
-      if (!confirmedBy) {
-        return res.status(400).json({ message: "confirmedBy is required" });
-      }
-
-      const updatedMove = await storage.confirmStockMove(id, confirmedBy);
-      res.json(updatedMove);
-    } catch (error) {
-      console.error("Error confirming stock move:", error);
-      res.status(500).json({ message: "Failed to confirm stock move" });
-    }
-  });
-
-  // Valider un mouvement de stock
-  app.patch("/api/stock-moves/:id/validate", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid move ID" });
-      }
-
-      const { doneBy } = req.body;
-      if (!doneBy) {
-        return res.status(400).json({ message: "doneBy is required" });
-      }
-
-      const updatedMove = await storage.validateStockMove(id, doneBy);
-      res.json(updatedMove);
-    } catch (error) {
-      console.error("Error validating stock move:", error);
-      res.status(500).json({ message: "Failed to validate stock move" });
-    }
-  });
-
-  // Créer un lot
-  app.post("/api/stock-lots", async (req, res) => {
-    try {
-      const lotData = req.body;
-
-      // Validation des données requises
-      if (!lotData.articleId || !lotData.lotNumber || !lotData.initialQuantity || !lotData.unit) {
-        return res.status(400).json({
-          message: "Missing required fields: articleId, lotNumber, initialQuantity, unit"
-        });
-      }
-
-      const newLot = await storage.createStockLot(lotData);
-      res.status(201).json(newLot);
-    } catch (error) {
-      console.error("Error creating stock lot:", error);
-      res.status(500).json({ message: "Failed to create stock lot" });
-    }
-  });
-
-  // Créer un mouvement de lot
-  app.post("/api/stock-lot-moves", async (req, res) => {
-    try {
-      const lotMoveData = req.body;
-
-      // Validation des données requises
-      if (!lotMoveData.lotId || !lotMoveData.moveId || !lotMoveData.quantity) {
-        return res.status(400).json({
-          message: "Missing required fields: lotId, moveId, quantity"
-        });
-      }
-
-      const newLotMove = await storage.createStockLotMove(lotMoveData);
-      res.status(201).json(newLotMove);
-    } catch (error) {
-      console.error("Error creating stock lot move:", error);
-      res.status(500).json({ message: "Failed to create stock lot move" });
-    }
-  });
-
-  // Créer un ajustement de stock
-  app.post("/api/stock-adjustments", async (req, res) => {
-    try {
-      const adjustmentData = req.body;
-
-      // Validation des données requises
-      if (!adjustmentData.articleId || !adjustmentData.type || !adjustmentData.systemQuantity ||
-        !adjustmentData.actualQuantity || !adjustmentData.reason) {
-        return res.status(400).json({
-          message: "Missing required fields: articleId, type, systemQuantity, actualQuantity, reason"
-        });
-      }
-
-      // Calculer la différence
-      const systemQty = parseFloat(adjustmentData.systemQuantity);
-      const actualQty = parseFloat(adjustmentData.actualQuantity);
-      adjustmentData.difference = (actualQty - systemQty).toString();
-
-      const newAdjustment = await storage.createStockAdjustment(adjustmentData);
-      res.status(201).json(newAdjustment);
-    } catch (error) {
-      console.error("Error creating stock adjustment:", error);
-      res.status(500).json({ message: "Failed to create stock adjustment" });
-    }
-  });
-
-  // Confirmer un ajustement de stock
-  app.patch("/api/stock-adjustments/:id/confirm", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid adjustment ID" });
-      }
-
-      const { confirmedBy } = req.body;
-      if (!confirmedBy) {
-        return res.status(400).json({ message: "confirmedBy is required" });
-      }
-
-      const updatedAdjustment = await storage.confirmStockAdjustment(id, confirmedBy);
-      res.json(updatedAdjustment);
-    } catch (error) {
-      console.error("Error confirming stock adjustment:", error);
-      res.status(500).json({ message: "Failed to confirm stock adjustment" });
-    }
-  });
 
   // Créer une réservation de stock
   app.post("/api/stock-reservations", async (req, res) => {

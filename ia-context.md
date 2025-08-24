@@ -79,8 +79,3 @@ The application is designed to be deployed as a single Node.js application that 
    - Avoid saturating database with excessive test data over time
 2. **Always test all API calls (CRUD) through the graphical interface** to ensure complete functionality
 3. **Navigation must be through lateral menu** - all pages should be accessible via sidebar navigation
-4. **Test execution of every CRUD function from frontend interface**:
-   - Test creation, modification, and deletion functions from the UI
-   - Add detailed logs to track function execution and results
-   - Launch functions from frontend and verify proper execution
-   - Verify results before providing final implementation to eliminate manual fixes

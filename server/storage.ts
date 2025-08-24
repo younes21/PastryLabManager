@@ -4,9 +4,7 @@ import {
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
-  invoices, invoiceItems, accountingEntries, accountingEntryLines,
-  // New stock management tables
-  stockMoves, stockLots, stockLotMoves, stockAdjustments, stockReservations,
+  invoices, invoiceItems, accountingEntries, accountingEntryLines, stockReservations,
 
   type User, type InsertUser,
   type Client, type InsertClient,
@@ -24,12 +22,9 @@ import {
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
   type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
   InventoryOperationWithItems,
-  // New types for stock management
-  type StockMove, type InsertStockMove,
-  type StockLot, type InsertStockLot,
-  type StockLotMove, type InsertStockLotMove,
-  type StockAdjustment, type InsertStockAdjustment,
-  type StockReservation, type InsertStockReservation
+  type StockReservation, type InsertStockReservation,
+  stock,
+  Stock
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt, and, or, gte, lte, isNull, sql } from "drizzle-orm";
@@ -189,7 +184,7 @@ export interface IStorage {
   generateReceptionCode(): Promise<string>;
   // Stock & cost updates
   adjustArticleStockAndCost(articleId: number, deltaQuantity: number, newUnitCost: string | number): Promise<Article | undefined>;
-  getInventoryRowsByOperation(operationId: number): Promise<Inventory[]>;
+  getInventoryRowsByOperation(operationId: number): Promise<Stock[]>;
 
   // Inventory Operations
   getAllInventoryOperations(): Promise<InventoryOperation[]>;
@@ -203,26 +198,7 @@ export interface IStorage {
 
   // ============ GESTION AVANCEE DES STOCKS ============
 
-  // Générer un code unique pour les mouvements de stock
-  generateStockMoveCode(): Promise<string>;
-  // Générer un code unique pour les lots
-  generateStockLotCode(): Promise<string>;
-  // Générer un code unique pour les ajustements
-  generateStockAdjustmentCode(): Promise<string>;
-  // Créer un mouvement de stock avec traçabilité complète
-  createStockMove(moveData: InsertStockMove): Promise<StockMove>;
-  // Confirmer un mouvement de stock
-  confirmStockMove(moveId: number, confirmedBy: number): Promise<StockMove>;
-  // Valider un mouvement de stock (le rendre effectif)
-  validateStockMove(moveId: number, doneBy: number): Promise<StockMove>;
-  // Créer un lot avec traçabilité
-  createStockLot(lotData: InsertStockLot): Promise<StockLot>;
-  // Créer un mouvement de lot
-  createStockLotMove(lotMoveData: InsertStockLotMove): Promise<StockLotMove>;
-  // Créer un ajustement de stock
-  createStockAdjustment(adjustmentData: InsertStockAdjustment): Promise<StockAdjustment>;
-  // Confirmer un ajustement de stock
-  confirmStockAdjustment(adjustmentId: number, confirmedBy: number): Promise<StockAdjustment>;
+
   // Créer une réservation de stock
   createStockReservation(reservationData: InsertStockReservation): Promise<StockReservation>;
   // Libérer une réservation de stock
@@ -233,14 +209,9 @@ export interface IStorage {
   releaseAllReservationsForOperation(operationId: number): Promise<boolean>;
   // Obtenir les réservations d'une opération d'inventaire
   getReservationsForOperation(operationId: number): Promise<StockReservation[]>;
-  // Obtenir l'historique des mouvements d'un article
-  getArticleStockHistory(articleId: number, limit: number): Promise<StockMove[]>;
-  // Obtenir l'historique des mouvements d'un article par zone
-  getArticleStockHistoryByZone(articleId: number, storageZoneId: number, limit: number): Promise<StockMove[]>;
-  // Obtenir le stock disponible par zone
+
   getArticleStockByZone(articleId: number): Promise<any[]>;
-  // Obtenir les lots d'un article
-  getArticleLots(articleId: number): Promise<StockLot[]>;
+
   // Obtenir les réservations d'un article
   getArticleReservations(articleId: number): Promise<StockReservation[]>;
   // Calculer le stock disponible (stock total - réservations)
@@ -250,6 +221,12 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  getInventoryRowsByOperation(operationId: number): Promise<Stock[]> {
+    throw new Error("Method not implemented.");
+  }
+  getArticleStockByZone(articleId: number): Promise<any[]> {
+    throw new Error("Method not implemented.");
+  }
   // Users
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -1423,6 +1400,112 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // async createAccountingEntryFromOperation(operation: InventoryOperation): Promise<AccountingEntry | undefined> {
+  //   if (operation.type === "reception" || operation.type === "livraison" || operation.type === "ajustement") {
+  //     return await createAccountingEntryFromOperation(operation);
+  //   }
+  // }
+
+  async updateInventoryOperationStatus(id: number, status: string): Promise<InventoryOperation | undefined> {
+
+    const result = await db.transaction(async (tx) => {
+      // Charger l’opération avec ses lignes
+      const op = await tx.query.inventoryOperations.findFirst({
+        where: (o, { eq }) => eq(o.id, id),
+        with: { items: true }
+      });
+
+      if (!op || op.type !== "reception") { throw new Error("Reception not found"); }
+
+      // Déjà dans l’état demandé → rien à faire
+      if (op.status === status) return op;
+
+      // Passage en "completed"
+      if (status === "completed") {
+        if (op.status === "completed") {
+          return op; // déjà traité
+        }
+
+        for (const item of op.items) {
+          const qty = Number(item.quantity) || 0;
+          const cost = Number(item.unitCost) || 0;
+
+          if (qty <= 0) {
+            throw new Error(`Invalid quantity for article ${item.articleId}`);
+          }
+
+          await tx.insert(stock).values({
+            articleId: item.articleId,
+            storageZoneId: item.toStorageZoneId!,
+            idLot: item.idLot ?? null,
+            serialNumber: item.serialNumber ?? null,
+            quantity: qty,
+            updatedAt: new Date()
+          }).onConflictDoUpdate({
+            target: ["article_id", "storage_zone_id", "lot_number", "serial_number"],
+            set: {
+              quantity: sql`${stock.quantity} + ${qty}`,
+              updatedAt: sql`now()`
+            }
+          });
+          // update article currentStock  
+          await db.update(articles)
+            .set({ currentStock: sql`${articles.currentStock} + ${item.quantity}` })
+            .where(eq(articles.id, item.articleId));
+          // en cas de bug ou panne on peut recalc current stock
+          // UPDATE articles a
+          //   SET current_stock = (
+          //     SELECT COALESCE(SUM(quantity), 0)
+          //     FROM inventory i
+          //     WHERE i.article_id = a.id);
+
+        }
+      }
+
+      // Passage en "cancelled"
+      if (status === "cancelled") {
+        // Si on annule une opération déjà complétée → rollback stock
+        if (op.status === "completed") {
+          for (const item of op.items) {
+            const qty = Number(item.quantity) || 0;
+
+            await tx.insert(inventory).values({
+              articleId: item.articleId,
+              storageZoneId: item.toStorageZoneId!,
+              lotNumber: item.lotNumber ?? null,
+              serialNumber: item.serialNumber ?? null,
+              quantity: -qty,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: ["article_id", "storage_zone_id", "lot_number", "serial_number"],
+              set: {
+                quantity: sql`${inventory.quantity} - ${qty}`,
+                updatedAt: sql`now()`
+              }
+            });
+
+            // Optionnel : marquer les lignes valuation comme annulées
+            await tx.update(stockValuation)
+              .set({ cancelledAt: new Date() })
+              .where(eq(stockValuation.operationId, op.id));
+          }
+        }
+      }
+
+      // Mettre à jour le statut
+      const [newOp] = await tx.update(inventoryOperations)
+        .set({
+          status,
+          updatedAt: new Date()
+        })
+        .where(eq(inventoryOperations.id, id))
+        .returning();
+
+      return newOp;
+    });
+
+    return result;
+  }
   async updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined> {
     const [operation] = await db.update(inventoryOperations)
       .set({ ...updateData, updatedAt: new Date().toISOString() })
@@ -1712,197 +1795,6 @@ export class DatabaseStorage implements IStorage {
 
   // ============ GESTION AVANCEE DES STOCKS ============
 
-  // Générer un code unique pour les mouvements de stock
-  async generateStockMoveCode(): Promise<string> {
-    const result = await db.execute(sql`
-      SELECT COUNT(*) as count FROM stock_moves
-    `);
-    const count = parseInt(String(result.rows[0].count)) + 1;
-    return `MOVE-${count.toString().padStart(6, '0')}`;
-  }
-
-  // Générer un code unique pour les lots
-  async generateStockLotCode(): Promise<string> {
-    const result = await db.execute(sql`
-      SELECT COUNT(*) as count FROM stock_lots
-    `);
-    const count = parseInt(String(result.rows[0].count)) + 1;
-    return `LOT-${count.toString().padStart(6, '0')}`;
-  }
-
-  // Générer un code unique pour les ajustements
-  async generateStockAdjustmentCode(): Promise<string> {
-    const result = await db.execute(sql`
-      SELECT COUNT(*) as count FROM stock_adjustments
-    `);
-    const count = parseInt(String(result.rows[0].count)) + 1;
-    return `ADJ-${count.toString().padStart(6, '0')}`;
-  }
-
-  // Créer un mouvement de stock avec traçabilité complète
-  async createStockMove(moveData: InsertStockMove): Promise<StockMove> {
-    const code = await this.generateStockMoveCode();
-
-    // Récupérer le stock actuel de l'article
-    const article = await this.getArticle(moveData.articleId);
-    if (!article) {
-      throw new Error(`Article ${moveData.articleId} not found`);
-    }
-
-    const currentStock = parseFloat(article.currentStock || '0');
-    const moveQuantity = parseFloat(moveData.quantity);
-
-    // Calculer le stock après le mouvement
-    let stockAfter = currentStock;
-    if (moveData.type === 'in') {
-      stockAfter = currentStock + moveQuantity;
-    } else if (moveData.type === 'out') {
-      stockAfter = currentStock - moveQuantity;
-    }
-
-    // Vérifier que le stock ne devient pas négatif
-    if (stockAfter < 0) {
-      throw new Error(`Insufficient stock for article ${article.name || 'Unknown'}. Available: ${currentStock}, Required: ${moveQuantity}`);
-    }
-
-    const [newMove] = await db.insert(stockMoves).values({
-      ...moveData,
-      code,
-      stockBefore: currentStock.toString(),
-      stockAfter: stockAfter.toString(),
-    }).returning();
-
-    // Mettre à jour le stock de l'article
-    await db.update(articles)
-      .set({ currentStock: stockAfter.toString() })
-      .where(eq(articles.id, moveData.articleId));
-
-    return newMove;
-  }
-
-  // Confirmer un mouvement de stock
-  async confirmStockMove(moveId: number, confirmedBy: number): Promise<StockMove> {
-    const [updatedMove] = await db.update(stockMoves)
-      .set({
-        status: 'confirmed',
-        confirmedBy,
-        confirmedAt: new Date().toISOString()
-      })
-      .where(eq(stockMoves.id, moveId))
-      .returning();
-
-    return updatedMove;
-  }
-
-  // Valider un mouvement de stock (le rendre effectif)
-  async validateStockMove(moveId: number, doneBy: number): Promise<StockMove> {
-    const [updatedMove] = await db.update(stockMoves)
-      .set({
-        status: 'done',
-        doneBy,
-        doneAt: new Date().toISOString()
-      })
-      .where(eq(stockMoves.id, moveId))
-      .returning();
-
-    return updatedMove;
-  }
-
-  // Créer un lot avec traçabilité
-  async createStockLot(lotData: InsertStockLot): Promise<StockLot> {
-    const code = await this.generateStockLotCode();
-
-    const [newLot] = await db.insert(stockLots).values({
-      ...lotData,
-      code,
-    }).returning();
-
-    return newLot;
-  }
-
-  // Créer un mouvement de lot
-  async createStockLotMove(lotMoveData: InsertStockLotMove): Promise<StockLotMove> {
-    // Récupérer le lot
-    const lot = await db.select().from(stockLots).where(eq(stockLots.id, lotMoveData.lotId)).limit(1);
-    if (!lot.length) {
-      throw new Error(`Lot ${lotMoveData.lotId} not found`);
-    }
-
-    const currentLotStock = parseFloat(lot[0].currentQuantity);
-    const moveQuantity = parseFloat(lotMoveData.quantity);
-
-    // Calculer le stock après le mouvement
-    const lotStockAfter = currentLotStock - moveQuantity;
-
-    if (lotStockAfter < 0) {
-      throw new Error(`Insufficient lot stock. Available: ${currentLotStock}, Required: ${moveQuantity}`);
-    }
-
-    const [newLotMove] = await db.insert(stockLotMoves).values({
-      ...lotMoveData,
-      lotStockBefore: currentLotStock.toString(),
-      lotStockAfter: lotStockAfter.toString(),
-    }).returning();
-
-    // Mettre à jour le stock du lot
-    await db.update(stockLots)
-      .set({ currentQuantity: lotStockAfter.toString() })
-      .where(eq(stockLots.id, lotMoveData.lotId));
-
-    return newLotMove;
-  }
-
-  // Créer un ajustement de stock
-  async createStockAdjustment(adjustmentData: InsertStockAdjustment): Promise<StockAdjustment> {
-    const code = await this.generateStockAdjustmentCode();
-
-    const [newAdjustment] = await db.insert(stockAdjustments).values({
-      ...adjustmentData,
-      code,
-    }).returning();
-
-    return newAdjustment;
-  }
-
-  // Confirmer un ajustement de stock
-  async confirmStockAdjustment(adjustmentId: number, confirmedBy: number): Promise<StockAdjustment> {
-    const adjustment = await db.select().from(stockAdjustments).where(eq(stockAdjustments.id, adjustmentId)).limit(1);
-    if (!adjustment.length) {
-      throw new Error(`Adjustment ${adjustmentId} not found`);
-    }
-
-    const adj = adjustment[0];
-    const difference = parseFloat(adj.difference);
-
-    // Créer un mouvement de stock pour l'ajustement
-    const moveData: InsertStockMove = {
-      type: difference > 0 ? 'in' : 'out',
-      status: 'done',
-      articleId: adj.articleId,
-      quantity: Math.abs(difference).toString(),
-      unit: 'kg', // À adapter selon l'article
-      fromStorageZoneId: difference > 0 ? null : adj.storageZoneId,
-      toStorageZoneId: difference > 0 ? adj.storageZoneId : null,
-      reason: `Ajustement: ${adj.reason}`,
-      notes: adj.description,
-      createdBy: adj.createdBy,
-      doneBy: confirmedBy,
-    };
-
-    await this.createStockMove(moveData);
-
-    // Confirmer l'ajustement
-    const [updatedAdjustment] = await db.update(stockAdjustments)
-      .set({
-        status: 'confirmed',
-        confirmedBy,
-        confirmedAt: new Date().toISOString()
-      })
-      .where(eq(stockAdjustments.id, adjustmentId))
-      .returning();
-
-    return updatedAdjustment;
-  }
 
   // Créer une réservation de stock
   async createStockReservation(reservationData: InsertStockReservation): Promise<StockReservation> {
@@ -2000,78 +1892,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stockReservations.inventoryOperationId, operationId));
   }
 
-  // Obtenir l'historique des mouvements d'un article
-  async getArticleStockHistory(articleId: number, limit: number = 50): Promise<StockMove[]> {
-    const moves = await db.select()
-      .from(stockMoves)
-      .where(eq(stockMoves.articleId, articleId))
-      .orderBy(desc(stockMoves.createdAt))
-      .limit(limit);
 
-    return moves;
-  }
-
-  // Obtenir l'historique des mouvements d'un article par zone
-  async getArticleStockHistoryByZone(articleId: number, storageZoneId: number, limit: number = 50): Promise<StockMove[]> {
-    const moves = await db.select()
-      .from(stockMoves)
-      .where(
-        and(
-          eq(stockMoves.articleId, articleId),
-          or(
-            eq(stockMoves.fromStorageZoneId, storageZoneId),
-            eq(stockMoves.toStorageZoneId, storageZoneId)
-          )
-        )
-      )
-      .orderBy(desc(stockMoves.createdAt))
-      .limit(limit);
-
-    return moves;
-  }
-
-  // Obtenir le stock disponible par zone
-  async getArticleStockByZone(articleId: number): Promise<any[]> {
-    const result = await db.execute(sql`
-      SELECT 
-        sz.id as zone_id,
-        sz.designation as zone_name,
-        COALESCE(SUM(
-          CASE 
-            WHEN sm.type = 'in' AND sm.to_storage_zone_id = sz.id THEN sm.quantity::numeric
-            WHEN sm.type = 'out' AND sm.from_storage_zone_id = sz.id THEN -sm.quantity::numeric
-            ELSE 0
-          END
-        ), 0) as stock_quantity
-      FROM storage_zones sz
-      LEFT JOIN stock_moves sm ON 
-        (sm.to_storage_zone_id = sz.id OR sm.from_storage_zone_id = sz.id)
-        AND sm.article_id = ${articleId}
-        AND sm.status = 'done'
-      WHERE sz.active = true
-      GROUP BY sz.id, sz.designation
-      HAVING COALESCE(SUM(
-        CASE 
-          WHEN sm.type = 'in' AND sm.to_storage_zone_id = sz.id THEN sm.quantity::numeric
-          WHEN sm.type = 'out' AND sm.from_storage_zone_id = sz.id THEN -sm.quantity::numeric
-          ELSE 0
-        END
-      ), 0) > 0
-      ORDER BY sz.designation
-    `);
-
-    return result.rows;
-  }
-
-  // Obtenir les lots d'un article
-  async getArticleLots(articleId: number): Promise<StockLot[]> {
-    const lots = await db.select()
-      .from(stockLots)
-      .where(eq(stockLots.articleId, articleId))
-      .orderBy(desc(stockLots.createdAt));
-
-    return lots;
-  }
 
   // Obtenir les réservations d'un article
   async getArticleReservations(articleId: number): Promise<StockReservation[]> {
