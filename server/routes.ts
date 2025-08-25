@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { eq, sql } from "drizzle-orm";
 import {
   insertUserSchema,
   insertMeasurementCategorySchema,
@@ -33,6 +35,13 @@ import {
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
   InventoryOperation,
+  stock,
+  articles,
+  storageZones,
+  lots,
+  inventoryOperations,
+  inventoryOperationItems,
+  users,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1925,12 +1934,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const items: any[] = [];
       for (const it of body.items ?? []) {
+        const stockRow = await db.query.stock.findFirst({
+          where: (s, { eq, and }) =>
+            and(eq(s.articleId, it.articleId), eq(s.storageZoneId, it.storageZoneId ?? 0))
+        });
+        const currentStock = parseFloat(stockRow?.quantity || '0');
+        const qtyOrdered = parseFloat(it.quantityOrdered || '0');
+
         const line = await storage.createInventoryOperationItem({
           operationId: op.id,
           articleId: it.articleId,
           quantity: it.quantityOrdered,
-          quantityBefore: it.currentStock,
-          quantityAfter: (parseFloat(it.currentStock || '0') + parseFloat(it.quantityOrdered || '0')).toString(),
+          quantityBefore: currentStock.toString(),
+          quantityAfter: (currentStock + qtyOrdered).toString(),
           unitCost: it.unitPrice,
           totalCost: it.totalPrice,
           taxRate: it.taxRate,
@@ -1988,6 +2004,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Reception not found" });
       }
 
+      // Si l'opération était complétée, annuler d'abord les stocks existants
+      if (existingOp.status === 'completed') {
+        const existingItems = await storage.getInventoryOperationItems(id);
+        for (const item of existingItems) {
+
+          const qty = Number(item.quantity) || 0;
+          if (qty > 0) {
+            if (!item.toStorageZoneId) {
+              throw new Error(`Missing storage zone for article ${item.articleId}`);
+            }
+
+            // Retirer du stock
+            await db.insert(stock).values({
+              articleId: item.articleId,
+              storageZoneId: item.toStorageZoneId,
+              lotId: item.lotId ?? null,
+              serialNumber: item.serialNumber ?? null,
+              quantity: -qty,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: ["article_id", "storage_zone_id", "lot_id", "serial_number"],
+              set: {
+                quantity: sql`${stock.quantity} - ${qty}`,
+                updatedAt: sql`now()`
+              }
+            });
+
+            // Mettre à jour le stock actuel de l'article
+            await db.update(articles)
+              .set({ currentStock: sql`${articles.currentStock} - ${qty}` })
+              .where(eq(articles.id, item.articleId));
+          }
+        }
+      }
+
       // Mettre à jour l'opération principale
       const updatedOp = await storage.updateInventoryOperation(id, {
         status: body?.purchaseOrder?.status ?? existingOp.status,
@@ -2009,12 +2060,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Créer les nouvelles lignes
       const items: any[] = [];
       for (const it of body.items ?? []) {
+
+        const stockRow = await db.query.stock.findFirst({
+          where: (s, { eq, and }) =>
+            and(eq(s.articleId, it.articleId), eq(s.storageZoneId, it.toStorageZoneId ?? 0))
+        });
+        const currentStock = parseFloat(stockRow?.quantity || '0');
+        const qtyOrdered = parseFloat(it.quantity || '0');
+
         const line = await storage.createInventoryOperationItem({
           operationId: id,
           articleId: it.articleId,
           quantity: it.quantityOrdered,
-          quantityBefore: it.currentStock,
-          quantityAfter: (parseFloat(it.currentStock || '0') + parseFloat(it.quantityOrdered || '0')).toString(),
+          quantityBefore: currentStock.toString(),
+          quantityAfter: (currentStock + qtyOrdered).toString(),
           unitCost: it.unitPrice,
           totalCost: it.totalPrice,
           taxRate: it.taxRate,
@@ -2023,6 +2082,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: it.notes ?? null,
         } as any);
         items.push(line);
+      }
+
+      // Si l'opération est maintenant complétée, ajouter les nouveaux stocks
+      if (updatedOp.status === 'completed') {
+        for (const it of body.items ?? []) {
+          const qty = Number(it.quantityOrdered) || 0;
+          if (qty > 0) {
+            if (!it.storageZoneId) {
+              throw new Error(`Missing storage zone for article ${it.articleId}`);
+            }
+
+            // Ajouter au stock
+            await db.insert(stock).values({
+              articleId: it.articleId,
+              storageZoneId: it.storageZoneId,
+              lotId: it.lotId ?? null,
+              serialNumber: it.serialNumber ?? null,
+              quantity: qty,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: ["article_id", "storage_zone_id", "lot_id", "serial_number"],
+              set: {
+                quantity: sql`${stock.quantity} + ${qty}`,
+                updatedAt: sql`now()`
+              }
+            });
+
+            // Mettre à jour le stock actuel de l'article
+            await db.update(articles)
+              .set({ currentStock: sql`${articles.currentStock} + ${qty}` })
+              .where(eq(articles.id, it.articleId));
+          }
+        }
       }
 
       res.json({ ...updatedOp, items });
@@ -2259,6 +2351,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking article stock:", error);
       res.status(500).json({ message: "Failed to check article stock" });
+    }
+  });
+
+  // ============ ENDPOINTS POUR LA PAGE STOCK ============
+
+  // Endpoint pour récupérer tous les items de stock avec les détails des articles et zones
+  app.get("/api/stock/items", async (req, res) => {
+    try {
+      const stockItems = await db
+        .select({
+          id: stock.id,
+          articleId: stock.articleId,
+          storageZoneId: stock.storageZoneId,
+          quantity: stock.quantity,
+          lotId: stock.lotId,
+          article: {
+            id: articles.id,
+            code: articles.code,
+            name: articles.name,
+            type: articles.type,
+            unit: articles.unit,
+            costPerUnit: articles.costPerUnit,
+            currentStock: articles.currentStock,
+            storageZoneId: articles.storageZoneId,
+            minStock: articles.minStock,
+            maxStock: articles.maxStock,
+          },
+          storageZone: {
+            id: storageZones.id,
+            designation: storageZones.designation,
+          },
+          lot: {
+            id: lots.id,
+            code: lots.code,
+            expirationDate: lots.expirationDate,
+          },
+        })
+        .from(stock)
+        .leftJoin(articles, eq(stock.articleId, articles.id))
+        .leftJoin(storageZones, eq(stock.storageZoneId, storageZones.id))
+        .leftJoin(lots, eq(stock.lotId, lots.id))
+        .where(eq(articles.active, true));
+
+      res.json(stockItems);
+    } catch (error) {
+      console.error("Error fetching stock items:", error);
+      res.status(500).json({ message: "Failed to fetch stock items" });
+    }
+  });
+
+  // Endpoint pour récupérer les opérations d'inventaire pour un article spécifique
+  app.get("/api/stock/:articleId/operations", async (req, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      if (isNaN(articleId)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      const operations = await db
+        .select({
+          id: inventoryOperations.id,
+          code: inventoryOperations.code,
+          type: inventoryOperations.type,
+          status: inventoryOperations.status,
+          scheduledDate: inventoryOperations.scheduledDate,
+          completedAt: inventoryOperations.completedAt,
+          notes: inventoryOperations.notes,
+          createdBy: inventoryOperations.createdBy,
+          createdByUser: {
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+          },
+        })
+        .from(inventoryOperations)
+        .leftJoin(users, eq(inventoryOperations.createdBy, users.id))
+        .where(
+          sql`EXISTS (
+            SELECT 1 FROM ${inventoryOperationItems} 
+            WHERE ${inventoryOperationItems.operationId} = ${inventoryOperations.id} 
+            AND ${inventoryOperationItems.articleId} = ${articleId}
+          )`
+        )
+        .orderBy(sql`${inventoryOperations.scheduledDate} DESC`);
+
+      // Pour chaque opération, récupérer les items correspondant à l'article
+      const operationsWithItems = await Promise.all(
+        operations.map(async (operation) => {
+          const items = await db
+            .select({
+              id: inventoryOperationItems.id,
+              operationId: inventoryOperationItems.operationId,
+              articleId: inventoryOperationItems.articleId,
+              quantity: inventoryOperationItems.quantity,
+              quantityBefore: inventoryOperationItems.quantityBefore,
+              quantityAfter: inventoryOperationItems.quantityAfter,
+              unitCost: inventoryOperationItems.unitCost,
+              fromStorageZoneId: inventoryOperationItems.fromStorageZoneId,
+              toStorageZoneId: inventoryOperationItems.toStorageZoneId,
+              notes: inventoryOperationItems.notes,
+              createdAt: inventoryOperationItems.createdAt,
+              article: {
+                id: articles.id,
+                code: articles.code,
+                name: articles.name,
+                type: articles.type,
+                unit: articles.unit,
+              },
+              fromStorageZone: {
+                id: storageZones.id,
+                designation: storageZones.designation,
+              },
+              toStorageZone: {
+                id: storageZones.id,
+                designation: storageZones.designation,
+              },
+            })
+            .from(inventoryOperationItems)
+            .leftJoin(articles, eq(inventoryOperationItems.articleId, articles.id))
+            .leftJoin(storageZones, eq(inventoryOperationItems.fromStorageZoneId, storageZones.id))
+            .where(
+              sql`${inventoryOperationItems.operationId} = ${operation.id} AND ${inventoryOperationItems.articleId} = ${articleId}`
+            );
+
+          return {
+            ...operation,
+            items,
+          };
+        })
+      );
+
+      res.json(operationsWithItems);
+    } catch (error) {
+      console.error("Error fetching inventory operations:", error);
+      res.status(500).json({ message: "Failed to fetch inventory operations" });
     }
   });
 

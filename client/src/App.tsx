@@ -150,7 +150,6 @@ function ProtectedRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/inventory" component={Inventory} />
       {/* Route ingredients supprimée - utiliser Articles avec filtrage */}
       {/* Routes supprimées - à réimplémenter */}
       <Route path="/recipes" component={Recipes} />
@@ -177,7 +176,7 @@ function ProtectedRouter() {
       <Route path="/ingredients" component={IngredientsNew} />
       <Route path="/orders" component={OrdersPage} />
       <Route path="/client_orders" component={ClientOrdersPage} />
-      <Route path="/inventory-operations" component={InventoryOperationsPage} />
+      {/* <Route path="/inventory-operations" component={InventoryOperationsPage} /> */}
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/deliveries" component={DeliveriesPage} />
       <Route path="/catalog" component={ClientCatalog} />

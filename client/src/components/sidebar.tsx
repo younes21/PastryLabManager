@@ -86,7 +86,7 @@ export function Sidebar() {
       group: "Principal",
     },
     {
-      path: "/inventory",
+      path: "/stock",
       label: "Gestion de Stock",
       icon: "fas fa-boxes",
       lucideIcon: Package,
@@ -99,7 +99,7 @@ export function Sidebar() {
       icon: "fas fa-book-open",
       lucideIcon: BookOpen,
       order: 0,
-      group: "Inventaire",
+      group: "Production",
     },
     {
       path: "/orders",
@@ -117,14 +117,14 @@ export function Sidebar() {
       order: 0,
       group: "Ventes",
     },
-    {
-      path: "/inventory-operations",
-      label: "Opérations Stock",
-      icon: "fas fa-warehouse",
-      lucideIcon: Package,
-      order: 0,
-      group: "Inventaire",
-    },
+    // {
+    //   path: "/inventory-operations",
+    //   label: "Opérations Stock",
+    //   icon: "fas fa-warehouse",
+    //   lucideIcon: Package,
+    //   order: 0,
+    //   group: "Inventaire",
+    // },
     {
       path: "/invoices",
       label: "Facturation",

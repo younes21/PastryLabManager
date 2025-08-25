@@ -6,44 +6,85 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Package, Warehouse, QrCode, Calendar, User, MapPin, 
   TrendingUp, TrendingDown, ArrowUpDown, Search, Filter,
-  Eye, History, BarChart3, AlertTriangle, CheckCircle
+  Eye, History, BarChart3, AlertTriangle, CheckCircle,
+  Plus, Minus, ArrowRight, ArrowLeft
 } from "lucide-react";
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/lib/auth';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
-interface Article {
+interface StockItem {
   id: number;
-  code: string;
-  name: string;
-  type: 'product' | 'ingredient' | 'service';
-  currentStock: string;
-  unit: string;
-  costPerUnit: string;
-  storageZoneId: number | null;
-  storageZone?: {
+  articleId: number;
+  article: {
+    id: number;
+    code: string;
+    name: string;
+    type: 'product' | 'ingredient' | 'service';
+    unit: string;
+    costPerUnit: string;
+    currentStock: string;
+    minStock: string;
+    maxStock: string;
+    storageZoneId: number | null;
+    storageZone?: {
+      id: number;
+      designation: string;
+    };
+  };
+  storageZoneId: number;
+  storageZone: {
     id: number;
     designation: string;
   };
+  quantity: string;
+  lotId: number | null;
+  lot?: {
+    id: number;
+    code: string;
+    expirationDate: string | null;
+  };
 }
 
-interface StockMove {
+interface InventoryOperation {
   id: number;
   code: string;
-  type: 'in' | 'out' | 'internal' | 'adjustment';
-  status: 'draft' | 'confirmed' | 'done' | 'cancelled';
+  type: string;
+  status: string;
+  scheduledDate: string;
+  completedAt: string | null;
+  notes: string;
+  createdBy: number;
+  createdByUser?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+  items: InventoryOperationItem[];
+}
+
+interface InventoryOperationItem {
+  id: number;
+  operationId: number;
   articleId: number;
+  article: {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    unit: string;
+  };
   quantity: string;
-  unit: string;
+  quantityBefore: string;
+  quantityAfter: string;
+  unitCost: string;
   fromStorageZoneId: number | null;
   toStorageZoneId: number | null;
-  stockBefore: string;
-  stockAfter: string;
-  reason: string;
-  notes: string;
-  createdAt: string;
   fromStorageZone?: {
     id: number;
     designation: string;
@@ -52,17 +93,8 @@ interface StockMove {
     id: number;
     designation: string;
   };
-  createdByUser?: {
-    id: number;
-    firstName: string;
-    lastName: string;
-  };
-}
-
-interface StockByZone {
-  zone_id: number;
-  zone_name: string;
-  stock_quantity: string;
+  notes: string;
+  createdAt: string;
 }
 
 interface StorageZone {
@@ -74,17 +106,17 @@ interface StorageZone {
 
 export default function Stock() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [activeTab, setActiveTab] = useState("ingredients");
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('');
   const [filterZone, setFilterZone] = useState('');
+  const [selectedStockItem, setSelectedStockItem] = useState<StockItem | null>(null);
+  const [isOperationsDialogOpen, setIsOperationsDialogOpen] = useState(false);
 
-  // Fetch articles with stock information
-  const { data: articles = [], isLoading: articlesLoading } = useQuery<Article[]>({
-    queryKey: ["articles"],
+  // Fetch stock data with article and storage zone information
+  const { data: stockItems = [], isLoading: stockLoading } = useQuery<StockItem[]>({
+    queryKey: ["stock-items"],
     queryFn: async () => {
-      const response = await apiRequest('/api/articles', 'GET');
+      const response = await apiRequest('/api/stock/items', 'GET');
       return response.json();
     },
   });
@@ -98,42 +130,31 @@ export default function Stock() {
     },
   });
 
-  // Fetch stock moves for selected article
-  const { data: stockMoves = [], isLoading: movesLoading } = useQuery<StockMove[]>({
-    queryKey: ["stock-moves", selectedArticle?.id],
+  // Fetch inventory operations for selected stock item
+  const { data: inventoryOperations = [], isLoading: operationsLoading } = useQuery<InventoryOperation[]>({
+    queryKey: ["inventory-operations", selectedStockItem?.articleId],
     queryFn: async () => {
-      if (!selectedArticle) return [];
-      const response = await apiRequest(`/api/articles/${selectedArticle.id}/stock-history?limit=100`, 'GET');
+      if (!selectedStockItem) return [];
+      const response = await apiRequest(`/api/stock/${selectedStockItem.articleId}/operations`, 'GET');
       return response.json();
     },
-    enabled: !!selectedArticle,
+    enabled: !!selectedStockItem,
   });
 
-  // Fetch stock by zone for selected article
-  const { data: stockByZone = [], isLoading: zoneStockLoading } = useQuery<StockByZone[]>({
-    queryKey: ["stock-by-zone", selectedArticle?.id],
-    queryFn: async () => {
-      if (!selectedArticle) return [];
-      const response = await apiRequest(`/api/articles/${selectedArticle.id}/stock-by-zone`, 'GET');
-      return response.json();
-    },
-    enabled: !!selectedArticle,
-  });
-
-  // Filter articles based on search and filters
-  const filteredArticles = articles.filter(article => {
-    const matchesSearch = article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = !filterType || article.type === filterType;
-    const matchesZone = !filterZone || article.storageZoneId === parseInt(filterZone);
+  // Filter stock items based on search and filters
+  const filteredStockItems = stockItems.filter(item => {
+    const matchesSearch = item.article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.article.code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = activeTab === "ingredients" ? item.article.type === 'ingredient' : item.article.type === 'product';
+    const matchesZone = !filterZone || item.storageZoneId === parseInt(filterZone);
     
     return matchesSearch && matchesType && matchesZone;
   });
 
-  const getStockStatus = (currentStock: string, minStock: string = '0', maxStock: string = '0') => {
-    const stock = parseFloat(currentStock);
-    const min = parseFloat(minStock);
-    const max = parseFloat(maxStock);
+  const getStockStatus = (quantity: string, minStock: string, maxStock: string) => {
+    const stock = parseFloat(quantity);
+    const min = parseFloat(minStock || '0');
+    const max = parseFloat(maxStock || '0');
     
     if (stock <= 0) return { status: 'out', color: 'bg-red-500', text: 'Rupture' };
     if (stock <= min) return { status: 'low', color: 'bg-orange-500', text: 'Stock faible' };
@@ -141,23 +162,51 @@ export default function Stock() {
     return { status: 'normal', color: 'bg-green-500', text: 'Normal' };
   };
 
-  const getMoveTypeIcon = (type: string) => {
+  const getOperationTypeIcon = (type: string) => {
     switch (type) {
-      case 'in': return <TrendingUp className="w-4 h-4 text-green-600" />;
-      case 'out': return <TrendingDown className="w-4 h-4 text-red-600" />;
-      case 'internal': return <ArrowUpDown className="w-4 h-4 text-blue-600" />;
-      case 'adjustment': return <BarChart3 className="w-4 h-4 text-purple-600" />;
-      default: return <Package className="w-4 h-4 text-gray-600" />;
+      case 'reception':
+      case 'fabrication':
+      case 'ajustement_plus':
+        return <Plus className="w-4 h-4 text-green-600" />;
+      case 'livraison':
+      case 'consommation':
+      case 'ajustement_moins':
+        return <Minus className="w-4 h-4 text-red-600" />;
+      case 'transfert':
+        return <ArrowRight className="w-4 h-4 text-blue-600" />;
+      default:
+        return <Package className="w-4 h-4 text-gray-600" />;
     }
   };
 
-  const getMoveTypeLabel = (type: string) => {
+  const getOperationTypeLabel = (type: string) => {
     switch (type) {
-      case 'in': return 'Entrée';
-      case 'out': return 'Sortie';
-      case 'internal': return 'Transfert';
-      case 'adjustment': return 'Ajustement';
+      case 'reception': return 'Réception';
+      case 'livraison': return 'Livraison';
+      case 'fabrication': return 'Fabrication';
+      case 'consommation': return 'Consommation';
+      case 'transfert': return 'Transfert';
+      case 'ajustement_plus': return 'Ajustement +';
+      case 'ajustement_moins': return 'Ajustement -';
+      case 'inventaire': return 'Inventaire';
       default: return type;
+    }
+  };
+
+  const getOperationDirection = (type: string) => {
+    switch (type) {
+      case 'reception':
+      case 'fabrication':
+      case 'ajustement_plus':
+        return { direction: 'in', color: 'text-green-600', icon: <TrendingUp className="w-4 h-4" /> };
+      case 'livraison':
+      case 'consommation':
+      case 'ajustement_moins':
+        return { direction: 'out', color: 'text-red-600', icon: <TrendingDown className="w-4 h-4" /> };
+      case 'transfert':
+        return { direction: 'transfer', color: 'text-blue-600', icon: <ArrowUpDown className="w-4 h-4" /> };
+      default:
+        return { direction: 'neutral', color: 'text-gray-600', icon: <Package className="w-4 h-4" /> };
     }
   };
 
@@ -171,23 +220,19 @@ export default function Stock() {
     });
   };
 
-  const getZoneName = (zoneId: number | null) => {
-    if (!zoneId) return 'Non assigné';
-    const zone = storageZones.find(z => z.id === zoneId);
-    return zone?.designation || 'Zone inconnue';
+  const handleViewOperations = (stockItem: StockItem) => {
+    setSelectedStockItem(stockItem);
+    setIsOperationsDialogOpen(true);
   };
-
+usePageTitle('Gestion des stocks')
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Warehouse className="w-8 h-8 text-blue-600" />
-        <h1 className="text-3xl font-bold">Gestion des Stocks</h1>
-      </div>
+     
 
       {/* Filters */}
-      <Card>
+      <Card className="m-4">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -197,18 +242,6 @@ export default function Stock() {
                 className="pl-10"
               />
             </div>
-            
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Type d'article" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="product">Produits</SelectItem>
-                <SelectItem value="ingredient">Ingrédients</SelectItem>
-                <SelectItem value="service">Services</SelectItem>
-              </SelectContent>
-            </Select>
             
             <Select value={filterZone} onValueChange={setFilterZone}>
               <SelectTrigger>
@@ -228,7 +261,6 @@ export default function Stock() {
               variant="outline" 
               onClick={() => {
                 setSearchTerm('');
-                setFilterType('');
                 setFilterZone('');
               }}
             >
@@ -239,208 +271,305 @@ export default function Stock() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Articles List */}
-        <div className="lg:col-span-1">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="ingredients" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Ingrédients ({filteredStockItems.filter(item => item.article.type === 'ingredient').length})
+          </TabsTrigger>
+          <TabsTrigger value="products" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Produits ({filteredStockItems.filter(item => item.article.type === 'product').length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ingredients" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="w-5 h-5" />
-                Articles ({filteredArticles.length})
+                Stock des Ingrédients
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {articlesLoading ? (
+              {stockLoading ? (
                 <div className="text-center py-8">Chargement...</div>
-              ) : filteredArticles.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  Aucun article trouvé
-                </div>
               ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {filteredArticles.map((article) => {
-                    const stockStatus = getStockStatus(article.currentStock);
-                    return (
-                      <div
-                        key={article.id}
-                        onClick={() => setSelectedArticle(article)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedArticle?.id === article.id 
-                            ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium text-sm">{article.name}</h3>
-                          <Badge className={`${stockStatus.color} text-white text-xs`}>
-                            {stockStatus.text}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <div>Code: {article.code}</div>
-                          <div>Stock: {parseFloat(article.currentStock).toFixed(3)} {article.unit}</div>
-                          <div>Zone: {getZoneName(article.storageZoneId)}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Article</TableHead>
+                      <TableHead>Zone</TableHead>
+                      <TableHead>Quantité</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Lot</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStockItems
+                      .filter(item => item.article.type === 'ingredient')
+                      .map((item) => {
+                        const stockStatus = getStockStatus(item.quantity, item.article.minStock, item.article.maxStock);
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{item.article.name}</div>
+                                <div className="text-sm text-gray-500">{item.article.code}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.storageZone.designation}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">
+                                {parseFloat(item.quantity).toFixed(3)} {item.article.unit}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${stockStatus.color} text-white`}>
+                                {stockStatus.text}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {item.lot ? (
+                                <div className="text-sm">
+                                  <div>{item.lot.code}</div>
+                                  {item.lot.expirationDate && (
+                                    <div className="text-xs text-gray-500">
+                                      DLC: {formatDate(item.lot.expirationDate)}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewOperations(item)}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                Opérations
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
-        </div>
+        </TabsContent>
 
-        {/* Article Details */}
-        <div className="lg:col-span-2">
-          {selectedArticle ? (
-            <div className="space-y-6">
-              {/* Article Header */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl">{selectedArticle.name}</CardTitle>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Code: {selectedArticle.code} | Type: {selectedArticle.type}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {parseFloat(selectedArticle.currentStock).toFixed(3)} {selectedArticle.unit}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Coût unitaire: {parseFloat(selectedArticle.costPerUnit).toFixed(2)} DA
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              {/* Stock by Zone */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    Stock par Zone
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {zoneStockLoading ? (
-                    <div className="text-center py-4">Chargement...</div>
-                  ) : stockByZone.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500">
-                      Aucun stock par zone
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {stockByZone.map((zoneStock) => (
-                        <div key={zoneStock.zone_id} className="p-3 border rounded-lg">
-                          <div className="font-medium">{zoneStock.zone_name}</div>
-                          <div className="text-lg font-bold text-blue-600">
-                            {parseFloat(zoneStock.stock_quantity).toFixed(3)} {selectedArticle.unit}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Stock Movements */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <History className="w-5 h-5" />
-                    Historique des Mouvements
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {movesLoading ? (
-                    <div className="text-center py-4">Chargement...</div>
-                  ) : stockMoves.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500">
-                      Aucun mouvement trouvé
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {stockMoves.map((move) => (
-                        <div key={move.id} className="p-3 border rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              {getMoveTypeIcon(move.type)}
-                              <span className="font-medium text-sm">
-                                {getMoveTypeLabel(move.type)}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {move.code}
+        <TabsContent value="products" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Stock des Produits
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stockLoading ? (
+                <div className="text-center py-8">Chargement...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Article</TableHead>
+                      <TableHead>Zone</TableHead>
+                      <TableHead>Quantité</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Lot</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStockItems
+                      .filter(item => item.article.type === 'product')
+                      .map((item) => {
+                        const stockStatus = getStockStatus(item.quantity, item.article.minStock, item.article.maxStock);
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{item.article.name}</div>
+                                <div className="text-sm text-gray-500">{item.article.code}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.storageZone.designation}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">
+                                {parseFloat(item.quantity).toFixed(3)} {item.article.unit}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${stockStatus.color} text-white`}>
+                                {stockStatus.text}
                               </Badge>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {formatDate(move.createdAt)}
-                            </div>
-                          </div>
-                          
-                          <div className="text-sm space-y-1">
-                            <div className="flex justify-between">
-                              <span>Quantité:</span>
-                              <span className={`font-medium ${
-                                move.type === 'in' ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {move.type === 'in' ? '+' : '-'}{parseFloat(move.quantity).toFixed(3)} {move.unit}
-                              </span>
-                            </div>
-                            
-                            <div className="flex justify-between">
-                              <span>Stock avant:</span>
-                              <span>{parseFloat(move.stockBefore).toFixed(3)} {move.unit}</span>
-                            </div>
-                            
-                            <div className="flex justify-between">
-                              <span>Stock après:</span>
-                              <span className="font-medium">{parseFloat(move.stockAfter).toFixed(3)} {move.unit}</span>
-                            </div>
-                            
-                            {move.fromStorageZoneId && (
-                              <div className="flex justify-between">
-                                <span>De:</span>
-                                <span>{getZoneName(move.fromStorageZoneId)}</span>
-                              </div>
-                            )}
-                            
-                            {move.toStorageZoneId && (
-                              <div className="flex justify-between">
-                                <span>Vers:</span>
-                                <span>{getZoneName(move.toStorageZoneId)}</span>
-                              </div>
-                            )}
-                            
-                            <div className="text-gray-600 text-xs mt-2">
-                              <div><strong>Raison:</strong> {move.reason}</div>
-                              {move.notes && <div><strong>Notes:</strong> {move.notes}</div>}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                            </TableCell>
+                            <TableCell>
+                              {item.lot ? (
+                                <div className="text-sm">
+                                  <div>{item.lot.code}</div>
+                                  {item.lot.expirationDate && (
+                                    <div className="text-xs text-gray-500">
+                                      DLC: {formatDate(item.lot.expirationDate)}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewOperations(item)}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                Opérations
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Operations Dialog */}
+      <Dialog open={isOperationsDialogOpen} onOpenChange={setIsOperationsDialogOpen}>
+        <DialogContent className="max-w-[90vw] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Historique des Opérations - {selectedStockItem?.article.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {operationsLoading ? (
+            <div className="text-center py-8">Chargement des opérations...</div>
+          ) : inventoryOperations.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Aucune opération trouvée pour cet article
             </div>
           ) : (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Package className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Sélectionnez un article
-                </h3>
-                <p className="text-gray-600">
-                  Choisissez un article dans la liste pour voir ses détails de stock
-                </p>
-              </CardContent>
-            </Card>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">Date</TableHead>
+                    {/* <TableHead className="w-[100px]">Code</TableHead> */}
+                    <TableHead className="w-[120px]">Type</TableHead>
+                    <TableHead className="w-[100px]">Statut</TableHead>
+                    <TableHead className="w-[80px]">Direction</TableHead>
+                    <TableHead className="w-[100px]">Quantité</TableHead>
+                    <TableHead className="w-[100px]">Stock Avant</TableHead>
+                    <TableHead className="w-[100px]">Stock Après</TableHead>
+                    <TableHead className="w-[100px]">Coût Unitaire</TableHead>
+                    <TableHead className="w-[150px]">Zones</TableHead>
+                    {/* <TableHead className="w-[200px]">Notes</TableHead> */}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inventoryOperations.flatMap((operation) =>
+                    operation.items
+                      .filter(item => item.articleId === selectedStockItem?.articleId)
+                      .map((item) => {
+                        const direction = getOperationDirection(operation.type);
+                        return (
+                          <TableRow key={`${operation.id}-${item.id}`}>
+                            <TableCell className="text-sm">
+                              {formatDate(item.createdAt)}
+                            </TableCell>
+                            {/* <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {operation.code}
+                              </Badge>
+                            </TableCell> */}
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {getOperationTypeIcon(operation.type)}
+                                <span className="text-sm">{getOperationTypeLabel(operation.type)}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`text-xs ${
+                                operation.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                operation.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {operation.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className={`flex items-center gap-1 ${direction.color}`}>
+                                {direction.icon}
+                                <span className="text-sm">
+                                  {direction.direction === 'in' ? 'Entrée' : 
+                                   direction.direction === 'out' ? 'Sortie' : 'Transfert'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className={`font-medium ${direction.color}`}>
+                              {direction.direction === 'in' ? '+' : '-'}{parseFloat(item.quantity).toFixed(3)} {item.article.unit}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {parseFloat(item.quantityBefore || '0').toFixed(3)} {item.article.unit}
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">
+                              {parseFloat(item.quantityAfter || '0').toFixed(3)} {item.article.unit}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {parseFloat(item.unitCost || '0').toFixed(2)} DA
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {(item.fromStorageZoneId || item.toStorageZoneId) ? (
+                                <div className="space-y-1">
+                                  {item.fromStorageZoneId && (
+                                    <div className="flex items-center gap-1 text-xs">
+                                      <ArrowLeft className="w-3 h-3 text-gray-400" />
+                                      <span className="text-gray-600">De:</span>
+                                      <span>{item.fromStorageZone?.designation || 'Zone inconnue'}</span>
+                                    </div>
+                                  )}
+                                  {item.toStorageZoneId && (
+                                    <div className="flex items-center gap-1 text-xs">
+                                      <ArrowRight className="w-3 h-3 text-gray-400" />
+                                      <span className="text-gray-600">Vers:</span>
+                                      <span>{item.toStorageZone?.designation || 'Zone inconnue'}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                            {/* <TableCell className="text-sm">
+                              <div className="max-w-[180px] truncate" title={item.notes || ''}>
+                                {item.notes || '-'}
+                              </div>
+                            </TableCell> */}
+                          </TableRow>
+                        );
+                      })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

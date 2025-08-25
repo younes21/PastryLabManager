@@ -1,5 +1,5 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, AnyPgColumn } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, AnyPgColumn, unique } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -574,7 +574,12 @@ export const stock = pgTable("stock", {
   quantity: decimal("quantity", { precision: 12, scale: 3 }).notNull().default("0.000"),
   createdAt: timestamp("createdAt", { mode: "string" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow()
-});
+} );
+export const stockUniqueIndex = sql`
+  CREATE UNIQUE INDEX IF NOT EXISTS uk_stock_keys
+  ON stock (article_id, storage_zone_id, lot_id, serial_number)
+  NULLS NOT DISTINCT;
+`;
 
 export const lots = pgTable("lots", {
   id: serial("id").primaryKey(),

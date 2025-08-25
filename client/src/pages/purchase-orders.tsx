@@ -59,7 +59,7 @@ const ReceptionAchatInterface = () => {
 
   const createNewOperation = () => {
     const newOp = {
-      id: Date.now(),
+      id:-Date.now(),
       code: undefined,
       status: 'draft',
       supplierId: '',
@@ -158,7 +158,7 @@ const ReceptionAchatInterface = () => {
       const taxAmount = totalPrice * (taxRate / 100);
 
       const newItem = {
-        id: Date.now(),
+        id: -Date.now(),
         articleId: articleToAdd.id,
         article: articleToAdd,
         quantityOrdered,
@@ -285,7 +285,7 @@ const ReceptionAchatInterface = () => {
       let data;
 
       // Détecter si c'est une modification (ID existe) ou création
-      if (currentOperation.id && typeof currentOperation.id === 'number') {
+      if (currentOperation.id> 0 && typeof currentOperation.id === 'number') {
         // Modification - utiliser PUT
         console.log('Modification de la réception:', currentOperation.id);
         res = await apiRequest(`/api/purchase-orders/${currentOperation.id}`, 'PUT', payload);
