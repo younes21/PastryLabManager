@@ -1406,77 +1406,73 @@ export class DatabaseStorage implements IStorage {
   //   }
   // }
 
-  async updateInventoryOperationStatus(id: number, status: string): Promise<InventoryOperation | undefined> {
-
-    const result = await db.transaction(async (tx) => {
-      // Charger l’opération avec ses lignes
+  async  updateInventoryOperationStatus(
+    id: number,
+    status: string
+  ): Promise<InventoryOperation | undefined> {
+    return await db.transaction(async (tx) => {
       const op = await tx.query.inventoryOperations.findFirst({
         where: (o, { eq }) => eq(o.id, id),
         with: { items: true }
       });
-
-      if (!op || op.type !== "reception") { throw new Error("Reception not found"); }
-
-      // Déjà dans l’état demandé → rien à faire
-      if (op.status === status) return op;
-
-      // Passage en "completed"
-      if (status === "completed") {
-        if (op.status === "completed") {
-          return op; // déjà traité
-        }
-
+      if (!op) throw new Error("Operation not found");
+  
+      if (op.status === status) return op; // rien à faire
+  
+      // ---- Passage en completed ----
+      if (status === "completed" && op.status !== "completed") {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
-          const cost = Number(item.unitCost) || 0;
-
-          if (qty <= 0) {
-            throw new Error(`Invalid quantity for article ${item.articleId}`);
+          if (qty < 0) throw new Error(`Invalid qty for article ${item.articleId}`);
+  
+          // Sortie de stock (fromStorageZoneId)
+          if (item.fromStorageZoneId) {
+            await tx.insert(stock).values({
+              articleId: item.articleId,
+              storageZoneId: item.fromStorageZoneId,
+              lotId: item.lotId ?? null,
+              serialNumber: item.serialNumber ?? null,
+              quantity: -qty,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: [stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
+              set: { quantity: sql`${stock.quantity} - ${qty}`, updatedAt: sql`now()` }
+            });
+  
+            await tx.update(articles)
+              .set({ currentStock: sql`${articles.currentStock} - ${qty}` })
+              .where(eq(articles.id, item.articleId));
           }
-
-          if (!item.toStorageZoneId) {
-            throw new Error(`Missing storage zone for article ${item.articleId}`);
+  
+          // Entrée de stock (toStorageZoneId)
+          if (item.toStorageZoneId) {
+            await tx.insert(stock).values({
+              articleId: item.articleId,
+              storageZoneId: item.toStorageZoneId,
+              lotId: item.lotId ?? null,
+              serialNumber: item.serialNumber ?? null,
+              quantity: qty,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: [stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
+              set: { quantity: sql`${stock.quantity} + ${qty}`, updatedAt: sql`now()` }
+            });
+  
+            await tx.update(articles)
+              .set({ currentStock: sql`${articles.currentStock} + ${qty}` })
+              .where(eq(articles.id, item.articleId));
           }
-
-          await tx.insert(stock).values({
-            articleId: item.articleId,
-            storageZoneId: item.toStorageZoneId,
-            lotId: item.lotId ?? null,
-            serialNumber: item.serialNumber ?? null,
-            quantity: qty,
-            updatedAt: new Date()
-          }).onConflictDoUpdate({
-            target:[stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
-            set: {
-              quantity: sql`${stock.quantity} + ${qty}`,
-              updatedAt: sql`now()`
-            }
-          });
-          // update article currentStock  
-          await tx.update(articles)
-            .set({ currentStock: sql`${articles.currentStock} + ${qty}` })
-            .where(eq(articles.id, item.articleId));
-          // en cas de bug ou panne on peut recalc current stock
-          // UPDATE articles a
-          //   SET current_stock = (
-          //     SELECT COALESCE(SUM(quantity), 0)
-          //     FROM inventory i
-          //     WHERE i.article_id = a.id);
-
         }
       }
-
-      // Passage en "cancelled"
-      if (status === "cancelled") {
-        // Si on annule une opération déjà complétée → rollback stock
-        if (op.status === "completed") {
-          for (const item of op.items) {
-            const qty = Number(item.quantity) || 0;
-
-            if (!item.toStorageZoneId) {
-              throw new Error(`Missing storage zone for article ${item.articleId}`);
-            }
-
+  
+      // ---- Passage en cancelled ----
+      if (status === "cancelled" && op.status === "completed") {
+        for (const item of op.items) {
+          const qty = Number(item.quantity) || 0;
+          if (qty <= 0) continue;
+  
+          // rollback entrée
+          if (item.toStorageZoneId) {
             await tx.insert(stock).values({
               articleId: item.articleId,
               storageZoneId: item.toStorageZoneId,
@@ -1485,35 +1481,46 @@ export class DatabaseStorage implements IStorage {
               quantity: -qty,
               updatedAt: new Date()
             }).onConflictDoUpdate({
-              target:[stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
-              set: {
-                quantity: sql`${stock.quantity} - ${qty}`,
-                updatedAt: sql`now()`
-              }
+              target: [stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
+              set: { quantity: sql`${stock.quantity} - ${qty}`, updatedAt: sql`now()` }
             });
-
-            // Mettre à jour le stock actuel de l'article
+  
             await tx.update(articles)
               .set({ currentStock: sql`${articles.currentStock} - ${qty}` })
               .where(eq(articles.id, item.articleId));
           }
+  
+          // rollback sortie
+          if (item.fromStorageZoneId) {
+            await tx.insert(stock).values({
+              articleId: item.articleId,
+              storageZoneId: item.fromStorageZoneId,
+              lotId: item.lotId ?? null,
+              serialNumber: item.serialNumber ?? null,
+              quantity: qty,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: [stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
+              set: { quantity: sql`${stock.quantity} + ${qty}`, updatedAt: sql`now()` }
+            });
+  
+            await tx.update(articles)
+              .set({ currentStock: sql`${articles.currentStock} + ${qty}` })
+              .where(eq(articles.id, item.articleId));
+          }
         }
       }
-
-      // Mettre à jour le statut
+  
+      // ---- Mettre à jour le statut ----
       const [newOp] = await tx.update(inventoryOperations)
-        .set({
-          status,
-          updatedAt: new Date()
-        })
+        .set({ status, updatedAt: new Date() })
         .where(eq(inventoryOperations.id, id))
         .returning();
-
+  
       return newOp;
     });
-
-    return result;
   }
+  
   async updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined> {
     const [operation] = await db.update(inventoryOperations)
       .set({ ...updateData, updatedAt: new Date().toISOString() })

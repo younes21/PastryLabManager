@@ -38,6 +38,7 @@ import InventoryOperationsPage from "@/pages/inventory-operations";
 import InvoicesPage from "@/pages/invoices";
 import DeliveriesPage from "@/pages/deliveries";
 import PurchaseOrders from "@/pages/purchase-orders";
+import InventoryPhysical from "@/pages/inventory-physical";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -171,6 +172,7 @@ function ProtectedRouter() {
       <Route path="/email-config" component={EmailConfig} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/purchase-orders" component={PurchaseOrders} />
+      <Route path="/inventory-physical" component={InventoryPhysical} />
       <Route path="/clients" component={Clients} />
       <Route path="/products" component={Products} />
       <Route path="/ingredients" component={IngredientsNew} />

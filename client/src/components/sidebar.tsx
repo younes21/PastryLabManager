@@ -94,6 +94,14 @@ export function Sidebar() {
       group: "Inventaire",
     },
     {
+      path: "/inventory-physical",
+      label: "Inventaire Physique",
+      icon: "fas fa-clipboard-check",
+      lucideIcon: CheckCircle,
+      order: 1,
+      group: "Inventaire",
+    },
+    {
       path: "/recipes",
       label: "Recettes",
       icon: "fas fa-book-open",

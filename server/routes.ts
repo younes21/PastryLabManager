@@ -1621,15 +1621,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/inventory-operations/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const { status } = req.body;
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid operation ID" });
       }
+      if (!["completed", "cancelled"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status transition" });
+      }
 
-      const updateData = insertInventoryOperationSchema.partial().parse(req.body);
-      const operation = await storage.updateInventoryOperation(id, updateData);
+      const result = await storage.updateInventoryOperationStatus(id, status);
 
-      if (operation) {
-        res.json(operation);
+      if (result) {
+        res.json(result);
       } else {
         res.status(404).json({ message: "Inventory operation not found" });
       }
