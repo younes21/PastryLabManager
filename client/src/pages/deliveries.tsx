@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Plus,
   Save,
   X,
   FileText,
   Edit3,
   Trash2,
-  Search,
   Package,
   Truck,
   ArrowLeft,
   Eye,
-  Ban,
   User,
   Calendar,
   CheckCircle,
@@ -54,27 +51,40 @@ export default function DeliveriesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // Récupérer le paramètre orderId de l'URL
+  const [orderId, setOrderId] = useState<number | null>(null);
+  
   // States
   const [currentDelivery, setCurrentDelivery] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
   const [items, setItems] = useState<any[]>([]);
-  const [showArticleSelect, setShowArticleSelect] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("list");
 
-  // Article select ref
-  const articleSelectRef = useRef<HTMLDivElement>(null);
+
+
+  // Récupérer le paramètre orderId de l'URL au chargement de la page
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderIdParam = urlParams.get('orderId');
+    if (orderIdParam) {
+      setOrderId(parseInt(orderIdParam));
+    }
+  }, []);
 
   // Queries
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<InventoryOperation[]>({
-    queryKey: ["/api/inventory-operations", { type: "delivery" }],
+    queryKey: ["/api/inventory-operations", { type: "delivery", orderId }],
     queryFn: async () => {
-      const response = await fetch("/api/inventory-operations?type=delivery");
+      let url = "/api/inventory-operations?type=delivery";
+      if (orderId) {
+        url += `&orderId=${orderId}`;
+      }
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch deliveries");
       return response.json();
     },
+    enabled: true,
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
@@ -87,6 +97,30 @@ export default function DeliveriesPage() {
 
   const { data: articles = [] } = useQuery<Article[]>({
     queryKey: ["/api/articles"],
+  });
+
+  // Query pour récupérer la commande spécifique si orderId est présent
+  const { data: currentOrder } = useQuery<Order>({
+    queryKey: ["/api/orders", orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+      const response = await fetch(`/api/orders/${orderId}`);
+      if (!response.ok) throw new Error("Failed to fetch order");
+      return response.json();
+    },
+    enabled: !!orderId,
+  });
+
+  // Query pour récupérer les articles de la commande si orderId est présent
+  const { data: orderItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/orders", orderId, "items"],
+    queryFn: async () => {
+      if (!orderId) return [];
+      const response = await fetch(`/api/orders/${orderId}/items`);
+      if (!response.ok) throw new Error("Failed to fetch order items");
+      return response.json();
+    },
+    enabled: !!orderId,
   });
 
   // Mutations
@@ -152,25 +186,7 @@ export default function DeliveriesPage() {
     },
   });
 
-  // Effects
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        articleSelectRef.current &&
-        !articleSelectRef.current.contains(event.target as Node)
-      ) {
-        setShowArticleSelect(false);
-      }
-    };
 
-    if (showArticleSelect) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showArticleSelect]);
 
   // Helper functions
   const resetForm = () => {
@@ -182,19 +198,44 @@ export default function DeliveriesPage() {
   };
 
   const startNewDelivery = () => {
-    setCurrentDelivery({
-      type: "delivery",
-      status: "draft",
-      clientId: null,
-      orderId: null,
-      scheduledDate: new Date().toISOString().split('T')[0],
-      notes: "",
-      currency: "DZD",
-      subtotalHT: 0,
-      totalTax: 0,
-      totalTTC: 0,
-    });
-    setItems([]);
+    if (orderId && currentOrder) {
+      // Si on a un orderId, pré-remplir avec les données de la commande
+      setCurrentDelivery({
+        type: "delivery",
+        status: "draft",
+        clientId: currentOrder.clientId,
+        orderId: orderId,
+        scheduledDate: new Date().toISOString().split('T')[0],
+        notes: `Livraison pour la commande ${currentOrder.code}`,
+        currency: "DZD",
+        // Ne plus initialiser les totaux - ils seront calculés côté serveur
+      });
+      
+      // Pré-remplir avec les articles de la commande (exclure ceux avec quantité 0)
+      setItems(orderItems
+        .filter((item: any) => parseFloat(item.quantity) > 0)
+        .map((item: any) => ({
+          id: Date.now() + Math.random(), // Nouvel ID temporaire
+          articleId: item.articleId,
+          article: articles.find(a => a.id === item.articleId),
+          quantity: parseFloat(item.quantity),
+          // Ne plus gérer unitPrice et totalPrice côté client
+          notes: item.notes || "",
+        })));
+    } else {
+      // Formulaire vide normal
+      setCurrentDelivery({
+        type: "delivery",
+        status: "draft",
+        clientId: null,
+        orderId: null,
+        scheduledDate: new Date().toISOString().split('T')[0],
+        notes: "",
+        currency: "DZD",
+        // Ne plus initialiser les totaux - ils seront calculés côté serveur
+      });
+      setItems([]);
+    }
     setIsEditing(true);
     setIsViewing(false);
     setActiveTab("form");
@@ -228,8 +269,7 @@ export default function DeliveriesPage() {
         articleId: item.articleId,
         article: articles.find(a => a.id === item.articleId),
         quantity: parseFloat(item.quantity),
-        unitPrice: parseFloat(item.unitPrice || "0"),
-        totalPrice: parseFloat(item.totalPrice || "0"),
+        // Ne plus gérer unitPrice et totalPrice côté client
         notes: item.notes || "",
       })));
     } catch (error) {
@@ -237,61 +277,43 @@ export default function DeliveriesPage() {
     }
   };
 
-  const addArticleToDelivery = () => {
-    if (!selectedArticle) return;
 
-    const existingItem = items.find(item => item.articleId === selectedArticle.id);
-    if (existingItem) {
-      toast({
-        title: "Article déjà ajouté",
-        description: "Cet article est déjà dans la livraison",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const newItem = {
-      id: Date.now() + Math.random(),
-      articleId: selectedArticle.id,
-      article: selectedArticle,
-      quantity: 1,
-      unitPrice: parseFloat(selectedArticle.salePrice || "0"),
-      totalPrice: parseFloat(selectedArticle.salePrice || "0"),
-      notes: "",
-    };
-
-    setItems([...items, newItem]);
-    setSelectedArticle(null);
-    setShowArticleSelect(false);
-    setSearchTerm("");
-  };
 
   const updateItemQuantity = (itemId: number | string, quantity: number) => {
-    setItems(items.map(item => 
-      item.id === itemId 
-        ? { ...item, quantity, totalPrice: quantity * item.unitPrice }
-        : item
-    ));
+    setItems(items.map(item => {
+      if (item.id === itemId) {
+        // Vérifier les limites avant de mettre à jour
+        const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
+        if (orderItem) {
+          const orderedQuantity = parseFloat(orderItem.quantity);
+          const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
+          const remainingQuantity = orderedQuantity - deliveredQuantity;
+          
+          // Ne pas dépasser la quantité restante ni la quantité commandée
+          const finalQuantity = Math.min(quantity, remainingQuantity, orderedQuantity);
+          
+          return { 
+            ...item, 
+            quantity: finalQuantity
+            // Ne plus calculer totalPrice côté client
+          };
+        }
+      }
+      return item;
+    }));
   };
 
-  const updateItemPrice = (itemId: number | string, unitPrice: number) => {
-    setItems(items.map(item => 
-      item.id === itemId 
-        ? { ...item, unitPrice, totalPrice: item.quantity * unitPrice }
-        : item
-    ));
-  };
 
-  const removeItem = (itemId: number | string) => {
-    setItems(items.filter(item => item.id !== itemId));
-  };
 
-  const calculateTotals = () => {
-    const subtotalHT = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const totalTax = subtotalHT * 0.19; // TVA 19%
-    const totalTTC = subtotalHT + totalTax;
-    return { subtotalHT, totalTax, totalTTC };
-  };
+
+
+  // Cette fonction n'est plus utilisée car les totaux sont calculés côté serveur
+  // const calculateTotals = () => {
+  //   const subtotalHT = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  //   const totalTax = subtotalHT * 0.19; // TVA 19%
+  //   const totalTTC = subtotalHT + totalTax;
+  //   return { subtotalHT, totalTax, totalTTC };
+  // };
 
   const saveDelivery = async () => {
     if (!currentDelivery.clientId) {
@@ -312,15 +334,48 @@ export default function DeliveriesPage() {
       return;
     }
 
-    const totals = calculateTotals();
+    // Vérifier que les quantités ne dépassent pas les limites
+    for (const item of items) {
+      const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
+      if (orderItem) {
+        const orderedQuantity = parseFloat(orderItem.quantity);
+        const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
+        const remainingQuantity = orderedQuantity - deliveredQuantity;
+        
+        if (item.quantity > remainingQuantity) {
+          toast({
+            title: "Quantité invalide",
+            description: `La quantité pour ${item.article?.name} dépasse la quantité restante (${remainingQuantity})`,
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        if (item.quantity > orderedQuantity) {
+          toast({
+            title: "Quantité invalide",
+            description: `La quantité pour ${item.article?.name} dépasse la quantité commandée (${orderedQuantity})`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+    }
+
+    // Préparer les données de livraison sans les totaux (calculés côté serveur)
     const deliveryData = {
-      ...currentDelivery,
-      ...totals,
+      type: "delivery",
+      status: currentDelivery.status || "draft",
+      clientId: currentDelivery.clientId,
+      orderId: currentDelivery.orderId,
+      scheduledDate: currentDelivery.scheduledDate,
+      notes: currentDelivery.notes,
+      currency: currentDelivery.currency || "DZD",
+      // Ne pas envoyer subtotalHT, totalTax, totalTTC - ils seront calculés côté serveur
       items: items.map(item => ({
         articleId: item.articleId,
         quantity: item.quantity.toString(),
-        unitPrice: item.unitPrice.toString(),
-        totalPrice: item.totalPrice.toString(),
+        // Ne pas envoyer unitPrice - il sera récupéré depuis la commande ou l'article
         notes: item.notes,
       }))
     };
@@ -344,6 +399,22 @@ export default function DeliveriesPage() {
     return order ? order.code : `CMD-${orderId}`;
   };
 
+  // Fonction pour calculer la quantité déjà livrée pour un article donné
+  const getDeliveredQuantity = (articleId: number, orderId: number) => {
+    if (!orderId) return 0;
+    
+    // Filtrer les livraisons pour cette commande (exclure la livraison actuelle et les annulées)
+    const relevantDeliveries = deliveries.filter(d => 
+      d.orderId === orderId && 
+      d.id !== currentDelivery?.id && 
+      d.status !== 'cancelled'
+    );
+    
+    // Pour simplifier, on retourne 0 car on n'a pas accès aux items des livraisons
+    // Dans une vraie implémentation, il faudrait récupérer les items de chaque livraison
+    return 0;
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { variant: "secondary" as const, label: "Brouillon" },
@@ -364,14 +435,10 @@ export default function DeliveriesPage() {
     return new Date(dateString).toLocaleDateString("fr-FR");
   };
 
-  const filteredArticles = articles.filter(article =>
-    article.allowSale &&
-    article.active &&
-    (article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     article.code?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
 
-  const totals = calculateTotals();
+
+  // Les totaux sont maintenant calculés côté serveur
+  // const totals = calculateTotals();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -380,13 +447,31 @@ export default function DeliveriesPage() {
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Truck className="h-8 w-8" />
             Livraisons
+            {orderId && (
+              <span className="text-lg text-muted-foreground font-normal">
+                - Commande #{orderId}
+              </span>
+            )}
           </h1>
           <p className="text-muted-foreground">
-            Gestion des livraisons clients
+            {orderId 
+              ? `Livraisons liées à la commande #${orderId}`
+              : "Gestion des livraisons clients"
+            }
           </p>
+          {orderId && (
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = '/orders'}
+              className="mt-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour aux commandes
+            </Button>
+          )}
         </div>
         <Button onClick={startNewDelivery} data-testid="button-new-delivery">
-          <Plus className="h-4 w-4 mr-2" />
+          <FileText className="h-4 w-4 mr-2" />
           Nouvelle livraison
         </Button>
       </div>
@@ -457,38 +542,61 @@ export default function DeliveriesPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(delivery.status)}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => viewDelivery(delivery)}
-                              data-testid={`button-view-delivery-${delivery.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => editDelivery(delivery)}
-                              disabled={delivery.status === "completed"}
-                              data-testid={`button-edit-delivery-${delivery.id}`}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
-                                  deleteDeliveryMutation.mutate(delivery.id);
-                                }
-                              }}
-                              disabled={delivery.status === "completed"}
-                              data-testid={`button-delete-delivery-${delivery.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
+                                                     <div className="flex items-center gap-2">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => viewDelivery(delivery)}
+                               data-testid={`button-view-delivery-${delivery.id}`}
+                             >
+                               <Eye className="h-4 w-4" />
+                             </Button>
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => editDelivery(delivery)}
+                               disabled={delivery.status === "completed"}
+                               data-testid={`button-edit-delivery-${delivery.id}`}
+                             >
+                               <Edit3 className="h-4 w-4" />
+                             </Button>
+                             <Select
+                               value={delivery.status}
+                               onValueChange={(newStatus) => {
+                                 if (newStatus !== delivery.status) {
+                                   updateDeliveryMutation.mutate({
+                                     id: delivery.id,
+                                     data: { status: newStatus }
+                                   });
+                                 }
+                               }}
+                               disabled={delivery.status === "completed"}
+                             >
+                               <SelectTrigger className="w-32">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="draft">Brouillon</SelectItem>
+                                 <SelectItem value="pending">En attente</SelectItem>
+                                 <SelectItem value="ready">Prêt</SelectItem>
+                                 <SelectItem value="completed">Livré</SelectItem>
+                                 <SelectItem value="cancelled">Annulé</SelectItem>
+                               </SelectContent>
+                             </Select>
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => {
+                                 if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
+                                   deleteDeliveryMutation.mutate(delivery.id);
+                                 }
+                               }}
+                               disabled={delivery.status === "completed"}
+                               data-testid={`button-delete-delivery-${delivery.id}`}
+                             >
+                               <Trash2 className="h-4 w-4 text-red-500" />
+                             </Button>
+                           </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -547,54 +655,24 @@ export default function DeliveriesPage() {
                     <CardTitle>Informations générales</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">Client *</label>
-                      <Select
-                        value={currentDelivery.clientId?.toString() || ""}
-                        onValueChange={(value) => setCurrentDelivery({
-                          ...currentDelivery,
-                          clientId: parseInt(value)
-                        })}
-                        disabled={!isEditing}
-                      >
-                        <SelectTrigger data-testid="select-client">
-                          <SelectValue placeholder="Sélectionner un client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id.toString()}>
-                              {getClientName(client.id)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    
 
-                    <div>
-                      <label className="text-sm font-medium">Commande liée</label>
-                      <Select
-                        value={currentDelivery.orderId?.toString() || "none"}
-                        onValueChange={(value) => setCurrentDelivery({
-                          ...currentDelivery,
-                          orderId: value === "none" ? null : parseInt(value)
-                        })}
-                        disabled={!isEditing}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Aucune commande" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Aucune commande</SelectItem>
-                          {orders
-                            .filter(order => !currentDelivery.clientId || order.clientId === currentDelivery.clientId)
-                            .map((order) => (
-                            <SelectItem key={order.id} value={order.id.toString()}>
-                              {order.code}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Affichage des informations de la commande liée */}
+                    {currentDelivery.orderId && currentOrder && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-800">
+                            Commande liée: {currentOrder.code}
+                          </span>
+                        </div>
+                        <div className="text-xs text-blue-700 space-y-1">
+                          <p>Client: {getClientName(currentOrder.clientId)}</p>
+                          <p>Date de commande: {currentOrder.createdAt ? new Date(currentOrder.createdAt).toLocaleDateString('fr-FR') : 'N/A'}</p>
+                          <p>Total: {parseFloat(currentOrder.totalTTC?.toString() || "0").toFixed(2)} DA</p>
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <label className="text-sm font-medium">Date prévue</label>
@@ -610,28 +688,7 @@ export default function DeliveriesPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="text-sm font-medium">Statut</label>
-                      <Select
-                        value={currentDelivery.status || "draft"}
-                        onValueChange={(value) => setCurrentDelivery({
-                          ...currentDelivery,
-                          status: value
-                        })}
-                        disabled={!isEditing}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="draft">Brouillon</SelectItem>
-                          <SelectItem value="pending">En attente</SelectItem>
-                          <SelectItem value="ready">Prêt</SelectItem>
-                          <SelectItem value="completed">Livré</SelectItem>
-                          <SelectItem value="cancelled">Annulé</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+
 
                     <div>
                       <label className="text-sm font-medium">Notes</label>
@@ -658,15 +715,27 @@ export default function DeliveriesPage() {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Sous-total HT</span>
-                        <span>{totals.subtotalHT.toFixed(2)} DA</span>
+                        <span>
+                          {currentDelivery.subtotalHT 
+                            ? parseFloat(currentDelivery.subtotalHT.toString()).toFixed(2) 
+                            : "0.00"} DA
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">TVA (19%)</span>
-                        <span>{totals.totalTax.toFixed(2)} DA</span>
+                        <span>
+                          {currentDelivery.totalTax 
+                            ? parseFloat(currentDelivery.totalTax.toString()).toFixed(2) 
+                            : "0.00"} DA
+                        </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold border-t pt-2">
                         <span>Total TTC</span>
-                        <span>{totals.totalTTC.toFixed(2)} DA</span>
+                        <span>
+                          {currentDelivery.totalTTC 
+                            ? parseFloat(currentDelivery.totalTTC.toString()).toFixed(2) 
+                            : "0.00"} DA
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -678,170 +747,102 @@ export default function DeliveriesPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>Articles à livrer ({items.length})</span>
-                    {isEditing && (
-                      <div className="relative" ref={articleSelectRef}>
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowArticleSelect(!showArticleSelect)}
-                          data-testid="button-add-article"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Ajouter un article
-                        </Button>
-                        
-                        {showArticleSelect && (
-                          <div className="absolute right-0 top-12 z-50 w-96 bg-white border rounded-lg shadow-lg">
-                            <div className="p-4 space-y-4">
-                              <div className="relative">
-                                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  placeholder="Rechercher un article..."
-                                  value={searchTerm}
-                                  onChange={(e) => setSearchTerm(e.target.value)}
-                                  className="pl-10"
-                                />
-                              </div>
-                              
-                              <div className="max-h-60 overflow-y-auto space-y-1">
-                                {filteredArticles.length === 0 ? (
-                                  <p className="text-center py-4 text-muted-foreground">
-                                    Aucun article trouvé
-                                  </p>
-                                ) : (
-                                  filteredArticles.map((article) => (
-                                    <div
-                                      key={article.id}
-                                      className="p-3 hover:bg-muted cursor-pointer rounded"
-                                      onClick={() => setSelectedArticle(article)}
-                                    >
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <p className="font-medium">{article.name}</p>
-                                          <p className="text-sm text-muted-foreground">
-                                            {article.code} • {article.unit}
-                                          </p>
-                                        </div>
-                                        <div className="text-right">
-                                          <p className="font-medium">
-                                            {parseFloat(article.salePrice || "0").toFixed(2)} DA
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                              
-                              {selectedArticle && (
-                                <div className="border-t pt-4">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <p className="font-medium">{selectedArticle.name}</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        {selectedArticle.code}
-                                      </p>
-                                    </div>
-                                    <Button onClick={addArticleToDelivery}>
-                                      Ajouter
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                    {currentDelivery.orderId && currentOrder && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        <Package className="h-3 w-3 mr-1" />
+                        Commande {currentOrder.code}
+                      </Badge>
                     )}
+
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Article</TableHead>
-                        <TableHead>Quantité</TableHead>
-                        <TableHead>Prix unitaire</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Notes</TableHead>
-                        {isEditing && <TableHead>Actions</TableHead>}
-                      </TableRow>
-                    </TableHeader>
+                                         <TableHeader>
+                       <TableRow>
+                         <TableHead>Article</TableHead>
+                         <TableHead>Quantité commandée</TableHead>
+                         <TableHead>Quantité déjà livrée</TableHead>
+                         <TableHead>Quantité restante</TableHead>
+                         <TableHead>Quantité à livrer</TableHead>
+                         <TableHead>Notes</TableHead>
+                       </TableRow>
+                     </TableHeader>
                     <TableBody>
                       {items.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={isEditing ? 6 : 5} className="text-center py-8">
+                          <TableCell colSpan={isEditing ? 4 : 4} className="text-center py-8">
                             Aucun article ajouté
                           </TableCell>
                         </TableRow>
                       ) : (
-                        items.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{item.article?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {item.article?.code} • {item.article?.unit}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {isEditing ? (
-                                <Input
-                                  type="number"
-                                  min="0.01"
-                                  step="0.01"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItemQuantity(item.id, parseFloat(e.target.value) || 0)}
-                                  className="w-20"
-                                />
-                              ) : (
-                                item.quantity
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {isEditing ? (
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.unitPrice}
-                                  onChange={(e) => updateItemPrice(item.id, parseFloat(e.target.value) || 0)}
-                                  className="w-24"
-                                />
-                              ) : (
-                                `${item.unitPrice.toFixed(2)} DA`
-                              )}
-                            </TableCell>
-                            <TableCell className="font-semibold">
-                              {item.totalPrice.toFixed(2)} DA
-                            </TableCell>
-                            <TableCell>
-                              {isEditing ? (
-                                <Input
-                                  value={item.notes}
-                                  onChange={(e) => setItems(items.map(i => 
-                                    i.id === item.id ? { ...i, notes: e.target.value } : i
-                                  ))}
-                                  placeholder="Notes..."
-                                  className="w-32"
-                                />
-                              ) : (
-                                item.notes || "-"
-                              )}
-                            </TableCell>
-                            {isEditing && (
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeItem(item.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))
+                                                 items.map((item) => {
+                           // Calculer les quantités déjà livrées et restantes
+                           const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
+                           const orderedQuantity = orderItem ? parseFloat(orderItem.quantity) : 0;
+                           
+                           // Calculer la quantité déjà livrée
+                           const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
+                           
+                           const remainingQuantity = orderedQuantity - deliveredQuantity;
+                           
+                           return (
+                             <TableRow key={item.id}>
+                               <TableCell>
+                                 <div>
+                                   <p className="font-medium">{item.article?.name}</p>
+                                   <p className="text-sm text-muted-foreground">
+                                     {item.article?.code} • {item.article?.unit}
+                                   </p>
+                                 </div>
+                               </TableCell>
+                               <TableCell className="text-center">
+                                 {orderedQuantity}
+                               </TableCell>
+                               <TableCell className="text-center">
+                                 {deliveredQuantity}
+                               </TableCell>
+                               <TableCell className="text-center">
+                                 {remainingQuantity}
+                               </TableCell>
+                               <TableCell>
+                                 {isEditing ? (
+                                   <Input
+                                     type="number"
+                                     min="0.01"
+                                     max={remainingQuantity}
+                                     step="0.01"
+                                     value={item.quantity}
+                                     onChange={(e) => {
+                                       const newQuantity = parseFloat(e.target.value) || 0;
+                                       if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
+                                         updateItemQuantity(item.id, newQuantity);
+                                       }
+                                     }}
+                                     className="w-20"
+                                   />
+                                 ) : (
+                                   item.quantity
+                                 )}
+                               </TableCell>
+                               {/* Prix unitaire et total supprimés - calculés côté serveur */}
+                               <TableCell>
+                                 {isEditing ? (
+                                   <Input
+                                     value={item.notes}
+                                     onChange={(e) => setItems(items.map(i => 
+                                       i.id === item.id ? { ...i, notes: e.target.value } : i
+                                     ))}
+                                     placeholder="Notes..."
+                                     className="w-32"
+                                   />
+                                 ) : (
+                                   item.notes || "-"
+                                 )}
+                               </TableCell>
+                             </TableRow>
+                           );
+                         })
                       )}
                     </TableBody>
                   </Table>

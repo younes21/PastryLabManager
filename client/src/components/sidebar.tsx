@@ -43,7 +43,7 @@ export function Sidebar() {
   // Fermer la sidebar sur mobile après navigation
   const handleNavigation = () => {
     if (window.innerWidth < 1366) { // lg breakpoint
-       closeSidebar();
+      closeSidebar();
     }
   };
 
@@ -138,14 +138,6 @@ export function Sidebar() {
       label: "Facturation",
       icon: "fas fa-file-invoice",
       lucideIcon: FileText,
-      order: 0,
-      group: "Ventes",
-    },
-    {
-      path: "/deliveries",
-      label: "Livraisons",
-      icon: "fas fa-truck",
-      lucideIcon: Truck,
       order: 0,
       group: "Ventes",
     },
@@ -306,7 +298,7 @@ export function Sidebar() {
   // Filter navigation based on user role
   const filteredNavItems = navItems.filter((item) => {
     if (!user) return false;
-
+    if (user.role !== 'client' && item.path === '/client_orders') return false;
     switch (user.role) {
       case "client":
         return ["/", "/client_orders"].includes(item.path);
@@ -334,7 +326,7 @@ export function Sidebar() {
   }, {} as Record<string, typeof filteredNavItems>);
 
   // Define group order for consistent display
-  const groupOrder = ["admin","Principal", "Inventaire","Ventes", "Achats",  "Production"];
+  const groupOrder = ["admin", "Principal", "Inventaire", "Ventes", "Achats", "Production"];
   const sortedGroupEntries = Object.entries(groupedMenu).sort(([a], [b]) => {
     const indexA = groupOrder.indexOf(a);
     const indexB = groupOrder.indexOf(b);
@@ -417,7 +409,7 @@ export function Sidebar() {
         {/* Contenu principal de la sidebar */}
         <div className="flex flex-col flex-grow  overflow-y-auto">
           {/* Logo desktop */}
-        {/* <div className="flex items-center ml-6">
+          {/* <div className="flex items-center ml-6">
             <div className="mr-3">
               <svg
                 width="24"
@@ -488,17 +480,16 @@ export function Sidebar() {
             {sortedGroupEntries.map(([groupName, groupItems]) => {
               const isExpanded = shouldGroupBeExpanded(groupItems, groupName);
               const groupActive = isGroupActive(groupItems);
-              
+
               return (
                 <div key={groupName} className="mb-2">
                   {/* Group Header - Accordéon */}
                   <button
                     onClick={() => toggleGroup(groupName)}
-                    className={`w-full flex items-center justify-between px-3 py-4 border-gray-100 border bg-slate-50   text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${
-                      groupActive 
-                        ? " text-blue-700" 
+                    className={`w-full flex items-center justify-between px-3 py-4 border-gray-100 border bg-slate-50   text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${groupActive
+                        ? " text-blue-700"
                         : "text-gray-700 hover:bg-blue-200"
-                    }`}
+                      }`}
                   >
                     <span className="uppercase tracking-wider text-xs">
                       {getGroupDisplayName(groupName)}
@@ -522,17 +513,15 @@ export function Sidebar() {
                         <div key={item.path}>
                           <Link href={item.path} onClick={handleNavigation}>
                             <div
-                              className={`relative flex border border-gray-50 items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${
-                                isActive(item.path)
+                              className={`relative flex border border-gray-50 items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${isActive(item.path)
                                   ? "bg-blue-200 text-blue-700 font-semibold shadow-sm"
                                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                              }`}
+                                }`}
                             >
                               {item.lucideIcon && (
                                 <item.lucideIcon
-                                  className={`mr-3 h-4 w-4 ${
-                                    isActive(item.path) ? "text-white" : "text-gray-400"
-                                  }`}
+                                  className={`mr-3 h-4 w-4 ${isActive(item.path) ? "text-white" : "text-gray-400"
+                                    }`}
                                 />
                               )}
                               <span className="truncate">{item.label}</span>

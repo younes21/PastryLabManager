@@ -43,6 +43,7 @@ import {
   inventoryOperations,
   inventoryOperationItems,
   users,
+  orderItems,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1652,9 +1653,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/inventory-operations", async (req, res) => {
     try {
-      const { type, include_reliquat, operator_id } = req.query;
+      const { type, include_reliquat, operator_id, orderId } = req.query;
       let operations;
-      if (type) {
+      
+      // Si orderId est spécifié, filtrer par commande
+      if (orderId) {
+        const orderIdNum = parseInt(orderId as string);
+        if (isNaN(orderIdNum)) {
+          return res.status(400).json({ message: "Invalid order ID" });
+        }
+        operations = await storage.getInventoryOperationsByOrder(orderIdNum);
+      } else if (type) {
         const includeReliquat = include_reliquat === 'true';
         const types = (type as string).split(',').map(t => t.trim());
         if (types.length === 1) {
@@ -1731,6 +1740,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operationId: undefined
           };
         });
+        // Calcul automatique des totaux pour les livraisons
+        if (operationData.type === 'delivery') {
+          let subtotalHT = 0;
+          let totalTax = 0;
+          let totalTTC = 0;
+          
+          // Récupérer les prix depuis la commande ou les articles
+          for (const item of itemsData) {
+            let unitPrice = 0;
+            
+            // Si on a une commande liée, récupérer le prix depuis la commande
+            if (operationData.orderId) {
+              const orderItem = await db.select()
+                .from(orderItems)
+                .where(and(
+                  eq(orderItems.orderId, operationData.orderId),
+                  eq(orderItems.articleId, item.articleId)
+                ))
+                .limit(1);
+              
+              if (orderItem.length > 0) {
+                unitPrice = parseFloat(orderItem[0].unitPrice.toString());
+              }
+            }
+            
+            // Si pas de prix trouvé dans la commande, utiliser le prix de l'article
+            if (unitPrice === 0) {
+              const article = await db.select()
+                .from(articles)
+                .where(eq(articles.id, item.articleId))
+                .limit(1);
+              
+              if (article.length > 0) {
+                unitPrice = parseFloat((article[0].salePrice || article[0].price || "0").toString());
+              }
+            }
+            
+            const itemTotal = unitPrice * parseFloat(item.quantity.toString());
+            subtotalHT += itemTotal;
+          }
+          
+          // Calculer la TVA (19% par défaut)
+          totalTax = subtotalHT * 0.19;
+          totalTTC = subtotalHT + totalTax;
+          
+          // Mettre à jour les totaux
+          operationData.subtotalHT = subtotalHT.toString();
+          operationData.totalTax = totalTax.toString();
+          operationData.totalTTC = totalTTC.toString();
+        }
+        
         const operation = await storage.createInventoryOperationWithItems(operationData, itemsData);
         res.status(201).json(operation);
       } else {

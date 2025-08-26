@@ -192,6 +192,7 @@ export interface IStorage {
   getInventoryOperation(id: number): Promise<InventoryOperation | undefined>;
   getInventoryOperationsByType(type: string, includeReliquat: boolean): Promise<InventoryOperation[]>;
   getInventoryOperationsByTypes(types: string[], includeReliquat: boolean): Promise<InventoryOperation[]>;
+  getInventoryOperationsByOrder(orderId: number): Promise<InventoryOperationWithItems[]>;
   createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation>;
   createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
   updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined>;
@@ -1358,6 +1359,61 @@ export class DatabaseStorage implements IStorage {
       return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
     } catch (error) {
       console.error('Error in getInventoryOperationsByOperator:', error);
+      throw error;
+    }
+  }
+
+  async getInventoryOperationsByOrder(orderId: number): Promise<InventoryOperationWithItems[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          io.*,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', iot.id,
+                'operationId', iot.operation_id,
+                'articleId', iot.article_id,
+                'quantity', iot.quantity,
+                'unitCost', iot.unit_cost,
+                'totalCost', iot.total_cost,
+                'notes', iot.notes,
+                'createdAt', iot.created_at,
+                'article', CASE 
+                  WHEN a.id IS NOT NULL THEN json_build_object(
+                    'id', a.id,
+                    'code', a.code,
+                    'name', a.name,
+                    'type', a.type,
+                    'description', a.description,
+                    'costPerUnit', a.cost_per_unit,
+                    'price', a.price,
+                    'currentStock', a.current_stock,
+                    'minStock', a.min_stock,
+                    'maxStock', a.max_stock,
+                    'active', a.active,
+                    'createdAt', a.created_at
+                  )
+                  ELSE NULL
+                END
+              )
+            ) FILTER (WHERE iot.id IS NOT NULL),
+            '[]'
+          ) AS items
+        FROM inventory_operations io
+        LEFT JOIN inventory_operation_items iot
+          ON iot.operation_id = io.id
+        LEFT JOIN articles a
+          ON a.id = iot.article_id
+        WHERE io.order_id = ${orderId}
+          AND io.type = 'livraison'
+        GROUP BY io.id, io.code, io.type, io.status, io.operator_id, io.scheduled_date, io.started_at, io.completed_at, io.notes, io.created_at, io.updated_at
+        ORDER BY io.created_at DESC
+      `);
+
+      return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+    } catch (error) {
+      console.error('Error in getInventoryOperationsByOrder:', error);
       throw error;
     }
   }
