@@ -47,7 +47,10 @@ export function PaymentManager({ invoice }: PaymentManagerProps) {
   // Queries
   const { data: payments = [], isLoading } = useQuery<Payment[]>({
     queryKey: ["/api/payments", { invoiceId: invoice.id }],
-    queryFn: () => apiRequest(`/api/invoices/${invoice.id}/payments`),
+    queryFn: async () => {
+      const response = await apiRequest(`/api/invoices/${invoice.id}/payments`, 'GET');
+      return response.json();
+    },
   });
 
   const form = useForm<PaymentFormData>({

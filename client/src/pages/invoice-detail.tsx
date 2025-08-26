@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { PaymentManager } from "@/components/payment-manager";
-import { 
-  ArrowLeft, 
-  FileText, 
-  User, 
-  Calendar, 
-  Euro, 
+import {
+  ArrowLeft,
+  FileText,
+  User,
+  Calendar,
+  Euro,
   Printer,
   Edit
 } from "lucide-react";
@@ -29,18 +29,28 @@ export default function InvoiceDetailPage() {
   // Queries
   const { data: invoice, isLoading: invoiceLoading } = useQuery<Invoice>({
     queryKey: ["/api/invoices", invoiceId],
-    queryFn: () => apiRequest(`/api/invoices/${invoiceId}`),
+    queryFn: async () => {
+      const res = await fetch(`/api/invoices/${invoiceId}`);
+      return res.json();
+    },
+  
   });
 
   const { data: client } = useQuery<Client>({
     queryKey: ["/api/clients", invoice?.clientId],
-    queryFn: () => apiRequest(`/api/clients/${invoice?.clientId}`),
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${invoice?.clientId}`);
+      return res.json();
+    },
     enabled: !!invoice?.clientId,
   });
 
   const { data: invoiceItems = [] } = useQuery<InvoiceItem[]>({
     queryKey: ["/api/invoices", invoiceId, "items"],
-    queryFn: () => apiRequest(`/api/invoices/${invoiceId}/items`),
+    queryFn: async() => {
+      const res = await fetch(`/api/invoices/${invoiceId}/items`);
+      return res.json();
+    },
     enabled: !!invoiceId,
   });
 
@@ -273,7 +283,7 @@ export default function InvoiceDetailPage() {
                     Aucun article facturé
                   </TableCell>
                 </TableRow>
-              ) : (
+              ) : (console.log(invoiceItems),
                 invoiceItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
@@ -295,7 +305,7 @@ export default function InvoiceDetailPage() {
               )}
             </TableBody>
           </Table>
-          
+
           {/* Total Summary */}
           <div className="mt-6 space-y-2 border-t pt-4">
             <div className="flex justify-between">
@@ -324,7 +334,7 @@ export default function InvoiceDetailPage() {
       </Card>
 
       {/* Payment Manager */}
-      <PaymentManager invoice={invoice} />
+      {invoice && <PaymentManager invoice={invoice} />}
     </div>
   );
 }
