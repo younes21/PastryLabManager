@@ -150,7 +150,7 @@ function ProtectedRouter() {
   // Default routes for admin, preparateur, gerant
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      {/* <Route path="/" component={Dashboard} /> */}
       {/* Route ingredients supprimée - utiliser Articles avec filtrage */}
       {/* Routes supprimées - à réimplémenter */}
       <Route path="/recipes" component={Recipes} />
@@ -183,7 +183,10 @@ function ProtectedRouter() {
       <Route path="/deliveries" component={DeliveriesPage} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route path="/preparation" component={PreparationPage} />
-      <Route path="/preparateur-preparations" component={PreparateurPreparationsPage} />
+      <Route
+        path="/preparateur-preparations"
+        component={PreparateurPreparationsPage}
+      />
       <Route component={NotFound} />
     </Switch>
   );
@@ -203,16 +206,17 @@ function AppContent() {
     );
   }
 
-  return user ?  
-            <Switch> 
-              <LayoutProvider>
-                <Layout>
-                <ProtectedRouter /> 
-                </Layout>
-              </LayoutProvider>
-          </Switch> 
-  
-         : <LoginPage />;
+  return user ? (
+    <Switch>
+      <LayoutProvider>
+        <Layout>
+          <ProtectedRouter />
+        </Layout>
+      </LayoutProvider>
+    </Switch>
+  ) : (
+    <LoginPage />
+  );
 }
 
 function App() {

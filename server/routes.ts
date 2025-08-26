@@ -1114,6 +1114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/recipes/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if(!id) return res.status(404).json({ message: "Recipe not found" });
       const recipe = await storage.getRecipe(id);
       if (!recipe) {
         return res.status(404).json({ message: "Recipe not found" });
