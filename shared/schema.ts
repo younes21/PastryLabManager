@@ -549,6 +549,7 @@ export const orders = pgTable("orders", {
     .references(() => clients.id)
     .notNull(),
   status: text("status").notNull().default("draft"), // draft, confirmed, prepared, ready, partially_delivered, delivered, cancelled
+  order: integer("order").default(0), // Ordre d'affichage pour le drag and drop
 
   // Dates
   orderDate: timestamp("order_date", { mode: "string" }).defaultNow(),

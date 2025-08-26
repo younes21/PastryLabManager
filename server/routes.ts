@@ -1414,7 +1414,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Échec de la mise à jour de la commande" });
     }
   });
+  app.put("/api/orders/reorder", async (req, res) => {
+    try {
+      const { updates } = req.body;
+      
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ message: "Updates array is required and must not be empty" });
+      }
 
+      // Validation des données
+      const updateSchema = z.object({
+        id: z.number(),
+        order: z.number().min(0)
+      });
+
+      const validatedUpdates = updates.map(update => updateSchema.parse(update));
+
+      // Mise à jour de l'ordre de chaque commande
+      for (const update of validatedUpdates) {
+        await storage.updateOrder(update.id, { order: update.order });
+      }
+
+      res.json({ message: "Orders reordered successfully" });
+    } catch (error) {
+      console.error("Error reordering orders:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ 
+          message: "Invalid update data", 
+          errors: error.errors 
+        });
+      } else {
+        res.status(500).json({ message: "Failed to reorder orders" });
+      }
+    }
+  });
   app.put("/api/orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
