@@ -8,6 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Eye, Edit, Trash2, User, Calendar, Package } from "lucide-react";
 import type { Order, Client, Article } from "@shared/schema";
 
+interface ProductionStatus {
+  orderId: number;
+  etat: string;
+  ajustements: string[];
+}
+
 interface OrderRowProps {
   order: Order;
   index: number;
@@ -18,6 +24,8 @@ interface OrderRowProps {
   onView: (order: Order) => void;
   orderStatusLabels: Record<string, string>;
   orderStatusColors: Record<string, string>;
+  productionStatus?: ProductionStatus;
+  productionStatusLoading: boolean;
 }
 
 export function OrderRow({
@@ -29,7 +37,9 @@ export function OrderRow({
   onDelete,
   onView,
   orderStatusLabels,
-  orderStatusColors
+  orderStatusColors,
+  productionStatus,
+  productionStatusLoading
 }: OrderRowProps) {
   const {
     attributes,
@@ -60,6 +70,34 @@ export function OrderRow({
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("fr-FR");
+  };
+
+  const getProductionStatusLabel = (etat: string) => {
+    switch (etat) {
+      case "prepare":
+        return "Préparé";
+      case "partiellement_prepare":
+        return "Partiellement préparé";
+      case "en_cours":
+        return "En cours";
+      case "non_prepare":
+      default:
+        return "Non préparé";
+    }
+  };
+
+  const getProductionStatusColor = (etat: string) => {
+    switch (etat) {
+      case "prepare":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "partiellement_prepare":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "en_cours":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "non_prepare":
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
+    }
   };
 
   return (
@@ -103,7 +141,7 @@ export function OrderRow({
           onValueChange={(value) => onStatusChange(order, value)}
         >
           <SelectTrigger className="w-auto">
-            <Badge variant={orderStatusColors[order.status as keyof typeof orderStatusColors]}>
+            <Badge variant="outline">
               {orderStatusLabels[order.status as keyof typeof orderStatusLabels]}
             </Badge>
           </SelectTrigger>
@@ -115,6 +153,31 @@ export function OrderRow({
             ))}
           </SelectContent>
         </Select>
+      </TableCell>
+      <TableCell>
+        {productionStatusLoading ? (
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+            <span className="text-sm text-muted-foreground">Chargement...</span>
+          </div>
+        ) : productionStatus ? (
+          <div className="flex flex-col gap-1">
+            <Badge 
+              className={`${getProductionStatusColor(productionStatus.etat)} border`}
+              variant="outline"
+            >
+              {getProductionStatusLabel(productionStatus.etat)}
+            </Badge>
+            {productionStatus.ajustements.length > 0 && (
+              <div className="text-xs text-muted-foreground max-w-32 truncate" title={productionStatus.ajustements.join(", ")}>
+                {productionStatus.ajustements[0]}
+                {productionStatus.ajustements.length > 1 && "..."}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        )}
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">

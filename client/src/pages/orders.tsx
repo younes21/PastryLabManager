@@ -32,8 +32,6 @@ import { OrdersTable } from "@/components/orders-table";
 const orderStatusLabels = {
   draft: "Brouillon",
   confirmed: "Confirmé",
-  prepared: "Préparé",
-  ready: "Prêt",
   partially_delivered: "Livré partiellement",
   delivered: "Livré",
   cancelled: "Annulé"

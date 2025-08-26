@@ -1335,20 +1335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/orders/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const order = await storage.getOrder(id);
-      if (order) {
-        res.json(order);
-      } else {
-        res.status(404).json({ message: "Order not found" });
-      }
-    } catch (error) {
-      console.error("Error fetching order:", error);
-      res.status(500).json({ message: "Failed to fetch order" });
-    }
-  });
+
 
   app.post("/api/orders", async (req, res) => {
     try {
@@ -1506,6 +1493,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route optimisée pour le calcul du statut de production de toutes les commandes
+  app.get("/api/orders/production-status-batch", async (req, res) => {
+    try {
+      // Récupérer toutes les commandes avec leurs articles
+      const orders = (await storage.getAllOrders())?.filter(f=>f.status !== 'cancelled'&& f.status!='delivered'&& f.status!='draft')
+      .sort((a,b)=>(a.order ||0) - (b.order||0));
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const items = await storage.getOrderItems(order.id);
+          return { ...order, items };
+        })
+      );
+
+      // Récupérer tous les articles uniques
+      const allArticleIds = new Set<number>();
+      ordersWithItems.forEach(order => {
+        order.items.forEach((item: any) => allArticleIds.add(item.articleId));
+      });
+
+      // Récupérer le stock disponible et les noms des articles pour tous les articles en une fois
+      const stockData: Record<number, number> = {};
+      const articleNames: Record<number, string> = {};
+      for (const articleId of Array.from(allArticleIds)) {
+        stockData[articleId] = await storage.getAvailableStock(articleId);
+        const article = await storage.getArticle(articleId);
+        articleNames[articleId] = article?.name || `Article ${articleId}`;
+      }
+
+      // Récupérer toutes les opérations de fabrication en cours
+      const operationsEnCours = await storage.getInventoryOperationsByType('fabrication');
+      const operationsEnCoursData: Record<number, any[]> = {};
+      
+      operationsEnCours.forEach(op => {
+        if (op.status === 'en_cours' && op.items) {
+          op.items.forEach((item: any) => {
+            if (!operationsEnCoursData[item.articleId]) {
+              operationsEnCoursData[item.articleId] = [];
+            }
+            operationsEnCoursData[item.articleId].push({
+              id: op.id,
+              quantity: item.quantity
+            });
+          });
+        }
+      });
+
+      // Copie virtuelle pour les ajustements
+      const stockVirtuel = { ...stockData };
+      const operationsVirtuelles = JSON.parse(JSON.stringify(operationsEnCoursData));
+
+      // Calculer l'état de production pour chaque commande dans l'ordre
+      const resultat = [];
+      
+      for (const order of ordersWithItems) {
+        const ajustements: string[] = [];
+        
+        // Vérifier l'état "préparé" / "partiellement préparé"
+        let toutDisponible = true;
+        let auMoinsUnDisponible = false;
+        
+        for (const item of order.items) {
+          const qCommande = parseFloat(item.quantity);
+          const qStock = stockVirtuel[item.articleId] || 0;
+          
+          if (qStock >= qCommande) {
+            auMoinsUnDisponible = true;
+          } else if (qStock > 0) {
+            toutDisponible = false;
+            auMoinsUnDisponible = true;
+          } else {
+            toutDisponible = false;
+          }
+        }
+        
+        // Vérifier l'état "en cours"
+        let enCours = true;
+        for (const item of order.items) {
+          const qStock = stockVirtuel[item.articleId] || 0;
+          const op = operationsVirtuelles[item.articleId];
+          
+          if (qStock > 0 || !op || op.length === 0) {
+            enCours = false;
+            break;
+          }
+        }
+        
+        // Déterminer l'état final et appliquer les ajustements virtuels
+        let etat = "non_prepare";
+        
+        if (enCours) {
+          etat = "en_cours";
+          for (const item of order.items) {
+            const op = operationsVirtuelles[item.articleId];
+            if (op && op.length > 0) {
+              const qOp = Math.min(parseFloat(item.quantity), op[0].quantity);
+              // Ajustement virtuel : diminuer la quantité dans l'opération
+              op[0].quantity -= qOp;
+              if (op[0].quantity <= 0) {
+                operationsVirtuelles[item.articleId] = op.slice(1);
+              }
+              ajustements.push(`${articleNames[item.articleId]} -${qOp} (depuis opération ${op[0].id})`);
+            }
+          }
+        } else if (toutDisponible) {
+          etat = "prepare";
+          for (const item of order.items) {
+            const qCommande = parseFloat(item.quantity);
+            // Ajustement virtuel : diminuer le stock
+            stockVirtuel[item.articleId] -= qCommande;
+            ajustements.push(`${articleNames[item.articleId]} -${qCommande}`);
+          }
+        } else if (auMoinsUnDisponible) {
+          etat = "partiellement_prepare";
+          for (const item of order.items) {
+            const qCommande = parseFloat(item.quantity);
+            const qDisponible = Math.min(qCommande, stockVirtuel[item.articleId] || 0);
+            if (qDisponible > 0) {
+              // Ajustement virtuel : diminuer le stock
+              stockVirtuel[item.articleId] -= qDisponible;
+              ajustements.push(`${articleNames[item.articleId]} -${qDisponible}`);
+            }
+          }
+        } else {
+          etat = "non_prepare";
+          ajustements.push("Aucun ajustement possible");
+        }
+        
+        resultat.push({
+          orderId: order.id,
+          etat,
+          ajustements
+        });
+      }
+      
+      res.json(resultat);
+
+    } catch (error) {
+      console.error("Erreur lors du calcul du statut de production en lot:", error);
+      res.status(500).json({ message: "Échec du calcul du statut de production en lot" });
+    }
+  });
+  app.get("/api/orders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.getOrder(id);
+      if (order) {
+        res.json(order);
+      } else {
+        res.status(404).json({ message: "Order not found" });
+      }
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
   // ============ OPERATIONS D'INVENTAIRE ROUTES ============
 
   app.get("/api/inventory-operations", async (req, res) => {
@@ -1578,7 +1720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
               )
             );
-          if (existing.length > 0) {
+          if (existing.length > 0 && existing.some(f=>f.status !== 'cancelled')) {
             return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
           }
         }
@@ -1603,7 +1745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
               )
             );
-          if (existing.length > 0) {
+          if (existing.length > 0 && existing.some(f=>f.status !== 'cancelled')) {
             return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
           }
         }

@@ -16,6 +16,7 @@ import {
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from "@/components/ui/table";
 import { OrderRow } from "./order-row";
 import type { Order, Client, Article } from "@shared/schema";
+import { useProductionStatusCalculation } from "@/hooks/use-production-status-calculation";
 
 interface OrdersTableProps {
   orders: Order[];
@@ -48,6 +49,9 @@ export function OrdersTable({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Utiliser le nouveau hook de calcul du statut de production
+  const { data: productionStatuses = [], isLoading: productionStatusLoading } = useProductionStatusCalculation(orders);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -83,24 +87,25 @@ export function OrdersTable({
             <TableHead>Date livraison</TableHead>
             <TableHead>Total TTC</TableHead>
             <TableHead>Statut</TableHead>
+            <TableHead>Production</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8">
+              <TableCell colSpan={11} className="text-center py-8">
                 Chargement des commandes...
               </TableCell>
             </TableRow>
           ) : orders.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8">
+              <TableCell colSpan={11} className="text-center py-8">
                 Aucune commande trouvée
               </TableCell>
             </TableRow>
           ) : (
-            <SortableContext items={orders.map(order => order.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={orders.map((order) => order.id)} strategy={verticalListSortingStrategy}>
               {orders.map((order, index) => (
                 <OrderRow
                   key={order.id}
@@ -113,6 +118,8 @@ export function OrdersTable({
                   onView={onView}
                   orderStatusLabels={orderStatusLabels}
                   orderStatusColors={orderStatusColors}
+                  productionStatus={productionStatuses.find(ps => ps.orderId === order.id)}
+                  productionStatusLoading={productionStatusLoading}
                 />
               ))}
             </SortableContext>

@@ -568,6 +568,8 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   deliveryNotes: text("delivery_notes"),
 
+  
+
   // Audit
   createdBy: integer("created_by").references(() => users.id),
   confirmedBy: integer("confirmed_by").references(() => users.id),
