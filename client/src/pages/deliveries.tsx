@@ -573,10 +573,10 @@ export default function DeliveriesPage() {
                     <div>
                       <label className="text-sm font-medium">Commande liée</label>
                       <Select
-                        value={currentDelivery.orderId?.toString() || ""}
+                        value={currentDelivery.orderId?.toString() || "none"}
                         onValueChange={(value) => setCurrentDelivery({
                           ...currentDelivery,
-                          orderId: value ? parseInt(value) : null
+                          orderId: value === "none" ? null : parseInt(value)
                         })}
                         disabled={!isEditing}
                       >
@@ -584,7 +584,7 @@ export default function DeliveriesPage() {
                           <SelectValue placeholder="Aucune commande" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Aucune commande</SelectItem>
+                          <SelectItem value="none">Aucune commande</SelectItem>
                           {orders
                             .filter(order => !currentDelivery.clientId || order.clientId === currentDelivery.clientId)
                             .map((order) => (
