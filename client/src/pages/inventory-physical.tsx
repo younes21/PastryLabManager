@@ -615,7 +615,6 @@ const InventoryPhysicalInterface = () => {
                     </TableRow>
                   );
                 })
-              )}
             </TableBody>
           </Table>
           
