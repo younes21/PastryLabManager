@@ -32,6 +32,7 @@ import {
   insertDeliverySchema,
   insertInvoiceSchema,
   insertInvoiceItemSchema,
+  insertPaymentSchema,
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
   InventoryOperation,
@@ -2521,6 +2522,302 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching inventory operations:", error);
       res.status(500).json({ message: "Failed to fetch inventory operations" });
+    }
+  });
+
+  // ============ INVOICES ROUTES ============
+  
+  // Get all invoices
+  app.get("/api/invoices", async (req, res) => {
+    try {
+      const { clientId } = req.query;
+      
+      if (clientId) {
+        const invoices = await storage.getInvoicesByClient(parseInt(clientId as string));
+        res.json(invoices);
+      } else {
+        const invoices = await storage.getAllInvoices();
+        res.json(invoices);
+      }
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // Get invoice by ID
+  app.get("/api/invoices/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const invoice = await storage.getInvoice(id);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  // Get invoices by order
+  app.get("/api/orders/:orderId/invoices", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.orderId);
+      const invoices = await storage.getInvoicesByOrder(orderId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching invoices for order:", error);
+      res.status(500).json({ message: "Failed to fetch invoices for order" });
+    }
+  });
+
+  // Get invoices from delivery operation
+  app.get("/api/inventory-operations/:operationId/invoices", async (req, res) => {
+    try {
+      const operationId = parseInt(req.params.operationId);
+      const invoices = await storage.getInvoicesFromDeliveryOperation(operationId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching invoices from delivery operation:", error);
+      res.status(500).json({ message: "Failed to fetch invoices from delivery operation" });
+    }
+  });
+
+  // Create invoice from delivery operation
+  app.post("/api/inventory-operations/:operationId/create-invoice", async (req, res) => {
+    try {
+      const operationId = parseInt(req.params.operationId);
+      const invoiceData = req.body; // Optional additional data
+      
+      const invoice = await storage.createInvoiceFromDelivery(operationId, invoiceData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating invoice from delivery:", error);
+      res.status(400).json({ message: error.message || "Failed to create invoice from delivery" });
+    }
+  });
+
+  // Create invoice
+  app.post("/api/invoices", async (req, res) => {
+    try {
+      const invoiceData = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice(invoiceData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      res.status(400).json({ message: "Invalid invoice data" });
+    }
+  });
+
+  // Update invoice
+  app.put("/api/invoices/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertInvoiceSchema.partial().parse(req.body);
+      const invoice = await storage.updateInvoice(id, updateData);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error updating invoice:", error);
+      res.status(400).json({ message: "Failed to update invoice" });
+    }
+  });
+
+  // Update invoice status based on payments
+  app.patch("/api/invoices/:id/status", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const invoice = await storage.updateInvoiceStatus(id);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error updating invoice status:", error);
+      res.status(400).json({ message: "Failed to update invoice status" });
+    }
+  });
+
+  // Delete invoice
+  app.delete("/api/invoices/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteInvoice(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // ============ INVOICE ITEMS ROUTES ============
+
+  // Get items for an invoice
+  app.get("/api/invoices/:invoiceId/items", async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const items = await storage.getInvoiceItems(invoiceId);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching invoice items:", error);
+      res.status(500).json({ message: "Failed to fetch invoice items" });
+    }
+  });
+
+  // Create invoice item
+  app.post("/api/invoice-items", async (req, res) => {
+    try {
+      const itemData = insertInvoiceItemSchema.parse(req.body);
+      const item = await storage.createInvoiceItem(itemData);
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating invoice item:", error);
+      res.status(400).json({ message: "Invalid invoice item data" });
+    }
+  });
+
+  // Update invoice item
+  app.put("/api/invoice-items/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertInvoiceItemSchema.partial().parse(req.body);
+      const item = await storage.updateInvoiceItem(id, updateData);
+      
+      if (!item) {
+        return res.status(404).json({ message: "Invoice item not found" });
+      }
+      
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating invoice item:", error);
+      res.status(400).json({ message: "Failed to update invoice item" });
+    }
+  });
+
+  // Delete invoice item
+  app.delete("/api/invoice-items/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteInvoiceItem(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Invoice item not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting invoice item:", error);
+      res.status(500).json({ message: "Failed to delete invoice item" });
+    }
+  });
+
+  // ============ PAYMENTS ROUTES ============
+
+  // Get all payments
+  app.get("/api/payments", async (req, res) => {
+    try {
+      const { invoiceId } = req.query;
+      
+      if (invoiceId) {
+        const payments = await storage.getPaymentsByInvoice(parseInt(invoiceId as string));
+        res.json(payments);
+      } else {
+        const payments = await storage.getAllPayments();
+        res.json(payments);
+      }
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  // Get payment by ID
+  app.get("/api/payments/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const payment = await storage.getPayment(id);
+      
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      
+      res.json(payment);
+    } catch (error) {
+      console.error("Error fetching payment:", error);
+      res.status(500).json({ message: "Failed to fetch payment" });
+    }
+  });
+
+  // Get payments for an invoice
+  app.get("/api/invoices/:invoiceId/payments", async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const payments = await storage.getPaymentsByInvoice(invoiceId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching payments for invoice:", error);
+      res.status(500).json({ message: "Failed to fetch payments for invoice" });
+    }
+  });
+
+  // Create payment
+  app.post("/api/payments", async (req, res) => {
+    try {
+      const paymentData = insertPaymentSchema.parse(req.body);
+      const payment = await storage.createPayment(paymentData);
+      res.status(201).json(payment);
+    } catch (error) {
+      console.error("Error creating payment:", error);
+      res.status(400).json({ message: "Invalid payment data" });
+    }
+  });
+
+  // Update payment
+  app.put("/api/payments/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = insertPaymentSchema.partial().parse(req.body);
+      const payment = await storage.updatePayment(id, updateData);
+      
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      
+      res.json(payment);
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      res.status(400).json({ message: "Failed to update payment" });
+    }
+  });
+
+  // Delete payment
+  app.delete("/api/payments/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deletePayment(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting payment:", error);
+      res.status(500).json({ message: "Failed to delete payment" });
     }
   });
 

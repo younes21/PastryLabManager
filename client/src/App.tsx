@@ -36,6 +36,7 @@ import IngredientsNew from "@/pages/ingredients-new";
 import OrdersPage from "@/pages/orders";
 import InventoryOperationsPage from "@/pages/inventory-operations";
 import InvoicesPage from "@/pages/invoices";
+import InvoiceDetailPage from "@/pages/invoice-detail";
 import DeliveriesPage from "@/pages/deliveries";
 import PurchaseOrders from "@/pages/purchase-orders";
 import InventoryPhysical from "@/pages/inventory-physical";
@@ -179,6 +180,7 @@ function ProtectedRouter() {
       <Route path="/orders" component={OrdersPage} />
       <Route path="/client_orders" component={ClientOrdersPage} />
       {/* <Route path="/inventory-operations" component={InventoryOperationsPage} /> */}
+      <Route path="/invoices/:id" component={InvoiceDetailPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/deliveries" component={DeliveriesPage} />
       <Route path="/catalog" component={ClientCatalog} />

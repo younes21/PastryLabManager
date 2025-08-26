@@ -24,21 +24,20 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { InvoiceForm } from "@/components/forms/invoice-form";
+import { Link } from "wouter";
 import type { Invoice, Client } from "@shared/schema";
 
 const invoiceStatusLabels = {
   draft: "Brouillon",
-  sent: "Envoyé", 
+  partial: "Partiellement payé",
   paid: "Payé",
-  overdue: "En retard",
   cancelled: "Annulé"
 };
 
 const invoiceStatusColors = {
   draft: "secondary",
-  sent: "default",
+  partial: "default",
   paid: "default",
-  overdue: "destructive",
   cancelled: "destructive"
 } as const;
 
@@ -336,13 +335,15 @@ export default function InvoicesPage() {
                         >
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          data-testid={`button-view-invoice-${invoice.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <Link href={`/invoices/${invoice.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            data-testid={`button-view-invoice-${invoice.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
                         <Button
                           variant="ghost"
                           size="sm"

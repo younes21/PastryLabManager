@@ -942,7 +942,7 @@ export const invoices = pgTable("invoices", {
     .notNull(),
 
   // Statut et dates
-  status: text("status").notNull().default("draft"), // draft, sent, paid, overdue, cancelled
+  status: text("status").notNull().default("draft"), // draft, sent, paid, partial, cancelled
   issueDate: timestamp("issue_date", { mode: "string" }).defaultNow(),
   dueDate: timestamp("due_date", { mode: "string" }),
   paidAt: timestamp("paid_at", { mode: "string" }),
@@ -952,6 +952,7 @@ export const invoices = pgTable("invoices", {
   totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
   totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0.00"),
 
   // Adresses et notes
   billingAddress: text("billing_address"),
@@ -974,6 +975,9 @@ export const invoiceItems = pgTable("invoice_items", {
     .notNull(),
   articleId: integer("article_id").references(() => articles.id),
   orderItemId: integer("order_item_id").references(() => orderItems.id),
+  inventoryOperationItemId: integer("inventory_operation_item_id")
+    .references(() => inventoryOperationItems.id)
+    .notNull(), // Traçabilité vers les livraisons
 
   description: text("description").notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
@@ -1131,6 +1135,10 @@ export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
   id: true,
   createdAt: true,
 });
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+});
 export const insertAccountingEntrySchema = createInsertSchema(
   accountingEntries,
 ).omit({ id: true, code: true, createdAt: true, updatedAt: true });
@@ -1166,9 +1174,65 @@ export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type AccountingEntry = typeof accountingEntries.$inferSelect;
 export type InsertAccountingEntry = z.infer<typeof insertAccountingEntrySchema>;
 export type AccountingEntryLine = typeof accountingEntryLines.$inferSelect;
 export type InsertAccountingEntryLine = z.infer<
   typeof insertAccountingEntryLineSchema
 >;
+
+// ============ ADDITIONAL RELATIONS ============
+
+export const invoicesRelations = relations(
+  invoices,
+  ({ one, many }) => ({
+    client: one(clients, {
+      fields: [invoices.clientId],
+      references: [clients.id],
+    }),
+    order: one(orders, {
+      fields: [invoices.orderId],
+      references: [orders.id],
+    }),
+    items: many(invoiceItems),
+    payments: many(payments),
+  }),
+);
+
+export const invoiceItemsRelations = relations(
+  invoiceItems,
+  ({ one }) => ({
+    invoice: one(invoices, {
+      fields: [invoiceItems.invoiceId],
+      references: [invoices.id],
+    }),
+    article: one(articles, {
+      fields: [invoiceItems.articleId],
+      references: [articles.id],
+    }),
+    orderItem: one(orderItems, {
+      fields: [invoiceItems.orderItemId],
+      references: [orderItems.id],
+    }),
+    inventoryOperationItem: one(inventoryOperationItems, {
+      fields: [invoiceItems.inventoryOperationItemId],
+      references: [inventoryOperationItems.id],
+    }),
+  }),
+);
+
+export const paymentsRelations = relations(
+  payments,
+  ({ one }) => ({
+    invoice: one(invoices, {
+      fields: [payments.invoiceId],
+      references: [invoices.id],
+    }),
+    createdBy: one(users, {
+      fields: [payments.createdBy],
+      references: [users.id],
+    }),
+  }),
+);

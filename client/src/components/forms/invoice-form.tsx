@@ -19,12 +19,15 @@ import type { Invoice, Client, Order } from "@shared/schema";
 const invoiceFormSchema = z.object({
   clientId: z.number().min(1, "Client requis"),
   orderId: z.number().optional(),
-  status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]),
+  status: z.enum(["draft", "partial", "paid", "cancelled"]),
   issueDate: z.string().optional(),
   dueDate: z.string().optional(),
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
-  discount: z.number().min(0, "Remise minimum 0").optional()
+  discount: z.string().optional(),
+  subtotalHT: z.string().optional(),
+  totalTax: z.string().optional(),
+  totalTTC: z.string().optional()
 });
 
 type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
@@ -57,7 +60,10 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 jours
       paymentTerms: "30 jours",
       notes: "",
-      discount: 0
+      discount: "0.00",
+      subtotalHT: "0.00",
+      totalTax: "0.00",
+      totalTTC: "0.00"
     }
   });
 
@@ -68,10 +74,11 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
         ...data,
         issueDate: data.issueDate || new Date().toISOString(),
         dueDate: data.dueDate || null,
-        subtotalHT: 0, // TODO: Calculer depuis la commande
-        totalTax: 0,
-        totalTTC: 0,
-        amountPaid: 0
+        subtotalHT: data.subtotalHT || "0.00",
+        totalTax: data.totalTax || "0.00",
+        totalTTC: data.totalTTC || "0.00",
+        discount: data.discount || "0.00",
+        amountPaid: "0.00"
       };
       
       if (invoice) {
@@ -109,7 +116,10 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
         dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : "",
         paymentTerms: invoice.paymentTerms || "",
         notes: invoice.notes || "",
-        discount: parseFloat(invoice.discount || "0")
+        discount: invoice.discount || "0.00",
+        subtotalHT: invoice.subtotalHT || "0.00",
+        totalTax: invoice.totalTax || "0.00",
+        totalTTC: invoice.totalTTC || "0.00"
       });
     }
   }, [invoice, form]);
@@ -221,12 +231,53 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="draft">Brouillon</SelectItem>
-                            <SelectItem value="sent">Envoyé</SelectItem>
+                            <SelectItem value="partial">Partiellement payé</SelectItem>
                             <SelectItem value="paid">Payé</SelectItem>
-                            <SelectItem value="overdue">En retard</SelectItem>
                             <SelectItem value="cancelled">Annulé</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="subtotalHT"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sous-total HT (DA)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...field}
+                            data-testid="input-invoice-subtotal"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalTax"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>TVA (DA)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...field}
+                            data-testid="input-invoice-tax"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -241,11 +292,30 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
                         <FormControl>
                           <Input
                             type="number"
-                            step="1"
+                            step="0.01"
                             min="0"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             data-testid="input-invoice-discount"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="totalTTC"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total TTC (DA)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...field}
+                            data-testid="input-invoice-total"
                           />
                         </FormControl>
                         <FormMessage />

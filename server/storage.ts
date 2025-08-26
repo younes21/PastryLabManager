@@ -4,7 +4,7 @@ import {
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
-  invoices, invoiceItems, accountingEntries, accountingEntryLines, stockReservations,
+  invoices, invoiceItems, payments, accountingEntries, accountingEntryLines, stockReservations,
 
   type User, type InsertUser,
   type Client, type InsertClient,
@@ -20,6 +20,7 @@ import {
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
   type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
+  type Payment, type InsertPayment,
   type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
   InventoryOperationWithItems,
   type StockReservation, type InsertStockReservation,
@@ -196,6 +197,35 @@ export interface IStorage {
   updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined>;
   updateInventoryOperationWithItems(operationId: number, updatedOperation: Partial<InsertInventoryOperation>, updatedItems: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
   deleteInventoryOperation(id: number): Promise<boolean>;
+
+  // ============ FACTURATION ============
+
+  // Invoices
+  getAllInvoices(): Promise<Invoice[]>;
+  getInvoice(id: number): Promise<Invoice | undefined>;
+  getInvoicesByClient(clientId: number): Promise<Invoice[]>;
+  getInvoicesByOrder(orderId: number): Promise<Invoice[]>;
+  getInvoicesFromDeliveryOperation(operationId: number): Promise<Invoice[]>;
+  createInvoiceFromDelivery(operationId: number, invoiceData?: Partial<InsertInvoice>): Promise<Invoice>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  updateInvoiceStatus(id: number): Promise<Invoice | undefined>; // Auto-calcul du statut basé sur les paiements
+  deleteInvoice(id: number): Promise<boolean>;
+  generateInvoiceCode(): Promise<string>;
+
+  // Invoice Items
+  getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
+  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
+  updateInvoiceItem(id: number, item: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined>;
+  deleteInvoiceItem(id: number): Promise<boolean>;
+
+  // Payments
+  getAllPayments(): Promise<Payment[]>;
+  getPayment(id: number): Promise<Payment | undefined>;
+  getPaymentsByInvoice(invoiceId: number): Promise<Payment[]>;
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  updatePayment(id: number, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
+  deletePayment(id: number): Promise<boolean>;
 
   // ============ GESTION AVANCEE DES STOCKS ============
 
@@ -2180,6 +2210,250 @@ export class DatabaseStorage implements IStorage {
 
     const result = await db.execute(query);
     return result.rows;
+  }
+
+  // ============ FACTURATION ============
+
+  // Invoices
+  async getAllInvoices(): Promise<Invoice[]> {
+    return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice || undefined;
+  }
+
+  async getInvoicesByClient(clientId: number): Promise<Invoice[]> {
+    return await db.select().from(invoices)
+      .where(eq(invoices.clientId, clientId))
+      .orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoicesByOrder(orderId: number): Promise<Invoice[]> {
+    return await db.select().from(invoices)
+      .where(eq(invoices.orderId, orderId))
+      .orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoicesFromDeliveryOperation(operationId: number): Promise<Invoice[]> {
+    // Trouver les factures liées aux éléments de livraison d'une opération
+    const invoicesData = await db
+      .select({ invoice: invoices })
+      .from(invoices)
+      .innerJoin(invoiceItems, eq(invoices.id, invoiceItems.invoiceId))
+      .innerJoin(inventoryOperationItems, eq(invoiceItems.inventoryOperationItemId, inventoryOperationItems.id))
+      .where(eq(inventoryOperationItems.operationId, operationId))
+      .groupBy(invoices.id);
+
+    return invoicesData.map(row => row.invoice);
+  }
+
+  async createInvoiceFromDelivery(operationId: number, invoiceData?: Partial<InsertInvoice>): Promise<Invoice> {
+    const operation = await db
+      .select().from(inventoryOperations)
+      .where(and(
+        eq(inventoryOperations.id, operationId),
+        eq(inventoryOperations.type, 'delivery'),
+        eq(inventoryOperations.status, 'completed')
+      )).limit(1);
+
+    if (operation.length === 0) {
+      throw new Error('Opération de livraison non trouvée ou non complétée');
+    }
+
+    const op = operation[0];
+    const invoiceCode = await this.generateInvoiceCode();
+
+    // Calculer les montants de la facture à partir des éléments de livraison
+    const operationItems = await db
+      .select().from(inventoryOperationItems)
+      .where(eq(inventoryOperationItems.operationId, operationId));
+
+    const subtotalHT = operationItems.reduce((sum, item) => 
+      sum + parseFloat(item.totalCost || '0'), 0
+    ).toFixed(2);
+
+    const totalTax = operationItems.reduce((sum, item) => 
+      sum + parseFloat(item.taxAmount || '0'), 0
+    ).toFixed(2);
+
+    const totalTTC = (parseFloat(subtotalHT) + parseFloat(totalTax)).toFixed(2);
+
+    // Créer la facture
+    const newInvoiceData: InsertInvoice = {
+      code: invoiceCode,
+      orderId: op.orderId || undefined,
+      clientId: op.clientId!,
+      status: 'draft',
+      subtotalHT,
+      totalTax,
+      totalTTC,
+      discount: '0.00',
+      amountPaid: '0.00',
+      ...invoiceData,
+    };
+
+    const [newInvoice] = await db.insert(invoices).values(newInvoiceData).returning();
+
+    // Créer les éléments de facture à partir des éléments de livraison
+    for (const opItem of operationItems) {
+      await db.insert(invoiceItems).values({
+        invoiceId: newInvoice.id,
+        articleId: opItem.articleId,
+        inventoryOperationItemId: opItem.id,
+        description: `Livraison - Article ID ${opItem.articleId}`,
+        quantity: opItem.quantity,
+        unitPrice: opItem.unitPriceSale || opItem.unitCost || '0.00',
+        totalPrice: opItem.totalCost || '0.00',
+        taxRate: opItem.taxRate || '0.00',
+        taxAmount: opItem.taxAmount || '0.00',
+      });
+    }
+
+    return newInvoice;
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const invoiceCode = await this.generateInvoiceCode();
+    const invoiceData = {
+      ...invoice,
+      code: invoiceCode,
+    };
+
+    const [newInvoice] = await db.insert(invoices).values(invoiceData).returning();
+    return newInvoice;
+  }
+
+  async updateInvoice(id: number, updateData: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const [invoice] = await db.update(invoices)
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
+      .where(eq(invoices.id, id))
+      .returning();
+    return invoice || undefined;
+  }
+
+  async updateInvoiceStatus(id: number): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    if (!invoice) return undefined;
+
+    const payments = await this.getPaymentsByInvoice(id);
+    const totalPaid = payments.reduce((sum, payment) => 
+      sum + parseFloat(payment.amount), 0
+    );
+    const totalTTC = parseFloat(invoice.totalTTC);
+
+    let newStatus: string;
+    if (totalPaid === 0) {
+      newStatus = invoice.status === 'cancelled' ? 'cancelled' : 'draft';
+    } else if (totalPaid >= totalTTC) {
+      newStatus = 'paid';
+    } else {
+      newStatus = 'partial';
+    }
+
+    const [updatedInvoice] = await db.update(invoices)
+      .set({
+        status: newStatus,
+        amountPaid: totalPaid.toFixed(2),
+        paidAt: newStatus === 'paid' ? new Date().toISOString() : null,
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(invoices.id, id))
+      .returning();
+
+    return updatedInvoice || undefined;
+  }
+
+  async deleteInvoice(id: number): Promise<boolean> {
+    const result = await db.delete(invoices).where(eq(invoices.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async generateInvoiceCode(): Promise<string> {
+    const existingInvoices = await db.select({ id: invoices.id }).from(invoices);
+    const nextNumber = existingInvoices.length + 1;
+    return `FAC-${nextNumber.toString().padStart(6, '0')}`;
+  }
+
+  // Invoice Items
+  async getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]> {
+    return await db.select().from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, invoiceId));
+  }
+
+  async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
+    const [newItem] = await db.insert(invoiceItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateInvoiceItem(id: number, updateData: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined> {
+    const [item] = await db.update(invoiceItems)
+      .set(updateData)
+      .where(eq(invoiceItems.id, id))
+      .returning();
+    return item || undefined;
+  }
+
+  async deleteInvoiceItem(id: number): Promise<boolean> {
+    const result = await db.delete(invoiceItems).where(eq(invoiceItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Payments
+  async getAllPayments(): Promise<Payment[]> {
+    return await db.select().from(payments).orderBy(desc(payments.createdAt));
+  }
+
+  async getPayment(id: number): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment || undefined;
+  }
+
+  async getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.invoiceId, invoiceId))
+      .orderBy(desc(payments.createdAt));
+  }
+
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [newPayment] = await db.insert(payments).values(payment).returning();
+    
+    // Mettre à jour automatiquement le statut de la facture
+    if (payment.invoiceId) {
+      await this.updateInvoiceStatus(payment.invoiceId);
+    }
+    
+    return newPayment;
+  }
+
+  async updatePayment(id: number, updateData: Partial<InsertPayment>): Promise<Payment | undefined> {
+    const [payment] = await db.update(payments)
+      .set(updateData)
+      .where(eq(payments.id, id))
+      .returning();
+
+    // Mettre à jour le statut de la facture si nécessaire
+    if (payment && payment.invoiceId) {
+      await this.updateInvoiceStatus(payment.invoiceId);
+    }
+
+    return payment || undefined;
+  }
+
+  async deletePayment(id: number): Promise<boolean> {
+    // Obtenir le paiement avant suppression pour mettre à jour la facture
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    
+    const result = await db.delete(payments).where(eq(payments.id, id));
+    const deleted = (result.rowCount || 0) > 0;
+
+    // Mettre à jour le statut de la facture
+    if (deleted && payment && payment.invoiceId) {
+      await this.updateInvoiceStatus(payment.invoiceId);
+    }
+
+    return deleted;
   }
 }
 
