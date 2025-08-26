@@ -28,6 +28,9 @@ const InventoryPhysicalInterface = () => {
   const [articles, setArticles] = useState<any[]>([]);
   const [stockItems, setStockItems] = useState<any[]>([]);
 
+  // Ajout d'un état pour savoir si un inventaire initial existe déjà pour la zone sélectionnée
+  const [hasInitialInventory, setHasInitialInventory] = useState(false);
+
   // Ref pour le select d'articles
   const articleSelectRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +78,19 @@ const InventoryPhysicalInterface = () => {
     }
   }, [selectedZoneId]);
 
+  // Vérifier s'il existe déjà un inventaire initial pour la zone sélectionnée
+  useEffect(() => {
+    if (!selectedZoneId) {
+      setHasInitialInventory(false);
+      return;
+    }
+    // On considère que le type 'inventaire_initiale' est utilisé pour l'inventaire initial
+    const initial = operations.find(
+      (op) => op.type === 'inventaire_initiale' && op.storageZoneId === selectedZoneId
+    );
+    setHasInitialInventory(!!initial);
+  }, [operations, selectedZoneId]);
+
   // Load initial data from API
   useEffect(() => {
     const loadAll = async () => {
@@ -103,14 +119,18 @@ const InventoryPhysicalInterface = () => {
     void loadAll();
   }, []);
 
-  // Dans createNewOperation, initialiser la zone sélectionnée et charger les items du stock de la zone
-  const createNewOperation = () => {
+  // Fonction pour créer une nouvelle opération d'inventaire (initial ou ajustement)
+  const createNewOperation = (isInitial = false) => {
+    if (isInitial && hasInitialInventory) {
+      alert('Un inventaire initial existe déjà pour cette zone.');
+      return;
+    }
     const defaultZoneId = storageZones[0]?.id || null;
     const newOp = {
       id: -Date.now(),
       code: undefined,
       status: 'draft',
-      type: 'ajustement',
+      type: isInitial ? 'inventaire_initiale' : 'ajustement',
       storageZoneId: defaultZoneId,
       notes: '',
       createdAt: new Date().toISOString(),
@@ -303,6 +323,13 @@ const InventoryPhysicalInterface = () => {
     }));
   };
 
+  // Ajouter la fonction pour modifier le prix d'achat
+  const updateItemUnitCost = (itemId: number, newUnitCost: string) => {
+    setItems(items.map(item =>
+      item.id === itemId ? { ...item, unitCost: parseFloat(newUnitCost) || 0 } : item
+    ));
+  };
+
   const saveOperation = async () => {
     if (!currentOperation) return;
 
@@ -319,7 +346,7 @@ const InventoryPhysicalInterface = () => {
 
     try {
       const operationData = {
-        type: 'ajustement',
+        type: currentOperation.type,
         status: currentOperation.status || 'draft',
         storageZoneId: currentOperation.storageZoneId,
         notes: currentOperation.notes.trim(),
@@ -330,7 +357,7 @@ const InventoryPhysicalInterface = () => {
         quantity: (it.newQuantity - it.currentStock).toString(),
         quantityBefore: it.currentStock.toString(),
         quantityAfter: it.newQuantity.toString(),
-        unitCost: '0',
+        unitCost: currentOperation.type === 'inventaire_initiale' ? (it.unitCost || '0').toString() : '0',
         toStorageZoneId: it.storageZoneId || currentOperation.storageZoneId,
         lotId: it.lotId || null,
         serialNumber: it.serialNumber || null,
@@ -457,7 +484,8 @@ const InventoryPhysicalInterface = () => {
     return matchesSearch && matchesType && !alreadyInItems && notInStock;
   });
 
-  const filteredOperations = operations.filter(op => op.type === 'ajustement');
+  // Afficher l'inventaire initial dans la liste des opérations (pas seulement les ajustements)
+  const filteredOperations = operations.filter(op => op.type === 'ajustement' || op.type === 'inventaire_initiale');
 
   if (!isEditing && !isViewing) {
     usePageTitle('Inventaire Physique');
@@ -471,10 +499,22 @@ const InventoryPhysicalInterface = () => {
               Gérez les inventaires physiques de vos stocks
             </p>
           </div>
-          <Button onClick={createNewOperation}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nouvel Inventaire
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => createNewOperation(true)}
+              disabled={hasInitialInventory }
+              className="bg-blue-600 hover:bg-blue-700 text-white mr-2"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Inventaire initial
+            </Button>
+            <Button
+              onClick={() => createNewOperation(false)}
+              disabled={!hasInitialInventory}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Nouvel ajustement
+            </Button>
+          </div>
         </div>
 
         {/* Operations List */}
@@ -728,6 +768,9 @@ const InventoryPhysicalInterface = () => {
                   <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Lot/Num Série</TableHead>
                   <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté en Stock</TableHead>
                   <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Réelle</TableHead>
+                  {currentOperation?.type === 'inventaire_initiale' && (
+                    <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Prix d'achat</TableHead>
+                  )}
                   <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">U.M</TableHead>
                   {!isViewing && (
                     <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</TableHead>
@@ -786,6 +829,23 @@ const InventoryPhysicalInterface = () => {
                            </div>
                          )}
                        </TableCell>
+                       {currentOperation?.type === 'inventaire_initiale' && (
+                         <TableCell className="text-center p-2">
+                           {isViewing ? (
+                             <span className="text-sm font-medium">{item.unitCost?.toFixed(2) ?? '-'}</span>
+                           ) : (
+                             <Input
+                               type="number"
+                               value={item.unitCost ?? ''}
+                               onChange={(e) => updateItemUnitCost(item.id, e.target.value)}
+                               min="0"
+                               step="0.01"
+                               className="w-24 text-center text-sm"
+                               disabled={currentOperation?.status !== 'draft'}
+                             />
+                           )}
+                         </TableCell>
+                       )}
                       <TableCell className="text-center text-sm p-2">
                         {item.unit}
                       </TableCell>

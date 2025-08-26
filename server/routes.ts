@@ -1527,22 +1527,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check if the request contains both operation and items
       if (req.body.operation && req.body.items) {
-        // Use the new method that handles both operation and items
         const operationData = insertInventoryOperationSchema.parse(req.body.operation);
+        // Vérification inventaire initiale unique par zone
+        if (operationData.type === 'inventaire_initiale' && operationData.storageZoneId) {
+          const existing = await db.select().from(inventoryOperations)
+            .where(
+              and(
+                eq(inventoryOperations.type, 'inventaire_initiale'),
+                eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
+              )
+            );
+          if (existing.length > 0) {
+            return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
+          }
+        }
         const itemsData = req.body.items.map((item: any) => {
           const validatedItem = insertInventoryOperationItemSchema.parse(item);
           return {
             ...validatedItem,
-            // Remove operationId if present, it will be set by the storage method
             operationId: undefined
           };
         });
-
         const operation = await storage.createInventoryOperationWithItems(operationData, itemsData);
         res.status(201).json(operation);
       } else {
         // Fallback to the old method for backward compatibility
         const operationData = insertInventoryOperationSchema.parse(req.body);
+        // Vérification inventaire initiale unique par zone
+        if (operationData.type === 'inventaire_initiale' && operationData.storageZoneId) {
+          const existing = await db.select().from(inventoryOperations)
+            .where(
+              and(
+                eq(inventoryOperations.type, 'inventaire_initiale'),
+                eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
+              )
+            );
+          if (existing.length > 0) {
+            return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
+          }
+        }
         const operation = await storage.createInventoryOperation(operationData);
         res.status(201).json(operation);
       }
