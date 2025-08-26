@@ -1933,6 +1933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalTax: body?.purchaseOrder?.totalTax ?? '0',
         totalTTC: body?.purchaseOrder?.totalTTC ?? '0',
         discount: body?.purchaseOrder?.discount ?? '0',
+        scheduledDate: body?.purchaseOrder?.scheduledDate || new Date().toISOString(), // Ajouté ici
       } as any);
 
       const items: any[] = [];
@@ -2052,6 +2053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalTax: body?.purchaseOrder?.totalTax ?? existingOp.totalTax,
         totalTTC: body?.purchaseOrder?.totalTTC ?? existingOp.totalTTC,
         discount: body?.purchaseOrder?.discount ?? existingOp.discount,
+        scheduledDate: body?.purchaseOrder?.scheduledDate || existingOp.scheduledDate, // Ajouté ici
       } as any);
 
       // Supprimer les anciennes lignes

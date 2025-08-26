@@ -48,6 +48,33 @@ const InventoryPhysicalInterface = () => {
     };
   }, [showArticleSelect]);
 
+  // Quand la zone change, recharger les items du stock de la zone sélectionnée
+  useEffect(() => {
+    if (isEditing && selectedZoneId) {
+      setCurrentOperation((prev: any) => prev ? { ...prev, storageZoneId: selectedZoneId } : prev);
+      // Charger uniquement les articles du stock de la zone sélectionnée
+      const stockArticles = stockItems
+        .filter(stockItem => stockItem.storageZoneId === selectedZoneId)
+        .map(stockItem => {
+          const article = articles.find(a => a.id === stockItem.articleId);
+          return {
+            id: Date.now() + Math.random() + stockItem.id,
+            articleId: stockItem.articleId,
+            article: article || { id: stockItem.articleId, name: 'Article inconnu', code: 'N/A', unit: 'N/A' },
+            currentStock: parseFloat(stockItem.quantity) || 0,
+            newQuantity: parseFloat(stockItem.quantity) || 0,
+            unit: article?.unit || 'N/A',
+            storageZoneId: stockItem.storageZoneId,
+            lotId: stockItem.lotId || null,
+            lotCode: stockItem.lot?.code || '',
+            serialNumber: stockItem.serialNumber || '',
+            notes: '',
+          };
+        });
+      setItems(stockArticles);
+    }
+  }, [selectedZoneId]);
+
   // Load initial data from API
   useEffect(() => {
     const loadAll = async () => {
@@ -76,37 +103,40 @@ const InventoryPhysicalInterface = () => {
     void loadAll();
   }, []);
 
+  // Dans createNewOperation, initialiser la zone sélectionnée et charger les items du stock de la zone
   const createNewOperation = () => {
+    const defaultZoneId = storageZones[0]?.id || null;
     const newOp = {
       id: -Date.now(),
       code: undefined,
       status: 'draft',
       type: 'ajustement',
-      storageZoneId: '',
+      storageZoneId: defaultZoneId,
       notes: '',
       createdAt: new Date().toISOString(),
       items: []
     };
     setCurrentOperation(newOp);
-    
-    // Charger automatiquement tous les articles du stock
-    const stockArticles = stockItems.map(stockItem => {
-      const article = articles.find(a => a.id === stockItem.articleId);
-      return {
-        id: Date.now() + Math.random() + stockItem.id,
-        articleId: stockItem.articleId,
-        article: article || { id: stockItem.articleId, name: 'Article inconnu', code: 'N/A', unit: 'N/A' },
-        currentStock: parseFloat(stockItem.quantity) || 0,
-        newQuantity: parseFloat(stockItem.quantity) || 0,
-        unit: article?.unit || 'N/A',
-        storageZoneId: stockItem.storageZoneId,
-        lotId: stockItem.lotId || null,
-        lotCode: stockItem.lot?.code || '',
-        serialNumber: stockItem.serialNumber || '',
-        notes: '',
-      };
-    });
-    
+    setSelectedZoneId(defaultZoneId);
+    // Charger uniquement les articles du stock de la zone sélectionnée
+    const stockArticles = stockItems
+      .filter(stockItem => stockItem.storageZoneId === defaultZoneId)
+      .map(stockItem => {
+        const article = articles.find(a => a.id === stockItem.articleId);
+        return {
+          id: Date.now() + Math.random() + stockItem.id,
+          articleId: stockItem.articleId,
+          article: article || { id: stockItem.articleId, name: 'Article inconnu', code: 'N/A', unit: 'N/A' },
+          currentStock: parseFloat(stockItem.quantity) || 0,
+          newQuantity: parseFloat(stockItem.quantity) || 0,
+          unit: article?.unit || 'N/A',
+          storageZoneId: stockItem.storageZoneId,
+          lotId: stockItem.lotId || null,
+          lotCode: stockItem.lot?.code || '',
+          serialNumber: stockItem.serialNumber || '',
+          notes: '',
+        };
+      });
     setItems(stockArticles);
     setIsEditing(true);
   };
@@ -136,7 +166,7 @@ const InventoryPhysicalInterface = () => {
         articleId: it.articleId,
         article: articles.find((a: any) => a.id === it.articleId) || { id: it.articleId },
         currentStock: parseFloat(it.quantityBefore || '0'),
-        newQuantity: parseFloat(it.quantity || '0'),
+        newQuantity: parseFloat(it.quantityAfter || '0'),
         unit: articles.find((a: any) => a.id === it.articleId)?.unit || '',
         storageZoneId: it.toStorageZoneId || null,
         lotId: it.lotId || null,
@@ -214,36 +244,27 @@ const InventoryPhysicalInterface = () => {
     }
   };
 
-  const addItem = (article: any, selectedZoneId?: number) => {
-    // Utiliser la zone sélectionnée ou la zone de stockage de l'article ou une zone par défaut
-    const defaultZoneId = selectedZoneId || article.storageZoneId || storageZones[0]?.id;
-    
-    // Vérifier si cet article existe déjà
-    const existingItem = items.find(item => 
-      item.articleId === article.id && 
-      item.storageZoneId === defaultZoneId
-    );
-    
-    if (!existingItem && defaultZoneId) {
+  const addItem = (article: any) => {
+    if (!selectedZoneId) return;
+    const existingItem = items.find(item => item.articleId === article.id && item.storageZoneId === selectedZoneId);
+    if (!existingItem) {
       const newItem = {
         id: Date.now() + Math.random(),
         articleId: article.id,
         article: article,
-        currentStock: 0, // Inventaire initial = 0
+        currentStock: 0,
         newQuantity: 0,
         unit: article.unit,
-        storageZoneId: defaultZoneId,
+        storageZoneId: selectedZoneId,
         lotId: null,
         lotCode: '',
         serialNumber: '',
         notes: '',
       };
-
       setItems(prev => [...prev, newItem]);
     }
-    
     setSelectedArticle(null);
-    setShowArticleSelect(false);
+  //  setShowArticleSelect(false);
   };
 
   const setItemQuantityToZero = (itemId: number) => {
@@ -422,17 +443,18 @@ const InventoryPhysicalInterface = () => {
     return <Badge className={styles[status]}>{labels[status]}</Badge>;
   };
 
-  // Filtrer les articles selon le type (ingredients/produits) et qui ne sont pas en stock
+  // Filtrer les articles selon la zone sélectionnée
   const filteredArticles = articles.filter(article => {
     const matchesSearch = article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          article.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = activeTab === 'ingredients' ? article.type === 'ingredient' : article.type === 'product';
-    
-    // Vérifier si l'article n'est pas en stock
-    const articleStockItems = stockItems.filter(s => s.articleId === article.id);
+    // Vérifier si l'article n'est pas déjà dans les items de la zone
+    const alreadyInItems = items.some(item => item.articleId === article.id);
+    // Vérifier si l'article n'est pas en stock dans la zone sélectionnée
+    const articleStockItems = stockItems.filter(s => s.articleId === article.id && s.storageZoneId === selectedZoneId);
     const notInStock = articleStockItems.length === 0;
-    
-    return matchesSearch && matchesType && notInStock;
+  
+    return matchesSearch && matchesType && !alreadyInItems && notInStock;
   });
 
   const filteredOperations = operations.filter(op => op.type === 'ajustement');
@@ -573,6 +595,24 @@ const InventoryPhysicalInterface = () => {
                 </span>
               )}
               {currentOperation?.status && getStatusBadge(currentOperation.status)}
+                {/* Select de zone de stockage */}
+                <div >
+                    
+                    <Select
+                    value={selectedZoneId?.toString() || ''}
+                    onValueChange={value => setSelectedZoneId(parseInt(value))}
+                    disabled={currentOperation?.status !== 'draft' || isViewing}
+                    >
+                    <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Sélectionner une zone de stockage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {storageZones.map(zone => (
+                        <SelectItem key={zone.id} value={zone.id.toString()}>{zone.designation}</SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                </div>
             </div>
             <div className="text-sm text-gray-500">
               {new Date().toLocaleDateString('fr-FR')}
@@ -590,91 +630,90 @@ const InventoryPhysicalInterface = () => {
             <div className="p-4">
            
             {/* Motif d'inventaire obligatoire */}
-            <div >
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Motif d'inventaire *
-              </label>
-              <textarea
-                value={currentOperation?.notes || ''}
-                onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, notes: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
-                rows={2}
-                placeholder="Motif obligatoire de cet inventaire..."
-                disabled={currentOperation?.status !== 'draft' || isViewing}
-                required
-              />
-              {(!currentOperation?.notes || currentOperation.notes.trim() === '') && (
-                <p className="text-red-500 text-xs mt-1">Le motif d'inventaire est obligatoire</p>
-              )}
-            </div>
-         
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-80 m-auto grid-cols-2">
-                  <TabsTrigger value="ingredients" className="flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    Ingrédients
-                  </TabsTrigger>
-                  <TabsTrigger value="products" className="flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    Produits
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+                <div >
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Motif d'inventaire *
+                </label>
+                <textarea
+                    value={currentOperation?.notes || ''}
+                    onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, notes: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
+                    rows={2}
+                    placeholder="Motif obligatoire de cet inventaire..."
+                    disabled={currentOperation?.status !== 'draft' || isViewing}
+                    required
+                />
+               
+                </div>
+        
+                <div className='flex items-center gap-4 mt-4'>
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                        <TabsList className="grid w-80 m-auto grid-cols-2">
+                        <TabsTrigger value="ingredients" className="flex items-center gap-2">
+                            <Package className="w-4 h-4" />
+                            Ingrédients
+                        </TabsTrigger>
+                        <TabsTrigger value="products" className="flex items-center gap-2">
+                            <Package className="w-4 h-4" />
+                            Produits
+                        </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
-              <div className="relative mt-4" ref={articleSelectRef}>
-                <button
-                  onClick={() => setShowArticleSelect(!showArticleSelect)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                  disabled={currentOperation?.status !== 'draft'}
-                >
-                  <span>{selectedArticle ? selectedArticle.name : 'Sélectionner un article...'}</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                
-                {showArticleSelect && (
-                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                    <div className="p-2">
-                      <Input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Rechercher un article..."
-                        className="w-full"
-                      />
+                    <div className="relative flex-1 " ref={articleSelectRef}>
+                        <button
+                        onClick={() => setShowArticleSelect(!showArticleSelect)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                        disabled={currentOperation?.status !== 'draft'}
+                        >
+                        <span>{selectedArticle ? selectedArticle.name : 'Sélectionner un article...'}</span>
+                        <ChevronDown className="w-4 h-4" />
+                        </button>
+                        
+                        {showArticleSelect && (
+                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                            <div className="p-2">
+                            <Input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Rechercher un article..."
+                                className="w-full"
+                            />
+                            </div>
+                                                <div className="max-h-80 overflow-y-auto">
+                            {filteredArticles.map(article => {
+                                // Déterminer la zone à afficher
+                                const articleZone = storageZones.find(z => z.id === article.storageZoneId);
+                                const displayZone = articleZone?.designation || 'Zone par défaut';
+                                
+                                return (
+                                <div
+                                    key={article.id}
+                                    onClick={() => {
+                                    setSelectedArticle(article);
+                                    addItem(article);
+                                    }}
+                                    className=" flex justify-between gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
+                                >
+                                    <div>
+                                    <div className="text-sm font-medium">{article.name}</div>
+                                    <div className="text-xs text-gray-500">
+                                    {article.code} - {article.unit}
+                                    </div>
+                                    </div>
+                                    <div className="text-xs text-orange-600">
+                                    
+                                    Zone: {displayZone}
+                                    </div>
+                                </div>
+                                );
+                            })}
+                            </div>
+                        </div>
+                        )}
                     </div>
-                                         <div className="max-h-80 overflow-y-auto">
-                       {filteredArticles.map(article => {
-                         // Déterminer la zone à afficher
-                         const articleZone = storageZones.find(z => z.id === article.storageZoneId);
-                         const displayZone = articleZone?.designation || 'Zone par défaut';
-                         
-                         return (
-                           <div
-                             key={article.id}
-                             onClick={() => {
-                               setSelectedArticle(article);
-                               addItem(article);
-                             }}
-                             className=" flex justify-between gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100"
-                           >
-                               <div>
-                             <div className="text-sm font-medium">{article.name}</div>
-                             <div className="text-xs text-gray-500">
-                               {article.code} - {article.unit}
-                             </div>
-                             </div>
-                             <div className="text-xs text-orange-600">
-                               <span>Nouvel article - pas encore en stock</span>
-                               <br />
-                               Zone: {displayZone}
-                             </div>
-                           </div>
-                         );
-                       })}
-                     </div>
-                  </div>
-                )}
-              </div>
+                </div>
             </div>
           </div>
         )}
@@ -685,14 +724,13 @@ const InventoryPhysicalInterface = () => {
             <Table>
               <TableHeader>
                 <TableRow className='bg-gray-50' >
-                  <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zone</TableHead>
                   <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Article</TableHead>
-                  <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Lot/Num Série</TableHead>
-                  <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Qté en Stock</TableHead>
-                  <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Qté Réelle</TableHead>
-                  <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">U.M</TableHead>
+                  <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Lot/Num Série</TableHead>
+                  <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté en Stock</TableHead>
+                  <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Réelle</TableHead>
+                  <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">U.M</TableHead>
                   {!isViewing && (
-                    <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</TableHead>
+                    <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</TableHead>
                   )}
                 </TableRow>
               </TableHeader>
@@ -710,70 +748,49 @@ const InventoryPhysicalInterface = () => {
                    const displayZone = zone || articleZone;
                   
                   return (
-                                         <TableRow key={item.id} className={item.newQuantity === 0 ? 'bg-gray-50' : ''}>
-                       <TableCell>
-                         {isViewing ||item.currentStock> 0 ? (
-                           <div className="text-sm font-medium">
-                             {displayZone?.designation || '-'}
-                           </div>
-                         ) : (
-                           <Select
-                             value={item.storageZoneId?.toString() || ''}
-                             onValueChange={(value) => updateItemZone(item.id, parseInt(value))}
-                           >
-                             <SelectTrigger className="w-32 h-8 text-xs">
-                               <SelectValue placeholder="Zone" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {storageZones.map(zone => (
-                                 <SelectItem key={zone.id} value={zone.id.toString()}>
-                                   {zone.designation}
-                                 </SelectItem>
-                               ))}
-                             </SelectContent>
-                           </Select>
-                         )}
-                       </TableCell>
-                      <TableCell>
-                        <div>
+                        <TableRow key={item.id} >
+                       <TableCell className="p-2">
+                         <div>
                           <div className="font-medium text-sm">{item.article?.name}</div>
                           <div className="text-xs text-gray-500">{item.article?.code}</div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-2">
                         <div className="text-xs">
                           {item.lotCode && <div>Lot: {item.lotCode}</div>}
                           {item.serialNumber && <div>Série: {item.serialNumber}</div>}
                           {!item.lotCode && !item.serialNumber && <span className="text-gray-400">-</span>}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center p-2">
                         <span className="text-sm font-medium">
                           {item.currentStock.toFixed(3)}
                         </span>
                       </TableCell>
-                                             <TableCell className="text-center">
+                       <TableCell className="text-center p-2">
                          {isViewing ? (
                            <span className={`text-sm font-medium ${item.newQuantity === 0 ? 'text-red-600' : ''}`}>
                              {item.newQuantity.toFixed(3)}
                            </span>
                          ) : (
+                            <div className='flex justify-center'>
                            <Input
                              type="number"
                              value={item.newQuantity}
                              onChange={(e) => updateItemQuantity(item.id, e.target.value)}
-                             step="0.001"
+                             
                              min="0"
                              className={`w-24 text-center text-sm ${item.newQuantity === 0 ? 'border-red-300 bg-red-50' : ''}`}
                              disabled={currentOperation?.status !== 'draft'}
                            />
+                           </div>
                          )}
                        </TableCell>
-                      <TableCell className="text-center text-sm">
+                      <TableCell className="text-center text-sm p-2">
                         {item.unit}
                       </TableCell>
                       {!isViewing && (
-                        <TableCell className="text-center">
+                        <TableCell className="text-center p-2">
                                                      {currentOperation?.status === 'draft' && (
                              <Button
                                variant="outline"
@@ -811,7 +828,7 @@ const InventoryPhysicalInterface = () => {
             }}
           >
             <X className="w-4 h-4 mr-2" />
-            {isViewing ? 'Fermer' : 'Annuler'}
+            Fermer
           </Button>
           
           {/* Actions d'édition - seulement en mode édition et pour les brouillons */}
@@ -836,12 +853,13 @@ const InventoryPhysicalInterface = () => {
                   !currentOperation?.id ||
                   !currentOperation?.notes ||
                   currentOperation.notes.trim() === '' ||
-                  items.length === 0
+                  items.length === 0 ||
+                  currentOperation.id<0
                 }
                 className="bg-green-600 hover:bg-green-700"
               >
                 <FileText className="w-4 h-4 mr-2" />
-                Compléter
+                Valider
               </Button>
             </>
           )}

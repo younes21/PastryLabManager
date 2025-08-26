@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-  Package, Warehouse, QrCode, Calendar, User, MapPin, 
+import {
+  Package, Warehouse, QrCode, Calendar, User, MapPin,
   TrendingUp, TrendingDown, ArrowUpDown, Search, Filter,
   Eye, History, BarChart3, AlertTriangle, CheckCircle,
   Plus, Minus, ArrowRight, ArrowLeft
@@ -144,10 +144,10 @@ export default function Stock() {
   // Filter stock items based on search and filters
   const filteredStockItems = stockItems.filter(item => {
     const matchesSearch = item.article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.article.code.toLowerCase().includes(searchTerm.toLowerCase());
+      item.article.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = activeTab === "ingredients" ? item.article.type === 'ingredient' : item.article.type === 'product';
     const matchesZone = !filterZone || item.storageZoneId === parseInt(filterZone);
-    
+
     return matchesSearch && matchesType && matchesZone;
   });
 
@@ -155,7 +155,7 @@ export default function Stock() {
     const stock = parseFloat(quantity);
     const min = parseFloat(minStock || '0');
     const max = parseFloat(maxStock || '0');
-    
+
     if (stock <= 0) return { status: 'out', color: 'bg-red-500', text: 'Rupture' };
     if (stock <= min) return { status: 'low', color: 'bg-orange-500', text: 'Stock faible' };
     if (max > 0 && stock >= max) return { status: 'high', color: 'bg-yellow-500', text: 'Stock élevé' };
@@ -186,25 +186,21 @@ export default function Stock() {
       case 'fabrication': return 'Fabrication';
       case 'consommation': return 'Consommation';
       case 'transfert': return 'Transfert';
-      case 'ajustement_plus': return 'Ajustement +';
-      case 'ajustement_moins': return 'Ajustement -';
+      case 'ajustement': return 'Ajustement';
       case 'inventaire': return 'Inventaire';
       default: return type;
     }
   };
 
-  const getOperationDirection = (type: string) => {
-    switch (type) {
-      case 'reception':
-      case 'fabrication':
-      case 'ajustement_plus':
+  const getOperationDirection = (quantityAfter: number, quantityBefore: number) => {
+
+    let toStock = quantityAfter == quantityBefore ? null : quantityAfter < quantityBefore;
+
+    switch (toStock) {
+      case true:
         return { direction: 'in', color: 'text-green-600', icon: <TrendingUp className="w-4 h-4" /> };
-      case 'livraison':
-      case 'consommation':
-      case 'ajustement_moins':
+      case false:
         return { direction: 'out', color: 'text-red-600', icon: <TrendingDown className="w-4 h-4" /> };
-      case 'transfert':
-        return { direction: 'transfer', color: 'text-blue-600', icon: <ArrowUpDown className="w-4 h-4" /> };
       default:
         return { direction: 'neutral', color: 'text-gray-600', icon: <Package className="w-4 h-4" /> };
     }
@@ -224,10 +220,10 @@ export default function Stock() {
     setSelectedStockItem(stockItem);
     setIsOperationsDialogOpen(true);
   };
-usePageTitle('Gestion des stocks')
+  usePageTitle('Gestion des stocks')
   return (
     <div className="space-y-6">
-     
+
 
       {/* Filters */}
       <Card className="m-4">
@@ -242,7 +238,7 @@ usePageTitle('Gestion des stocks')
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={filterZone} onValueChange={setFilterZone}>
               <SelectTrigger>
                 <SelectValue placeholder="Zone de stockage" />
@@ -256,9 +252,9 @@ usePageTitle('Gestion des stocks')
                 ))}
               </SelectContent>
             </Select>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               onClick={() => {
                 setSearchTerm('');
                 setFilterZone('');
@@ -456,7 +452,7 @@ usePageTitle('Gestion des stocks')
               Historique des Opérations - {selectedStockItem?.article.name}
             </DialogTitle>
           </DialogHeader>
-          
+
           {operationsLoading ? (
             <div className="text-center py-8">Chargement des opérations...</div>
           ) : inventoryOperations.length === 0 ? (
@@ -485,8 +481,12 @@ usePageTitle('Gestion des stocks')
                   {inventoryOperations.flatMap((operation) =>
                     operation.items
                       .filter(item => item.articleId === selectedStockItem?.articleId)
+                      .sort((a, b) =>
+                        new Date(b.createdAt.replace(" ", "T")).getTime() -
+                        new Date(a.createdAt.replace(" ", "T")).getTime()
+                      )
                       .map((item) => {
-                        const direction = getOperationDirection(operation.type);
+                        const direction = getOperationDirection(parseFloat(item.quantityBefore || "0"), parseFloat(item.quantityAfter || "0"));
                         return (
                           <TableRow key={`${operation.id}-${item.id}`}>
                             <TableCell className="text-sm">
@@ -504,11 +504,10 @@ usePageTitle('Gestion des stocks')
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={`text-xs ${
-                                operation.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              <Badge className={`text-xs ${operation.status === 'completed' ? 'bg-green-100 text-green-800' :
                                 operation.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }`}>
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
                                 {operation.status}
                               </Badge>
                             </TableCell>
@@ -516,8 +515,8 @@ usePageTitle('Gestion des stocks')
                               <div className={`flex items-center gap-1 ${direction.color}`}>
                                 {direction.icon}
                                 <span className="text-sm">
-                                  {direction.direction === 'in' ? 'Entrée' : 
-                                   direction.direction === 'out' ? 'Sortie' : 'Transfert'}
+                                  {direction.direction === 'in' ? 'Entrée' :
+                                    direction.direction === 'out' ? 'Sortie' : 'Transfert'}
                                 </span>
                               </div>
                             </TableCell>

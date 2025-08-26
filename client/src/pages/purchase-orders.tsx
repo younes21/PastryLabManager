@@ -70,6 +70,7 @@ const ReceptionAchatInterface = () => {
       discount: 0,
       notes: '',
       createdAt: new Date().toISOString(),
+      scheduledDate: new Date().toISOString(), // Ajouté ici
       items: []
     };
     setCurrentOperation(newOp);
@@ -100,6 +101,7 @@ const ReceptionAchatInterface = () => {
         totalTTC: parseFloat(data.totalTTC || '0'),
         notes: data.notes || '',
         createdAt: data.createdAt,
+        scheduledDate: data.scheduledDate || data.createdAt, // Ajouté ici
         storageZoneId: data.storageZoneId || '',
       });
 
@@ -262,6 +264,7 @@ const ReceptionAchatInterface = () => {
         discount: (currentOperation.discount || 0).toFixed(2),
         notes: currentOperation.notes || '',
         storageZoneId: currentOperation.storageZoneId || null,
+        scheduledDate: currentOperation.scheduledDate || new Date().toISOString(), // Ajouté ici
       };
 
       const itemsPayload = items.map((it) => ({
@@ -319,6 +322,7 @@ const ReceptionAchatInterface = () => {
         totalTTC: parseFloat(data.totalTTC || '0'),
         notes: data.notes || '',
         createdAt: data.createdAt,
+        scheduledDate: data.scheduledDate || new Date().toISOString(), // Ajouté ici
         storageZoneId: data.storageZoneId || '',
       });
 
@@ -467,7 +471,7 @@ const ReceptionAchatInterface = () => {
                            {parseFloat(operation.totalTTC || operation.totalTtc || '0').toFixed(2)} DA
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                           {new Date(operation.createdAt || operation.orderDate || Date.now()).toLocaleDateString('fr-FR')}
+                           {new Date(operation.scheduledDate || operation.createdAt || Date.now()).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center space-x-2">
@@ -597,7 +601,19 @@ const ReceptionAchatInterface = () => {
                 />
               </div>
 
-              <div className="relative col-span-2 md:col-span-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date de l'opération *</label>
+                <input
+                  type="date"
+                  value={currentOperation?.scheduledDate ? currentOperation.scheduledDate.substring(0, 10) : ''}
+                  onChange={(e) => setCurrentOperation((prev: any) => ({ ...prev, scheduledDate: e.target.value + 'T00:00:00.000Z' }))}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                  disabled={currentOperation?.status !== 'draft'}
+                  required
+                />
+              </div>
+
+              <div className="relative col-span-2 md:col-span-2">
                 <label className="block text-xs font-medium text-gray-700 mb-1">Ajouter Produit</label>
                 <button
                   onClick={() => setShowProductSelect(!showProductSelect)}
