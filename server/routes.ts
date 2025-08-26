@@ -1479,7 +1479,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let operations;
       if (type) {
         const includeReliquat = include_reliquat === 'true';
-        operations = await storage.getInventoryOperationsByType(type as string, includeReliquat);
+        const types = (type as string).split(',').map(t => t.trim());
+        if (types.length === 1) {
+          operations = await storage.getInventoryOperationsByType(types[0], includeReliquat);
+        } else {
+          // Pour plusieurs types, utiliser une méthode qui accepte un tableau
+          operations = await storage.getInventoryOperationsByTypes(types, includeReliquat);
+        }
       } else if (operator_id) {
         // Filter operations by operator ID
         const operatorId = parseInt(operator_id as string);

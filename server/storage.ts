@@ -190,6 +190,7 @@ export interface IStorage {
   getAllInventoryOperations(): Promise<InventoryOperation[]>;
   getInventoryOperation(id: number): Promise<InventoryOperation | undefined>;
   getInventoryOperationsByType(type: string, includeReliquat: boolean): Promise<InventoryOperation[]>;
+  getInventoryOperationsByTypes(types: string[], includeReliquat: boolean): Promise<InventoryOperation[]>;
   createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation>;
   createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
   updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined>;
@@ -1239,6 +1240,38 @@ export class DatabaseStorage implements IStorage {
     WHERE ${condition}
     GROUP BY io.id
     ORDER BY io.created_at DESC
+  `);
+
+    return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+  }
+
+  async getInventoryOperationsByTypes(types: string[], includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
+    // Construire la condition pour plusieurs types
+    const typeConditions = types.map(type => {
+      if (type === 'preparation' && includeReliquat) {
+        return sql`io.type IN ('preparation', 'preparation_reliquat')`;
+      }
+      return sql`io.type = ${type}`;
+    });
+
+    // Joindre les conditions avec OR
+    const condition = sql.join(typeConditions, sql` OR `);
+
+    const result = await db.execute(sql`
+    SELECT 
+      io.*,
+      COALESCE(
+        json_agg(iot.*) FILTER (WHERE iot.id IS NOT NULL),
+        '[]'
+      ) AS items
+    FROM inventory_operations io
+    LEFT JOIN inventory_operation_items iot
+      ON iot.operation_id = io.id
+    WHERE (${condition})
+    GROUP BY io.id
+    ORDER BY 
+      CASE WHEN io.type = 'inventaire_initiale' THEN 0 ELSE 1 END,
+      io.created_at DESC
   `);
 
     return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];

@@ -99,7 +99,7 @@ const InventoryPhysicalInterface = () => {
           apiRequest('/api/storage-zones', 'GET'),
           apiRequest('/api/articles', 'GET'),
           apiRequest('/api/stock/items', 'GET'),
-          apiRequest('/api/inventory-operations?type=ajustement', 'GET'),
+          apiRequest('/api/inventory-operations?type=ajustement,inventaire_initiale', 'GET'),
         ]);
 
         const zonesData = await zoneRes.json();
@@ -523,6 +523,7 @@ const InventoryPhysicalInterface = () => {
             <TableHeader>
               <TableRow className="bg-gray-50 border-b">
                 <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Code</TableHead>
+                <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Type</TableHead>
                 <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zone</TableHead>
                 <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</TableHead>
                 <TableHead className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</TableHead>
@@ -531,65 +532,90 @@ const InventoryPhysicalInterface = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOperations.map((op) => (
-                <TableRow key={op.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">{op.code}</TableCell>
-                  <TableCell>
-                    {storageZones.find(z => z.id === op.storageZoneId)?.designation || '-'}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(op.status)}</TableCell>
-                  <TableCell>
-                    {new Date(op.createdAt).toLocaleDateString('fr-FR')}
-                  </TableCell>
-                  <TableCell>{op.items?.length || 0} articles</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {/* Bouton Consulter - toujours visible */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => viewOperation(op)}
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      
-                      {/* Bouton Annuler - seulement pour les inventaires terminés */}
-                      {op.status === 'completed' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => cancelOperation(op)}
-                          className="text-red-600 hover:text-red-700"
+              {filteredOperations
+                .sort((a, b) => {
+                  // Inventaire initial en premier, puis par date
+                  if (a.type === 'inventaire_initiale' && b.type !== 'inventaire_initiale') return -1;
+                  if (a.type !== 'inventaire_initiale' && b.type === 'inventaire_initiale') return 1;
+                  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                })
+                .map((op) => {
+                  const isInitial = op.type === 'inventaire_initiale';
+                  const rowClass = isInitial 
+                    ? 'hover:bg-blue-50 border-l-4 border-l-blue-500 bg-blue-50/30' 
+                    : 'hover:bg-orange-50 border-l-4 border-l-orange-500 bg-orange-50/30';
+                  
+                  return (
+                    <TableRow key={op.id} className={rowClass}>
+                      <TableCell className="font-medium">{op.code}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          className={isInitial 
+                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                            : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                          }
                         >
-                          <Ban className="w-4 h-4" />
-                        </Button>
-                      )}
-                      
-                      {/* Boutons Modifier/Supprimer - seulement pour les brouillons */}
-                      {op.status === 'draft' && (
-                        <>
+                          {isInitial ? 'Inventaire Initial' : 'Ajustement'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {storageZones.find(z => z.id === op.storageZoneId)?.designation || '-'}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(op.status)}</TableCell>
+                      <TableCell>
+                        {new Date(op.createdAt).toLocaleDateString('fr-FR')}
+                      </TableCell>
+                      <TableCell>{op.items?.length || 0} articles</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          {/* Bouton Consulter - toujours visible */}
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => editOperation(op)}
+                            onClick={() => viewOperation(op)}
+                            className="text-blue-600 hover:text-blue-700"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deleteOperation(op)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          
+                          {/* Bouton Annuler - seulement pour les inventaires terminés */}
+                          {op.status === 'completed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => cancelOperation(op)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Ban className="w-4 h-4" />
+                            </Button>
+                          )}
+                          
+                          {/* Boutons Modifier/Supprimer - seulement pour les brouillons */}
+                          {op.status === 'draft' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => editOperation(op)}
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deleteOperation(op)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
           
