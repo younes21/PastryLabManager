@@ -12,6 +12,8 @@ import {
   User,
   Calendar,
   CheckCircle,
+  AlertTriangle,
+  Plus,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -45,6 +47,7 @@ import type {
   Order, 
   Article 
 } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
@@ -60,7 +63,11 @@ export default function DeliveriesPage() {
   const [isViewing, setIsViewing] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("list");
-
+  const [splitModal, setSplitModal] = useState<{ open: boolean, articleId: number | null }>({ open: false, articleId: null });
+  const [splits, setSplits] = useState<Record<number, Array<{ lotId: number|null, fromStorageZoneId: number|null, quantity: number }>>>({});
+  const [lots, setLots] = useState<any[]>([]); // à charger via API
+  const [zones, setZones] = useState<any[]>([]); // à charger via API
+  const [splitError, setSplitError] = useState<string>("");
 
 
   // Récupérer le paramètre orderId de l'URL au chargement de la page
@@ -70,6 +77,12 @@ export default function DeliveriesPage() {
     if (orderIdParam) {
       setOrderId(parseInt(orderIdParam));
     }
+  }, []);
+
+  // Charger lots et zones au montage
+  useEffect(() => {
+    fetch('/api/lots').then(r => r.json()).then(setLots);
+    fetch('/api/storage-zones').then(r => r.json()).then(setZones);
   }, []);
 
   // Queries
@@ -316,6 +329,20 @@ export default function DeliveriesPage() {
   // };
 
   const saveDelivery = async () => {
+    // Pour chaque article, la répartition doit exister et être correcte
+    for (const item of items) {
+      const split = splits[item.articleId];
+      const sum = getSplitSum(item.articleId);
+      if (!split || split.length === 0 || sum !== item.quantity || sum === 0) {
+        toast({
+          title: "Répartition incomplète",
+          description: `Veuillez répartir correctement la quantité pour l'article ${item.article?.name}`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     if (!currentDelivery.clientId) {
       toast({
         title: "Client requis",
@@ -362,6 +389,25 @@ export default function DeliveriesPage() {
       }
     }
 
+    // Pour chaque article, si une répartition existe, utiliser les splits, sinon fallback sur item.quantity
+    const allItems = items.flatMap(item => {
+      if (splits[item.articleId] && splits[item.articleId].length > 0) {
+        return splits[item.articleId].map(split => ({
+          articleId: item.articleId,
+          quantity: split.quantity.toString(),
+          lotId: split.lotId,
+          fromStorageZoneId: split.fromStorageZoneId,
+          notes: item.notes,
+        }));
+      } else {
+        return [{
+          articleId: item.articleId,
+          quantity: item.quantity.toString(),
+          notes: item.notes,
+        }];
+      }
+    });
+
     // Préparer les données de livraison sans les totaux (calculés côté serveur)
     const deliveryData = {
       type: "delivery",
@@ -372,12 +418,7 @@ export default function DeliveriesPage() {
       notes: currentDelivery.notes,
       currency: currentDelivery.currency || "DZD",
       // Ne pas envoyer subtotalHT, totalTax, totalTTC - ils seront calculés côté serveur
-      items: items.map(item => ({
-        articleId: item.articleId,
-        quantity: item.quantity.toString(),
-        // Ne pas envoyer unitPrice - il sera récupéré depuis la commande ou l'article
-        notes: item.notes,
-      }))
+      items: allItems,
     };
 
     if (currentDelivery.id) {
@@ -435,6 +476,8 @@ export default function DeliveriesPage() {
     return new Date(dateString).toLocaleDateString("fr-FR");
   };
 
+  // Fonction utilitaire pour calculer la somme répartie pour un article
+  const getSplitSum = (articleId: number) => (splits[articleId] || []).reduce((sum, s) => sum + (s.quantity || 0), 0);
 
 
   // Les totaux sont maintenant calculés côté serveur
@@ -840,6 +883,22 @@ export default function DeliveriesPage() {
                                    item.notes || "-"
                                  )}
                                </TableCell>
+                               <TableCell>
+                                 {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
+                                   <>
+                                     <CheckCircle className="text-green-600 inline-block mr-1" />
+                                     <span className="sr-only">Répartition complète</span>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                     <span className="sr-only">Répartition incomplète</span>
+                                   </>
+                                 )}
+                                 <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
+                                   Répartir
+                                 </Button>
+                               </TableCell>
                              </TableRow>
                            );
                          })
@@ -852,6 +911,95 @@ export default function DeliveriesPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Modal de répartition amélioré */}
+      <Dialog open={splitModal.open} onOpenChange={open => setSplitModal({ open, articleId: splitModal.articleId })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Répartition lots/zones</DialogTitle>
+          </DialogHeader>
+          {splitModal.articleId && (() => {
+            const article = items.find(i => i.articleId === splitModal.articleId);
+            const maxQty = article ? article.quantity : 0;
+            const splitSum = getSplitSum(splitModal.articleId);
+            return (
+              <div>
+                <table className="w-full text-sm mb-2">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th>Lot</th>
+                      <th>Zone</th>
+                      <th>Quantité</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(splits[splitModal.articleId] || []).map((split, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <select value={split.lotId || ''} onChange={e => {
+                            const v = e.target.value ? parseInt(e.target.value) : null;
+                            setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].map((sp, i) => i === idx ? { ...sp, lotId: v } : sp) }));
+                          }} className="border rounded px-1 py-0.5">
+                            <option value="">Lot...</option>
+                            {lots.filter(l => l.articleId === splitModal.articleId).map(lot => (
+                              <option key={lot.id} value={lot.id}>{lot.code} {lot.expirationDate ? `(DLC: ${lot.expirationDate})` : ''}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select value={split.fromStorageZoneId || ''} onChange={e => {
+                            const v = e.target.value ? parseInt(e.target.value) : null;
+                            setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].map((sp, i) => i === idx ? { ...sp, fromStorageZoneId: v } : sp) }));
+                          }} className="border rounded px-1 py-0.5">
+                            <option value="">Zone...</option>
+                            {zones.map(zone => (
+                              <option key={zone.id} value={zone.id}>{zone.designation}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <Input type="number" min={0.01} value={split.quantity} onChange={e => {
+                            const v = parseFloat(e.target.value) || 0;
+                            setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].map((sp, i) => i === idx ? { ...sp, quantity: v } : sp) }));
+                          }} className="w-20" />
+                        </td>
+                        <td>
+                          <Button size="icon" variant="ghost" onClick={() => setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].filter((_, i) => i !== idx) }))}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex items-center gap-2 mb-2">
+                  <Button size="sm" variant="secondary" onClick={() => setSplits(s => ({ ...s, [splitModal.articleId!]: [...(s[splitModal.articleId!] || []), { lotId: null, fromStorageZoneId: null, quantity: 0 }] }))}>
+                    <Plus className="w-4 h-4 mr-1" /> Ajouter une ligne
+                  </Button>
+                  <span className={splitSum === maxQty && splitSum > 0 ? "text-green-600" : "text-red-600"}>
+                    Total réparti : {splitSum} / {maxQty}
+                  </span>
+                </div>
+                {splitError && <div className="text-red-600 text-xs mb-2">{splitError}</div>}
+                <div className="mt-2 flex justify-end">
+                  <Button size="sm" onClick={() => {
+                    // Validation stricte
+                    if (splitSum !== maxQty || splitSum === 0) {
+                      setSplitError("La somme des quantités réparties doit être égale à la quantité à livrer.");
+                      return;
+                    }
+                    setSplitError("");
+                    setSplitModal({ open: false, articleId: null });
+                  }} disabled={splitSum !== maxQty || splitSum === 0}>
+                    Valider la répartition
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
