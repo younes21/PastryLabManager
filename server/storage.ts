@@ -5,6 +5,7 @@ import {
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
   invoices, invoiceItems, payments, accountingEntries, accountingEntryLines, stockReservations,
+  lots,
 
   type User, type InsertUser,
   type Client, type InsertClient,

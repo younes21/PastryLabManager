@@ -56,6 +56,7 @@ const InventoryPhysicalInterface = () => {
   const [articles, setArticles] = useState<any[]>([]);
   const [stockItems, setStockItems] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [lots, setLots] = useState<any[]>([]);
 
   // Ajout d'un état pour savoir si un inventaire initial existe déjà pour la zone sélectionnée
   const [hasInitialInventory, setHasInitialInventory] = useState(false);
@@ -119,6 +120,23 @@ const InventoryPhysicalInterface = () => {
         });
       setItems(stockArticles);
     }
+  }, [selectedZoneId]);
+
+  // Charger les lots de la zone sélectionnée
+  useEffect(() => {
+    if (!selectedZoneId) {
+      setLots([]);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await apiRequest(`/api/lots?storageZoneId=${selectedZoneId}`, "GET");
+        const data = await res.json();
+        setLots(data || []);
+      } catch (e) {
+        setLots([]);
+      }
+    })();
   }, [selectedZoneId]);
 
   // Vérifier s'il existe déjà un inventaire initial pour la zone sélectionnée
@@ -631,7 +649,9 @@ const InventoryPhysicalInterface = () => {
 
   // Afficher l'inventaire initial dans la liste des opérations (pas seulement les ajustements)
   const filteredOperations = operations.filter(
-    (op) => op.type === "ajustement" || op.type === "inventaire_initiale",
+    (op) => 
+      (op.type === "ajustement" || op.type === "inventaire_initiale") &&
+      (!selectedZoneId || op.storageZoneId === selectedZoneId)
   );
 
   if (!isEditing && !isViewing) {
@@ -1079,26 +1099,50 @@ const InventoryPhysicalInterface = () => {
                         </TableCell>
                         <TableCell className="p-2">
                           <div className="text-xs">
-                            {item.lotCode && <div>Lot: {item.lotCode}</div>}
+                            {(() => {
+                              const lot = lots.find(l => l.id === item.lotId);
+                              return lot ? (
+                                <div className="space-y-1">
+                                  <div className="font-medium text-blue-600">Lot: {lot.code}</div>
+                                  {lot.manufacturingDate && (
+                                    <div className="text-gray-500">
+                                      Fab: {new Date(lot.manufacturingDate).toLocaleDateString("fr-FR")}
+                                    </div>
+                                  )}
+                                  {lot.expirationDate && (
+                                    <div className="text-gray-500">
+                                      Exp: {new Date(lot.expirationDate).toLocaleDateString("fr-FR")}
+                                    </div>
+                                  )}
+                                  {lot.supplierId && (
+                                    <div className="text-gray-500">
+                                      Fournisseur: {suppliers.find(s => s.id === lot.supplierId)?.name || lot.supplierId}
+                                    </div>
+                                  )}
+                                  {lot.notes && (
+                                    <div className="text-gray-500 italic">"{lot.notes}"</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-400">-</span>
+                                  {!isViewing && currentOperation?.status === "draft" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openAddLotModal(item)}
+                                      className="h-6 px-2 text-xs"
+                                      title="Ajouter un lot"
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Lot
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {item.serialNumber && (
                               <div>Série: {item.serialNumber}</div>
-                            )}
-                            {!item.lotCode && !item.serialNumber && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-400">-</span>
-                                {!isViewing && currentOperation?.status === "draft" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openAddLotModal(item)}
-                                    className="h-6 px-2 text-xs"
-                                    title="Ajouter un lot"
-                                  >
-                                    <Plus className="w-3 h-3 mr-1" />
-                                    Lot
-                                  </Button>
-                                )}
-                              </div>
                             )}
                           </div>
                         </TableCell>

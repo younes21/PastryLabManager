@@ -3271,6 +3271,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route pour récupérer les lots (optionnellement filtrés par zone)
+  app.get("/api/lots", async (req, res) => {
+    try {
+      const { storageZoneId } = req.query;
+      let lotsResult = [];
+      if (storageZoneId) {
+        // 1. Lots dont l'article est en stock dans la zone
+        lotsResult = await db.select().from(lots)
+          .where(sql`${lots.articleId} IN (SELECT article_id FROM stock WHERE storage_zone_id = ${storageZoneId})`);
+        // 2. Si aucun lot trouvé, lots des articles dont la zone par défaut correspond
+        if (lotsResult.length === 0) {
+          lotsResult = await db.select().from(lots)
+            .where(sql`${lots.articleId} IN (SELECT id FROM articles WHERE storage_zone_id = ${storageZoneId})`);
+        }
+      } else {
+        lotsResult = await db.select().from(lots);
+      }
+      res.json(lotsResult);
+    } catch (error) {
+      console.error("Error fetching lots:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des lots" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
