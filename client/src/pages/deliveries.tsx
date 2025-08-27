@@ -48,6 +48,7 @@ import type {
   Article 
 } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DeliverySplitModal } from "@/components/delivery-split-modal";
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
@@ -883,22 +884,29 @@ export default function DeliveriesPage() {
                                    item.notes || "-"
                                  )}
                                </TableCell>
-                               <TableCell>
-                                 {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
-                                   <>
-                                     <CheckCircle className="text-green-600 inline-block mr-1" />
-                                     <span className="sr-only">Répartition complète</span>
-                                   </>
-                                 ) : (
-                                   <>
-                                     <AlertTriangle className="text-yellow-500 inline-block mr-1" />
-                                     <span className="sr-only">Répartition incomplète</span>
-                                   </>
-                                 )}
-                                 <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
-                                   Répartir
-                                 </Button>
-                               </TableCell>
+                                                               <TableCell>
+                                  {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
+                                    <>
+                                      <CheckCircle className="text-green-600 inline-block mr-1" />
+                                      <span className="sr-only">Répartition complète</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                      <span className="sr-only">Répartition incomplète</span>
+                                    </>
+                                  )}
+                                  {/* Masquer le bouton "Répartir" si c'est un cas simple (livraison directe possible) */}
+                                  {!splits[item.articleId] || splits[item.articleId].length === 0 ? (
+                                    <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
+                                      Répartir
+                                    </Button>
+                                  ) : (
+                                    <span className="text-sm text-green-600 font-medium">
+                                      ✓ Répartition validée
+                                    </span>
+                                  )}
+                                </TableCell>
                              </TableRow>
                            );
                          })
@@ -913,93 +921,18 @@ export default function DeliveriesPage() {
       </Tabs>
 
       {/* Modal de répartition amélioré */}
-      <Dialog open={splitModal.open} onOpenChange={open => setSplitModal({ open, articleId: splitModal.articleId })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Répartition lots/zones</DialogTitle>
-          </DialogHeader>
-          {splitModal.articleId && (() => {
-            const article = items.find(i => i.articleId === splitModal.articleId);
-            const maxQty = article ? article.quantity : 0;
-            const splitSum = getSplitSum(splitModal.articleId);
-            return (
-              <div>
-                <table className="w-full text-sm mb-2">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th>Lot</th>
-                      <th>Zone</th>
-                      <th>Quantité</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(splits[splitModal.articleId] || []).map((split, idx) => (
-                      <tr key={idx}>
-                        <td>
-                          <select value={split.lotId || ''} onChange={e => {
-                            const v = e.target.value ? parseInt(e.target.value) : null;
-                            setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].map((sp, i) => i === idx ? { ...sp, lotId: v } : sp) }));
-                          }} className="border rounded px-1 py-0.5">
-                            <option value="">Lot...</option>
-                            {lots.filter(l => l.articleId === splitModal.articleId).map(lot => (
-                              <option key={lot.id} value={lot.id}>{lot.code} {lot.expirationDate ? `(DLC: ${lot.expirationDate})` : ''}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <select value={split.fromStorageZoneId || ''} onChange={e => {
-                            const v = e.target.value ? parseInt(e.target.value) : null;
-                            setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].map((sp, i) => i === idx ? { ...sp, fromStorageZoneId: v } : sp) }));
-                          }} className="border rounded px-1 py-0.5">
-                            <option value="">Zone...</option>
-                            {zones.map(zone => (
-                              <option key={zone.id} value={zone.id}>{zone.designation}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <Input type="number" min={0.01} value={split.quantity} onChange={e => {
-                            const v = parseFloat(e.target.value) || 0;
-                            setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].map((sp, i) => i === idx ? { ...sp, quantity: v } : sp) }));
-                          }} className="w-20" />
-                        </td>
-                        <td>
-                          <Button size="icon" variant="ghost" onClick={() => setSplits(s => ({ ...s, [splitModal.articleId!]: s[splitModal.articleId!].filter((_, i) => i !== idx) }))}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="flex items-center gap-2 mb-2">
-                  <Button size="sm" variant="secondary" onClick={() => setSplits(s => ({ ...s, [splitModal.articleId!]: [...(s[splitModal.articleId!] || []), { lotId: null, fromStorageZoneId: null, quantity: 0 }] }))}>
-                    <Plus className="w-4 h-4 mr-1" /> Ajouter une ligne
-                  </Button>
-                  <span className={splitSum === maxQty && splitSum > 0 ? "text-green-600" : "text-red-600"}>
-                    Total réparti : {splitSum} / {maxQty}
-                  </span>
-                </div>
-                {splitError && <div className="text-red-600 text-xs mb-2">{splitError}</div>}
-                <div className="mt-2 flex justify-end">
-                  <Button size="sm" onClick={() => {
-                    // Validation stricte
-                    if (splitSum !== maxQty || splitSum === 0) {
-                      setSplitError("La somme des quantités réparties doit être égale à la quantité à livrer.");
-                      return;
-                    }
-                    setSplitError("");
-                    setSplitModal({ open: false, articleId: null });
-                  }} disabled={splitSum !== maxQty || splitSum === 0}>
-                    Valider la répartition
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+      <DeliverySplitModal
+        open={splitModal.open}
+        onOpenChange={(open: boolean) => setSplitModal({ open, articleId: splitModal.articleId })}
+        articleId={splitModal.articleId}
+        articleName={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.articleName || "" : ""}
+        requestedQuantity={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.quantity || 0 : 0}
+        onSplitValidated={(newSplits: Array<{ lotId: number|null, fromStorageZoneId: number|null, quantity: number }>) => {
+          if (splitModal.articleId) {
+            setSplits(s => ({ ...s, [splitModal.articleId!]: newSplits }));
+          }
+        }}
+      />
     </div>
   );
 }

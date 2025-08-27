@@ -37,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AddLotModal } from "@/components/add-lot-modal";
 
 const InventoryPhysicalInterface = () => {
   const [operations, setOperations] = useState<any[]>([]);
@@ -54,9 +55,14 @@ const InventoryPhysicalInterface = () => {
   const [storageZones, setStorageZones] = useState<any[]>([]);
   const [articles, setArticles] = useState<any[]>([]);
   const [stockItems, setStockItems] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   // Ajout d'un état pour savoir si un inventaire initial existe déjà pour la zone sélectionnée
   const [hasInitialInventory, setHasInitialInventory] = useState(false);
+
+  // Modal d'ajout de lot
+  const [showAddLotModal, setShowAddLotModal] = useState(false);
+  const [selectedItemForLot, setSelectedItemForLot] = useState<any>(null);
 
   // Ref pour le select d'articles
   const articleSelectRef = useRef<HTMLDivElement>(null);
@@ -134,7 +140,7 @@ const InventoryPhysicalInterface = () => {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [zoneRes, artRes, stockRes, invRes] = await Promise.all([
+        const [zoneRes, artRes, stockRes, invRes, suppliersRes] = await Promise.all([
           apiRequest("/api/storage-zones", "GET"),
           apiRequest("/api/articles", "GET"),
           apiRequest("/api/stock/items", "GET"),
@@ -142,17 +148,20 @@ const InventoryPhysicalInterface = () => {
             "/api/inventory-operations?type=ajustement,inventaire_initiale",
             "GET",
           ),
+          apiRequest("/api/suppliers", "GET"),
         ]);
 
         const zonesData = await zoneRes.json();
         const articlesData = await artRes.json();
         const stockData = await stockRes.json();
         const invData = await invRes.json();
+        const suppliersData = await suppliersRes.json();
 
         setStorageZones(zonesData || []);
         setArticles(articlesData || []);
         setStockItems(stockData || []);
         setOperations(invData || []);
+        setSuppliers(suppliersData || []);
       } catch (e) {
         console.error("Failed to load initial data", e);
       }
@@ -173,13 +182,13 @@ const InventoryPhysicalInterface = () => {
       code: undefined,
       status: "draft",
       type: isInitial ? "inventaire_initiale" : "ajustement",
-      storageZoneId: defaultZoneId,
+      storageZoneId: selectedZoneId || defaultZoneId,
       notes: "",
       createdAt: new Date().toISOString(),
       items: [],
     };
     setCurrentOperation(newOp);
-    setSelectedZoneId(defaultZoneId);
+    //setSelectedZoneId(defaultZoneId);
     // Charger uniquement les articles du stock de la zone sélectionnée
     const stockArticles = stockItems
       .filter((stockItem) => stockItem.storageZoneId === defaultZoneId)
@@ -228,6 +237,9 @@ const InventoryPhysicalInterface = () => {
         createdAt: data.createdAt,
       });
 
+      // Mettre à jour selectedZoneId avec la zone de l'opération
+      setSelectedZoneId(data.storageZoneId);
+
       setItems(
         (data.items || []).map((it: any) => ({
           id: it.id,
@@ -243,6 +255,7 @@ const InventoryPhysicalInterface = () => {
           lotCode: it.lotCode || "",
           serialNumber: it.serialNumber || "",
           notes: it.notes || "",
+          unitCost: parseFloat(it.unitCost || "0"),
         })),
       );
 
@@ -296,6 +309,7 @@ const InventoryPhysicalInterface = () => {
           lotCode: it.lotCode || "",
           serialNumber: it.serialNumber || "",
           notes: it.notes || "",
+          unitCost: parseFloat(it.unitCost || "0"),
         })),
       );
 
@@ -409,6 +423,30 @@ const InventoryPhysicalInterface = () => {
           : item,
       ),
     );
+  };
+
+  // Fonction pour ouvrir le modal d'ajout de lot
+  const openAddLotModal = (item: any) => {
+    setSelectedItemForLot(item);
+    setShowAddLotModal(true);
+  };
+
+  // Fonction pour gérer l'ajout d'un lot
+  const handleLotAdded = (newLot: any) => {
+    if (selectedItemForLot) {
+      setItems(
+        items.map((item) =>
+          item.id === selectedItemForLot.id
+            ? {
+                ...item,
+                lotId: newLot.id,
+                lotCode: newLot.code,
+              }
+            : item
+        )
+      );
+    }
+    setSelectedItemForLot(null);
   };
 
   const saveOperation = async () => {
@@ -611,18 +649,55 @@ const InventoryPhysicalInterface = () => {
           <div className="flex gap-2">
             <Button
               onClick={() => createNewOperation(true)}
-              disabled={hasInitialInventory}
+              disabled={!selectedZoneId || hasInitialInventory}
               className="bg-blue-600 hover:bg-blue-700 text-white mr-2"
             >
               <Plus className="w-4 h-4 mr-2" /> Inventaire initial
             </Button>
             <Button
               onClick={() => createNewOperation(false)}
-              disabled={!hasInitialInventory}
+              disabled={!selectedZoneId || !hasInitialInventory}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               <Plus className="w-4 h-4 mr-2" /> Nouvel ajustement
             </Button>
+          </div>
+        </div>
+
+        {/* Zone Selection */}
+        <div className="mx-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm border">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Zone de stockage
+                </label>
+                <Select
+                  value={selectedZoneId?.toString() || ""}
+                  onValueChange={(value) => setSelectedZoneId(value ? parseInt(value) : null)}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Sélectionner une zone de stockage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {storageZones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id.toString()}>
+                        {zone.designation}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-gray-600">
+                {!selectedZoneId ? (
+                  <span className="text-orange-600">⚠️ Sélectionnez une zone pour commencer</span>
+                ) : hasInitialInventory ? (
+                  <span className="text-blue-600">✅ Inventaire initial disponible - Ajustements possibles</span>
+                ) : (
+                  <span className="text-green-600">✅ Prêt pour l'inventaire initial</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1009,7 +1084,21 @@ const InventoryPhysicalInterface = () => {
                               <div>Série: {item.serialNumber}</div>
                             )}
                             {!item.lotCode && !item.serialNumber && (
-                              <span className="text-gray-400">-</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">-</span>
+                                {!isViewing && currentOperation?.status === "draft" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openAddLotModal(item)}
+                                    className="h-6 px-2 text-xs"
+                                    title="Ajouter un lot"
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    Lot
+                                  </Button>
+                                )}
+                              </div>
                             )}
                           </div>
                         </TableCell>
@@ -1140,6 +1229,18 @@ const InventoryPhysicalInterface = () => {
           )}
         </div>
       </div>
+
+      {/* Modal d'ajout de lot */}
+      <AddLotModal
+        isOpen={showAddLotModal}
+        onClose={() => {
+          setShowAddLotModal(false);
+          setSelectedItemForLot(null);
+        }}
+        article={selectedItemForLot?.article}
+        onLotAdded={handleLotAdded}
+        suppliers={suppliers}
+      />
     </div>
   );
 };

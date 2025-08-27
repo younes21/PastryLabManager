@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, isNull } from "drizzle-orm";
 import {
   insertUserSchema,
   insertMeasurementCategorySchema,
@@ -44,6 +44,7 @@ import {
   inventoryOperationItems,
   users,
   orderItems,
+  insertStockReservationSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -3053,6 +3054,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting payment:", error);
       res.status(500).json({ message: "Failed to delete payment" });
+    }
+  });
+
+  // Stock reservations routes
+  app.post("/api/stock-reservations", async (req, res) => {
+    try {
+      const reservationData = insertStockReservationSchema.parse(req.body);
+      const newReservation = await storage.createStockReservation(reservationData);
+      res.status(201).json(newReservation);
+    } catch (error) {
+      console.error("Error creating stock reservation:", error);
+      res.status(500).json({ message: "Failed to create stock reservation" });
+    }
+  });
+
+  app.patch("/api/stock-reservations/:id/release", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updatedReservation = await storage.releaseStockReservation(parseInt(id));
+      res.json(updatedReservation);
+    } catch (error) {
+      console.error("Error releasing stock reservation:", error);
+      res.status(500).json({ message: "Failed to release stock reservation" });
+    }
+  });
+
+  // Route pour récupérer les informations de disponibilité des articles pour la répartition des livraisons
+  app.get("/api/articles/:articleId/availability", async (req, res) => {
+    try {
+      const { articleId } = req.params;
+      const articleIdNum = parseInt(articleId);
+      
+      if (isNaN(articleIdNum)) {
+        return res.status(400).json({ message: "Invalid article ID" });
+      }
+
+      // Récupérer l'article
+      const article = await storage.getArticle(articleIdNum);
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+
+      // Récupérer les lots de l'article
+      const articleLots = await db
+        .select()
+        .from(lots)
+        .where(eq(lots.articleId, articleIdNum));
+
+      // Récupérer les zones de stockage où l'article existe
+      const articleZones = await db
+        .select()
+        .from(storageZones)
+        .where(
+          sql`EXISTS (
+            SELECT 1 FROM ${stock} 
+            WHERE ${stock.articleId} = ${articleIdNum} 
+            AND ${stock.storageZoneId} = ${storageZones.id}
+            AND ${stock.quantity} > 0
+          )`
+        );
+
+      // Récupérer les réservations actives pour cet article
+      const reservations = await storage.getActiveArticleReservations(articleIdNum);
+
+      // Calculer la disponibilité par lot et zone
+      const availability = [];
+
+      for (const lot of articleLots) {
+        for (const zone of articleZones) {
+          // Récupérer le stock disponible pour ce lot et cette zone
+          const stockQuery = await db
+            .select({ quantity: stock.quantity })
+            .from(stock)
+            .where(
+              and(
+                eq(stock.articleId, articleIdNum),
+                eq(stock.storageZoneId, zone.id),
+                eq(stock.lotId, lot.id),
+                sql`${stock.quantity} > 0`
+              )
+            );
+
+          if (stockQuery.length > 0) {
+            const stockQuantity = parseFloat(stockQuery[0].quantity);
+            
+            // Calculer les réservations pour ce lot et cette zone
+            const reservedQuantity = reservations
+              .filter(r => r.lotId === lot.id && r.fromStorageZoneId === zone.id)
+              .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
+
+            const availableQuantity = stockQuantity - reservedQuantity;
+
+            if (availableQuantity > 0) {
+              availability.push({
+                lotId: lot.id,
+                lotCode: lot.code,
+                lotExpirationDate: lot.expirationDate,
+                storageZoneId: zone.id,
+                storageZoneCode: zone.code,
+                storageZoneDesignation: zone.designation,
+                stockQuantity,
+                reservedQuantity,
+                availableQuantity,
+                isPerishable: article.isPerishable,
+                requiresLotSelection: article.isPerishable || articleLots.length > 1,
+                requiresZoneSelection: articleZones.length > 1
+              });
+            }
+          }
+        }
+      }
+
+      // Si l'article n'a pas de lots, vérifier la disponibilité générale
+      if (articleLots.length === 0) {
+        for (const zone of articleZones) {
+          const stockQuery = await db
+            .select({ quantity: stock.quantity })
+            .from(stock)
+            .where(
+              and(
+                eq(stock.articleId, articleIdNum),
+                eq(stock.storageZoneId, zone.id),
+                isNull(stock.lotId),
+                sql`${stock.quantity} > 0`
+              )
+            );
+
+          if (stockQuery.length > 0) {
+            const stockQuantity = parseFloat(stockQuery[0].quantity);
+            
+            const reservedQuantity = reservations
+              .filter(r => !r.lotId && r.fromStorageZoneId === zone.id)
+              .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
+
+            const availableQuantity = stockQuantity - reservedQuantity;
+
+            if (availableQuantity > 0) {
+              availability.push({
+                lotId: null,
+                lotCode: null,
+                lotExpirationDate: null,
+                storageZoneId: zone.id,
+                storageZoneCode: zone.code,
+                storageZoneDesignation: zone.designation,
+                stockQuantity,
+                reservedQuantity,
+                availableQuantity,
+                isPerishable: article.isPerishable,
+                requiresLotSelection: false,
+                requiresZoneSelection: articleZones.length > 1
+              });
+            }
+          }
+        }
+      }
+
+      res.json({
+        article,
+        availability,
+        summary: {
+          totalStock: availability.reduce((sum, a) => sum + a.stockQuantity, 0),
+          totalReserved: availability.reduce((sum, a) => sum + a.reservedQuantity, 0),
+          totalAvailable: availability.reduce((sum, a) => sum + a.availableQuantity, 0),
+          requiresLotSelection: article.isPerishable || articleLots.length > 1,
+          requiresZoneSelection: articleZones.length > 1,
+          canDirectDelivery: articleLots.length === 1 && articleZones.length === 1 && !article.isPerishable
+        }
+      });
+
+    } catch (error) {
+      console.error("Error fetching article availability:", error);
+      res.status(500).json({ message: "Failed to fetch article availability" });
+    }
+  });
+
+  // Route pour créer un lot
+  app.post("/api/lots", async (req, res) => {
+    try {
+      const { articleId, code, manufacturingDate, useDate, expirationDate, alertDate, supplierId, notes } = req.body;
+
+      // Validation des données
+      if (!articleId || !code) {
+        return res.status(400).json({ message: "L'ID de l'article et le code du lot sont requis" });
+      }
+
+      // Vérifier que le code du lot est unique
+      const existingLot = await db
+        .select()
+        .from(lots)
+        .where(eq(lots.code, code));
+
+      if (existingLot.length > 0) {
+        return res.status(400).json({ message: "Un lot avec ce code existe déjà" });
+      }
+
+      // Créer le lot
+      const newLot = await db
+        .insert(lots)
+        .values({
+          articleId: parseInt(articleId),
+          code,
+          manufacturingDate: manufacturingDate || null,
+          useDate: useDate || null,
+          expirationDate: expirationDate || null,
+          alertDate: alertDate || null,
+          supplierId: supplierId ? parseInt(supplierId) : null,
+          notes: notes || null,
+        })
+        .returning();
+
+      res.status(201).json(newLot[0]);
+    } catch (error) {
+      console.error("Error creating lot:", error);
+      res.status(500).json({ message: "Erreur lors de la création du lot" });
     }
   });
 
