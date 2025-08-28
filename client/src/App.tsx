@@ -110,14 +110,14 @@ function LoginPage() {
 
             {error && <div className="text-red-600 text-sm">{error}</div>}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full !mt-6" disabled={isLoading}>
               {isLoading ? "Connexion..." : "Se connecter"}
             </Button>
           </form>
 
-          <div className="mt-4 text-sm text-gray-600">
-            <p>Compte par défaut :</p>
-            <p>Utilisateur: admin | Mot de passe: admin123</p>
+          <div className="mt-6 text-sm text-gray-600">
+            
+            <p>* pour plus de detail veuillez contacter l'administrateur</p>
           </div>
         </CardContent>
       </Card>

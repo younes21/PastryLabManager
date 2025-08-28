@@ -5,6 +5,7 @@ import { apiRequest } from '@/lib/queryClient';
 import ProductSelectionDialog from './dialog-prepration';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { extractMessage } from '@/lib/utils';
 
 // Ajout utilitaire pour charger les stocks de tous les articles d'une recette
 async function fetchStockDetails(articleIds: number[]): Promise<Record<number, any>> {
@@ -735,15 +736,10 @@ const PreparationPage = () => {
       }
 
         alert('Préparation sauvegardée');
-    } catch (e) {
-      console.error('❌ Failed to save preparation:', e);
-      console.error('Error details:', {
-        message: e instanceof Error ? e.message : String(e),
-        stack: e instanceof Error ? e.stack : undefined,
-        currentOperation,
-        items
-      });
-      alert('Erreur lors de la sauvegarde');
+    } catch (e:any) {
+      alert (extractMessage(e));
+     
+    
     }
   };
 

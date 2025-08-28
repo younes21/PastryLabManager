@@ -305,7 +305,7 @@ export function Sidebar() {
       case "livreur":
         return ["/"].includes(item.path);
       case "preparateur":
-        return ["/production", "/orders", "/preparateur-preparations"].includes(item.path);
+        return [ "/preparateur-preparations"].includes(item.path);
       case "admin":
         return true;
       case "gerant":

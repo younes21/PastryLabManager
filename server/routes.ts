@@ -1815,15 +1815,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error creating inventory operation:", error);
+      
       if (error instanceof z.ZodError) {
-        res
-          .status(400)
-          .json({ message: "Invalid operation data", errors: error.errors });
-      } else {
-        res
-          .status(500)
-          .json({ message: "Failed to create inventory operation" });
+        return res.status(400).json({
+          message: "Invalid operation data",
+          errors: error.errors,
+        });
       }
+      if (error instanceof Error) {
+        return res.status(400).json({
+          message: error.message,   // renvoyer le vrai message de l’erreur
+        });
+      }
+      return res.status(500).json({
+        message: "Failed to create inventory operation",
+        error: String(error), // au cas où ce n’est pas une Error standard
+      });
     }
   });
   app.delete("/api/inventory-operations/:id", async (req, res) => {
@@ -1873,14 +1880,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating inventory operation:", error);
       if (error instanceof z.ZodError) {
-        res
-          .status(400)
-          .json({ message: "Invalid operation data", errors: error.errors });
-      } else {
-        res
-          .status(500)
-          .json({ message: "Failed to update inventory operation" });
+        return res.status(400).json({
+          message: "Invalid operation data",
+          errors: error.errors,
+        });
       }
+      if (error instanceof Error) {
+        return res.status(400).json({
+          message: error.message,   // renvoyer le vrai message de l’erreur
+        });
+      }
+      return res.status(500).json({
+        message: "Failed to create inventory operation",
+        error: String(error), // au cas où ce n’est pas une Error standard
+      });
     }
   });
 
