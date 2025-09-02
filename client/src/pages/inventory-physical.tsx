@@ -50,6 +50,7 @@ const InventoryPhysicalInterface = () => {
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("ingredients");
+  const [totalCost, setTotalCost] = useState(0);
 
   // Data from API
   const [storageZones, setStorageZones] = useState<any[]>([]);
@@ -188,6 +189,17 @@ const InventoryPhysicalInterface = () => {
     void loadAll();
   }, []);
 
+  useEffect(() => {
+    if (items) {
+      const cost = items.reduce((acc, item) => {
+        const quantity = parseFloat(item.newQuantity) || 0;
+        const unitCost = parseFloat(item.unitCost) || 0;
+        return acc + quantity * unitCost;
+      }, 0);
+      setTotalCost(cost);
+    }
+  }, [items]);
+
   // Fonction pour créer une nouvelle opération d'inventaire (initial ou ajustement)
   const createNewOperation = (isInitial = false) => {
     if (isInitial && hasInitialInventory) {
@@ -244,7 +256,9 @@ const InventoryPhysicalInterface = () => {
 
       const res = await apiRequest(`/api/inventory-operations/${op.id}`, "GET");
       const data = await res.json();
-
+      // Mettre à jour selectedZoneId avec la zone de l'opération
+      setSelectedZoneId(data.storageZoneId);
+      
       setCurrentOperation({
         id: data.id,
         code: data.code,
@@ -255,8 +269,7 @@ const InventoryPhysicalInterface = () => {
         createdAt: data.createdAt,
       });
 
-      // Mettre à jour selectedZoneId avec la zone de l'opération
-      setSelectedZoneId(data.storageZoneId);
+
 
       setItems(
         (data.items || []).map((it: any) => ({
@@ -638,13 +651,8 @@ const InventoryPhysicalInterface = () => {
         : article.type === "product";
     // Vérifier si l'article n'est pas déjà dans les items de la zone
     const alreadyInItems = items.some((item) => item.articleId === article.id);
-    // Vérifier si l'article n'est pas en stock dans la zone sélectionnée
-    const articleStockItems = stockItems.filter(
-      (s) => s.articleId === article.id && s.storageZoneId === selectedZoneId,
-    );
-    const notInStock = articleStockItems.length === 0;
 
-    return matchesSearch && matchesType && !alreadyInItems && notInStock;
+    return matchesSearch && matchesType && !alreadyInItems;
   });
 
   // Afficher l'inventaire initial dans la liste des opérations (pas seulement les ajustements)
@@ -894,6 +902,11 @@ const InventoryPhysicalInterface = () => {
               )}
               {currentOperation?.status &&
                 getStatusBadge(currentOperation.status)}
+              {isEditing && currentOperation?.type === 'inventaire_initiale' && (
+                <div className="text-sm font-medium text-gray-700">
+                  Coût Total: <span className="font-bold text-blue-600">{totalCost.toFixed(2)} €</span>
+                </div>
+              )}
               {/* Select de zone de stockage */}
               <div>
                 <Select

@@ -1791,6 +1791,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operationData.totalTax = totalTax.toString();
           operationData.totalTTC = totalTTC.toString();
         }
+
+        if (operationData.type === 'inventaire_initiale') {
+          let totalCost = 0;
+          for (const item of itemsData) {
+            const unitCost = parseFloat(item.unitCost || "0");
+            const quantity = parseFloat(item.quantityAfter || "0");
+            totalCost += unitCost * quantity;
+          }
+          operationData.subtotalHT = totalCost.toString();
+          operationData.totalTTC = totalCost.toString();
+        }
         
         const operation = await storage.createInventoryOperationWithItems(operationData, itemsData);
         res.status(201).json(operation);
@@ -1863,6 +1874,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use the new method that handles both operation and items
         const data = updateInventoryOperationWithItemsSchema.parse(req.body);
         const { operation, items } = data;
+
+        if (operation.type === 'inventaire_initiale') {
+          let totalCost = 0;
+          for (const item of items) {
+            const unitCost = parseFloat(item.unitCost || "0");
+            const quantity = parseFloat(item.quantityAfter || "0");
+            totalCost += unitCost * quantity;
+          }
+          operation.subtotalHT = totalCost.toString();
+          operation.totalTTC = totalCost.toString();
+        }
 
         const updatedOperation = await storage.updateInventoryOperationWithItems(id, operation, items);
         res.json({ message: "Inventory operation updated successfully", operation: updatedOperation });
@@ -2059,6 +2081,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conformQty = parseFloat(conformQuantity || totalPlanned.toString());
       const ratio = totalPlanned > 0 ? conformQty / totalPlanned : 1;
 
+      // Add produced items to stock
+      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        for (const item of items) {
+          const producedQty = parseFloat(item.quantity) * ratio;
+          if (producedQty > 0) {
+            const productArticle = await storage.getArticle(item.articleId);
+            if (!productArticle) {
+              console.error(`Article ${item.articleId} not found for stock update.`);
+              continue;
+            }
+            
+            const toStorageZoneId = item.toStorageZoneId || productArticle.storageZoneId;
+            if (!toStorageZoneId) {
+              return res.status(400).json({ message: `No storage zone defined for product ${productArticle.name}` });
+            }
+
+            // Add to stock table
+            await db.insert(stock).values({
+              articleId: item.articleId,
+              storageZoneId: toStorageZoneId,
+              quantity: producedQty.toString(),
+              lotId: null,
+              serialNumber: null,
+              updatedAt: new Date()
+            }).onConflictDoUpdate({
+              target: [stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
+              set: {
+                quantity: sql`${stock.quantity} + ${producedQty.toString()}`,
+                updatedAt: sql`now()`
+              }
+            });
+
+            // Update total stock on article
+            await db.update(articles)
+              .set({ currentStock: sql`${articles.currentStock} + ${producedQty.toString()}` })
+              .where(eq(articles.id, item.articleId));
+          }
+        }
+      }
 
       // Create waste operation if there's waste
       if (conformQty < totalPlanned && operation.type === 'preparation') {
