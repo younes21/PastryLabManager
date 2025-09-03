@@ -4,7 +4,7 @@ import {
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
-  invoices, invoiceItems, payments, accountingEntries, accountingEntryLines, stockReservations,
+  deliveryStockReservations, invoices, invoiceItems, payments, accountingEntries, accountingEntryLines, stockReservations,
   lots,
 
   type User, type InsertUser,
@@ -20,6 +20,7 @@ import {
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
   type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
+  type DeliveryStockReservation, type InsertDeliveryStockReservation,
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
   type Payment, type InsertPayment,
   type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
@@ -251,6 +252,33 @@ export interface IStorage {
   getAvailableStock(articleId: number): Promise<number>;
   // Obtenir le rapport de traçabilité d'un article
   getArticleTraceabilityReport(articleId: number, startDate?: string, endDate?: string): Promise<any>;
+
+  // ============ RESERVATIONS DE LIVRAISON ============
+
+  // Créer des réservations de stock pour une livraison
+  createDeliveryStockReservations(deliveryId: number, orderItems: any[]): Promise<DeliveryStockReservation[]>;
+  // Libérer toutes les réservations d'une livraison
+  releaseDeliveryStockReservations(deliveryId: number): Promise<boolean>;
+  // Obtenir les réservations d'une livraison
+  getDeliveryStockReservations(deliveryId: number): Promise<DeliveryStockReservation[]>;
+  // Calculer le stock disponible pour un article (en tenant compte des réservations de livraison)
+  getArticleAvailableStockWithDeliveryReservations(articleId: number): Promise<number>;
+  // Valider une livraison et déduire le stock
+  validateDelivery(deliveryId: number): Promise<Delivery>;
+
+  // ============ GESTION DES ANNULATIONS ============
+  
+  // 1. Annuler une livraison (avant validation) - retour au stock
+  cancelDeliveryBeforeValidation(deliveryId: number, reason: string): Promise<Delivery>;
+  
+  // 3. Créer une opération de rebut
+  createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation>;
+  
+  // 2. Créer une opération de retour au stock
+  createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation>;
+  
+  // 4. Annuler une livraison (après validation) - retour au stock ou rebut
+  cancelDeliveryAfterValidation(deliveryId: number, reason: string, isReturnToStock: boolean): Promise<Delivery>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2311,7 +2339,7 @@ export class DatabaseStorage implements IStorage {
       .select().from(inventoryOperations)
       .where(and(
         eq(inventoryOperations.id, operationId),
-        eq(inventoryOperations.type, 'delivery'),
+        eq(inventoryOperations.type, 'livraison'),
         eq(inventoryOperations.status, 'completed')
       )).limit(1);
 
@@ -2511,6 +2539,402 @@ export class DatabaseStorage implements IStorage {
     }
 
     return deleted;
+  }
+
+  // ============ RESERVATIONS DE LIVRAISON ============
+
+  async createDeliveryStockReservations(deliveryId: number, orderItems: any[]): Promise<DeliveryStockReservation[]> {
+    const reservations: DeliveryStockReservation[] = [];
+
+    for (const orderItem of orderItems) {
+      // Vérifier le stock disponible
+      const availableStock = await this.getArticleAvailableStockWithDeliveryReservations(orderItem.articleId);
+      const requestedQuantity = parseFloat(orderItem.quantity || '0');
+
+      if (availableStock < requestedQuantity) {
+        throw new Error(`Stock insuffisant pour l'article ${orderItem.articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
+      }
+
+      // Créer la réservation
+      const [reservation] = await db.insert(deliveryStockReservations).values({
+        deliveryId,
+        articleId: orderItem.articleId,
+        orderItemId: orderItem.id,
+        reservedQuantity: orderItem.quantity,
+        status: 'reserved',
+        notes: `Réservation pour livraison ${deliveryId}`,
+      }).returning();
+
+      reservations.push(reservation);
+    }
+
+    return reservations;
+  }
+
+  async releaseDeliveryStockReservations(deliveryId: number): Promise<boolean> {
+    const result = await db.delete(deliveryStockReservations)
+      .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getDeliveryStockReservations(deliveryId: number): Promise<DeliveryStockReservation[]> {
+    return await db.select().from(deliveryStockReservations)
+      .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+  }
+
+  async getArticleAvailableStockWithDeliveryReservations(articleId: number): Promise<number> {
+    // Obtenir le stock total de l'article
+    const article = await this.getArticle(articleId);
+    if (!article) return 0;
+
+    const totalStock = parseFloat(article.currentStock || '0');
+
+    // Obtenir toutes les réservations actives pour cet article
+    const activeReservations = await db.select({
+      reservedQuantity: deliveryStockReservations.reservedQuantity
+    })
+    .from(deliveryStockReservations)
+    .where(and(
+      eq(deliveryStockReservations.articleId, articleId),
+      eq(deliveryStockReservations.status, 'reserved')
+    ));
+
+    // Calculer le total des réservations
+    const totalReservations = activeReservations.reduce((sum, res) => {
+      return sum + parseFloat(res.reservedQuantity || '0');
+    }, 0);
+
+    // Stock disponible = stock total - réservations
+    return Math.max(0, totalStock - totalReservations);
+  }
+
+  async validateDelivery(deliveryId: number): Promise<Delivery> {
+    return await db.transaction(async (tx) => {
+      // 1. Obtenir la livraison et ses réservations
+      const [delivery] = await tx.select().from(deliveries).where(eq(deliveries.id, deliveryId));
+      if (!delivery) {
+        throw new Error(`Livraison ${deliveryId} non trouvée`);
+      }
+
+      if (delivery.isValidated) {
+        throw new Error(`Livraison ${deliveryId} déjà validée`);
+      }
+
+      const reservations = await tx.select().from(deliveryStockReservations)
+        .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+
+      // 2. Créer une opération d'inventaire de sortie
+      const existingOperations = await tx.select().from(inventoryOperations);
+      const nextNumber = existingOperations.length + 1;
+      const operationCode = `LIV-${nextNumber.toString().padStart(6, '0')}`;
+      
+      const [operation] = await tx.insert(inventoryOperations).values({
+        code: operationCode,
+        type: 'livraison',
+        status: 'completed',
+        clientId: delivery.orderId ? await this.getOrder(delivery.orderId).then(o => o?.clientId) : undefined,
+        orderId: delivery.orderId,
+        operatorId: delivery.createdBy,
+        notes: `Livraison validée ${delivery.code}`,
+        isValidated: true,
+        validatedAt: new Date().toISOString(),
+      }).returning();
+
+      // 3. Créer les items de l'opération d'inventaire
+      for (const reservation of reservations) {
+        await tx.insert(inventoryOperationItems).values({
+          operationId: operation.id,
+          articleId: reservation.articleId,
+          quantity: reservation.reservedQuantity,
+          quantityBefore: parseFloat((await this.getArticle(reservation.articleId))?.currentStock || '0'),
+          quantityAfter: parseFloat((await this.getArticle(reservation.articleId))?.currentStock || '0') - parseFloat(reservation.reservedQuantity),
+          unitCost: '0.00', // Pas de coût pour les sorties de livraison
+          notes: `Sortie pour livraison ${delivery.code}`,
+        });
+
+        // 4. Mettre à jour le stock de l'article
+        const article = await this.getArticle(reservation.articleId);
+        if (article) {
+          const newStock = Math.max(0, parseFloat(article.currentStock || '0') - parseFloat(reservation.reservedQuantity));
+          await tx.update(articles)
+            .set({ currentStock: newStock.toString() })
+            .where(eq(articles.id, reservation.articleId));
+        }
+      }
+
+      // 5. Marquer la livraison comme validée
+      const [updatedDelivery] = await tx.update(deliveries)
+        .set({
+          isValidated: true,
+          validatedAt: new Date().toISOString(),
+          status: 'delivered'
+        })
+        .where(eq(deliveries.id, deliveryId))
+        .returning();
+
+      // 6. Mettre à jour le statut des réservations
+      await tx.update(deliveryStockReservations)
+        .set({ status: 'delivered' })
+        .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+
+      return updatedDelivery;
+    });
+  }
+
+  // ============ GESTION DES ANNULATIONS ============
+  
+  // 1. Annuler une livraison (avant validation) - retour au stock
+  async cancelDeliveryBeforeValidation(deliveryId: number, reason: string): Promise<Delivery> {
+    return await db.transaction(async (tx) => {
+      // 1. Obtenir la livraison et ses réservations
+      const [delivery] = await tx.select().from(deliveries).where(eq(deliveries.id, deliveryId));
+      if (!delivery) {
+        throw new Error(`Livraison ${deliveryId} non trouvée`);
+      }
+
+      if (delivery.isValidated) {
+        throw new Error(`Livraison ${deliveryId} déjà validée, utilisez cancelDeliveryAfterValidation`);
+      }
+
+      if (delivery.status === 'cancelled') {
+        throw new Error(`Livraison ${deliveryId} déjà annulée`);
+      }
+
+      // Validation de la raison
+      if (!reason || reason.trim().length < 3) {
+        throw new Error('Raison d\'annulation requise (minimum 3 caractères)');
+      }
+
+      // 2. Libérer toutes les réservations (elles retournent automatiquement au stock disponible)
+      await tx.delete(deliveryStockReservations)
+        .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+
+      // 3. Marquer la livraison comme annulée
+      const [updatedDelivery] = await tx.update(deliveries)
+        .set({
+          status: 'cancelled',
+          cancellationReason: reason,
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(deliveries.id, deliveryId))
+        .returning();
+
+      return updatedDelivery;
+    });
+  }
+  
+  // 3. Créer une opération de rebut
+  async createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
+    const delivery = await this.getDelivery(deliveryId);
+    if (!delivery) {
+      throw new Error(`Livraison ${deliveryId} non trouvée`);
+    }
+
+    if (!delivery.isValidated) {
+      throw new Error(`Livraison ${deliveryId} non validée, impossible de créer un rebut`);
+    }
+
+    if (delivery.status === 'cancelled') {
+      throw new Error(`Livraison ${deliveryId} déjà annulée`);
+    }
+
+    // Validation de la raison
+    if (!reason || reason.trim().length < 3) {
+      throw new Error('Raison de rebut requise (minimum 3 caractères)');
+    }
+
+    const existingOperations = await db.select().from(inventoryOperations);
+    const nextNumber = existingOperations.length + 1;
+    const operationCode = `REB-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const [operation] = await db.insert(inventoryOperations).values({
+      code: operationCode,
+      type: 'rebut_livraison',
+      status: 'completed',
+      clientId: delivery.orderId ? await this.getOrder(delivery.orderId).then(o => o?.clientId) : undefined,
+      orderId: delivery.orderId,
+      parentOperationId: deliveryId, // Lien explicite avec la livraison d'origine
+      operatorId: delivery.createdBy,
+      notes: `Rebut - ${reason}`,
+      cancellationReason: reason,
+      isValidated: true,
+      validatedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      completedBy: delivery.createdBy,
+    }).returning();
+
+    // Créer les items de l'opération de rebut
+    const reservations = await this.getDeliveryStockReservations(deliveryId);
+    if (reservations.length === 0) {
+      throw new Error(`Aucune réservation trouvée pour la livraison ${deliveryId}`);
+    }
+
+    for (const reservation of reservations) {
+      const article = await this.getArticle(reservation.articleId);
+      if (article) {
+        const currentStock = parseFloat(article.currentStock || '0');
+
+        await db.insert(inventoryOperationItems).values({
+          operationId: operation.id,
+          articleId: reservation.articleId,
+          quantity: reservation.reservedQuantity,
+          quantityBefore: currentStock,
+          quantityAfter: currentStock, // Le stock reste inchangé (déjà déduit)
+          unitCost: article.costPerUnit || '0.00',
+          notes: `Rebut pour annulation livraison ${delivery.code} - Raison: ${reason}`,
+          lineStatus: 'completed',
+          wasteReason: reason, // Utilisation du champ spécifique aux rebuts
+        });
+      }
+    }
+
+    return operation;
+  }
+  
+  // 2. Créer une opération de retour au stock
+  async createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
+    const delivery = await this.getDelivery(deliveryId);
+    if (!delivery) {
+      throw new Error(`Livraison ${deliveryId} non trouvée`);
+    }
+
+    if (!delivery.isValidated) {
+      throw new Error(`Livraison ${deliveryId} non validée, impossible de créer un retour au stock`);
+    }
+
+    if (delivery.status === 'cancelled') {
+      throw new Error(`Livraison ${deliveryId} déjà annulée`);
+    }
+
+    // Validation de la raison
+    if (!reason || reason.trim().length < 3) {
+      throw new Error('Raison de retour au stock requise (minimum 3 caractères)');
+    }
+
+    const existingOperations = await db.select().from(inventoryOperations);
+    const nextNumber = existingOperations.length + 1;
+    const operationCode = `RET-${nextNumber.toString().padStart(6, '0')}`;
+    
+    const [operation] = await db.insert(inventoryOperations).values({
+      code: operationCode,
+      type: 'retour_livraison',
+      status: 'completed',
+      clientId: delivery.orderId ? await this.getOrder(delivery.orderId).then(o => o?.clientId) : undefined,
+      orderId: delivery.orderId,
+      parentOperationId: deliveryId, // Lien explicite avec la livraison d'origine
+      operatorId: delivery.createdBy,
+      notes: `Retour au stock - ${reason}`,
+      cancellationReason: reason,
+      isValidated: true,
+      validatedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      completedBy: delivery.createdBy,
+    }).returning();
+
+    // Créer les items de l'opération de retour
+    const reservations = await this.getDeliveryStockReservations(deliveryId);
+    if (reservations.length === 0) {
+      throw new Error(`Aucune réservation trouvée pour la livraison ${deliveryId}`);
+    }
+
+    for (const reservation of reservations) {
+      const article = await this.getArticle(reservation.articleId);
+      if (article) {
+        const currentStock = parseFloat(article.currentStock || '0');
+        const reservedQuantity = parseFloat(reservation.reservedQuantity);
+        const newStock = currentStock + reservedQuantity;
+
+        await db.insert(inventoryOperationItems).values({
+          operationId: operation.id,
+          articleId: reservation.articleId,
+          quantity: reservation.reservedQuantity,
+          quantityBefore: currentStock,
+          quantityAfter: newStock,
+          unitCost: article.costPerUnit || '0.00',
+          notes: `Retour au stock pour annulation livraison ${delivery.code} - Raison: ${reason}`,
+          lineStatus: 'completed',
+        });
+      }
+    }
+
+    return operation;
+  }
+  
+  // 4. Annuler une livraison (après validation) - retour au stock ou rebut
+  async cancelDeliveryAfterValidation(deliveryId: number, reason: string, isReturnToStock: boolean): Promise<Delivery> {
+    return await db.transaction(async (tx) => {
+      // 1. Obtenir la livraison et ses réservations
+      const [delivery] = await tx.select().from(deliveries).where(eq(deliveries.id, deliveryId));
+      if (!delivery) {
+        throw new Error(`Livraison ${deliveryId} non trouvée`);
+      }
+
+      if (!delivery.isValidated) {
+        throw new Error(`Livraison ${deliveryId} non validée, utilisez cancelDeliveryBeforeValidation`);
+      }
+
+      if (delivery.status === 'cancelled') {
+        throw new Error(`Livraison ${deliveryId} déjà annulée`);
+      }
+
+      // Validation de la raison
+      if (!reason || reason.trim().length < 3) {
+        throw new Error('Raison d\'annulation requise (minimum 3 caractères)');
+      }
+
+      const reservations = await tx.select().from(deliveryStockReservations)
+        .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+
+      if (reservations.length === 0) {
+        throw new Error(`Aucune réservation trouvée pour la livraison ${deliveryId}`);
+      }
+
+      // 2. Créer l'opération appropriée (retour ou rebut)
+      let operation: InventoryOperation;
+      if (isReturnToStock) {
+        operation = await this.createReturnToStockOperation(deliveryId, reason);
+      } else {
+        operation = await this.createWasteOperation(deliveryId, reason);
+      }
+
+      // 3. Mettre à jour le stock des articles selon le type d'annulation
+      for (const reservation of reservations) {
+        const article = await this.getArticle(reservation.articleId);
+        if (article) {
+          const currentStock = parseFloat(article.currentStock || '0');
+          let newStock: number;
+
+          if (isReturnToStock) {
+            // Retour au stock : ajouter la quantité
+            newStock = currentStock + parseFloat(reservation.reservedQuantity);
+          } else {
+            // Rebut : le stock reste inchangé (déjà déduit lors de la validation)
+            newStock = currentStock;
+          }
+
+          await tx.update(articles)
+            .set({ currentStock: newStock.toString() })
+            .where(eq(articles.id, reservation.articleId));
+        }
+      }
+
+      // 4. Marquer la livraison comme annulée
+      const [updatedDelivery] = await tx.update(deliveries)
+        .set({
+          status: 'cancelled',
+          cancellationReason: reason,
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(deliveries.id, deliveryId))
+        .returning();
+
+      // 5. Mettre à jour le statut des réservations
+      await tx.update(deliveryStockReservations)
+        .set({ status: 'cancelled' })
+        .where(eq(deliveryStockReservations.deliveryId, deliveryId));
+
+      return updatedDelivery;
+    });
   }
 }
 

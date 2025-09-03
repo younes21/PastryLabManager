@@ -134,6 +134,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to delete user" });
     }
   });
+
+  // ============ RESERVATIONS DE LIVRAISON ============
+
+  // Créer des réservations de stock pour une livraison
+  app.post("/api/deliveries/:id/reservations", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const { orderItems } = req.body;
+
+      if (!orderItems || !Array.isArray(orderItems)) {
+        return res.status(400).json({ message: "orderItems array is required" });
+      }
+
+      const reservations = await storage.createDeliveryStockReservations(deliveryId, orderItems);
+      res.status(201).json(reservations);
+    } catch (error) {
+      console.error("Error creating delivery stock reservations:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to create reservations" });
+    }
+  });
+
+  // Obtenir les réservations d'une livraison
+  app.get("/api/deliveries/:id/reservations", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const reservations = await storage.getDeliveryStockReservations(deliveryId);
+      res.json(reservations);
+    } catch (error) {
+      console.error("Error fetching delivery reservations:", error);
+      res.status(500).json({ message: "Failed to fetch reservations" });
+    }
+  });
+
+  // Libérer les réservations d'une livraison
+  app.delete("/api/deliveries/:id/reservations", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const released = await storage.releaseDeliveryStockReservations(deliveryId);
+      
+      if (!released) {
+        return res.status(404).json({ message: "No reservations found for this delivery" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error releasing delivery reservations:", error);
+      res.status(500).json({ message: "Failed to release reservations" });
+    }
+  });
+
+  // Valider une livraison (déduire le stock et créer l'opération d'inventaire)
+  app.post("/api/deliveries/:id/validate", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const validatedDelivery = await storage.validateDelivery(deliveryId);
+      res.json(validatedDelivery);
+    } catch (error) {
+      console.error("Error validating delivery:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to validate delivery" });
+    }
+  });
+
+  // Obtenir le stock disponible d'un article (en tenant compte des réservations)
+  app.get("/api/articles/:id/available-stock", async (req, res) => {
+    try {
+      const articleId = parseInt(req.params.id);
+      const availableStock = await storage.getArticleAvailableStockWithDeliveryReservations(articleId);
+      res.json({ articleId, availableStock });
+    } catch (error) {
+      console.error("Error fetching available stock:", error);
+      res.status(500).json({ message: "Failed to fetch available stock" });
+    }
+  });
+
+  // ============ GESTION DES ANNULATIONS DE LIVRAISON ============
+
+  // Annuler une livraison (avant validation) - retour au stock
+  app.post("/api/deliveries/:id/cancel-before-validation", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const { reason } = req.body;
+      
+      if (!reason) {
+        return res.status(400).json({ message: "Raison d'annulation requise" });
+      }
+
+      const cancelledDelivery = await storage.cancelDeliveryBeforeValidation(deliveryId, reason);
+      res.json(cancelledDelivery);
+    } catch (error) {
+      console.error("Error cancelling delivery before validation:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to cancel delivery" });
+    }
+  });
+
+  // Annuler une livraison (après validation) - retour au stock ou rebut
+  app.post("/api/deliveries/:id/cancel-after-validation", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const { reason, isReturnToStock } = req.body;
+      
+      if (!reason) {
+        return res.status(400).json({ message: "Raison d'annulation requise" });
+      }
+
+      if (typeof isReturnToStock !== 'boolean') {
+        return res.status(400).json({ message: "isReturnToStock doit être un booléen" });
+      }
+
+      const cancelledDelivery = await storage.cancelDeliveryAfterValidation(deliveryId, reason, isReturnToStock);
+      res.json(cancelledDelivery);
+    } catch (error) {
+      console.error("Error cancelling delivery after validation:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to cancel delivery" });
+    }
+  });
+
   // Storage Zones routes (replacing Storage Locations)
   app.get("/api/storage-zones", async (req, res) => {
     try {
@@ -1742,7 +1858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         });
         // Calcul automatique des totaux pour les livraisons
-        if (operationData.type === 'delivery') {
+        if (operationData.type === 'livraison') {
           let subtotalHT = 0;
           let totalTax = 0;
           let totalTTC = 0;
@@ -1797,6 +1913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (const item of itemsData) {
             const unitCost = parseFloat(item.unitCost || "0");
             const quantity = parseFloat(item.quantityAfter || "0");
+            item.totalCost = (unitCost * quantity).toString();
             totalCost += unitCost * quantity;
           }
           operationData.subtotalHT = totalCost.toString();

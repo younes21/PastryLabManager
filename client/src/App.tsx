@@ -40,6 +40,7 @@ import InvoiceDetailPage from "@/pages/invoice-detail";
 import DeliveriesPage from "@/pages/deliveries";
 import PurchaseOrders from "@/pages/purchase-orders";
 import InventoryPhysical from "@/pages/inventory-physical";
+import DeliveryCancellations from "@/pages/delivery-cancellations";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

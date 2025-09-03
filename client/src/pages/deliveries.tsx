@@ -49,6 +49,8 @@ import type {
 } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DeliverySplitModal } from "@/components/delivery-split-modal";
+import { CancellationDetails } from '@/components/delivery-cancellation-details';
+import { CancellationModal } from '@/pages/delivery-cancellations';
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
@@ -69,6 +71,13 @@ export default function DeliveriesPage() {
   const [lots, setLots] = useState<any[]>([]); // à charger via API
   const [zones, setZones] = useState<any[]>([]); // à charger via API
   const [splitError, setSplitError] = useState<string>("");
+  const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [inventoryOperations, setInventoryOperations] = useState<any[]>([]);
+
+  const [orderIdFilter, setOrderIdFilter] = useState<string>('all');
+  const [clientIdFilter, setClientIdFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
 
   // Récupérer le paramètre orderId de l'URL au chargement de la page
@@ -86,11 +95,16 @@ export default function DeliveriesPage() {
     fetch('/api/storage-zones').then(r => r.json()).then(setZones);
   }, []);
 
+  // Charger les opérations d'inventaire pour la traçabilité
+  useEffect(() => {
+    fetch('/api/inventory-operations').then(r => r.json()).then(setInventoryOperations);
+  }, []);
+
   // Queries
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<InventoryOperation[]>({
     queryKey: ["/api/inventory-operations", { type: "delivery", orderId }],
     queryFn: async () => {
-      let url = "/api/inventory-operations?type=delivery";
+      let url = "/api/inventory-operations?type=livraison";
       if (orderId) {
         url += `&orderId=${orderId}`;
       }
@@ -480,9 +494,34 @@ export default function DeliveriesPage() {
   // Fonction utilitaire pour calculer la somme répartie pour un article
   const getSplitSum = (articleId: number) => (splits[articleId] || []).reduce((sum, s) => sum + (s.quantity || 0), 0);
 
+  const handleCancelDelivery = (delivery: any) => {
+    setSelectedDelivery(delivery);
+    setIsCancelModalOpen(true);
+  };
+
+  const handleCancelModalSuccess = () => {
+    setSelectedDelivery(null);
+    setIsCancelModalOpen(false);
+    // Recharger les livraisons et opérations
+    queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
+    fetch('/api/inventory-operations').then(r => r.json()).then(setInventoryOperations);
+  };
+
+  const getRelatedOperations = (deliveryId: number) => {
+    return inventoryOperations.filter(op => op.parentOperationId === deliveryId || (op.type === 'livraison' && op.orderId === deliveryId));
+  };
+
 
   // Les totaux sont maintenant calculés côté serveur
   // const totals = calculateTotals();
+
+  const filteredDeliveries = deliveries.filter((delivery) => {
+    const matchesOrder = orderIdFilter === 'all' || String(delivery.orderId ?? '') === orderIdFilter;
+    const matchesClient = clientIdFilter === 'all' || String(delivery.clientId ?? '') === clientIdFilter;
+    const matchesStatus = statusFilter === 'all' || delivery.status === statusFilter;
+    // Ajoutez ici la logique de recherche si besoin
+    return matchesOrder && matchesClient && matchesStatus;
+  });
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -514,10 +553,54 @@ export default function DeliveriesPage() {
             </Button>
           )}
         </div>
-        <Button onClick={startNewDelivery} data-testid="button-new-delivery">
+        <div className="flex items-center gap-4">
+          {/* Filtres avancés */}
+          <Select value={orderIdFilter} onValueChange={setOrderIdFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filtrer par commande" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les commandes</SelectItem>
+              {orders.map(order => (
+                <SelectItem key={order.id} value={String(order.id)}>
+                  {order.code} - {getClientName(order.clientId)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={clientIdFilter} onValueChange={setClientIdFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filtrer par client" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les clients</SelectItem>
+              {clients.map(client => (
+                <SelectItem key={client.id} value={String(client.id)}>
+                  {getClientName(client.id)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Filtrer par statut" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              <SelectItem value="draft">Brouillon</SelectItem>
+              <SelectItem value="pending">En attente</SelectItem>
+              <SelectItem value="ready">Prêt</SelectItem>
+              <SelectItem value="completed">Livré</SelectItem>
+              <SelectItem value="cancelled">Annulé</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input placeholder="Recherche..." className="w-64" disabled />
+        </div>
+        {/* Désactiver le bouton Nouvelle livraison */}
+       {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
           <FileText className="h-4 w-4 mr-2" />
           Nouvelle livraison
-        </Button>
+        </Button> } 
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -535,7 +618,7 @@ export default function DeliveriesPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Liste des livraisons ({deliveries.length})
+                Liste des livraisons ({filteredDeliveries.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -558,14 +641,14 @@ export default function DeliveriesPage() {
                         Chargement des livraisons...
                       </TableCell>
                     </TableRow>
-                  ) : deliveries.length === 0 ? (
+                  ) : filteredDeliveries.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8">
                         Aucune livraison trouvée
                       </TableCell>
                     </TableRow>
                   ) : (
-                    deliveries.map((delivery) => (
+                    filteredDeliveries.map((delivery) => (
                       <TableRow key={delivery.id} data-testid={`row-delivery-${delivery.id}`}>
                         <TableCell className="font-medium">{delivery.code}</TableCell>
                         <TableCell>
@@ -640,8 +723,26 @@ export default function DeliveriesPage() {
                              >
                                <Trash2 className="h-4 w-4 text-red-500" />
                              </Button>
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => handleCancelDelivery(delivery)}
+                               disabled={delivery.status === "completed" || delivery.status === "cancelled"}
+                               data-testid={`button-cancel-delivery-${delivery.id}`}
+                             >
+                               <X className="h-4 w-4 text-red-500" />
+                             </Button>
                            </div>
                         </TableCell>
+                        {delivery.status === 'cancelled' && (
+                          <CancellationDetails
+                            delivery={{
+                              ...delivery,
+                              cancellationReason: delivery.cancellationReason || undefined
+                            }}
+                            inventoryOperations={getRelatedOperations(delivery.id)}
+                          />
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -933,6 +1034,14 @@ export default function DeliveriesPage() {
           }
         }}
       />
+      {selectedDelivery && (
+        <CancellationModal
+          delivery={selectedDelivery}
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          onSuccess={handleCancelModalSuccess}
+        />
+      )}
     </div>
   );
 }

@@ -30,6 +30,7 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
+  XCircle,
 } from "lucide-react";
 
 export function Sidebar() {
@@ -267,6 +268,14 @@ export function Sidebar() {
       icon: "fas fa-box",
       lucideIcon: Package,
       order: 0,
+      group: "Ventes",
+    },
+    {
+      path: "/deliveries",
+      label: "Livraisons",
+      icon: "fas fa-truck",
+      lucideIcon: TruckIcon,
+      order: 1,
       group: "Ventes",
     },
     {

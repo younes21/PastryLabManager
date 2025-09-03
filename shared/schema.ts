@@ -895,6 +895,10 @@ export const deliveries = pgTable("deliveries", {
   deliveryAddress: text("delivery_address"),
   deliveryNotes: text("delivery_notes"),
 
+  // Validation et stock
+  isValidated: boolean("is_validated").default(false), // Nouveau champ pour gérer la validation
+  validatedAt: timestamp("validated_at", { mode: "string" }), // Date de validation
+
   // Colis
   packageCount: integer("package_count").default(1),
   trackingNumbers: text("tracking_numbers"), // JSON array of tracking numbers
@@ -930,6 +934,43 @@ export const deliveryItems = pgTable("delivery_items", {
     .references(() => articles.id)
     .notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
+// Nouvelle table pour gérer les réservations de stock spécifiques aux livraisons
+export const deliveryStockReservations = pgTable("delivery_stock_reservations", {
+  id: serial("id").primaryKey(),
+  deliveryId: integer("delivery_id")
+    .references(() => deliveries.id, { onDelete: "cascade" })
+    .notNull(),
+  articleId: integer("article_id")
+    .references(() => articles.id)
+    .notNull(),
+  orderItemId: integer("order_item_id")
+    .references(() => orderItems.id)
+    .notNull(),
+  
+  // Quantités
+  reservedQuantity: decimal("reserved_quantity", {
+    precision: 10,
+    scale: 3,
+  }).notNull(),
+  deliveredQuantity: decimal("delivered_quantity", {
+    precision: 10,
+    scale: 3,
+  }).default("0.00"),
+  
+  // Statut de la réservation
+  status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
+  
+  // Traçabilité
+  parentOperationId: integer("parent_operation_id").references(() => inventoryOperations.id), // Opération mère (livraison)
+  
+  // Dates
+  reservedAt: timestamp("reserved_at", { mode: "string" }).defaultNow(),
+  expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
+  
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
@@ -1128,6 +1169,13 @@ export const insertDeliveryItemSchema = createInsertSchema(deliveryItems).omit({
   id: true,
   createdAt: true,
 });
+
+// Schéma pour les réservations de stock des livraisons
+export const insertDeliveryStockReservationSchema = createInsertSchema(deliveryStockReservations).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true,
   code: true,
@@ -1173,6 +1221,8 @@ export type DeliveryPackage = typeof deliveryPackages.$inferSelect;
 export type InsertDeliveryPackage = z.infer<typeof insertDeliveryPackageSchema>;
 export type DeliveryItem = typeof deliveryItems.$inferSelect;
 export type InsertDeliveryItem = z.infer<typeof insertDeliveryItemSchema>;
+export type DeliveryStockReservation = typeof deliveryStockReservations.$inferSelect;
+export type InsertDeliveryStockReservation = z.infer<typeof insertDeliveryStockReservationSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
@@ -1236,6 +1286,29 @@ export const paymentsRelations = relations(
     createdBy: one(users, {
       fields: [payments.createdBy],
       references: [users.id],
+    }),
+  }),
+);
+
+// Relations pour les réservations de stock des livraisons
+export const deliveryStockReservationsRelations = relations(
+  deliveryStockReservations,
+  ({ one }) => ({
+    delivery: one(deliveries, {
+      fields: [deliveryStockReservations.deliveryId],
+      references: [deliveries.id],
+    }),
+    article: one(articles, {
+      fields: [deliveryStockReservations.articleId],
+      references: [articles.id],
+    }),
+    orderItem: one(orderItems, {
+      fields: [deliveryStockReservations.orderItemId],
+      references: [orderItems.id],
+    }),
+    parentOperation: one(inventoryOperations, {
+      fields: [deliveryStockReservations.parentOperationId],
+      references: [inventoryOperations.id],
     }),
   }),
 );

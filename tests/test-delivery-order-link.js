@@ -7,7 +7,7 @@ async function testDeliveryOrderLink() {
     
     // Test 1: Récupérer toutes les livraisons
     console.log('\n1. Récupération de toutes les livraisons...');
-    const allDeliveries = await fetch('http://localhost:3000/api/inventory-operations?type=delivery');
+    const allDeliveries = await fetch('http://localhost:5000/api/inventory-operations?type=livraison');
     const allDeliveriesData = await allDeliveries.json();
     console.log(`✅ ${allDeliveriesData.length} livraisons trouvées`);
     
@@ -18,7 +18,7 @@ async function testDeliveryOrderLink() {
       // Test 2: Récupérer les livraisons d'une commande spécifique (si orderId existe)
       if (firstDelivery.orderId) {
         console.log(`\n2. Récupération des livraisons pour la commande ${firstDelivery.orderId}...`);
-        const orderDeliveries = await fetch(`http://localhost:3000/api/inventory-operations?type=delivery&orderId=${firstDelivery.orderId}`);
+        const orderDeliveries = await fetch(`http://localhost:5000/api/inventory-operations?type=livraison&orderId=${firstDelivery.orderId}`);
         const orderDeliveriesData = await orderDeliveries.json();
         console.log(`✅ ${orderDeliveriesData.length} livraisons trouvées pour la commande ${firstDelivery.orderId}`);
         
@@ -32,7 +32,7 @@ async function testDeliveryOrderLink() {
     
     // Test 3: Récupérer les commandes
     console.log('\n3. Récupération des commandes...');
-    const orders = await fetch('http://localhost:3000/api/orders');
+    const orders = await fetch('http://localhost:5000/api/orders');
     const ordersData = await orders.json();
     console.log(`✅ ${ordersData.length} commandes trouvées`);
     
@@ -42,7 +42,7 @@ async function testDeliveryOrderLink() {
       
       // Test 4: Récupérer les livraisons d'une commande spécifique
       console.log(`\n4. Récupération des livraisons pour la commande ${firstOrder.id}...`);
-      const orderDeliveries = await fetch(`http://localhost:3000/api/inventory-operations?type=delivery&orderId=${firstOrder.id}`);
+      const orderDeliveries = await fetch(`http://localhost:5000/api/inventory-operations?type=livraison&orderId=${firstOrder.id}`);
       const orderDeliveriesData = await orderDeliveries.json();
       console.log(`✅ ${orderDeliveriesData.length} livraisons trouvées pour la commande ${firstOrder.id}`);
       

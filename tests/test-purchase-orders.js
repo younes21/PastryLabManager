@@ -1,6 +1,6 @@
 // Test simple pour vérifier les routes purchase-orders
 const testPurchaseOrders = async () => {
-  const baseUrl = 'http://localhost:3000/api';
+  const baseUrl = 'http://localhost:5000/api';
   
   try {
     console.log('🧪 Test des routes purchase-orders...');

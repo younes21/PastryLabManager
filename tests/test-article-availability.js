@@ -5,7 +5,7 @@ const testArticleAvailability = async () => {
 
     // Test 1: Récupérer la disponibilité d'un article existant
     console.log('1️⃣ Test récupération disponibilité article existant...');
-    const response1 = await fetch('http://localhost:3000/api/articles/1/availability');
+    const response1 = await fetch('http://localhost:5000/api/articles/1/availability');
     
     if (response1.ok) {
       const data1 = await response1.json();
@@ -29,7 +29,7 @@ const testArticleAvailability = async () => {
     }
 
     console.log('\n2️⃣ Test récupération disponibilité article inexistant...');
-    const response2 = await fetch('http://localhost:3000/api/articles/99999/availability');
+    const response2 = await fetch('http://localhost:5000/api/articles/99999/availability');
     
     if (response2.status === 404) {
       console.log('✅ Succès: Article non trouvé (404)');
@@ -38,7 +38,7 @@ const testArticleAvailability = async () => {
     }
 
     console.log('\n3️⃣ Test récupération disponibilité avec ID invalide...');
-    const response3 = await fetch('http://localhost:3000/api/articles/invalid/availability');
+    const response3 = await fetch('http://localhost:5000/api/articles/invalid/availability');
     
     if (response3.status === 400) {
       console.log('✅ Succès: ID invalide rejeté (400)');
