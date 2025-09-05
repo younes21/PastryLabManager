@@ -2036,19 +2036,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH endpoint for inventory operations (for status updates)
+  // PATCH endpoint for inventory operations (for status updates and scheduling)
   app.patch("/api/inventory-operations/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { status } = req.body;
+      const { status, scheduledDate } = req.body;
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid operation ID" });
       }
-      if (!["completed", "cancelled"].includes(status)) {
-        return res.status(400).json({ message: "Invalid status transition" });
+
+      // If only status is being updated and it's a completion/cancellation
+      if (status && !scheduledDate && ["completed", "cancelled"].includes(status)) {
+        const result = await storage.updateInventoryOperationStatus(id, status);
+        if (result) {
+          res.json(result);
+        } else {
+          res.status(404).json({ message: "Inventory operation not found" });
+        }
+        return;
       }
 
-      const result = await storage.updateInventoryOperationStatus(id, status);
+      // For scheduling (scheduledDate) or other status updates (like "programmed")
+      const updateData: any = {};
+      
+      if (status) {
+        updateData.status = status;
+      }
+      
+      if (scheduledDate) {
+        updateData.scheduledDate = scheduledDate;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      const result = await storage.updateInventoryOperation(id, updateData);
 
       if (result) {
         res.json(result);

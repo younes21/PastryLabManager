@@ -1113,6 +1113,8 @@ export class DatabaseStorage implements IStorage {
             articleCode: articles.code,
             articleName: articles.name,
             articleType: articles.type,
+            articleCurrentStock: articles.currentStock,
+            articleUnit: articles.unit,
           })
           .from(orderItems)
           .leftJoin(articles, eq(orderItems.articleId, articles.id))
@@ -1143,6 +1145,8 @@ export class DatabaseStorage implements IStorage {
                 code: item.articleCode,
                 name: item.articleName,
                 type: item.articleType,
+                currentStock: item.articleCurrentStock,
+                unit: item.articleUnit,
               }
             }))
           };
@@ -1558,9 +1562,37 @@ export class DatabaseStorage implements IStorage {
   //   }
   // }
 
+  // Fonction de calcul du PMP (Prix Moyen Pondéré)
+  private async calculateWeightedAveragePrice(
+    tx: any,
+    articleId: number,
+    incomingQuantity: number,
+    incomingUnitCost: number
+  ): Promise<number> {
+    // Récupérer l'article actuel
+    const [article] = await tx.select().from(articles).where(eq(articles.id, articleId));
+    if (!article) throw new Error(`Article ${articleId} not found`);
+
+    const currentStock = parseFloat(article.currentStock || '0');
+    const currentCostPerUnit = parseFloat(article.costPerUnit || '0');
+
+    // Si stock nul, le PMP devient le prix d'entrée
+    if (currentStock === 0) {
+      return incomingUnitCost;
+    }
+
+    // Calcul PMP : (Stock_actuel × PMP_actuel + Quantité_entrante × Prix_entrant) / (Stock_actuel + Quantité_entrante)
+    const totalCurrentValue = currentStock * currentCostPerUnit;
+    const totalIncomingValue = incomingQuantity * incomingUnitCost;
+    const newTotalStock = currentStock + incomingQuantity;
+    
+    return (totalCurrentValue + totalIncomingValue) / newTotalStock;
+  }
+
   async  updateInventoryOperationStatus(
     id: number,
-    status: string
+    status: string,
+    scheduledDate?: string
   ): Promise<InventoryOperation | undefined> {
     return await db.transaction(async (tx) => {
       const op = await tx.query.inventoryOperations.findFirst({
@@ -1596,8 +1628,23 @@ export class DatabaseStorage implements IStorage {
               .where(eq(articles.id, item.articleId));
           }
   
-          // Entrée de stock (toStorageZoneId)
+          // Entrée de stock (toStorageZoneId) - avec calcul PMP
           if (item.toStorageZoneId) {
+            // Calculer le nouveau PMP pour les opérations d'achat et d'inventaire initial
+            if ((op.type === 'reception' || op.type === 'inventaire_initiale') && item.unitCost && parseFloat(item.unitCost) > 0) {
+              const newPMP = await this.calculateWeightedAveragePrice(
+                tx,
+                item.articleId,
+                qty,
+                parseFloat(item.unitCost)
+              );
+              
+              // Mettre à jour le PMP de l'article
+              await tx.update(articles)
+                .set({ costPerUnit: newPMP.toFixed(2) })
+                .where(eq(articles.id, item.articleId));
+            }
+
             await tx.insert(stock).values({
               articleId: item.articleId,
               storageZoneId: item.toStorageZoneId,
@@ -1664,8 +1711,13 @@ export class DatabaseStorage implements IStorage {
       }
   
       // ---- Mettre à jour le statut ----
+      const updateData: any = { status, updatedAt: new Date().toISOString() };
+      if (scheduledDate) {
+        updateData.scheduledDate = scheduledDate;
+      }
+      
       const [newOp] = await tx.update(inventoryOperations)
-        .set({ status, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(inventoryOperations.id, id))
         .returning();
   

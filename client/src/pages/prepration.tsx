@@ -39,6 +39,10 @@ const PreparationPage = () => {
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [completionData, setCompletionData] = useState<{ operationId: number | null, conformQuantity: string, wasteReason: string }>({ operationId: null, conformQuantity: '', wasteReason: '' });
   
+  // Dialogue de programmation
+  const [showProgramDialog, setShowProgramDialog] = useState(false);
+  const [programData, setProgramData] = useState<{ operationId: number | null, scheduledDate: string }>({ operationId: null, scheduledDate: '' });
+  
   // Orders data for planning
   const [orders, setOrders] = useState<any[]>([]);
 
@@ -848,6 +852,60 @@ const PreparationPage = () => {
     setShowCompletionDialog(true);
   };
 
+  const programOperation = (operation: any) => {
+    // Prevent programming already completed operations
+    if (operation.status === 'completed') {
+      alert('Impossible de programmer une opération terminée.');
+      return;
+    }
+
+    setProgramData({
+      operationId: operation.id,
+      scheduledDate: operation.scheduledDate ? operation.scheduledDate.split('T')[0] : ''
+    });
+    setShowProgramDialog(true);
+  };
+
+  const saveProgrammedDate = async () => {
+    try {
+      const { operationId, scheduledDate } = programData;
+      
+      if (!operationId || !scheduledDate) {
+        alert('Veuillez sélectionner une date');
+        return;
+      }
+
+      // Validate date is not in the past
+      const selectedDate = new Date(scheduledDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        alert('La date programmée ne peut pas être dans le passé');
+        return;
+      }
+
+      // Update the operation with the scheduled date
+      await apiRequest(`/api/inventory-operations/${operationId}`, 'PATCH', {
+        scheduledDate: scheduledDate,
+        status: 'programmed'
+      });
+      
+      // Update the operations list
+      setOperations(operations.map(op => 
+        op.id === operationId ? { ...op, scheduledDate: scheduledDate, status: 'programmed' } : op
+      ));
+      
+      setShowProgramDialog(false);
+      setProgramData({ operationId: null, scheduledDate: '' });
+      
+      alert('Préparation programmée avec succès');
+    } catch (e) {
+      console.error('Failed to program preparation', e);
+      alert('Erreur lors de la programmation');
+    }
+  };
+
   const completeOperationWithQuantity = async () => {
     try {
       const { operationId, conformQuantity, wasteReason } = completionData;
@@ -1254,7 +1312,8 @@ const PreparationPage = () => {
           <td className="px-3 py-2 text-center text-xs text-gray-600">
             {article?.costPerUnit}DA/{article?.unit}
             {hasSubIngredients && (
-              <div className="text-xs text-gray-400">(calculé)</div>
+              <div className="text-xs text-gray-400">(calculé {(unitCost / parseFloat(ingredient.quantity || '1')).toFixed(2)} /{ ingredient.unit})</div>
+            
             )}
             {!hasSubIngredients && article?.unit !== ingredient.unit && (
               <div className="text-xs text-gray-400">
@@ -1262,7 +1321,7 @@ const PreparationPage = () => {
               </div>
             )}
           </td>
-          <td className="px-3 py-2 text-center text-xs font-semibold">
+          <td className="px-3 py-2 text-center text-xs font-semibold text-blue-600">
             {parseFloat(ingredient.quantity).toFixed(3)}
           </td>
           <td className="px-3 py-2 text-center text-xs text-gray-600">
@@ -1544,6 +1603,53 @@ const PreparationPage = () => {
             onSelect={addItemFromDialog}
           />
         )}
+
+           {/* Program Dialog */}
+           {showProgramDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Programmer la préparation</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date de préparation *
+                    </label>
+                    <input
+                      type="date"
+                      value={programData.scheduledDate}
+                      onChange={(e) => setProgramData(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sélectionnez la date à laquelle cette préparation doit être effectuée
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowProgramDialog(false);
+                      setProgramData({ operationId: null, scheduledDate: '' });
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={saveProgrammedDate}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Programmer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -1574,6 +1680,11 @@ const PreparationPage = () => {
                   {currentOperation?.code || 'Nouveau'}
                 </span>
                 {currentOperation?.status && getStatusBadge(currentOperation.status)}
+                {items[0]?.article && (
+                  <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                    Stock: {items[0].article.currentStock|| 0} {items[0].article.unit}
+                  </span>
+                )}
               </div>
               <div className="text-sm text-gray-500">
                 {new Date().toLocaleDateString('fr-FR')}
@@ -2077,7 +2188,7 @@ const PreparationPage = () => {
         )}
 
         {/* Completion Dialog */}
-        {showCompletionDialog && (
+        {/* {showCompletionDialog && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
               <div className="p-6">
@@ -2131,7 +2242,7 @@ const PreparationPage = () => {
               </div>
             </div>
           </div>
-        )}
+        )} */}
       </div>
     
   );
