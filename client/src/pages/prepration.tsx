@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, X, FileText, Trash2, Edit3, ChevronDown, ArrowLeft, Play, Clock, Filter, CheckCircle, AlertTriangle, Pause, Zap, CirclePlus } from 'lucide-react';
+import { Plus, Save, X, FileText, Trash2, Edit3, ChevronDown, ArrowLeft, Play, Clock,CalendarDays, Filter, CheckCircle, AlertTriangle, Pause, Zap, CirclePlus } from 'lucide-react';
 import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
 import ProductSelectionDialog from './dialog-prepration';
@@ -1424,7 +1424,7 @@ const PreparationPage = () => {
                       return (
                         <tr key={`${operation.id}-${operation.isChild ? 'child' : 'parent'}`} className={rowClass}>
                           <td className={`px-4 py-3 text-sm text-gray-800 ${isChild ? 'pl-8' : ''}`}>
-                            {new Date(operation.scheduledDate || operation.createdAt).toLocaleDateString('fr-FR')}
+                         {  operation.scheduledDate ? new Date(operation.scheduledDate ).toLocaleDateString('fr-FR') : '-'}
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-blue-600">
                             {isChild && '└─ '}
@@ -1451,7 +1451,7 @@ const PreparationPage = () => {
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-center space-x-1">
                               {/* Lancer tout - pour operations programmées */}
-                              {operation.status === 'programmed' && (
+                              {/* {operation.status === 'programmed' && (
                                 <button
                                   onClick={() => launchAllOperation(operation.id)}
                                   className="text-green-600 hover:text-green-800 p-1"
@@ -1459,10 +1459,10 @@ const PreparationPage = () => {
                                 >
                                   <Play className="w-4 h-4" />
                                 </button>
-                              )}
+                              )} */}
                               
                               {/* Terminer - pour operations en cours */}
-                              {operation.status === 'in_progress' && (
+                              {/* {operation.status === 'in_progress' && (
                                 <button
                                   onClick={() => openCompletionDialog(operation.id)}
                                   className="text-purple-600 hover:text-purple-800 p-1"
@@ -1470,8 +1470,18 @@ const PreparationPage = () => {
                                 >
                                   <CheckCircle className="w-4 h-4" />
                                 </button>
-                              )}
+                              )} */}
                               
+                              {/* Créer reliquat - pour operations principales uniquement */}
+                              {!isChild && (operation.status === 'draft' || operation.status === 'programmed') && (
+                                <button
+                                  onClick={() => programOperation(operation)}
+                                  className="text-purple-600 hover:text-purple-800 p-1"
+                                  title="Programmer la préparation"
+                                >
+                                  <CalendarDays className="w-4 h-4" />
+                                </button>
+                              )}
                               {/* Créer reliquat - pour operations principales uniquement */}
                               {!isChild && operation.status === 'programmed' && (
                                 <button
@@ -1664,11 +1674,11 @@ const PreparationPage = () => {
                         onChange={e => items[0] && updateItemQuantity(items[0].id, e.target.value)}
                         min="0.0000001"
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        disabled={!canUpdateOp()}
+                        disabled={!canUpdateOp() ||items[0]?.orderId!=null}
                       />
                     </div>
 
-                    <div>
+                    {/* <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Date programmée *</label>
                       <input
                         type="date"
@@ -1677,11 +1687,8 @@ const PreparationPage = () => {
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                         disabled={!canUpdateOp()}
                       />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div>
+                    </div> */}
+                       <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Opérateur</label>
                       <select
                         value={currentOperation?.operatorId || null}
@@ -1695,6 +1702,10 @@ const PreparationPage = () => {
                         ))}
                       </select>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                 
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-4">
                     <div>
@@ -1897,7 +1908,7 @@ const PreparationPage = () => {
                       <span>Sauvegarder</span>
                     </button>
                     
-                    {currentOperation?.id && currentOperation?.status !== 'completed' && (
+                    {/* {currentOperation?.id && currentOperation?.status !== 'completed' && (
                       <button
                         onClick={startPreparation}
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center space-x-2"
@@ -1905,7 +1916,7 @@ const PreparationPage = () => {
                         <Play className="w-4 h-4" />
                         <span>Lancer la préparation</span>
                       </button>
-                    )}
+                    )} */}
                   </>
                 )}
                 

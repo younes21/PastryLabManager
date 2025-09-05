@@ -279,7 +279,8 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                         <thead>
                           <tr className="bg-gray-100 border-b">
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nom du Produit</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Totale Restante</th>
+                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté en stock</th>
+                            {/* <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Totale Restante</th> */}
                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté à Produire</th>
                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                           </tr>
@@ -293,9 +294,10 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                                 <td className="px-4 py-3 text-sm font-medium">
                                   {summary.articleName}
                                 </td>
-                                <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
+                                <td className="px-4 py-3 text-sm font-medium">{/*remplir la quantité en stock ici */}</td>
+                                {/* <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
                                   {summary.totalQuantityRemaining}
-                                </td>
+                                </td> */}
                                 <td className="px-4 py-3 text-center">
                                   <input
                                     type="number"
@@ -360,8 +362,9 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                             <tr className="bg-gray-100 border-b">
                               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Commande</th>
                               <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Commandée</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Préparée</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Restante</th>
+                              {/* <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Préparée</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté Restante</th> */}
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté en stock</th>
                               <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qté à Produire</th>
                               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Client</th>
                               <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Action</th>
@@ -383,12 +386,13 @@ const ProductSelectionDialog: React.FC<ProductSelectionDialogProps> = ({
                                   <td className="px-4 py-3 text-center text-sm font-semibold">
                                     {product.quantityOrdered}
                                   </td>
-                                  <td className="px-4 py-3 text-center text-sm text-green-600">
+                                  {/* <td className="px-4 py-3 text-center text-sm text-green-600">
                                     {product.quantityPrepared}
                                   </td>
                                   <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
                                     {product.quantityRemaining}
-                                  </td>
+                                  </td> */}
+                                  <td className="px-4 py-3 text-center text-sm font-semibold text-gray-700">{/*remplir la quantité en stock ici */}</td>
                                   <td className="px-4 py-3 text-center">
                                     <input
                                       type="number"

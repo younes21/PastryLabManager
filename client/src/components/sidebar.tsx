@@ -143,6 +143,22 @@ export function Sidebar() {
       group: "Ventes",
     },
     {
+      path: "/payment-dashboard",
+      label: "Tableau de Bord Règlements",
+      icon: "fas fa-chart-line",
+      lucideIcon: DollarSign,
+      order: 1,
+      group: "Ventes",
+    },
+    {
+      path: "/payment-reports",
+      label: "Rapports de Règlements",
+      icon: "fas fa-chart-bar",
+      lucideIcon: Calculator,
+      order: 2,
+      group: "Ventes",
+    },
+    {
       path: "/users",
       label: "Utilisateurs",
       icon: "fas fa-users",

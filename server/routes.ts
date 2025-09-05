@@ -3157,10 +3157,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all payments
   app.get("/api/payments", async (req, res) => {
     try {
-      const { invoiceId } = req.query;
+      const { invoiceId, clientId, deliveryId } = req.query;
       
       if (invoiceId) {
         const payments = await storage.getPaymentsByInvoice(parseInt(invoiceId as string));
+        res.json(payments);
+      } else if (clientId) {
+        const payments = await storage.getPaymentsByClient(parseInt(clientId as string));
+        res.json(payments);
+      } else if (deliveryId) {
+        const payments = await storage.getPaymentsByDelivery(parseInt(deliveryId as string));
         res.json(payments);
       } else {
         const payments = await storage.getAllPayments();
@@ -3169,6 +3175,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching payments:", error);
       res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  // Get outstanding payments
+  app.get("/api/payments/outstanding", async (req, res) => {
+    try {
+      const outstandingPayments = await storage.getOutstandingPayments();
+      res.json(outstandingPayments);
+    } catch (error) {
+      console.error("Error fetching outstanding payments:", error);
+      res.status(500).json({ message: "Failed to fetch outstanding payments" });
+    }
+  });
+
+  // Get payment statistics
+  app.get("/api/payments/statistics", async (req, res) => {
+    try {
+      const statistics = await storage.getPaymentStatistics();
+      res.json(statistics);
+    } catch (error) {
+      console.error("Error fetching payment statistics:", error);
+      res.status(500).json({ message: "Failed to fetch payment statistics" });
     }
   });
 

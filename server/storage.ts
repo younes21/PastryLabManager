@@ -226,6 +226,10 @@ export interface IStorage {
   getAllPayments(): Promise<Payment[]>;
   getPayment(id: number): Promise<Payment | undefined>;
   getPaymentsByInvoice(invoiceId: number): Promise<Payment[]>;
+  getPaymentsByClient(clientId: number): Promise<Payment[]>;
+  getPaymentsByDelivery(deliveryId: number): Promise<Payment[]>;
+  getOutstandingPayments(): Promise<any[]>;
+  getPaymentStatistics(): Promise<any>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: number, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
   deletePayment(id: number): Promise<boolean>;
@@ -2499,6 +2503,138 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(payments)
       .where(eq(payments.invoiceId, invoiceId))
       .orderBy(desc(payments.createdAt));
+  }
+
+  async getPaymentsByClient(clientId: number): Promise<any[]> {
+    return await db.select({
+      id: payments.id,
+      invoiceId: payments.invoiceId,
+      date: payments.date,
+      amount: payments.amount,
+      method: payments.method,
+      reference: payments.reference,
+      notes: payments.notes,
+      createdAt: payments.createdAt,
+      createdBy: payments.createdBy,
+      // Informations de la facture
+      invoiceCode: invoices.code,
+      invoiceStatus: invoices.status,
+      invoiceTotalTTC: invoices.totalTTC,
+      invoiceAmountPaid: invoices.amountPaid,
+      // Informations de la commande
+      orderCode: orders.code,
+      orderStatus: orders.status,
+      // Informations de la livraison
+      deliveryCode: deliveries.code,
+      deliveryStatus: deliveries.status,
+    })
+    .from(payments)
+    .leftJoin(invoices, eq(payments.invoiceId, invoices.id))
+    .leftJoin(orders, eq(invoices.orderId, orders.id))
+    .leftJoin(deliveries, eq(orders.id, deliveries.orderId))
+    .where(eq(invoices.clientId, clientId))
+    .orderBy(desc(payments.createdAt));
+  }
+
+  async getPaymentsByDelivery(deliveryId: number): Promise<any[]> {
+    return await db.select({
+      id: payments.id,
+      invoiceId: payments.invoiceId,
+      date: payments.date,
+      amount: payments.amount,
+      method: payments.method,
+      reference: payments.reference,
+      notes: payments.notes,
+      createdAt: payments.createdAt,
+      createdBy: payments.createdBy,
+      // Informations de la facture
+      invoiceCode: invoices.code,
+      invoiceStatus: invoices.status,
+      invoiceTotalTTC: invoices.totalTTC,
+      invoiceAmountPaid: invoices.amountPaid,
+    })
+    .from(payments)
+    .leftJoin(invoices, eq(payments.invoiceId, invoices.id))
+    .leftJoin(orders, eq(invoices.orderId, orders.id))
+    .leftJoin(deliveries, eq(orders.id, deliveries.orderId))
+    .where(eq(deliveries.id, deliveryId))
+    .orderBy(desc(payments.createdAt));
+  }
+
+  async getOutstandingPayments(): Promise<any[]> {
+    try {
+      return await db.select({
+        clientId: clients.id,
+        clientCode: clients.code,
+        clientName: clients.lastName,
+        clientPrenom: clients.firstName,
+        clientRaisonSociale: clients.companyName,
+        invoiceId: invoices.id,
+        invoiceCode: invoices.code,
+        invoiceTotalTTC: invoices.totalTTC,
+        invoiceAmountPaid: invoices.amountPaid,
+        outstandingAmount: sql<number>`${invoices.totalTTC} - ${invoices.amountPaid}`,
+        invoiceStatus: invoices.status,
+        dueDate: invoices.dueDate,
+        daysOverdue: sql<number>`CASE 
+          WHEN ${invoices.dueDate} IS NOT NULL AND ${invoices.dueDate} < NOW() 
+          THEN EXTRACT(DAY FROM NOW() - ${invoices.dueDate})::INTEGER
+          ELSE 0 
+        END`,
+        orderCode: orders.code,
+        orderStatus: orders.status,
+        deliveryCode: deliveries.code,
+        deliveryStatus: deliveries.status,
+      })
+      .from(invoices)
+      .leftJoin(clients, eq(invoices.clientId, clients.id))
+      .leftJoin(orders, eq(invoices.orderId, orders.id))
+      .leftJoin(deliveries, eq(orders.id, deliveries.orderId))
+      .where(sql`${invoices.totalTTC} > ${invoices.amountPaid}`)
+      .orderBy(desc(invoices.dueDate));
+    } catch (error) {
+      console.error('Error in getOutstandingPayments:', error);
+      return [];
+    }
+  }
+
+  async getPaymentStatistics(): Promise<any> {
+    try {
+      const totalInvoices = await db.select({
+        count: sql<number>`COUNT(*)`,
+        totalAmount: sql<number>`COALESCE(SUM(${invoices.totalTTC}), 0)`,
+        paidAmount: sql<number>`COALESCE(SUM(${invoices.amountPaid}), 0)`,
+        outstandingAmount: sql<number>`COALESCE(SUM(${invoices.totalTTC} - ${invoices.amountPaid}), 0)`,
+      })
+      .from(invoices);
+
+      const overdueInvoices = await db.select({
+        count: sql<number>`COUNT(*)`,
+        totalAmount: sql<number>`COALESCE(SUM(${invoices.totalTTC} - ${invoices.amountPaid}), 0)`,
+      })
+      .from(invoices)
+      .where(sql`${invoices.dueDate} < NOW() AND ${invoices.totalTTC} > ${invoices.amountPaid}`);
+
+      const recentPayments = await db.select({
+        count: sql<number>`COUNT(*)`,
+        totalAmount: sql<number>`COALESCE(SUM(${payments.amount}), 0)`,
+      })
+      .from(payments)
+      .where(sql`${payments.createdAt} >= NOW() - INTERVAL '30 days'`);
+
+      return {
+        totalInvoices: totalInvoices[0] || { count: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0 },
+        overdueInvoices: overdueInvoices[0] || { count: 0, totalAmount: 0 },
+        recentPayments: recentPayments[0] || { count: 0, totalAmount: 0 },
+      };
+    } catch (error) {
+      console.error('Error in getPaymentStatistics:', error);
+      return {
+        totalInvoices: { count: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0 },
+        overdueInvoices: { count: 0, totalAmount: 0 },
+        recentPayments: { count: 0, totalAmount: 0 },
+      };
+    }
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {

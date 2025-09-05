@@ -11,7 +11,7 @@ import Inventory from "@/pages/inventory";
 // Modules supprimés - à réimplémenter
 import Recipes from "@/pages/recipes";
 // import Production from "@/pages/production";
-// import Orders from "@/pages/orders";
+//import Orders from "@/pages/orders";
 // import Delivery from "@/pages/delivery";
 import Stock from "@/pages/stock";
 import Users from "@/pages/users";
@@ -33,7 +33,6 @@ import Suppliers from "@/pages/suppliers";
 import Clients from "@/pages/clients-new";
 import Products from "@/pages/products";
 import IngredientsNew from "@/pages/ingredients-new";
-import OrdersPage from "@/pages/orders";
 import InventoryOperationsPage from "@/pages/inventory-operations";
 import InvoicesPage from "@/pages/invoices";
 import InvoiceDetailPage from "@/pages/invoice-detail";
@@ -41,6 +40,9 @@ import DeliveriesPage from "@/pages/deliveries";
 import PurchaseOrders from "@/pages/purchase-orders";
 import InventoryPhysical from "@/pages/inventory-physical";
 import DeliveryCancellations from "@/pages/delivery-cancellations";
+import PaymentDashboard from "@/pages/payment-dashboard";
+import PaymentReports from "@/pages/payment-reports";
+import ClientPaymentHistory from "@/pages/client-payment-history";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,7 @@ import ClientOrdersPage from "./pages/orders-clients";
 import PreparationPage from "./pages/prepration";
 import PreparateurPreparationsPage from "./pages/preparateur-preparations";
 import { LayoutProvider } from "./contexts/LayoutContext";
+import OrdersPage from "./pages/orders-new";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -184,6 +187,9 @@ function ProtectedRouter() {
       <Route path="/invoices/:id" component={InvoiceDetailPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/deliveries" component={DeliveriesPage} />
+      <Route path="/payment-dashboard" component={PaymentDashboard} />
+      <Route path="/payment-reports" component={PaymentReports} />
+      <Route path="/client-payment-history/:clientId" component={ClientPaymentHistory} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route path="/preparation" component={PreparationPage} />
       <Route

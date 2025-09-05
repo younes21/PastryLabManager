@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Edit, Trash2, Plus, User, Building } from "lucide-react";
+import { Eye, Edit, Trash2, Plus, User, Building, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -730,6 +730,14 @@ return (
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.location.href = `/client-payment-history/${client.id}`}
+                        data-testid={`button-payment-${client.id}`}
+                      >
+                        <DollarSign className="h-4 w-4" />
+                      </Button>
                           <Button
                             variant="ghost"
                             size="sm"

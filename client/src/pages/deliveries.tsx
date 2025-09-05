@@ -51,6 +51,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DeliverySplitModal } from "@/components/delivery-split-modal";
 import { CancellationDetails } from '@/components/delivery-cancellation-details';
 import { CancellationModal } from '@/pages/delivery-cancellations';
+import { DeliveryPaymentDetails } from "@/components/delivery-payment-details";
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
@@ -885,6 +886,9 @@ export default function DeliveriesPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Détails de paiement */}
+                <DeliveryPaymentDetails deliveryId={currentDelivery.id} />
               </div>
 
               {/* Articles */}
