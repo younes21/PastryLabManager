@@ -590,7 +590,7 @@ const PreparationPage = () => {
         const requiredQuantity = baseIngredientQuantity * ratio;
         
         const stock = ingredientStocks[ingredient.articleId];     
-        if (!stock)  <span className="text-gray-400">-</span>;
+        if (!stock)  return false;
           const articleReservations = reservations?.filter(res => 
             res.articleId === ingredient.articleId && 
             res.status === 'reserved'
@@ -612,27 +612,27 @@ const PreparationPage = () => {
         }
 
         // If this is a sub-product, check its ingredients recursively
-        if (article.type === 'product') {
-          const subRecipe = recipes.find(r => r.articleId === article.id);
-          if (subRecipe) {
-            console.log(`${'  '.repeat(level)}🔍 Checking sub-product: ${article.name}`);
+        // if (article.type === 'product') {
+        //   const subRecipe = recipes.find(r => r.articleId === article.id);
+        //   if (subRecipe) {
+        //     console.log(`${'  '.repeat(level)}🔍 Checking sub-product: ${article.name}`);
             
-            // Get sub-recipe ingredients
-            const subIngredientsRes = await apiRequest(`/api/recipes/${subRecipe.id}/ingredients`, 'GET');
-            const subIngredientsData = await subIngredientsRes.json();
+        //     // Get sub-recipe ingredients
+        //     const subIngredientsRes = await apiRequest(`/api/recipes/${subRecipe.id}/ingredients`, 'GET');
+        //     const subIngredientsData = await subIngredientsRes.json();
             
-            if (subIngredientsData && subIngredientsData.length > 0) {
-              // Check each sub-ingredient recursively
-              for (const subIngredient of subIngredientsData) {
-                const subIngredientAvailable = await checkIngredientRecursive(subIngredient, level + 1);
-                if (!subIngredientAvailable) {
-                  console.log(`${'  '.repeat(level)}❌ Sub-product ${article.name} has insufficient ingredients`);
-                  return false;
-                }
-              }
-            }
-          }
-        }
+        //     if (subIngredientsData && subIngredientsData.length > 0) {
+        //       // Check each sub-ingredient recursively
+        //       for (const subIngredient of subIngredientsData) {
+        //         const subIngredientAvailable = await checkIngredientRecursive(subIngredient, level + 1);
+        //         if (!subIngredientAvailable) {
+        //           console.log(`${'  '.repeat(level)}❌ Sub-product ${article.name} has insufficient ingredients`);
+        //           return false;
+        //         }
+        //       }
+        //     }
+        //   }
+        // }
 
         console.log(`${'  '.repeat(level)}✅ ${article.name}: sufficient stock`);
         return true;
@@ -1562,7 +1562,7 @@ const PreparationPage = () => {
                               )} */}
                               
                               {/* Créer reliquat - pour operations principales uniquement */}
-                              {!isChild && (operation.status === 'draft' || operation.status === 'programmed') && (
+                              { (operation.status === 'draft' || operation.status === 'programmed') && (
                                 <button
                                   onClick={() => programOperation(operation)}
                                   className="text-purple-600 hover:text-purple-800 p-1"
@@ -1893,7 +1893,7 @@ const PreparationPage = () => {
                       </p>
                     </div>
 
-                    <div>
+                    {/* <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Zone de stockage</label>
                       <select
                         value={currentOperation?.storageZoneId || ''}
@@ -1908,7 +1908,7 @@ const PreparationPage = () => {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </div> */}
 
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Opérateur *</label>

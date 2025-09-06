@@ -18,7 +18,8 @@ import {
   SortDesc,
   Calendar,
   User,
-  Package
+  Package,
+  Truck
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { OrderForm } from "@/components/forms/order-form";
@@ -32,8 +33,6 @@ import { OrdersTable } from "@/components/orders-table";
 const orderStatusLabels = {
   draft: "Brouillon",
   confirmed: "Confirmé",
-  prepared: "Préparé",
-  ready: "Prêt",
   partially_delivered: "Livré partiellement",
   delivered: "Livré",
   cancelled: "Annulé"
@@ -216,7 +215,7 @@ export default function OrdersPage() {
 
   if (showCreateForm) {
     return (
-      <div className="container mx-auto p-6 space-y-8">
+      <div className="container mx-auto min-w-full p-6 space-y-8">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Nouvelle Commande</h1>
@@ -246,7 +245,7 @@ export default function OrdersPage() {
   usePageTitle('Gestion des commandes'); 
   
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto min-w-full p-6 space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <p className="text-muted-foreground">
@@ -418,6 +417,20 @@ export default function OrdersPage() {
                   <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
                 </div>
                 <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
+              </div>
+              
+              {/* Bouton pour afficher les livraisons liées */}
+              <div className="flex justify-center mt-6">
+                <Button
+                  onClick={() => {
+                    // Rediriger vers la page des livraisons avec un filtre sur cette commande
+                    window.location.href = `/deliveries?orderId=${viewingOrder.id}`;
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                >
+                  <Truck className="w-5 h-5" />
+                  Voir les livraisons de cette commande
+                </Button>
               </div>
             </div>
           )}

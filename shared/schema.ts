@@ -533,6 +533,8 @@ export type Supplier = typeof suppliers.$inferSelect;
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Lot = typeof lots.$inferSelect;
+export type InsertLot = z.infer<typeof insertLotSchema>;
 // Purchase types removed as purchase_* tables are not used anymore
 
 // ============ ACHATS FOURNISSEURS ============
@@ -828,6 +830,28 @@ export const inventoryOperationItemsRelations = relations(
   }),
 );
 
+export const lotsRelations = relations(lots, ({ one }) => ({
+  article: one(articles, {
+    fields: [lots.articleId],
+    references: [articles.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [lots.supplierId],
+    references: [suppliers.id],
+  }),
+}));
+
+export const operationLotsRelations = relations(operationLots, ({ one }) => ({
+  operation: one(inventoryOperations, {
+    fields: [operationLots.operationId],
+    references: [inventoryOperations.id],
+  }),
+  lot: one(lots, {
+    fields: [operationLots.lotId],
+    references: [lots.id],
+  }),
+}));
+
 export const stockReservationsRelations = relations(
   stockReservations,
   ({ one }) => ({
@@ -870,7 +894,11 @@ export const insertStockReservationSchema = createInsertSchema(
       path: ["orderId", "inventoryOperationId"],
     },
   );
-
+// Schémas pour les lots
+export const insertLotSchema = createInsertSchema(lots).omit({
+  id: true,
+  createdAt: true,
+});
 export type InsertStockReservation = z.infer<
   typeof insertStockReservationSchema
 >;

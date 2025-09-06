@@ -95,6 +95,11 @@ interface InventoryOperationItem {
   };
   notes: string;
   createdAt: string;
+  lotId: number | null;
+  lot?: {
+    id: number;
+    code: string;
+  };
 }
 
 interface StorageZone {
@@ -111,6 +116,8 @@ export default function Stock() {
   const [filterZone, setFilterZone] = useState('');
   const [selectedStockItem, setSelectedStockItem] = useState<StockItem | null>(null);
   const [isOperationsDialogOpen, setIsOperationsDialogOpen] = useState(false);
+  // Ajout état pour filtrer les opérations par zone/lot
+  const [operationZoneLotFilter, setOperationZoneLotFilter] = useState<{zoneId?: number, lotId?: number} | null>(null);
 
   // Fetch stock data with article and storage zone information
   const { data: stockItems = [], isLoading: stockLoading } = useQuery<StockItem[]>({
@@ -150,6 +157,24 @@ export default function Stock() {
 
     return matchesSearch && matchesType && matchesZone;
   });
+
+  // Grouper les articles par articleId (pour ingredients)
+  const groupedIngredients = Object.values(filteredStockItems
+    .filter(item => item.article.type === 'ingredient')
+    .reduce((acc, item) => {
+      if (!acc[item.articleId]) acc[item.articleId] = { article: item.article, items: [] };
+      acc[item.articleId].items.push(item);
+      return acc;
+    }, {} as Record<number, { article: StockItem['article'], items: StockItem[] }>));
+
+  // Grouper les produits par articleId (pour produits)
+  const groupedProducts = Object.values(filteredStockItems
+    .filter(item => item.article.type === 'product')
+    .reduce((acc, item) => {
+      if (!acc[item.articleId]) acc[item.articleId] = { article: item.article, items: [] };
+      acc[item.articleId].items.push(item);
+      return acc;
+    }, {} as Record<number, { article: StockItem['article'], items: StockItem[] }>));
 
   const getStockStatus = (quantity: string, minStock: string, maxStock: string) => {
     const stock = parseFloat(quantity);
@@ -304,56 +329,34 @@ export default function Stock() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStockItems
-                      .filter(item => item.article.type === 'ingredient')
-                      .map((item) => {
-                        const stockStatus = getStockStatus(item.quantity, item.article.minStock, item.article.maxStock);
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{item.article.name}</div>
-                                <div className="text-sm text-gray-500">{item.article.code}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{item.storageZone.designation}</TableCell>
-                            <TableCell>
-                              <div className="font-medium">
-                                {parseFloat(item.quantity).toFixed(3)} {item.article.unit}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={`${stockStatus.color} text-white`}>
-                                {stockStatus.text}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {item.lot ? (
-                                <div className="text-sm">
-                                  <div>{item.lot.code}</div>
-                                  {item.lot.expirationDate && (
-                                    <div className="text-xs text-gray-500">
-                                      DLC: {formatDate(item.lot.expirationDate)}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewOperations(item)}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                Opérations
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                    {groupedIngredients.map(({ article, items }) => {
+                      const totalStock = items.reduce((sum, i) => sum + parseFloat(i.quantity), 0);
+                      const stockStatus = getStockStatus(totalStock.toString(), article.minStock, article.maxStock);
+                      // On prend le premier item pour l'action (pour ouvrir le dialogue sur cet article)
+                      const firstItem = items[0];
+                      return (
+                        <TableRow key={article.id}>
+                          <TableCell>
+                            <div className="font-medium">{article.name}</div>
+                            <div className="text-sm text-gray-500">{article.code}</div>
+                          </TableCell>
+                          <TableCell>-</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{totalStock.toFixed(3)} {article.unit}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${stockStatus.color} text-white`}>{stockStatus.text}</Badge>
+                          </TableCell>
+                          <TableCell>-</TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm" onClick={() => handleViewOperations(firstItem)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Détail
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -385,56 +388,34 @@ export default function Stock() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStockItems
-                      .filter(item => item.article.type === 'product')
-                      .map((item) => {
-                        const stockStatus = getStockStatus(item.quantity, item.article.minStock, item.article.maxStock);
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{item.article.name}</div>
-                                <div className="text-sm text-gray-500">{item.article.code}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{item.storageZone.designation}</TableCell>
-                            <TableCell>
-                              <div className="font-medium">
-                                {parseFloat(item.quantity).toFixed(3)} {item.article.unit}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={`${stockStatus.color} text-white`}>
-                                {stockStatus.text}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {item.lot ? (
-                                <div className="text-sm">
-                                  <div>{item.lot.code}</div>
-                                  {item.lot.expirationDate && (
-                                    <div className="text-xs text-gray-500">
-                                      DLC: {formatDate(item.lot.expirationDate)}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewOperations(item)}
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                Opérations
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                    {groupedProducts.map(({ article, items }) => {
+                      const totalStock = items.reduce((sum, i) => sum + parseFloat(i.quantity), 0);
+                      const stockStatus = getStockStatus(totalStock.toString(), article.minStock, article.maxStock);
+                      // On prend le premier item pour l'action (pour ouvrir le dialogue sur cet article)
+                      const firstItem = items[0];
+                      return (
+                        <TableRow key={article.id}>
+                          <TableCell>
+                            <div className="font-medium">{article.name}</div>
+                            <div className="text-sm text-gray-500">{article.code}</div>
+                          </TableCell>
+                          <TableCell>-</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{totalStock.toFixed(3)} {article.unit}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${stockStatus.color} text-white`}>{stockStatus.text}</Badge>
+                          </TableCell>
+                          <TableCell>-</TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm" onClick={() => handleViewOperations(firstItem)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Détail
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -460,112 +441,153 @@ export default function Stock() {
               Aucune opération trouvée pour cet article
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[120px]">Date</TableHead>
-                    {/* <TableHead className="w-[100px]">Code</TableHead> */}
-                    <TableHead className="w-[120px]">Type</TableHead>
-                    <TableHead className="w-[100px]">Statut</TableHead>
-                    <TableHead className="w-[80px]">Direction</TableHead>
-                    <TableHead className="w-[100px]">Quantité</TableHead>
-                    <TableHead className="w-[100px]">Stock Avant</TableHead>
-                    <TableHead className="w-[100px]">Stock Après</TableHead>
-                    <TableHead className="w-[100px]">Coût Unitaire</TableHead>
-                    <TableHead className="w-[150px]">Zones</TableHead>
-                    {/* <TableHead className="w-[200px]">Notes</TableHead> */}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {inventoryOperations.flatMap((operation) =>
-                    operation.items
+            <>
+              {/* Tableau récapitulatif par zone/lot */}
+              <div className="mb-4">
+                <div className="flex flex-wrap gap-2 items-center mb-2">
+                  <Button size="sm" variant={!operationZoneLotFilter ? "default" : "outline"} onClick={() => setOperationZoneLotFilter(null)}>
+                    Afficher tout
+                  </Button>
+                 
+                </div>
+                {/* Tableau détail par zone/lot */}
+                <Table className="border">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Zone</TableHead>
+                      <TableHead>Lot</TableHead>
+                      <TableHead>Quantité</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stockItems
                       .filter(item => item.articleId === selectedStockItem?.articleId)
-                      .sort((a, b) =>
-                        new Date(b.createdAt.replace(" ", "T")).getTime() -
-                        new Date(a.createdAt.replace(" ", "T")).getTime()
-                      )
-                      .map((item) => {
-                        const direction = getOperationDirection(parseFloat(item.quantityBefore || "0"), parseFloat(item.quantityAfter || "0"));
-                        return (
-                          <TableRow key={`${operation.id}-${item.id}`}>
-                            <TableCell className="text-sm">
-                              {formatDate(item.createdAt)}
-                            </TableCell>
-                            {/* <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {operation.code}
-                              </Badge>
-                            </TableCell> */}
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                {getOperationTypeIcon(operation.type)}
-                                <span className="text-sm">{getOperationTypeLabel(operation.type)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={`text-xs ${operation.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                operation.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                  'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                {operation.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className={`flex items-center gap-1 ${direction.color}`}>
-                                {direction.icon}
-                                <span className="text-sm">
-                                  {direction.direction === 'in' ? 'Entrée' :
-                                    direction.direction === 'out' ? 'Sortie' : 'Transfert'}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className={`font-medium ${direction.color}`}>
-                              {direction.direction === 'in' ? '+' : '-'}{parseFloat(item.quantity).toFixed(3)} {item.article.unit}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {parseFloat(item.quantityBefore || '0').toFixed(3)} {item.article.unit}
-                            </TableCell>
-                            <TableCell className="font-medium text-sm">
-                              {parseFloat(item.quantityAfter || '0').toFixed(3)} {item.article.unit}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {parseFloat(item.unitCost || '0').toFixed(2)} DA
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {(item.fromStorageZoneId || item.toStorageZoneId) ? (
-                                <div className="space-y-1">
-                                  {item.fromStorageZoneId && (
-                                    <div className="flex items-center gap-1 text-xs">
-                                      <ArrowLeft className="w-3 h-3 text-gray-400" />
-                                      <span className="text-gray-600">De:</span>
-                                      <span>{item.fromStorageZone?.designation || 'Zone inconnue'}</span>
-                                    </div>
-                                  )}
-                                  {item.toStorageZoneId && (
-                                    <div className="flex items-center gap-1 text-xs">
-                                      <ArrowRight className="w-3 h-3 text-gray-400" />
-                                      <span className="text-gray-600">Vers:</span>
-                                      <span>{item.toStorageZone?.designation || 'Zone inconnue'}</span>
-                                    </div>
-                                  )}
+                      .map((item, idx) => (
+                        <TableRow
+                          key={item.id}
+                          className={operationZoneLotFilter && operationZoneLotFilter.zoneId === item.storageZoneId && operationZoneLotFilter.lotId === item.lot?.id ? 'bg-blue-100 cursor-pointer' : 'cursor-pointer'}
+                          onClick={() => setOperationZoneLotFilter({ zoneId: item.storageZoneId, lotId: item.lot?.id })}
+                        >
+                          <TableCell>{item.storageZone?.designation || '-'}</TableCell>
+                          <TableCell>{item.lot?.code || '-'}</TableCell>
+                          <TableCell>{parseFloat(item.quantity).toFixed(3)} {item.article.unit}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Tableau des opérations filtré */}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[120px]">Date</TableHead>
+                      <TableHead className="w-[120px]">Type</TableHead>
+                      <TableHead className="w-[100px]">Statut</TableHead>
+                      <TableHead className="w-[80px]">Direction</TableHead>
+                      <TableHead className="w-[100px]">Quantité</TableHead>
+                      <TableHead className="w-[100px]">Stock Avant</TableHead>
+                      <TableHead className="w-[100px]">Stock Après</TableHead>
+                      <TableHead className="w-[100px]">Coût Unitaire</TableHead>
+                      {/* <TableHead className="w-[150px]">Zones</TableHead> */}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inventoryOperations.flatMap((operation) =>
+                      operation.items
+                        .filter(item => item.articleId === selectedStockItem?.articleId)
+                        .filter(item => {
+                          if (!operationZoneLotFilter) return true;
+                          const zoneMatch = !operationZoneLotFilter.zoneId ||item.toStorageZoneId === operationZoneLotFilter.zoneId|| item.fromStorageZoneId === operationZoneLotFilter.zoneId;
+                          const lotMatch = !operationZoneLotFilter.lotId || item.lot?.id === operationZoneLotFilter.lotId;
+                          return zoneMatch && lotMatch;
+                        })
+                        .sort((a, b) =>
+                          new Date(b.createdAt.replace(" ", "T")).getTime() -
+                          new Date(a.createdAt.replace(" ", "T")).getTime()
+                        )
+                        .map((item) => {
+                          const direction = getOperationDirection(parseFloat(item.quantityBefore || "0"), parseFloat(item.quantityAfter || "0"));
+                          return (
+                            <TableRow key={`${operation.id}-${item.id}`}>
+                              <TableCell className="text-sm">
+                                {formatDate(item.createdAt)}
+                              </TableCell>
+                              {/* <TableCell>
+                                <Badge variant="outline" className="text-xs">
+                                  {operation.code}
+                                </Badge>
+                              </TableCell> */}
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {getOperationTypeIcon(operation.type)}
+                                  <span className="text-sm">{getOperationTypeLabel(operation.type)}</span>
                                 </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </TableCell>
-                            {/* <TableCell className="text-sm">
-                              <div className="max-w-[180px] truncate" title={item.notes || ''}>
-                                {item.notes || '-'}
-                              </div>
-                            </TableCell> */}
-                          </TableRow>
-                        );
-                      })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={`text-xs ${operation.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                  operation.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                  {operation.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className={`flex items-center gap-1 ${direction.color}`}>
+                                  {direction.icon}
+                                  <span className="text-sm">
+                                    {direction.direction === 'in' ? 'Entrée' :
+                                      direction.direction === 'out' ? 'Sortie' : 'Transfert'}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className={`font-medium ${direction.color}`}>
+                                {direction.direction === 'in' ? '+' : ''}{parseFloat(item.quantity).toFixed(3)} {item.article.unit}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {parseFloat(item.quantityBefore || '0').toFixed(3)} {item.article.unit}
+                              </TableCell>
+                              <TableCell className="font-medium text-sm">
+                                {parseFloat(item.quantityAfter || '0').toFixed(3)} {item.article.unit}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {parseFloat(item.unitCost || '0').toFixed(2)} DA
+                              </TableCell>
+                              {/* <TableCell className="text-sm">
+                                {(item.fromStorageZoneId || item.toStorageZoneId) ? (
+                                  <div className="space-y-1">
+                                    {item.fromStorageZoneId && (
+                                      <div className="flex items-center gap-1 text-xs">
+                                        <ArrowLeft className="w-3 h-3 text-gray-400" />
+                                        <span className="text-gray-600">De:</span>
+                                        <span>{item.fromStorageZone?.designation || 'Zone inconnue'}</span>
+                                      </div>
+                                    )}
+                                    {item.toStorageZoneId && (
+                                      <div className="flex items-center gap-1 text-xs">
+                                        <ArrowRight className="w-3 h-3 text-gray-400" />
+                                        <span className="text-gray-600">Vers:</span>
+                                        <span>{item.toStorageZone?.designation || 'Zone inconnue'}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </TableCell> */}
+                              {/* <TableCell className="text-sm">
+                                <div className="max-w-[180px] truncate" title={item.notes || ''}>
+                                  {item.notes || '-'}
+                                </div>
+                              </TableCell> */}
+                            </TableRow>
+                          );
+                        })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>

@@ -43,6 +43,7 @@ import DeliveryCancellations from "@/pages/delivery-cancellations";
 import PaymentDashboard from "@/pages/payment-dashboard";
 import PaymentReports from "@/pages/payment-reports";
 import ClientPaymentHistory from "@/pages/client-payment-history";
+import LotsPage from "@/pages/lots";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,7 @@ function LoginPage() {
           </form>
 
           <div className="mt-6 text-sm text-gray-600">
-            
+
             <p>* pour plus de detail veuillez contacter l'administrateur</p>
           </div>
         </CardContent>
@@ -147,6 +148,17 @@ function ProtectedRouter() {
     return (
       <Switch>
         <Route path="/" component={DeliveryDashboard} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+  if (user?.role === "preparateur") {
+    return (
+      <Switch>
+        <Route
+          path="/preparateur-preparations"
+          component={PreparateurPreparationsPage}
+        />
         <Route component={NotFound} />
       </Switch>
     );
@@ -178,6 +190,7 @@ function ProtectedRouter() {
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/purchase-orders" component={PurchaseOrders} />
       <Route path="/inventory-physical" component={InventoryPhysical} />
+      <Route path="/lots" component={LotsPage} />
       <Route path="/clients" component={Clients} />
       <Route path="/products" component={Products} />
       <Route path="/ingredients" component={IngredientsNew} />

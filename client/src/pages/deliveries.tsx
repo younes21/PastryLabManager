@@ -14,6 +14,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Plus,
+  CreditCard,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -52,6 +53,10 @@ import { DeliverySplitModal } from "@/components/delivery-split-modal";
 import { CancellationDetails } from '@/components/delivery-cancellation-details';
 import { CancellationModal } from '@/pages/delivery-cancellations';
 import { DeliveryPaymentDetails } from "@/components/delivery-payment-details";
+import { DeliveryAssignmentModal } from "@/components/delivery-assignment-modal";
+import { DeliveryPackagesModal } from "@/components/delivery-packages-modal";
+import { DeliveryTrackingModal } from "@/components/delivery-tracking-modal";
+import { DeliveryPaymentModal } from "@/components/delivery-payment-modal";
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
@@ -75,6 +80,12 @@ export default function DeliveriesPage() {
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [inventoryOperations, setInventoryOperations] = useState<any[]>([]);
+  
+  // Nouveaux modals
+  const [assignmentModal, setAssignmentModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
+  const [packagesModal, setPackagesModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
+  const [trackingModal, setTrackingModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
+  const [paymentModal, setPaymentModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
 
   const [orderIdFilter, setOrderIdFilter] = useState<string>('all');
   const [clientIdFilter, setClientIdFilter] = useState<string>('all');
@@ -670,24 +681,58 @@ export default function DeliveriesPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(delivery.status)}</TableCell>
                         <TableCell>
-                                                     <div className="flex items-center gap-2">
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => viewDelivery(delivery)}
-                               data-testid={`button-view-delivery-${delivery.id}`}
-                             >
-                               <Eye className="h-4 w-4" />
-                             </Button>
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => editDelivery(delivery)}
-                               disabled={delivery.status === "completed"}
-                               data-testid={`button-edit-delivery-${delivery.id}`}
-                             >
-                               <Edit3 className="h-4 w-4" />
-                             </Button>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => viewDelivery(delivery)}
+                              data-testid={`button-view-delivery-${delivery.id}`}
+                              title="Voir les détails"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => editDelivery(delivery)}
+                              disabled={delivery.status === "completed"}
+                              data-testid={`button-edit-delivery-${delivery.id}`}
+                              title="Modifier"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setAssignmentModal({ open: true, delivery })}
+                              title="Assigner un livreur"
+                            >
+                              <User className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPackagesModal({ open: true, delivery })}
+                              title="Gérer les colis"
+                            >
+                              <Package className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTrackingModal({ open: true, delivery })}
+                              title="Suivi de livraison"
+                            >
+                              <Truck className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPaymentModal({ open: true, delivery })}
+                              title="Paiement à la livraison"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </Button>
                              <Select
                                value={delivery.status}
                                onValueChange={(newStatus) => {
@@ -789,6 +834,25 @@ export default function DeliveriesPage() {
                       <Save className="h-4 w-4 mr-2" />
                       {currentDelivery.id ? "Mettre à jour" : "Créer"}
                     </Button>
+                    {currentDelivery.id && currentDelivery.status !== "completed" && (
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={async () => {
+                          try {
+                            await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
+                            toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
+                            queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+                            resetForm();
+                          } catch (e: any) {
+                            toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
+                          }
+                        }}
+                        disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Valider la livraison
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1046,6 +1110,43 @@ export default function DeliveriesPage() {
           onSuccess={handleCancelModalSuccess}
         />
       )}
+
+      {/* Nouveaux modals */}
+      <DeliveryAssignmentModal
+        open={assignmentModal.open}
+        onOpenChange={(open) => setAssignmentModal({ open, delivery: null })}
+        delivery={assignmentModal.delivery}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+        }}
+      />
+
+      <DeliveryPackagesModal
+        open={packagesModal.open}
+        onOpenChange={(open) => setPackagesModal({ open, delivery: null })}
+        delivery={packagesModal.delivery}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+        }}
+      />
+
+      <DeliveryTrackingModal
+        open={trackingModal.open}
+        onOpenChange={(open) => setTrackingModal({ open, delivery: null })}
+        delivery={trackingModal.delivery}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+        }}
+      />
+
+      <DeliveryPaymentModal
+        open={paymentModal.open}
+        onOpenChange={(open) => setPaymentModal({ open, delivery: null })}
+        delivery={paymentModal.delivery}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+        }}
+      />
     </div>
   );
 }

@@ -40,6 +40,7 @@ import {
   articles,
   storageZones,
   lots,
+  suppliers,
   inventoryOperations,
   inventoryOperationItems,
   users,
@@ -1981,12 +1982,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (error instanceof Error) {
         return res.status(400).json({
-          message: error.message,   // renvoyer le vrai message de l’erreur
+          message: error.message,   // renvoyer le vrai message de l'erreur
         });
       }
       return res.status(500).json({
         message: "Failed to create inventory operation",
-        error: String(error), // au cas où ce n’est pas une Error standard
+        error: String(error), // au cas où ce n'est pas une Error standard
       });
     }
   });
@@ -2080,12 +2081,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (error instanceof Error) {
         return res.status(400).json({
-          message: error.message,   // renvoyer le vrai message de l’erreur
+          message: error.message,   // renvoyer le vrai message de l'erreur
         });
       }
       return res.status(500).json({
         message: "Failed to create inventory operation",
-        error: String(error), // au cas où ce n’est pas une Error standard
+        error: String(error), // au cas où ce n'est pas une Error standard
       });
     }
   });
@@ -2220,7 +2221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid operation ID" });
       }
 
-      const { status, completedAt, conformQuantity, wasteReason } = req.body;
+      const { status, completedAt, conformQuantity, wasteReason, preparationZoneId, wasteZoneId } = req.body;
 
       // Validate required fields
       if (status !== 'completed') {
@@ -2248,17 +2249,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completedBy: req.body.completedBy || null
       };
 
-      const updatedOperation = await storage.updateInventoryOperation(id, updateData);
-      if (!updatedOperation) {
-        return res.status(404).json({ message: "Failed to update operation" });
-      }
-
+   
       // For preparation operations, update stock with actual quantities
       if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
         const conformQty = parseFloat(conformQuantity || '0');
-
-        // Update stock for all items (products and ingredients) based on actual quantities
-        await storage.updateStockFromOperationItems(id, conformQty);
 
         // Handle waste if conform quantity is less than planned
         const items = await storage.getInventoryOperationItems(id);
@@ -2266,41 +2260,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .filter(item => parseFloat(item.quantity || '0') > 0) // Only positive quantities (products)
           .reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
 
+        // Calculate total produced quantity (conform + waste)
+        const totalProduced = conformQty + (conformQty < totalPlanned ? (totalPlanned - conformQty) : 0);
+
+        // Create lot automatically if total produced > 0
+        let lotId: number | undefined;
+        if (totalProduced > 0) {
+          lotId = await storage.createLotForPreparationOperation(id, totalProduced, completedAt);
+        }
+
+        // Update stock with lot information
+        await storage.updateStockFromOperationItems(id, conformQty, preparationZoneId, wasteZoneId, lotId);
+
         if (conformQty < totalPlanned && wasteReason) {
           const wasteQuantity = totalPlanned - conformQty;
 
-          // Create waste operation
+          // 2. Mettre à jour tous les items de l'opération principale avec la zone de production
+          if (preparationZoneId) {
+           // await storage.updateAllItemsToStorageZone(id, preparationZoneId);
+          }
+
+          // 3. Créer l'opération de rebut avec parentOperationId
           const wasteOperation = {
             type: 'ajustement_rebut',
             status: 'completed',
             operatorId: operation.operatorId,
             scheduledDate: new Date().toISOString(),
-            notes: `Rebut de préparation ${operation.code}: ${wasteReason || 'Aucune raison spécifiée'}`
+            notes: `Rebut de préparation ${operation.code}: ${wasteReason || 'Aucune raison spécifiée'}`,
+            parentOperationId: id
           };
 
+          // 1. Quantité négative pour le rebut
           const wasteItems = items
             .filter(item => parseFloat(item.quantity || '0') > 0) // Only positive quantities (products)
             .map((item) => {
               const plannedQuantity = parseFloat(item.quantity || '0');
-              const wasteItemQuantity = (plannedQuantity * wasteQuantity) / totalPlanned;
-
+              const wasteItemQuantity = -(wasteQuantity); // NEGATIVE
               return {
                 articleId: item.articleId,
                 quantity: wasteItemQuantity.toString(),
-                quantityBefore: item.quantityBefore || '0',
-                quantityAfter: item.quantityAfter || '0',
+                quantityBefore: item.quantityAfter || '0',
+                quantityAfter: (parseFloat(item.quantityAfter  || '0') + wasteItemQuantity).toString(),
                 unitCost: item.unitCost || '0',
-                totalCost: (parseFloat(item.unitCost || '0') * wasteItemQuantity).toString(),
+                totalCost: (parseFloat(item.unitCost || '0') * Math.abs(wasteItemQuantity)).toString(),
                 notes: `Rebut de préparation ${operation.code}`,
                 wasteReason: wasteReason || 'Aucune raison spécifiée',
-                toStorageZoneId: item.toStorageZoneId || 1,
+                toStorageZoneId: wasteZoneId || item.toStorageZoneId || 1,
               };
             });
 
           await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
         }
       }
-
+      const updatedOperation = await storage.updateInventoryOperation(id, updateData);
+      if (!updatedOperation) {
+        return res.status(404).json({ message: "Failed to update operation" });
+      }
       res.json(updatedOperation);
     } catch (error) {
       console.error("Error completing inventory operation:", error);
@@ -2324,6 +2339,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inventory Operation Lots
+  app.get("/api/inventory-operations/:operationId/lots", async (req, res) => {
+    try {
+      const operationId = parseInt(req.params.operationId);
+      if (isNaN(operationId)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const lots = await storage.getInventoryOperationLots(operationId);
+      res.json(lots);
+    } catch (error) {
+      console.error("Error fetching inventory operation lots:", error);
+      res.status(500).json({ message: "Failed to fetch inventory operation lots" });
+    }
+  });
+
   // ============ LIVRAISONS ROUTES ============
 
   app.get("/api/deliveries", async (req, res) => {
@@ -2344,6 +2375,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating delivery:", error);
       res.status(500).json({ message: "Failed to create delivery" });
+    }
+  });
+
+  // Routes pour la gestion des livreurs
+  app.get("/api/deliveries/available-delivery-persons", async (req, res) => {
+    try {
+      const deliveryPersons = await storage.getAvailableDeliveryPersons();
+      res.json(deliveryPersons);
+    } catch (error) {
+      console.error("Error fetching available delivery persons:", error);
+      res.status(500).json({ message: "Failed to fetch available delivery persons" });
+    }
+  });
+
+  app.get("/api/deliveries/by-delivery-person/:deliveryPersonId", async (req, res) => {
+    try {
+      const { deliveryPersonId } = req.params;
+      const { status } = req.query;
+      const deliveries = await storage.getDeliveriesByDeliveryPerson(
+        parseInt(deliveryPersonId), 
+        status as string
+      );
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching deliveries by delivery person:", error);
+      res.status(500).json({ message: "Failed to fetch deliveries by delivery person" });
+    }
+  });
+
+  app.put("/api/deliveries/:id/assign", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { deliveryPersonId } = req.body;
+      const delivery = await storage.assignDeliveryPerson(parseInt(id), deliveryPersonId);
+      res.json(delivery);
+    } catch (error) {
+      console.error("Error assigning delivery person:", error);
+      res.status(500).json({ message: "Failed to assign delivery person" });
+    }
+  });
+
+  app.put("/api/deliveries/:id/reassign", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { newDeliveryPersonId } = req.body;
+      const delivery = await storage.reassignDelivery(parseInt(id), newDeliveryPersonId);
+      res.json(delivery);
+    } catch (error) {
+      console.error("Error reassigning delivery:", error);
+      res.status(500).json({ message: "Failed to reassign delivery" });
+    }
+  });
+
+  app.put("/api/deliveries/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, notes } = req.body;
+      const delivery = await storage.updateDeliveryStatusByDeliveryPerson(parseInt(id), status, notes);
+      res.json(delivery);
+    } catch (error) {
+      console.error("Error updating delivery status:", error);
+      res.status(500).json({ message: "Failed to update delivery status" });
+    }
+  });
+
+  // Routes pour la gestion des colis
+  app.get("/api/deliveries/:id/packages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const packages = await storage.getDeliveryPackages(parseInt(id));
+      res.json(packages);
+    } catch (error) {
+      console.error("Error fetching delivery packages:", error);
+      res.status(500).json({ message: "Failed to fetch delivery packages" });
+    }
+  });
+
+  app.post("/api/deliveries/:id/packages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const packageData = req.body;
+      const deliveryPackage = await storage.createDeliveryPackage(parseInt(id), packageData);
+      res.status(201).json(deliveryPackage);
+    } catch (error) {
+      console.error("Error creating delivery package:", error);
+      res.status(500).json({ message: "Failed to create delivery package" });
+    }
+  });
+
+  app.put("/api/deliveries/:id/packages/:packageId", async (req, res) => {
+    try {
+      const { packageId } = req.params;
+      const packageData = req.body;
+      const deliveryPackage = await storage.updateDeliveryPackage(parseInt(packageId), packageData);
+      res.json(deliveryPackage);
+    } catch (error) {
+      console.error("Error updating delivery package:", error);
+      res.status(500).json({ message: "Failed to update delivery package" });
+    }
+  });
+
+  app.put("/api/deliveries/:id/packages/:packageId/tracking", async (req, res) => {
+    try {
+      const { packageId } = req.params;
+      const { status, location } = req.body;
+      const deliveryPackage = await storage.updatePackageTrackingStatus(parseInt(packageId), status, location);
+      res.json(deliveryPackage);
+    } catch (error) {
+      console.error("Error updating package tracking status:", error);
+      res.status(500).json({ message: "Failed to update package tracking status" });
+    }
+  });
+
+  app.put("/api/deliveries/:id/tracking", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { trackingNumber } = req.body;
+      const delivery = await storage.addTrackingNumber(parseInt(id), trackingNumber);
+      res.json(delivery);
+    } catch (error) {
+      console.error("Error adding tracking number:", error);
+      res.status(500).json({ message: "Failed to add tracking number" });
+    }
+  });
+
+  // Routes pour les paiements à la livraison
+  app.get("/api/deliveries/:id/payments", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const payments = await storage.getDeliveryPayments(parseInt(id));
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching delivery payments:", error);
+      res.status(500).json({ message: "Failed to fetch delivery payments" });
+    }
+  });
+
+  app.post("/api/deliveries/:id/payments", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const paymentData = req.body;
+      const payment = await storage.createDeliveryPayment(parseInt(id), paymentData);
+      res.status(201).json(payment);
+    } catch (error) {
+      console.error("Error creating delivery payment:", error);
+      res.status(500).json({ message: "Failed to create delivery payment" });
+    }
+  });
+
+  app.post("/api/deliveries/:id/invoice", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const invoice = await storage.createInvoiceAfterDelivery(parseInt(id));
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Error creating invoice after delivery:", error);
+      res.status(500).json({ message: "Failed to create invoice after delivery" });
+    }
+  });
+
+  // Route pour valider une livraison avec répartitions
+  app.post("/api/deliveries/:id/validate", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { splits } = req.body;
+      const delivery = await storage.validateDelivery(parseInt(id), splits);
+      res.json(delivery);
+    } catch (error) {
+      console.error("Error validating delivery:", error);
+      res.status(500).json({ message: "Failed to validate delivery" });
     }
   });
 
@@ -3433,7 +3634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Si l'article n'a pas de lots, vérifier la disponibilité générale
-      if (articleLots.length === 0) {
+      if (articleLots.length === 0 || availability.length==0) {
         for (const zone of articleZones) {
           const stockQuery = await db
             .select({ quantity: stock.quantity })
@@ -3540,8 +3741,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Route pour récupérer les lots (optionnellement filtrés par zone)
   app.get("/api/lots", async (req, res) => {
     try {
-      const { storageZoneId } = req.query;
+      const { storageZoneId, articleId } = req.query;
       let lotsResult = [];
+      
       if (storageZoneId) {
         // 1. Lots dont l'article est en stock dans la zone
         lotsResult = await db.select().from(lots)
@@ -3551,13 +3753,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lotsResult = await db.select().from(lots)
             .where(sql`${lots.articleId} IN (SELECT id FROM articles WHERE storage_zone_id = ${storageZoneId})`);
         }
+      } else if (articleId) {
+        // Filtrer par article spécifique
+        lotsResult = await db.select().from(lots)
+          .where(eq(lots.articleId, parseInt(articleId as string)));
       } else {
-        lotsResult = await db.select().from(lots);
+        // Récupérer tous les lots avec les informations de l'article
+        lotsResult = await db
+          .select({
+            id: lots.id,
+            articleId: lots.articleId,
+            code: lots.code,
+            manufacturingDate: lots.manufacturingDate,
+            useDate: lots.useDate,
+            expirationDate: lots.expirationDate,
+            alertDate: lots.alertDate,
+            supplierId: lots.supplierId,
+            notes: lots.notes,
+            createdAt: lots.createdAt,
+            // Informations de l'article
+            articleName: articles.name,
+            articleCode: articles.code,
+            articleUnit: articles.unit,
+            // Informations du fournisseur
+            supplierName: suppliers.companyName,
+            supplierCode: suppliers.code,
+          })
+          .from(lots)
+          .leftJoin(articles, eq(lots.articleId, articles.id))
+          .leftJoin(suppliers, eq(lots.supplierId, suppliers.id))
+          .orderBy(lots.createdAt);
       }
+      
       res.json(lotsResult);
     } catch (error) {
       console.error("Error fetching lots:", error);
       res.status(500).json({ message: "Erreur lors de la récupération des lots" });
+    }
+  });
+
+  // Route pour récupérer un lot spécifique
+  app.get("/api/lots/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const lotResult = await db
+        .select({
+          id: lots.id,
+          articleId: lots.articleId,
+          code: lots.code,
+          manufacturingDate: lots.manufacturingDate,
+          useDate: lots.useDate,
+          expirationDate: lots.expirationDate,
+          alertDate: lots.alertDate,
+          supplierId: lots.supplierId,
+          notes: lots.notes,
+          createdAt: lots.createdAt,
+          // Informations de l'article
+          articleName: articles.name,
+          articleCode: articles.code,
+          articleUnit: articles.unit,
+          // Informations du fournisseur
+          supplierName: suppliers.companyName,
+          supplierCode: suppliers.code,
+        })
+        .from(lots)
+        .leftJoin(articles, eq(lots.articleId, articles.id))
+        .leftJoin(suppliers, eq(lots.supplierId, suppliers.id))
+        .where(eq(lots.id, parseInt(id)))
+        .limit(1);
+
+      if (lotResult.length === 0) {
+        return res.status(404).json({ message: "Lot non trouvé" });
+      }
+
+      res.json(lotResult[0]);
+    } catch (error) {
+      console.error("Error fetching lot:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération du lot" });
+    }
+  });
+
+  // Route pour mettre à jour un lot
+  app.put("/api/lots/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { code, manufacturingDate, useDate, expirationDate, alertDate, supplierId, notes } = req.body;
+
+      // Vérifier que le lot existe
+      const existingLot = await db
+        .select()
+        .from(lots)
+        .where(eq(lots.id, parseInt(id)))
+        .limit(1);
+
+      if (existingLot.length === 0) {
+        return res.status(404).json({ message: "Lot non trouvé" });
+      }
+
+      // Vérifier que le code du lot est unique (si modifié)
+      if (code && code !== existingLot[0].code) {
+        const duplicateLot = await db
+          .select()
+          .from(lots)
+          .where(eq(lots.code, code))
+          .limit(1);
+
+        if (duplicateLot.length > 0) {
+          return res.status(400).json({ message: "Un lot avec ce code existe déjà" });
+        }
+      }
+
+      // Mettre à jour le lot
+      const updatedLot = await db
+        .update(lots)
+        .set({
+          code: code || existingLot[0].code,
+          manufacturingDate: manufacturingDate || null,
+          useDate: useDate || null,
+          expirationDate: expirationDate || null,
+          alertDate: alertDate || null,
+          supplierId: supplierId ? parseInt(supplierId) : null,
+          notes: notes || null,
+        })
+        .where(eq(lots.id, parseInt(id)))
+        .returning();
+
+      res.json(updatedLot[0]);
+    } catch (error) {
+      console.error("Error updating lot:", error);
+      res.status(500).json({ message: "Erreur lors de la mise à jour du lot" });
+    }
+  });
+
+  // Route pour supprimer un lot
+  app.delete("/api/lots/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Vérifier que le lot existe
+      const existingLot = await db
+        .select()
+        .from(lots)
+        .where(eq(lots.id, parseInt(id)))
+        .limit(1);
+
+      if (existingLot.length === 0) {
+        return res.status(404).json({ message: "Lot non trouvé" });
+      }
+
+      // Vérifier s'il y a des stocks associés à ce lot
+      const stockWithLot = await db
+        .select()
+        .from(stock)
+        .where(eq(stock.lotId, parseInt(id)))
+        .limit(1);
+
+      if (stockWithLot.length > 0) {
+        return res.status(400).json({ 
+          message: "Impossible de supprimer ce lot car il est associé à des stocks existants" 
+        });
+      }
+
+      // Supprimer le lot
+      await db
+        .delete(lots)
+        .where(eq(lots.id, parseInt(id)));
+
+      res.json({ message: "Lot supprimé avec succès" });
+    } catch (error) {
+      console.error("Error deleting lot:", error);
+      res.status(500).json({ message: "Erreur lors de la suppression du lot" });
     }
   });
 

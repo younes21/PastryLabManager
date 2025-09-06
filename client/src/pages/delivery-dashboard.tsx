@@ -23,7 +23,7 @@ export default function DeliveryDashboard() {
   const { data: assignedDeliveries, isLoading: assignedLoading } = useQuery({
     queryKey: ["/api/deliveries", user?.id, "assigned"],
     queryFn: async () => {
-      const response = await fetch(`/api/deliveries?delivererId=${user?.id}`);
+      const response = await fetch(`/api/deliveries/by-delivery-person/${user?.id}`);
       return response.json();
     },
     enabled: !!user?.id,
@@ -39,9 +39,8 @@ export default function DeliveryDashboard() {
   });
 
   const updateDeliveryMutation = useMutation({
-    mutationFn: async ({ deliveryId, updateData }: { deliveryId: number; updateData: any }) => {
-      const response = await apiRequest("PATCH", `/api/deliveries/${deliveryId}`, updateData);
-      return response.json();
+    mutationFn: async ({ deliveryId, status, notes }: { deliveryId: number; status: string; notes?: string }) => {
+      return await apiRequest(`/api/deliveries/${deliveryId}/status`, "PUT", { status, notes });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
@@ -50,10 +49,10 @@ export default function DeliveryDashboard() {
         description: "Le statut de la livraison a été mis à jour.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erreur",
-        description: "Impossible de mettre à jour la livraison.",
+        description: error.message || "Impossible de mettre à jour la livraison.",
         variant: "destructive",
       });
     },

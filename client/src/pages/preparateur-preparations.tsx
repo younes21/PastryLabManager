@@ -21,7 +21,7 @@ const PreparateurPreparationsPage = () => {
   
   // Dialogues
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
-  const [completionData, setCompletionData] = useState<{ operationId: number | null, conformQuantity: string, wasteReason: string }>({ operationId: null, conformQuantity: '', wasteReason: '' });
+  const [completionData, setCompletionData] = useState<{ operationId: number | null, conformQuantity: string, wasteReason: string, preparationZoneId: number | null, wasteZoneId: number | null }>({ operationId: null, conformQuantity: '', wasteReason: '', preparationZoneId: null, wasteZoneId: null });
   
   // Data from API
   const [storageZones, setStorageZones] = useState<any[]>([]);
@@ -435,7 +435,9 @@ const PreparateurPreparationsPage = () => {
     setCompletionData({
       operationId,
       conformQuantity: totalPlanned.toString(),
-      wasteReason: ''
+      wasteReason: '',
+      preparationZoneId: null,
+      wasteZoneId: null
     });
     setShowCompletionDialog(true);
   };
@@ -443,6 +445,7 @@ const PreparateurPreparationsPage = () => {
   const completeOperationWithQuantity = async () => {
     if (!completionData.operationId) return;
     
+
     try {
       const conformQuantity = parseFloat(completionData.conformQuantity);
       const operation = operations.find(op => op.id === completionData.operationId);
@@ -451,6 +454,12 @@ const PreparateurPreparationsPage = () => {
 
       const totalPlanned = (operation.items || []).reduce((sum: number, item: any) => 
         sum + parseFloat(item.quantity || 0), 0);
+
+          // Validation des champs requis
+    if ((!completionData.conformQuantity || !completionData.preparationZoneId) || (conformQuantity < totalPlanned  && !completionData.wasteZoneId)) {
+      alert('Veuillez remplir tous les champs obligatoires (quantité conforme, zone de préparation, zone de rebut)');
+      return;
+    }
 
       console.log('🔍 Completion data:', {
         conformQuantity,
@@ -464,7 +473,9 @@ const PreparateurPreparationsPage = () => {
         status: 'completed',
         completedAt: new Date().toISOString(),
         conformQuantity: conformQuantity.toString(),
-        wasteReason: completionData.wasteReason || ''
+        wasteReason: completionData.wasteReason || '',
+        preparationZoneId: completionData.preparationZoneId,
+        wasteZoneId: completionData.wasteZoneId
       });
 
       // 3. Le backend gère automatiquement la création de l'opération de rebut si nécessaire
@@ -482,7 +493,7 @@ const PreparateurPreparationsPage = () => {
       }
       
       setShowCompletionDialog(false);
-      setCompletionData({ operationId: null, conformQuantity: '', wasteReason: '' });
+      setCompletionData({ operationId: null, conformQuantity: '', wasteReason: '', preparationZoneId: null, wasteZoneId: null });
       
       // 5. Recharger les données pour avoir les stocks à jour
       await loadOperations();
@@ -1277,6 +1288,42 @@ const PreparateurPreparationsPage = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Zone de préparation *
+                    </label>
+                    <select
+                      value={completionData.preparationZoneId || ''}
+                      onChange={(e) => setCompletionData(prev => ({ ...prev, preparationZoneId: parseInt(e.target.value) || null }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Sélectionner une zone de préparation</option>
+                      {storageZones.map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.designation}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Zone de rebut *
+                    </label>
+                    <select
+                      value={completionData.wasteZoneId || ''}
+                      onChange={(e) => setCompletionData(prev => ({ ...prev, wasteZoneId: parseInt(e.target.value) || null }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Sélectionner une zone de rebut</option>
+                      {storageZones.map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.designation}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Cause du rebut (si quantité conforme &lt; quantité prévue)
                     </label>
                     <textarea
@@ -1293,7 +1340,7 @@ const PreparateurPreparationsPage = () => {
                   <button
                     onClick={() => {
                       setShowCompletionDialog(false);
-                      setCompletionData({ operationId: null, conformQuantity: '', wasteReason: '' });
+                      setCompletionData({ operationId: null, conformQuantity: '', wasteReason: '', preparationZoneId: null, wasteZoneId: null });
                     }}
                     className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >

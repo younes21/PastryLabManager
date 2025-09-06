@@ -103,6 +103,14 @@ export function Sidebar() {
       group: "Inventaire",
     },
     {
+      path: "/lots",
+      label: "Gestion des Lots",
+      icon: "fas fa-boxes",
+      lucideIcon: Package,
+      order: 2,
+      group: "Inventaire",
+    },
+    {
       path: "/recipes",
       label: "Recettes",
       icon: "fas fa-book-open",
