@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const deliveryId = parseInt(req.params.id);
       const released = await storage.releaseDeliveryStockReservations(deliveryId);
-      
+
       if (!released) {
         return res.status(404).json({ message: "No reservations found for this delivery" });
       }
@@ -215,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const deliveryId = parseInt(req.params.id);
       const { reason } = req.body;
-      
+
       if (!reason) {
         return res.status(400).json({ message: "Raison d'annulation requise" });
       }
@@ -233,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const deliveryId = parseInt(req.params.id);
       const { reason, isReturnToStock } = req.body;
-      
+
       if (!reason) {
         return res.status(400).json({ message: "Raison d'annulation requise" });
       }
@@ -1233,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/recipes/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if(!id) return res.status(404).json({ message: "Recipe not found" });
+      if (!id) return res.status(404).json({ message: "Recipe not found" });
       const recipe = await storage.getRecipe(id);
       if (!recipe) {
         return res.status(404).json({ message: "Recipe not found" });
@@ -1522,7 +1522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/orders/reorder", async (req, res) => {
     try {
       const { updates } = req.body;
-      
+
       if (!Array.isArray(updates) || updates.length === 0) {
         return res.status(400).json({ message: "Updates array is required and must not be empty" });
       }
@@ -1544,9 +1544,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reordering orders:", error);
       if (error instanceof z.ZodError) {
-        res.status(400).json({ 
-          message: "Invalid update data", 
-          errors: error.errors 
+        res.status(400).json({
+          message: "Invalid update data",
+          errors: error.errors
         });
       } else {
         res.status(500).json({ message: "Failed to reorder orders" });
@@ -1615,8 +1615,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/production-status-batch", async (req, res) => {
     try {
       // Récupérer toutes les commandes avec leurs articles
-      const orders = (await storage.getAllOrders())?.filter(f=>f.status !== 'cancelled'&& f.status!='delivered'&& f.status!='draft')
-      .sort((a,b)=>(a.order ||0) - (b.order||0));
+      const orders = (await storage.getAllOrders())?.filter(f => f.status !== 'cancelled' && f.status != 'delivered' && f.status != 'draft')
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
         orders.map(async (order) => {
           const items = await storage.getOrderItems(order.id);
@@ -1642,7 +1642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Récupérer toutes les opérations de fabrication en cours
       const operationsEnCours = await storage.getInventoryOperationsByType('fabrication');
       const operationsEnCoursData: Record<number, any[]> = {};
-      
+
       operationsEnCours.forEach(op => {
         if (op.status === 'en_cours' && op.items) {
           op.items.forEach((item: any) => {
@@ -1663,18 +1663,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculer l'état de production pour chaque commande dans l'ordre
       const resultat = [];
-      
+
       for (const order of ordersWithItems) {
         const ajustements: string[] = [];
-        
+
         // Vérifier l'état "préparé" / "partiellement préparé"
         let toutDisponible = true;
         let auMoinsUnDisponible = false;
-        
+
         for (const item of order.items) {
           const qCommande = parseFloat(item.quantity);
           const qStock = stockVirtuel[item.articleId] || 0;
-          
+
           if (qStock >= qCommande) {
             auMoinsUnDisponible = true;
           } else if (qStock > 0) {
@@ -1684,22 +1684,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             toutDisponible = false;
           }
         }
-        
+
         // Vérifier l'état "en cours"
         let enCours = true;
         for (const item of order.items) {
           const qStock = stockVirtuel[item.articleId] || 0;
           const op = operationsVirtuelles[item.articleId];
-          
+
           if (qStock > 0 || !op || op.length === 0) {
             enCours = false;
             break;
           }
         }
-        
+
         // Déterminer l'état final et appliquer les ajustements virtuels
         let etat = "non_prepare";
-        
+
         if (enCours) {
           etat = "en_cours";
           for (const item of order.items) {
@@ -1737,14 +1737,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           etat = "non_prepare";
           ajustements.push("Aucun ajustement possible");
         }
-        
+
         resultat.push({
           orderId: order.id,
           etat,
           ajustements
         });
       }
-      
+
       res.json(resultat);
 
     } catch (error) {
@@ -1772,7 +1772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { type, include_reliquat, operator_id, orderId } = req.query;
       let operations;
-      
+
       // Si orderId est spécifié, filtrer par commande
       if (orderId) {
         const orderIdNum = parseInt(orderId as string);
@@ -1846,7 +1846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
               )
             );
-          if (existing.length > 0 && existing.some(f=>f.status !== 'cancelled')) {
+          if (existing.length > 0 && existing.some(f => f.status !== 'cancelled')) {
             return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
           }
         }
@@ -1862,11 +1862,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let subtotalHT = 0;
           let totalTax = 0;
           let totalTTC = 0;
-          
+
           // Récupérer les prix depuis la commande ou les articles
           for (const item of itemsData) {
             let unitPrice = 0;
-            
+
             // Si on a une commande liée, récupérer le prix depuis la commande
             if (operationData.orderId) {
               const orderItem = await db.select()
@@ -1876,32 +1876,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   eq(orderItems.articleId, item.articleId)
                 ))
                 .limit(1);
-              
+
               if (orderItem.length > 0) {
                 unitPrice = parseFloat(orderItem[0].unitPrice.toString());
               }
             }
-            
+
             // Si pas de prix trouvé dans la commande, utiliser le prix de l'article
             if (unitPrice === 0) {
               const article = await db.select()
                 .from(articles)
                 .where(eq(articles.id, item.articleId))
                 .limit(1);
-              
+
               if (article.length > 0) {
                 unitPrice = parseFloat((article[0].salePrice || article[0].price || "0").toString());
               }
             }
-            
+
             const itemTotal = unitPrice * parseFloat(item.quantity.toString());
             subtotalHT += itemTotal;
           }
-          
+
           // Calculer la TVA (19% par défaut)
           totalTax = subtotalHT * 0.19;
           totalTTC = subtotalHT + totalTax;
-          
+
           // Mettre à jour les totaux
           operationData.subtotalHT = subtotalHT.toString();
           operationData.totalTax = totalTax.toString();
@@ -1919,7 +1919,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operationData.subtotalHT = totalCost.toString();
           operationData.totalTTC = totalCost.toString();
         }
-        
+
+        // Pour les préparations, calculer automatiquement les ingrédients à consommer
+        if (operationData.type === 'preparation' || operationData.type === 'preparation_reliquat') {
+          const allItems = [...itemsData]; // Copie des items produits
+
+          // Pour chaque produit à produire, calculer les ingrédients nécessaires
+          for (let i = 0; i < itemsData.length; i++) {
+            const productItem = itemsData[i];
+            const result = await storage.calculateIngredientConsumptionItems(productItem);
+
+            // Ajouter les ingrédients
+            allItems.push(...result.items);
+
+            // Mettre à jour le coût du produit principal basé sur le coût total des ingrédients
+            const productQuantity = parseFloat(productItem.quantity || '0');
+            const calculatedUnitCost = productQuantity > 0 ? result.totalCost / productQuantity : 0;
+
+            // Mettre à jour l'item produit avec le coût calculé
+            productItem.unitCost = calculatedUnitCost.toString();
+            productItem.totalCost = result.totalCost.toString();
+            productItem.quantityBefore = result.quantityBefore;
+            productItem.quantityAfter = result.quantityAfter;
+            console.log(`💰 Product ${productItem.articleId} - Calculated unit cost: ${calculatedUnitCost}, Total cost: ${result.totalCost}`);
+          }
+
+          // Remplacer itemsData par allItems (produits + ingrédients)
+          itemsData.length = 0;
+          itemsData.push(...allItems);
+        }
+
         const operation = await storage.createInventoryOperationWithItems(operationData, itemsData);
         res.status(201).json(operation);
       } else {
@@ -1934,7 +1963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
               )
             );
-          if (existing.length > 0 && existing.some(f=>f.status !== 'cancelled')) {
+          if (existing.length > 0 && existing.some(f => f.status !== 'cancelled')) {
             return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
           }
         }
@@ -1943,7 +1972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error creating inventory operation:", error);
-      
+
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Invalid operation data",
@@ -2002,7 +2031,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operation.subtotalHT = totalCost.toString();
           operation.totalTTC = totalCost.toString();
         }
+        // Pour les préparations, calculer automatiquement les ingrédients à consommer
+        if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+          var NewItems = items.filter((f: any) => f.quantity >= 0);
+          const allItems = [...NewItems]; // Copie des items produits
 
+          // Pour chaque produit à produire, calculer les ingrédients nécessaires
+          for (const productItem of NewItems) {
+          
+            const result = await storage.calculateIngredientConsumptionItems(productItem);
+            allItems.push(...result.items);
+             // Mettre à jour le coût du produit principal basé sur le coût total des ingrédients
+             const productQuantity = parseFloat(productItem.quantity || '0');
+             const calculatedUnitCost = productQuantity > 0 ? result.totalCost / productQuantity : 0;
+ 
+             // Mettre à jour l'item produit avec le coût calculé
+             productItem.unitCost = calculatedUnitCost.toString();
+             productItem.totalCost = result.totalCost.toString();
+             productItem.quantityBefore = result.quantityBefore;
+             productItem.quantityAfter = result.quantityAfter;
+ 
+          }
+
+          // Remplacer itemsData par allItems (produits + ingrédients)
+          items.length = 0;
+          items.push(...allItems);
+        }
         const updatedOperation = await storage.updateInventoryOperationWithItems(id, operation, items);
         res.json({ message: "Inventory operation updated successfully", operation: updatedOperation });
       } else {
@@ -2058,11 +2112,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For scheduling (scheduledDate) or other status updates (like "programmed")
       const updateData: any = {};
-      
+
       if (status) {
         updateData.status = status;
       }
-      
+
       if (scheduledDate) {
         updateData.scheduledDate = scheduledDate;
       }
@@ -2127,25 +2181,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get operation items to consume ingredients
       const items = await storage.getInventoryOperationItems(id);
 
-      // For preparation operations, consume ingredients based on recipe and create stock moves
-      if (operation.type === 'preparation') {
-        for (const item of items) {
-          const article = await storage.getArticle(item.articleId);
-          if (!article) continue;
-
-          // Find the recipe for this product
-          const recipe = await storage.getRecipeByArticleId(article.id);
-          if (!recipe) continue;
-
-          // Get recipe ingredients
-          const recipeIngredients = await storage.getRecipeIngredients(recipe.id);
-
-          // Calculate consumption based on planned quantity
-          const plannedQuantity = parseFloat(item.quantity || '0');
-          const recipeQuantity = parseFloat(recipe.quantity || '1');
-          const ratio = plannedQuantity / recipeQuantity;
-
-        }
+      // For preparation operations, only handle waste if any
+      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        console.log('🔍 Starting preparation - items already calculated during creation');
+        // Les ingrédients sont déjà calculés lors de la création
+        // Ici on ne fait que démarrer la préparation
       }
 
       // Update operation status
@@ -2213,84 +2253,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Failed to update operation" });
       }
 
-      // Get operation items to update inventory
-      const items = await storage.getInventoryOperationItems(id);
-
-      // Calculate the ratio of conform quantity to planned quantity
-      const totalPlanned = items.reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
-      const conformQty = parseFloat(conformQuantity || totalPlanned.toString());
-      const ratio = totalPlanned > 0 ? conformQty / totalPlanned : 1;
-
-      // Add produced items to stock
+      // For preparation operations, update stock with actual quantities
       if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
-        for (const item of items) {
-          const producedQty = parseFloat(item.quantity) * ratio;
-          if (producedQty > 0) {
-            const productArticle = await storage.getArticle(item.articleId);
-            if (!productArticle) {
-              console.error(`Article ${item.articleId} not found for stock update.`);
-              continue;
-            }
-            
-            const toStorageZoneId = item.toStorageZoneId || productArticle.storageZoneId;
-            if (!toStorageZoneId) {
-              return res.status(400).json({ message: `No storage zone defined for product ${productArticle.name}` });
-            }
+        const conformQty = parseFloat(conformQuantity || '0');
 
-            // Add to stock table
-            await db.insert(stock).values({
-              articleId: item.articleId,
-              storageZoneId: toStorageZoneId,
-              quantity: producedQty.toString(),
-              lotId: null,
-              serialNumber: null,
-              updatedAt: new Date()
-            }).onConflictDoUpdate({
-              target: [stock.articleId, stock.storageZoneId, stock.lotId, stock.serialNumber],
-              set: {
-                quantity: sql`${stock.quantity} + ${producedQty.toString()}`,
-                updatedAt: sql`now()`
-              }
+        // Update stock for all items (products and ingredients) based on actual quantities
+        await storage.updateStockFromOperationItems(id, conformQty);
+
+        // Handle waste if conform quantity is less than planned
+        const items = await storage.getInventoryOperationItems(id);
+        const totalPlanned = items
+          .filter(item => parseFloat(item.quantity || '0') > 0) // Only positive quantities (products)
+          .reduce((sum, item) => sum + parseFloat(item.quantity || '0'), 0);
+
+        if (conformQty < totalPlanned && wasteReason) {
+          const wasteQuantity = totalPlanned - conformQty;
+
+          // Create waste operation
+          const wasteOperation = {
+            type: 'ajustement_rebut',
+            status: 'completed',
+            operatorId: operation.operatorId,
+            scheduledDate: new Date().toISOString(),
+            notes: `Rebut de préparation ${operation.code}: ${wasteReason || 'Aucune raison spécifiée'}`
+          };
+
+          const wasteItems = items
+            .filter(item => parseFloat(item.quantity || '0') > 0) // Only positive quantities (products)
+            .map((item) => {
+              const plannedQuantity = parseFloat(item.quantity || '0');
+              const wasteItemQuantity = (plannedQuantity * wasteQuantity) / totalPlanned;
+
+              return {
+                articleId: item.articleId,
+                quantity: wasteItemQuantity.toString(),
+                quantityBefore: item.quantityBefore || '0',
+                quantityAfter: item.quantityAfter || '0',
+                unitCost: item.unitCost || '0',
+                totalCost: (parseFloat(item.unitCost || '0') * wasteItemQuantity).toString(),
+                notes: `Rebut de préparation ${operation.code}`,
+                wasteReason: wasteReason || 'Aucune raison spécifiée',
+                toStorageZoneId: item.toStorageZoneId || 1,
+              };
             });
 
-            // Update total stock on article
-            await db.update(articles)
-              .set({ currentStock: sql`${articles.currentStock} + ${producedQty.toString()}` })
-              .where(eq(articles.id, item.articleId));
-          }
+          await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
         }
-      }
-
-      // Create waste operation if there's waste
-      if (conformQty < totalPlanned && operation.type === 'preparation') {
-        const wasteQuantity = totalPlanned - conformQty;
-
-        const wasteOperation = {
-          type: 'ajustement_rebut',
-          status: 'completed',
-          operatorId: operation.operatorId,
-          scheduledDate: new Date().toISOString(),
-          notes: `Rebut de préparation ${operation.code}: ${wasteReason || 'Aucune raison spécifiée'}`
-        };
-
-        const wasteItems = items.map((item) => {
-          const plannedQuantity = parseFloat(item.quantity || '0');
-          const wasteItemQuantity = (plannedQuantity * wasteQuantity) / totalPlanned;
-
-          return {
-            articleId: item.articleId,
-            quantity: wasteItemQuantity.toString(),
-            unitCost: item.unitCost || '0',
-            totalCost: (parseFloat(item.unitCost || '0') * wasteItemQuantity).toString(),
-            notes: `Rebut de préparation ${operation.code}`,
-            wasteReason: wasteReason || 'Aucune raison spécifiée',
-            operationId: 0 // Sera remplacé automatiquement par createInventoryOperationWithItems
-          };
-        });
-
-      await storage.createInventoryOperationWithItems(wasteOperation, wasteItems);
-
-     
       }
 
       res.json(updatedOperation);
@@ -2742,6 +2750,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Obtenir toutes les réservations des articles d'une opération (en excluant les réservations de l'opération elle-même)
+  app.get("/api/inventory-operations/:id/other-reservations", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid operation ID" });
+      }
+
+      const reservations = await storage.getOtherReservationsForOperationArticles(id);
+      res.json(reservations);
+    } catch (error) {
+      console.error("Error getting other reservations for operation articles:", error);
+      res.status(500).json({ message: "Failed to get other reservations for operation articles" });
+    }
+  });
+
   // Créer des réservations d'ingrédients pour une préparation
   app.post("/api/inventory-operations/:id/reservations", async (req, res) => {
     try {
@@ -2976,12 +3000,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============ INVOICES ROUTES ============
-  
+
   // Get all invoices
   app.get("/api/invoices", async (req, res) => {
     try {
       const { clientId } = req.query;
-      
+
       if (clientId) {
         const invoices = await storage.getInvoicesByClient(parseInt(clientId as string));
         res.json(invoices);
@@ -3000,11 +3024,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const invoice = await storage.getInvoice(id);
-      
+
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      
+
       res.json(invoice);
     } catch (error) {
       console.error("Error fetching invoice:", error);
@@ -3041,7 +3065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const operationId = parseInt(req.params.operationId);
       const invoiceData = req.body; // Optional additional data
-      
+
       const invoice = await storage.createInvoiceFromDelivery(operationId, invoiceData);
       res.status(201).json(invoice);
     } catch (error) {
@@ -3068,11 +3092,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const updateData = insertInvoiceSchema.partial().parse(req.body);
       const invoice = await storage.updateInvoice(id, updateData);
-      
+
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      
+
       res.json(invoice);
     } catch (error) {
       console.error("Error updating invoice:", error);
@@ -3085,11 +3109,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const invoice = await storage.updateInvoiceStatus(id);
-      
+
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      
+
       res.json(invoice);
     } catch (error) {
       console.error("Error updating invoice status:", error);
@@ -3102,11 +3126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteInvoice(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      
+
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting invoice:", error);
@@ -3146,11 +3170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const updateData = insertInvoiceItemSchema.partial().parse(req.body);
       const item = await storage.updateInvoiceItem(id, updateData);
-      
+
       if (!item) {
         return res.status(404).json({ message: "Invoice item not found" });
       }
-      
+
       res.json(item);
     } catch (error) {
       console.error("Error updating invoice item:", error);
@@ -3163,11 +3187,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteInvoiceItem(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Invoice item not found" });
       }
-      
+
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting invoice item:", error);
@@ -3181,7 +3205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payments", async (req, res) => {
     try {
       const { invoiceId, clientId, deliveryId } = req.query;
-      
+
       if (invoiceId) {
         const payments = await storage.getPaymentsByInvoice(parseInt(invoiceId as string));
         res.json(payments);
@@ -3228,11 +3252,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const payment = await storage.getPayment(id);
-      
+
       if (!payment) {
         return res.status(404).json({ message: "Payment not found" });
       }
-      
+
       res.json(payment);
     } catch (error) {
       console.error("Error fetching payment:", error);
@@ -3270,11 +3294,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const updateData = insertPaymentSchema.partial().parse(req.body);
       const payment = await storage.updatePayment(id, updateData);
-      
+
       if (!payment) {
         return res.status(404).json({ message: "Payment not found" });
       }
-      
+
       res.json(payment);
     } catch (error) {
       console.error("Error updating payment:", error);
@@ -3287,11 +3311,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deletePayment(id);
-      
+
       if (!deleted) {
         return res.status(404).json({ message: "Payment not found" });
       }
-      
+
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting payment:", error);
@@ -3327,7 +3351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { articleId } = req.params;
       const articleIdNum = parseInt(articleId);
-      
+
       if (isNaN(articleIdNum)) {
         return res.status(400).json({ message: "Invalid article ID" });
       }
@@ -3380,7 +3404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (stockQuery.length > 0) {
             const stockQuantity = parseFloat(stockQuery[0].quantity);
-            
+
             // Calculer les réservations pour ce lot et cette zone
             const reservedQuantity = reservations
               .filter(r => r.lotId === lot.id && r.fromStorageZoneId === zone.id)
@@ -3425,7 +3449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (stockQuery.length > 0) {
             const stockQuantity = parseFloat(stockQuery[0].quantity);
-            
+
             const reservedQuantity = reservations
               .filter(r => !r.lotId && r.fromStorageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);

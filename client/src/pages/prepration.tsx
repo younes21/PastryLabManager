@@ -588,7 +588,19 @@ const PreparationPage = () => {
         // Calculate required quantity for this ingredient
         const baseIngredientQuantity = parseFloat(ingredient.quantity || 0);
         const requiredQuantity = baseIngredientQuantity * ratio;
-        const currentStock = parseFloat(article.currentStock || 0);
+        
+        const stock = ingredientStocks[ingredient.articleId];     
+        if (!stock)  <span className="text-gray-400">-</span>;
+          const articleReservations = reservations?.filter(res => 
+            res.articleId === ingredient.articleId && 
+            res.status === 'reserved'
+          );
+          const reservedQuantity = articleReservations?.reduce((sum, res) => 
+            sum + parseFloat(res.reservedQuantity || '0'), 0
+          );
+          const currentStock = stock.availableStock + reservedQuantity;
+        
+
 
         console.log(`${'  '.repeat(level)}📦 ${article.name}: required=${requiredQuantity.toFixed(3)} ${ingredient.unit}, available=${currentStock.toFixed(3)} ${article.unit}`);
 
@@ -665,7 +677,7 @@ const PreparationPage = () => {
       }
      
       
-      const invalidLine = items.some((it) => (Number(it.quantity) || 0) <= 0);
+      const invalidLine = items.filter((f:any)=>f.quantity>=0).some((it) => (Number(it.quantity) || 0) <= 0);
       if (invalidLine) {
         toast({title:'la quantité doit etre > 0.',variant: "warning"});
         return;
@@ -675,6 +687,11 @@ const PreparationPage = () => {
       if( currentOperation.type=='preparation_reliquat' && reliquatQuantity >= parentQuantity ){
      
         toast({title:'la quantité doit etre < '+ parentQuantity,variant: "warning"});
+        return;
+      }
+      const available = await checkIngredientAvailability(items[0].recipe.id, items[0].quantity);
+      if (!available) {
+        alert(`Ingrédients insuffisants pour ${items[0].article.name}`);
         return;
       }
 
@@ -1254,7 +1271,6 @@ const PreparationPage = () => {
     if (!ingredientsList || ingredientsList.length === 0 || level > 5) return []; // Augmenté à 5 niveaux pour supporter plus de profondeur
     return ingredientsList.flatMap((ingredient, index) => {
       const article = articles.find(a => a.id === ingredient.articleId);
-      const stockDispo = article?.currentStock || 0;
       
       // Chercher la recette du sous-produit si c'est un produit
       let subRecipe = null;
@@ -1342,10 +1358,24 @@ const PreparationPage = () => {
               const stock = ingredientStocks[ingredient.articleId];
               const article = articles.find(a => a.id === ingredient.articleId);
               if (!stock) return <span className="text-gray-400">-</span>;
-        //      const isSubProduct = article?.type === "product" || article?.type === "semi-fini";
+              
+              // Calculer le stock disponible = stock total - toutes les autres réservations (sauf celles de l'opération en cours)
+              let stockDispo = parseFloat(article?.currentStock || '0');
+              
+              // Soustraire toutes les réservations sauf celles de l'opération en cours
+              if (reservations.length > 0) {
+                const articleReservations = reservations.filter(res => 
+                  res.articleId === ingredient.articleId && 
+                  res.status === 'reserved'
+                );
+                const reservedQuantity = articleReservations.reduce((sum, res) => 
+                  sum + parseFloat(res.reservedQuantity || '0'), 0
+                );
+                stockDispo = stock.availableStock + reservedQuantity;
+              }
+              
               const required = parseFloat(ingredient.quantity || "0");
-              const stockDispo = stock.availableStock;
-              const isAlert =  stockDispo < required;
+              const isAlert = stockDispo < required;
               return (
                 <span className={isAlert ? "text-red-600 font-bold" : ""}>
                   {stockDispo.toFixed(3)}
@@ -1460,7 +1490,7 @@ const PreparationPage = () => {
                     {getFilteredOperations().map((operation, index) => {
                     
                       const operator = operators.find(o => o.id === operation.operatorId);
-                      const totalQuantity = (operation.items || []).reduce((sum: number, item: any) => 
+                      const totalQuantity = (operation.items || []).filter((f:any)=>f.quantity>=0).reduce((sum: number, item: any) => 
                         sum + parseFloat(item.quantity || 0), 0);
                       // Sum conformQuantity per item if available, otherwise fallback
                       let conformQuantity = '-';
@@ -1472,7 +1502,7 @@ const PreparationPage = () => {
                         }
                       }
                       // Get recipe names for the operation, prefer item.recipe.designation if available
-                      const recipeNames = (operation.items || [])
+                      const recipeNames = (operation.items || []).filter( (f:any) => f.quantity >= 0)
                       .map((item:any) => recipeMap.get(item.articleId) || 'Recette inconnue')
                       .join(', ');
                   
@@ -1783,7 +1813,8 @@ const PreparationPage = () => {
                         type="number"
                         value={items[0]?.quantity || 0}
                         onChange={e => items[0] && updateItemQuantity(items[0].id, e.target.value)}
-                        min="0.0000001"
+                        min="0"
+                        step={1}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                         disabled={!canUpdateOp() ||items[0]?.orderId!=null}
                       />
@@ -1852,7 +1883,7 @@ const PreparationPage = () => {
                         type="number"
                         value={items[0]?.quantity || 1}
                         onChange={(e) => items[0] && updateItemQuantity(items[0].id, e.target.value)}
-                        min="1"
+                        min="0"
                         max={parentOperation?.items?.[0]?.quantity || 999}
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                         disabled={!canUpdateOp()}

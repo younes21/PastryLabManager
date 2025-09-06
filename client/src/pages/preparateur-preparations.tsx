@@ -429,7 +429,7 @@ const PreparateurPreparationsPage = () => {
       return;
     }
 
-    const totalPlanned = (operation.items || []).reduce((sum: number, item: any) => 
+    const totalPlanned = (operation.items.filter((item: any) => parseFloat(item.quantity ||"0") >= 0) || []).reduce((sum: number, item: any) => 
       sum + parseFloat(item.quantity || 0), 0);
 
     setCompletionData({
@@ -893,11 +893,24 @@ const PreparateurPreparationsPage = () => {
           <td className="px-3 py-2 text-center text-xs">
             {(() => {
               const stock = ingredientStocks[ingredient.articleId];
-              const article = articles.find(a => a.id === ingredient.articleId);
               if (!stock) return <span className="text-gray-400">-</span>;
-            //  const isSubProduct = article?.type === "product" || article?.type === "semi-fini";
-              const required = parseFloat(ingredient.quantity || "0");
-              const stockDispo = stock.availableStock;
+            
+               // Calculer le stock disponible = stock total - toutes les autres réservations (sauf celles de l'opération en cours)
+               let stockDispo = parseFloat(article?.currentStock || '0');
+              
+               // Soustraire toutes les réservations sauf celles de l'opération en cours
+               if (reservations.length > 0) {
+                 const articleReservations = reservations.filter(res => 
+                   res.articleId === ingredient.articleId && 
+                   res.status === 'reserved'
+                 );
+                 const reservedQuantity = articleReservations.reduce((sum, res) => 
+                   sum + parseFloat(res.reservedQuantity || '0'), 0
+                 );
+                 stockDispo = stock.availableStock + reservedQuantity;
+               }
+            const required = parseFloat(ingredient.quantity || "0");
+          
               const isAlert =  stockDispo < required;
               return (
                 <span className={isAlert ? "text-red-600 font-bold" : ""}>
