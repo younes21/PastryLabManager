@@ -1,0 +1,20 @@
+{
+  "deliveryData": {
+    "orderId": 15,
+    "status": "pending",
+    "scheduledDate": "2025-01-15T10:00:00Z",
+    "deliveryAddress": "Test Address",
+    "deliveryNotes": "Test Delivery",
+    "packageCount": 1
+  },
+  "orderItems": [
+    {
+      "id": 1,
+      "articleId": 1,
+      "quantity": "1.000",
+      "unitPrice": "100.000",
+      "taxRate": "19.000"
+    }
+  ]
+}
+

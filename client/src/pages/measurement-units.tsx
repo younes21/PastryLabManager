@@ -40,7 +40,7 @@ export default function MeasurementUnitsPage() {
     label: "",
     abbreviation: "",
     type: "reference",
-    factor: "1.000000",
+    factor: 1,
     active: true
   });
 
@@ -142,7 +142,7 @@ export default function MeasurementUnitsPage() {
       label: "",
       abbreviation: "",
       type: "reference",
-      factor: "1.000000",
+      factor: 1,
       active: true
     });
     setEditingUnit(null);
@@ -508,10 +508,9 @@ export default function MeasurementUnitsPage() {
                     <Input
                       id="unit-factor"
                       type="number"
-                      step="0.000001"
                       value={unitForm.factor}
-                      onChange={(e) => setUnitForm({...unitForm, factor: e.target.value})}
-                      placeholder="1.000000"
+                      onChange={(e) => setUnitForm({...unitForm, factor: parseFloat(e.target.value)})}
+                      placeholder="1"
                       required
                       data-testid="input-unit-factor"
                     />
@@ -565,7 +564,7 @@ export default function MeasurementUnitsPage() {
                           <div className="bg-gray-50 px-3 py-1 rounded-lg">
                             <span className="text-sm font-medium text-gray-700">
                               Facteur: <span className="font-bold text-green-600">
-                                {parseFloat(unit.factor).toFixed(6)}
+                                {unit.factor}
                               </span>
                             </span>
                           </div>

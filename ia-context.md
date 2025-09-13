@@ -74,8 +74,3 @@ The application is designed to be deployed as a single Node.js application that 
 - Form state handled locally or with react-hook-form
 
 ### Development Rules (Critical)
-1. **Always test generated code with minimal test data and fix errors** to avoid manual fixes after generation
-   - Use only essential test data (2-3 records maximum per entity)
-   - Avoid saturating database with excessive test data over time
-2. **Always test all API calls (CRUD) through the graphical interface** to ensure complete functionality
-3. **Navigation must be through lateral menu** - all pages should be accessible via sidebar navigation

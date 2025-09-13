@@ -2,11 +2,10 @@ import fetch from 'node-fetch';
 
 const API_BASE = 'http://localhost:5000/api';
 
-async function testSimpleDelivery() {
-  console.log('🧪 Test simple de création de livraison...');
+async function testDeliveryWithSimpleSplit() {
+  console.log('🧪 Test de création de livraison avec répartition simple...');
   
   try {
-    // Test avec des données minimales
     const response = await fetch(`${API_BASE}/deliveries/with-items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -15,7 +14,24 @@ async function testSimpleDelivery() {
           orderId: 15,
           status: "pending"
         },
-        orderItems: []
+        orderItems: [
+          {
+            id: 23,
+            articleId: 5,
+            quantity: "2.000",
+            unitPrice: "15.00",
+            taxRate: "19.00"
+          }
+        ],
+        splits: {
+          5: [ // Article ID 5
+            {
+              lotId: null,
+              fromStorageZoneId: 1,
+              quantity: 2
+            }
+          ]
+        }
       }),
     });
     
@@ -28,4 +44,5 @@ async function testSimpleDelivery() {
   }
 }
 
-testSimpleDelivery();
+testDeliveryWithSimpleSplit();
+

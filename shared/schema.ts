@@ -8,6 +8,8 @@ import {
   timestamp,
   AnyPgColumn,
   unique,
+  doublePrecision,
+  real,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -37,7 +39,7 @@ export const measurementUnits = pgTable("measurement_units", {
   label: text("label").notNull(),
   abbreviation: text("abbreviation").notNull(),
   type: text("type").notNull(), // 'reference', 'larger', 'smaller'
-  factor: decimal("factor", { precision: 15, scale: 6 }).notNull(), // Conversion factor to reference unit
+  factor: doublePrecision("factor").notNull(), // Conversion factor to reference unit
   active: boolean("active").default(true),
 });
 
@@ -754,23 +756,7 @@ export const lots = pgTable("lots", {
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
-export const operationLots = pgTable("operation_lots", {
-  id: serial("id").primaryKey(),
-  operationId: integer("operation_id")
-    .references(() => inventoryOperations.id, { onDelete: "cascade" })
-    .notNull(),
-  lotId: integer("lot_id")
-    .references(() => lots.id, { onDelete: "cascade" })
-    .notNull(),
 
-  producedQuantity: decimal("produced_quantity", {
-    precision: 10,
-    scale: 3,
-  }).notNull(),
-  notes: text("notes"),
-
-  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-});
 
 // Table pour les réservations de stock (pour les commandes et préparations)
 export const stockReservations = pgTable("stock_reservations", {
@@ -841,16 +827,6 @@ export const lotsRelations = relations(lots, ({ one }) => ({
   }),
 }));
 
-export const operationLotsRelations = relations(operationLots, ({ one }) => ({
-  operation: one(inventoryOperations, {
-    fields: [operationLots.operationId],
-    references: [inventoryOperations.id],
-  }),
-  lot: one(lots, {
-    fields: [operationLots.lotId],
-    references: [lots.id],
-  }),
-}));
 
 export const stockReservationsRelations = relations(
   stockReservations,

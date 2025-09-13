@@ -92,7 +92,7 @@ export function DeliveryAssignmentModal({ open, onOpenChange, delivery, onSucces
                 <SelectValue placeholder="Sélectionner un livreur" />
               </SelectTrigger>
               <SelectContent>
-                {availableDeliveryPersons.map((person: any) => (
+                {Array.isArray(availableDeliveryPersons) && availableDeliveryPersons.map((person: any) => (
                   <SelectItem key={person.id} value={person.id.toString()}>
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />

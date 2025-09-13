@@ -504,6 +504,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: "Invalid price list data" });
     }
   });
+  app.delete("/api/price-lists/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deletePriceList(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Price list not found" });
+      }
+
+      res.json({ message: "Price list deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete price list,(can be used by clients or has rules)" });
+    }
+  });
   // Price Rules routes
   app.get("/api/price-rules", async (req, res) => {
     try {
@@ -2342,13 +2356,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Inventory Operation Lots
   app.get("/api/inventory-operations/:operationId/lots", async (req, res) => {
     try {
-      const operationId = parseInt(req.params.operationId);
-      if (isNaN(operationId)) {
-        return res.status(400).json({ message: "Invalid operation ID" });
-      }
-
-      const lots = await storage.getInventoryOperationLots(operationId);
-      res.json(lots);
+    // to be implemented
+     throw new Error("Not implemented");
     } catch (error) {
       console.error("Error fetching inventory operation lots:", error);
       res.status(500).json({ message: "Failed to fetch inventory operation lots" });
@@ -2359,7 +2368,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/deliveries", async (req, res) => {
     try {
-      const deliveries = await storage.getAllDeliveries();
+      const { orderId } = req.query;
+      let deliveries;
+      
+      if (orderId) {
+        deliveries = await storage.getDeliveriesByOrder(parseInt(orderId as string));
+      } else {
+        deliveries = await storage.getAllDeliveries();
+      }
+      
       res.json(deliveries);
     } catch (error) {
       console.error("Error fetching deliveries:", error);
@@ -2375,6 +2392,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating delivery:", error);
       res.status(500).json({ message: "Failed to create delivery" });
+    }
+  });
+
+  // Route pour créer une livraison avec items (atomique)
+  app.post("/api/deliveries/with-items", async (req, res) => {
+    try {
+      const { deliveryData, orderItems, splits } = req.body;
+      
+      if (!deliveryData || !orderItems || !Array.isArray(orderItems)) {
+        return res.status(400).json({ message: "Missing required data: deliveryData and orderItems" });
+      }
+
+      const validatedDeliveryData = insertDeliverySchema.parse(deliveryData);
+      const delivery = await storage.createDeliveryWithItems(validatedDeliveryData, orderItems, splits);
+      res.status(201).json(delivery);
+    } catch (error) {
+      console.error("Error creating delivery with items:", error);
+      res.status(500).json({ message: "Failed to create delivery with items" });
     }
   });
 
@@ -2420,7 +2455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { newDeliveryPersonId } = req.body;
-      const delivery = await storage.reassignDelivery(parseInt(id), newDeliveryPersonId);
+      const delivery = await storage.assignDeliveryPerson(parseInt(id), newDeliveryPersonId);
       res.json(delivery);
     } catch (error) {
       console.error("Error reassigning delivery:", error);
@@ -2504,7 +2539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliveries/:id/payments", async (req, res) => {
     try {
       const { id } = req.params;
-      const payments = await storage.getDeliveryPayments(parseInt(id));
+      const payments = await storage.getPaymentsByDelivery(parseInt(id));
       res.json(payments);
     } catch (error) {
       console.error("Error fetching delivery payments:", error);

@@ -113,12 +113,12 @@ export default function DeliveriesPage() {
   }, []);
 
   // Queries
-  const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<InventoryOperation[]>({
-    queryKey: ["/api/inventory-operations", { type: "delivery", orderId }],
+  const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<any[]>({
+    queryKey: ["/api/deliveries", { orderId }],
     queryFn: async () => {
-      let url = "/api/inventory-operations?type=livraison";
+      let url = "/api/deliveries";
       if (orderId) {
-        url += `&orderId=${orderId}`;
+        url += `?orderId=${orderId}`;
       }
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch deliveries");
@@ -165,11 +165,11 @@ export default function DeliveriesPage() {
 
   // Mutations
   const createDeliveryMutation = useMutation({
-    mutationFn: async (deliveryData: any) => {
-      return await apiRequest("/api/inventory-operations", "POST", deliveryData);
+    mutationFn: async (data: { deliveryData: any, orderItems: any[], splits?: any }) => {
+      return await apiRequest("/api/deliveries/with-items", "POST", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
       toast({ 
         title: "Livraison créée",
         description: "La livraison a été créée avec succès"
@@ -187,10 +187,10 @@ export default function DeliveriesPage() {
 
   const updateDeliveryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await apiRequest(`/api/inventory-operations/${id}`, "PUT", data);
+      return await apiRequest(`/api/deliveries/${id}`, "PUT", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
       toast({ 
         title: "Livraison mise à jour",
         description: "La livraison a été modifiée avec succès"
@@ -208,10 +208,10 @@ export default function DeliveriesPage() {
 
   const deleteDeliveryMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/inventory-operations/${id}`, "DELETE");
+      return await apiRequest(`/api/deliveries/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
       toast({ 
         title: "Livraison supprimée",
         description: "La livraison a été supprimée avec succès"
@@ -435,23 +435,36 @@ export default function DeliveriesPage() {
       }
     });
 
-    // Préparer les données de livraison sans les totaux (calculés côté serveur)
+    // Préparer les données de livraison
     const deliveryData = {
-      type: "delivery",
-      status: currentDelivery.status || "draft",
-      clientId: currentDelivery.clientId,
       orderId: currentDelivery.orderId,
-      scheduledDate: currentDelivery.scheduledDate,
-      notes: currentDelivery.notes,
-      currency: currentDelivery.currency || "DZD",
-      // Ne pas envoyer subtotalHT, totalTax, totalTTC - ils seront calculés côté serveur
-      items: allItems,
+      deliveryPersonId: currentDelivery.deliveryPersonId || null,
+      scheduledDate: currentDelivery.scheduledDate || null,
+      status: currentDelivery.status || "pending",
+      deliveryAddress: currentDelivery.deliveryAddress || null,
+      deliveryNotes: currentDelivery.notes || null,
+      packageCount: currentDelivery.packageCount || 1,
+      trackingNumbers: currentDelivery.trackingNumbers || null,
+      createdBy: 1, // TODO: Récupérer l'ID de l'utilisateur connecté
     };
+
+    // Préparer les orderItems pour l'API
+    const orderItemsForAPI = items.map(item => ({
+      id: item.id,
+      articleId: item.articleId,
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice || "0.000",
+      taxRate: item.taxRate || "0.000",
+    }));
 
     if (currentDelivery.id) {
       updateDeliveryMutation.mutate({ id: currentDelivery.id, data: deliveryData });
     } else {
-      createDeliveryMutation.mutate(deliveryData);
+      createDeliveryMutation.mutate({ 
+        deliveryData, 
+        orderItems: orderItemsForAPI, 
+        splits: Object.keys(splits).length > 0 ? splits : undefined 
+      });
     }
   };
 
