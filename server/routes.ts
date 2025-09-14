@@ -1767,6 +1767,268 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Échec du calcul du statut de production en lot" });
     }
   });
+  // Route pour récupérer les détails de production d'une commande spécifique
+  app.get("/api/orders/:id/production-detail", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.getOrder(id);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Récupérer toutes les commandes avec leurs articles (même logique que production-status-batch)
+      const orders = (await storage.getAllOrders())?.filter(f => f.status !== 'cancelled' && f.status != 'delivered' && f.status != 'draft')
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const items = await storage.getOrderItems(order.id);
+          return { ...order, items };
+        })
+      );
+
+      // Récupérer tous les articles uniques
+      const allArticleIds = new Set<number>();
+      ordersWithItems.forEach(order => {
+        order.items.forEach((item: any) => allArticleIds.add(item.articleId));
+      });
+
+      // Récupérer le stock disponible et les noms des articles pour tous les articles en une fois
+      const stockData: Record<number, number> = {};
+      const articleNames: Record<number, string> = {};
+      for (const articleId of Array.from(allArticleIds)) {
+        stockData[articleId] = await storage.getAvailableStock(articleId);
+        const article = await storage.getArticle(articleId);
+        articleNames[articleId] = article?.name || `Article ${articleId}`;
+      }
+
+      // Récupérer toutes les opérations de fabrication en cours
+      const operationsEnCours = await storage.getInventoryOperationsByType('fabrication');
+      const operationsEnCoursData: Record<number, any[]> = {};
+
+      operationsEnCours.forEach(op => {
+        if (op.status === 'en_cours' && op.items) {
+          op.items.forEach((item: any) => {
+            if (!operationsEnCoursData[item.articleId]) {
+              operationsEnCoursData[item.articleId] = [];
+            }
+            operationsEnCoursData[item.articleId].push({
+              id: op.id,
+              quantity: item.quantity
+            });
+          });
+        }
+      });
+
+      // Copie virtuelle pour les ajustements (même logique que production-status-batch)
+      const stockVirtuel = { ...stockData };
+      const operationsVirtuelles = JSON.parse(JSON.stringify(operationsEnCoursData));
+
+      // Trouver la commande cible et calculer son état dans l'ordre
+      const targetOrder = ordersWithItems.find(o => o.id === id);
+      if (!targetOrder) {
+        return res.status(404).json({ message: "Order not found in active orders" });
+      }
+
+      const targetOrderIndex = ordersWithItems.findIndex(o => o.id === id);
+      const ajustements: string[] = [];
+      let etat = "non_prepare";
+
+      // Traiter toutes les commandes jusqu'à la commande cible (exclus)
+      for (let i = 0; i < targetOrderIndex; i++) {
+        const currentOrder = ordersWithItems[i];
+        // Traiter les commandes précédentes pour ajuster le stock virtuel
+        let toutDisponible = true;
+        let auMoinsUnDisponible = false;
+
+        for (const item of currentOrder.items) {
+          const qCommande = parseFloat(item.quantity);
+          const qStock = stockVirtuel[item.articleId] || 0;
+
+          if (qStock >= qCommande) {
+            auMoinsUnDisponible = true;
+          } else if (qStock > 0) {
+            toutDisponible = false;
+            auMoinsUnDisponible = true;
+          } else {
+            toutDisponible = false;
+          }
+        }
+
+        let enCours = true;
+        for (const item of currentOrder.items) {
+          const qStock = stockVirtuel[item.articleId] || 0;
+          const op = operationsVirtuelles[item.articleId];
+
+          if (qStock > 0 || !op || op.length === 0) {
+            enCours = false;
+            break;
+          }
+        }
+
+        // Appliquer les ajustements virtuels pour les commandes précédentes
+        if (enCours) {
+          for (const item of currentOrder.items) {
+            const op = operationsVirtuelles[item.articleId];
+            if (op && op.length > 0) {
+              const qOp = Math.min(parseFloat(item.quantity), op[0].quantity);
+              op[0].quantity -= qOp;
+              if (op[0].quantity <= 0) {
+                operationsVirtuelles[item.articleId] = op.slice(1);
+              }
+            }
+          }
+        } else if (toutDisponible) {
+          for (const item of currentOrder.items) {
+            const qCommande = parseFloat(item.quantity);
+            stockVirtuel[item.articleId] -= qCommande;
+          }
+        } else if (auMoinsUnDisponible) {
+          for (const item of currentOrder.items) {
+            const qCommande = parseFloat(item.quantity);
+            const qDisponible = Math.min(qCommande, stockVirtuel[item.articleId] || 0);
+            if (qDisponible > 0) {
+              stockVirtuel[item.articleId] -= qDisponible;
+            }
+          }
+        }
+      }
+
+      // Capturer le stock AVANT de traiter la commande cible
+      const stockAvantCommande = { ...stockVirtuel };
+
+      // Maintenant traiter la commande cible
+      const currentOrder = ordersWithItems[targetOrderIndex];
+      let toutDisponible = true;
+      let auMoinsUnDisponible = false;
+
+      // Vérifier l'état "préparé" / "partiellement préparé"
+      for (const item of currentOrder.items) {
+        const qCommande = parseFloat(item.quantity);
+        const qStock = stockVirtuel[item.articleId] || 0;
+
+        if (qStock >= qCommande) {
+          auMoinsUnDisponible = true;
+        } else if (qStock > 0) {
+          toutDisponible = false;
+          auMoinsUnDisponible = true;
+        } else {
+          toutDisponible = false;
+        }
+      }
+
+      // Vérifier l'état "en cours"
+      let enCours = true;
+      for (const item of currentOrder.items) {
+        const qStock = stockVirtuel[item.articleId] || 0;
+        const op = operationsVirtuelles[item.articleId];
+
+        if (qStock > 0 || !op || op.length === 0) {
+          enCours = false;
+          break;
+        }
+      }
+
+      // Déterminer l'état final
+      if (enCours) {
+        etat = "en_cours";
+        for (const item of currentOrder.items) {
+          const op = operationsVirtuelles[item.articleId];
+          if (op && op.length > 0) {
+            const qOp = Math.min(parseFloat(item.quantity), op[0].quantity);
+            // Ajustement virtuel : diminuer la quantité dans l'opération
+            op[0].quantity -= qOp;
+            if (op[0].quantity <= 0) {
+              operationsVirtuelles[item.articleId] = op.slice(1);
+            }
+            ajustements.push(`${articleNames[item.articleId]} -${qOp} (depuis opération ${op[0].id})`);
+          }
+        }
+      } else if (toutDisponible) {
+        etat = "prepare";
+        for (const item of currentOrder.items) {
+          const qCommande = parseFloat(item.quantity);
+          // Ajustement virtuel : diminuer le stock
+          stockVirtuel[item.articleId] -= qCommande;
+          ajustements.push(`${articleNames[item.articleId]} -${qCommande}`);
+        }
+      } else if (auMoinsUnDisponible) {
+        etat = "partiellement_prepare";
+        for (const item of currentOrder.items) {
+          const qCommande = parseFloat(item.quantity);
+          const qDisponible = Math.min(qCommande, stockVirtuel[item.articleId] || 0);
+          if (qDisponible > 0) {
+            // Ajustement virtuel : diminuer le stock
+            stockVirtuel[item.articleId] -= qDisponible;
+            ajustements.push(`${articleNames[item.articleId]} -${qDisponible}`);
+          }
+        }
+      } else {
+        etat = "non_prepare";
+        ajustements.push("Aucun ajustement possible");
+      }
+
+      // Créer les détails des articles avec les bonnes quantités
+      const itemsDetail = targetOrder.items.map(item => {
+        const qCommande = parseFloat(item.quantity);
+        const qStockInitial = stockData[item.articleId] || 0;
+        
+        // Calculer la quantité ajustée : ce qui peut être satisfait pour cette commande
+        // C'est la quantité qui sera réellement prélevée du stock pour cette commande
+        let qAjuste = 0;
+        
+        // Trouver l'ajustement correspondant à cet article dans la liste des ajustements
+        const ajustementArticle = ajustements.find(aj => 
+          aj.includes(articleNames[item.articleId]) && !aj.includes("Aucun ajustement possible")
+        );
+        
+        if (ajustementArticle) {
+          // Extraire la quantité de l'ajustement (format: "Article -X" ou "Article -X (depuis opération Y)")
+          const match = ajustementArticle.match(/-(\d+(?:\.\d+)?)/);
+          if (match) {
+            qAjuste = parseFloat(match[1]);
+          }
+        }
+        
+        const qRestantAProduire = qCommande - qAjuste;
+        
+        let status: 'available' | 'partial' | 'missing' | 'in_production' = 'missing';
+        
+        if (qAjuste === qCommande) {
+          status = 'available';
+        } else if (qAjuste > 0) {
+          status = 'partial';
+        } else if (operationsVirtuelles[item.articleId] && operationsVirtuelles[item.articleId].length > 0) {
+          status = 'in_production';
+        }
+
+        return {
+          articleId: item.articleId,
+          articleName: articleNames[item.articleId],
+          quantity: qCommande,
+          stockAvailable: qStockInitial, // Stock initial pour référence
+          quantityAdjusted: qAjuste,
+          inProduction: qRestantAProduire,
+          stockRemaining: stockAvantCommande[item.articleId] || 0, // Stock restant AVANT cette commande
+          status
+        };
+      });
+
+      const result = {
+        orderId: targetOrder.id,
+        etat,
+        ajustements,
+        items: itemsDetail
+      };
+
+      res.json(result);
+
+    } catch (error) {
+      console.error("Erreur lors du calcul des détails de production:", error);
+      res.status(500).json({ message: "Échec du calcul des détails de production" });
+    }
+  });
+
   app.get("/api/orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);

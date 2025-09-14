@@ -19,7 +19,11 @@ import {
   Calendar,
   User,
   Package,
-  Truck
+  Truck,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  XCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { OrderForm } from "@/components/forms/order-form";
@@ -48,6 +52,20 @@ const orderStatusColors = {
   cancelled: "destructive"
 } as const;
 
+const productionStatusLabels = {
+  not_started: "Non commencée",
+  in_progress: "En cours",
+  completed: "Terminée",
+  partially_completed: "Partiellement terminée"
+};
+
+const productionStatusColors = {
+  not_started: "secondary",
+  in_progress: "default",
+  completed: "default",
+  partially_completed: "outline"
+} as const;
+
 export default function OrdersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -56,6 +74,11 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [filterClient, setFilterClient] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterProductionStatus, setFilterProductionStatus] = useState("");
   const [sortBy, setSortBy] = useState<"order" | "orderDate" | "code" | "totalTTC">("order");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -119,6 +142,68 @@ export default function OrdersPage() {
     },
   });
 
+  // Fonction pour calculer l'état de production d'une commande
+  const getProductionStatus = (order: Order): keyof typeof productionStatusLabels => {
+    if (order.status === "draft" || order.status === "cancelled") {
+      return "not_started";
+    }
+    
+    // Pour les commandes confirmées, on peut déterminer l'état de production
+    // basé sur les quantités préparées vs commandées
+    // Note: Cette logique pourrait être améliorée avec des données réelles de production
+    if (order.status === "confirmed") {
+      return "in_progress";
+    } else if (order.status === "prepared" || order.status === "ready") {
+      return "completed";
+    } else if (order.status === "partially_delivered") {
+      return "partially_completed";
+    } else if (order.status === "delivered") {
+      return "completed";
+    }
+    
+    return "not_started";
+  };
+
+  // Fonction pour vérifier si une date correspond au filtre
+  const matchesDateFilter = (orderDate: string | null) => {
+    if (!orderDate) return false;
+    
+    const orderDateObj = new Date(orderDate);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Normaliser les dates (ignorer l'heure)
+    const normalizeDate = (date: Date) => {
+      const normalized = new Date(date);
+      normalized.setHours(0, 0, 0, 0);
+      return normalized;
+    };
+    
+    const normalizedOrderDate = normalizeDate(orderDateObj);
+    const normalizedToday = normalizeDate(today);
+    const normalizedYesterday = normalizeDate(yesterday);
+    const normalizedTomorrow = normalizeDate(tomorrow);
+    
+    switch (filterDate) {
+      case "today":
+        return normalizedOrderDate.getTime() === normalizedToday.getTime();
+      case "yesterday":
+        return normalizedOrderDate.getTime() === normalizedYesterday.getTime();
+      case "tomorrow":
+        return normalizedOrderDate.getTime() === normalizedTomorrow.getTime();
+      case "range":
+        if (!filterDateFrom || !filterDateTo) return true;
+        const fromDate = normalizeDate(new Date(filterDateFrom));
+        const toDate = normalizeDate(new Date(filterDateTo));
+        return normalizedOrderDate >= fromDate && normalizedOrderDate <= toDate;
+      default:
+        return true;
+    }
+  };
+
   // Filtrage et tri
   const filteredAndSortedOrders = orders
     .filter((order) => {
@@ -126,7 +211,12 @@ export default function OrdersPage() {
         getClientName(order.clientId).toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = !filterStatus || filterStatus === "all" || order.status === filterStatus;
       const matchesType = !filterType || filterType === "all" || order.type === filterType;
-      return matchesSearch && matchesStatus && matchesType;
+      const matchesClient = !filterClient || filterClient === "all" || order.clientId.toString() === filterClient;
+      const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(order.orderDate || order.createdAt);
+      const matchesProductionStatus = !filterProductionStatus || filterProductionStatus === "all" || 
+        getProductionStatus(order) === filterProductionStatus;
+      
+      return matchesSearch && matchesStatus && matchesType && matchesClient && matchesDate && matchesProductionStatus;
     })
     .sort((a, b) => {
       // Si on trie par ordre personnalisé, utiliser le champ order
@@ -266,7 +356,7 @@ export default function OrdersPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -303,6 +393,49 @@ export default function OrdersPage() {
               </SelectContent>
             </Select>
 
+            <Select value={filterClient} onValueChange={setFilterClient}>
+              <SelectTrigger data-testid="select-filter-client">
+                <SelectValue placeholder="👤 Client" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les clients</SelectItem>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id.toString()}>
+                    {client.type !== 'societe' 
+                      ? `${client.firstName} ${client.lastName}` 
+                      : client.companyName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterDate} onValueChange={setFilterDate}>
+              <SelectTrigger data-testid="select-filter-date">
+                <SelectValue placeholder="📅 Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les dates</SelectItem>
+                <SelectItem value="today">Aujourd'hui</SelectItem>
+                <SelectItem value="yesterday">Hier</SelectItem>
+                <SelectItem value="tomorrow">Demain</SelectItem>
+                <SelectItem value="range">Intervalle personnalisé</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterProductionStatus} onValueChange={setFilterProductionStatus}>
+              <SelectTrigger data-testid="select-filter-production">
+                <SelectValue placeholder="⚙️ État de production" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les états</SelectItem>
+                {Object.entries(productionStatusLabels).map(([status, label]) => (
+                  <SelectItem key={status} value={status}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <div className="flex gap-2">
               <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                 <SelectTrigger data-testid="select-sort-by">
@@ -326,6 +459,36 @@ export default function OrdersPage() {
               </Button>
             </div>
           </div>
+          
+          {/* Filtres de date personnalisés */}
+          {filterDate === "range" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t bg-gray-50 p-4 rounded-lg">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Date de début
+                </label>
+                <Input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  data-testid="input-date-from"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Date de fin
+                </label>
+                <Input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  data-testid="input-date-to"
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

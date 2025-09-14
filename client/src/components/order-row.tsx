@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
@@ -7,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, Edit, Trash2, User, Calendar, Package } from "lucide-react";
 import type { Order, Client, Article } from "@shared/schema";
+import { ProductionSummaryDialog } from "./production-summary-dialog";
 
 interface ProductionStatus {
   orderId: number;
@@ -41,6 +43,8 @@ export function OrderRow({
   productionStatus,
   productionStatusLoading
 }: OrderRowProps) {
+  const [isProductionDialogOpen, setIsProductionDialogOpen] = useState(false);
+  
   const {
     attributes,
     listeners,
@@ -101,12 +105,13 @@ export function OrderRow({
   };
 
   return (
-    <TableRow 
-      ref={setNodeRef} 
-      style={style} 
-      data-testid={`row-order-${order.id}`}
-      className={isDragging ? "opacity-50" : ""}
-    >
+    <>
+      <TableRow 
+        ref={setNodeRef} 
+        style={style} 
+        data-testid={`row-order-${order.id}`}
+        className={isDragging ? "opacity-50" : ""}
+      >
       <TableCell className="w-12 p-0">
         <div
           {...attributes}
@@ -118,18 +123,18 @@ export function OrderRow({
         </div>
       </TableCell>
       <TableCell className="font-medium">{order.code}</TableCell>
-      <TableCell>
+      {/* <TableCell>
         <Badge variant="outline">
           {order.type === "quote" ? "Devis" : "Commande"}
         </Badge>
-      </TableCell>
+      </TableCell> */}
       <TableCell>
         <div className="flex items-center gap-2">
           <User className="h-4 w-4 text-muted-foreground" />
-          {getClientName(order.clientId)}
+          <span className="font-bold">{getClientName(order.clientId)}</span>
         </div>
       </TableCell>
-      <TableCell>{getClientPhone(order.clientId)}</TableCell>
+      {/* <TableCell className="font-bold">{getClientPhone(order.clientId)}</TableCell> */}
       <TableCell>{formatDate(order.orderDate || null)}</TableCell>
       <TableCell>{formatDate(order.deliveryDate || null)}</TableCell>
       <TableCell className="font-semibold">
@@ -161,19 +166,18 @@ export function OrderRow({
             <span className="text-sm text-muted-foreground">Chargement...</span>
           </div>
         ) : productionStatus ? (
-          <div className="flex flex-col gap-1">
+          <div 
+            className="flex flex-col gap-1 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+            onClick={() => setIsProductionDialogOpen(true)}
+            title="Cliquer pour voir le détail de la préparation"
+          >
             <Badge 
               className={`${getProductionStatusColor(productionStatus.etat)} border`}
               variant="outline"
             >
               {getProductionStatusLabel(productionStatus.etat)}
             </Badge>
-            {productionStatus.ajustements.length > 0 && (
-              <div className="text-xs text-muted-foreground max-w-32 truncate" title={productionStatus.ajustements.join(", ")}>
-                {productionStatus.ajustements[0]}
-                {productionStatus.ajustements.length > 1 && "..."}
-              </div>
-            )}
+           
           </div>
         ) : (
           <span className="text-sm text-muted-foreground">-</span>
@@ -208,5 +212,13 @@ export function OrderRow({
         </div>
       </TableCell>
     </TableRow>
+    
+    <ProductionSummaryDialog
+      order={order}
+      isOpen={isProductionDialogOpen}
+      onClose={() => setIsProductionDialogOpen(false)}
+      clients={clients}
+    />
+    </>
   );
 }

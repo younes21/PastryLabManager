@@ -80,9 +80,9 @@ export function OrdersTable({
           <TableRow>
             <TableHead className="w-12">Ordre</TableHead>
             <TableHead>Référence</TableHead>
-            <TableHead>Type</TableHead>
+            {/* <TableHead>Type</TableHead> */}
             <TableHead>Client</TableHead>
-            <TableHead>Téléphone</TableHead>
+            {/* <TableHead>Téléphone</TableHead> */}
             <TableHead>Date commande</TableHead>
             <TableHead>Date livraison</TableHead>
             <TableHead>Total TTC</TableHead>
