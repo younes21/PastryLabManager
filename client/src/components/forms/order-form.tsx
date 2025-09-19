@@ -300,9 +300,29 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
       setSelectedClientId(order.clientId);
       setDeliveryDate(order.deliveryDate?.split(" ")[0] || "");
       setOrderNotes(order.notes || "");
-      // TODO: Charger les items de la commande existante
+      // Charger les items de la commande existante
+      (async () => {
+        try {
+          const res = await fetch(`/api/orders/${order.id}/items`);
+          const orderItems = await res.json();
+          if (Array.isArray(orderItems) && products.length > 0) {
+            const cartItems: CartItem[] = orderItems.map((item: any) => {
+              const product = products.find((p) => p.id === item.articleId);
+              if (!product) return null;
+              return {
+                articleId: item.articleId,
+                article: product,
+                quantity: parseFloat(item.quantity?.toString() || "1"),
+              };
+            }).filter(Boolean) as CartItem[];
+            setCart(cartItems);
+          }
+        } catch (e) {
+          // ignore
+        }
+      })();
     }
-  }, [order]);
+  }, [order, products]);
 
   // Vue catalogue des produits
   if (currentView === "catalog") {

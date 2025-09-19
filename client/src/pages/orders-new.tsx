@@ -346,309 +346,303 @@ export default function OrdersPage() {
     return new Date(dateString).toLocaleDateString("fr-FR");
   };
 
-  // Navigation vers les formulaires
-  if (currentView === "create") {
-    return (
-      <OrderForm
-        onSuccess={() => setCurrentView("list")}
-        onCancel={() => setCurrentView("list")}
-      />
-    );
-  }
-
-  if (currentView === "edit" && editingOrder) {
-    return (
-      <OrderForm
-        order={editingOrder}
-        onSuccess={() => {
-          setEditingOrder(null);
-          setCurrentView("list");
-        }}
-        onCancel={() => {
-          setEditingOrder(null);
-          setCurrentView("list");
-        }}
-      />
-    );
-  }
-
   usePageTitle('Gestion des commandes');
 
   return (
-    <div className="container mx-auto min-w-full p-6 space-y-8">
-      <Card>
-      <CardHeader>
-  <div className="flex justify-between items-center">
-    <CardTitle className="flex items-center gap-2">
-      <Filter className="h-5 w-5" />
-      Filtres et recherche
-    </CardTitle>
-
-    <Button
-      onClick={handleCreate}
-      className="bg-accent hover:bg-accent-hover"
-    >
-      Ajouter une commande
-    </Button>
-  </div>
-</CardHeader>
-
-
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6  gap-3 items-end">
-            <div className="col-span-1">
-              {/* Statut */}
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger data-testid="select-filter-status" className="h-9 text-sm">
-                  <SelectValue placeholder="Statut" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  {Object.entries(orderStatusLabels).map(([status, label]) => (
-                    <SelectItem key={status} value={status}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-2">
-              {/* État production */}
-              <Select value={filterProductionStatus} onValueChange={setFilterProductionStatus}>
-                <SelectTrigger data-testid="select-filter-production" className="h-9 text-sm">
-                  <SelectValue placeholder="⚙️ Prod." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  {Object.entries(productionStatusLabels).map(([status, label]) => (
-                    <SelectItem key={status} value={status}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Client */}
-            <div className="col-span-3">
-              <label className="text-xs text-gray-600"> Client</label>
-              <Select value={filterClient} onValueChange={setFilterClient}>
-                <SelectTrigger data-testid="select-filter-client" className="h-9 text-sm">
-                  <SelectValue placeholder="👤 Client" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
-                      {client.type !== 'societe'
-                        ? `${client.firstName} ${client.lastName}`
-                        : client.companyName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Dates */}
-            <div className="flex gap-2 col-span-3">
-              <div className="flex flex-col space-y-1 flex-1">
-                <label className="text-xs text-gray-600">📅 Début</label>
-                <Input
-                  type="date"
-                  value={filterDateFrom}
-                  onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
-                  data-testid="input-date-from"
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div className="flex flex-col space-y-1 flex-1">
-                <label className="text-xs text-gray-600">📅 Fin</label>
-                <Input
-                  type="date"
-                  value={filterDateTo}
-                  onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
-                  data-testid="input-date-to"
-                  className="h-9 text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Boutons rapides */}
-            <div className="flex  col-span-3 items-center justify-center gap-2">
-              {[
-                { label: "Aujourd'hui", value: "today" },
-                { label: "Hier", value: "yesterday" },
-                { label: "Demain", value: "tomorrow" },
-              ].map(({ label, value }) => (
-                <Button
-                  key={value}
-                  variant={filterDate === value ? "default" : "outline"}
-                  size="sm"
-                  className={`rounded-full ${filterDate === value ? "bg-blue-600 text-white" : ""
-                    }`}
-                  onClick={() => {
-                    const base = new Date();
-                    let d: Date;
-                    if (value === "yesterday") d = new Date(base.getTime() - 86400000);
-                    else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
-                    else d = base;
-                    const iso = d.toISOString().split("T")[0];
-                    setFilterDate(value);
-
-                  }}
-                >
-                  {label}
-                </Button>
-              ))}
-
-              {/* Bouton reset */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
-                onClick={() => {
-                  setFilterDate("all");
-                  setFilterDateFrom("");
-                  setFilterDateTo("");
-                }}
-              >
-                Réinitialiser
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-
-
-      {/* Onglets: Liste des commandes / Récap */}
-      <Tabs defaultValue="list" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="list">Liste des commandes</TabsTrigger>
-          <TabsTrigger value="recap">Récap</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="space-y-4">
+    <>
+      {currentView === "create" && (
+        <OrderForm
+          onSuccess={() => setCurrentView("list")}
+          onCancel={() => setCurrentView("list")}
+        />
+      )}
+      {currentView === "edit" && editingOrder && (
+        <OrderForm
+          order={editingOrder}
+          onSuccess={() => {
+            setEditingOrder(null);
+            setCurrentView("list");
+          }}
+          onCancel={() => {
+            setEditingOrder(null);
+            setCurrentView("list");
+          }}
+        />
+      )}
+      {currentView === "list" && (
+        <div className="container mx-auto min-w-full p-6 space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                Liste des commandes ({filteredAndSortedOrders.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <OrdersTable
-                orders={filteredAndSortedOrders}
-                clients={clients}
-                products={products}
-                onStatusChange={handleStatusChange}
-                onDelete={handleDelete}
-                onView={setViewingOrder}
-                onEdit={handleEdit}
-                onReorder={handleReorder}
-                orderStatusLabels={orderStatusLabels}
-                orderStatusColors={orderStatusColors}
-                isLoading={ordersLoading}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="recap" className="space-y-4">
-          <ProductsRecapServer
-            filters={{
-              search: searchTerm,
-              status: filterStatus,
-              type: filterType,
-              clientId: filterClient,
-              date: filterDate,
-              dateFrom: filterDateFrom,
-              dateTo: filterDateTo,
-            }}
-          />
-        </TabsContent>
-      </Tabs>
-
-      {/* Modale de consultation */}
-      <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
-        <DialogContent className="max-w-2xl p-0">
-          <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-6">
-            <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
-              <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
-            </DialogTitle>
-          </DialogHeader>
-          {viewingOrder && (
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-gray-700 flex items-center gap-2">
-                  <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
-                </span>
-                <Badge
-                  variant={orderStatusColors[viewingOrder.status as keyof typeof orderStatusColors] as any}
-                  className="text-xs px-3 py-1 rounded-full capitalize"
-                >
-                  {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
-                </Badge>
-              </div>
-              <hr className="my-2" />
-              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-orange-400" />
-                  <span>Date de création :</span>
-                </div>
-                <span>{formatDate(viewingOrder.orderDate || viewingOrder.createdAt)}</span>
-                {viewingOrder.deliveryDate && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-orange-400" />
-                      <span>Date de livraison :</span>
-                    </div>
-                    <span>{formatDate(viewingOrder.deliveryDate)}</span>
-                  </>
-                )}
-                {viewingOrder.notes && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Edit className="w-4 h-4 text-orange-400" />
-                      <span>Notes :</span>
-                    </div>
-                    <span className="italic text-gray-500">{viewingOrder.notes}</span>
-                  </>
-                )}
-              </div>
-              <hr className="my-2" />
-              <div className="mt-2">
-                <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
-                </div>
-                <OrderItemsSummary orderId={viewingOrder.id} products={products} />
-              </div>
-              <hr className="my-2" />
-              <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
-                <div className="flex items-center gap-2 text-orange-700">
-                  Total TTC
-                </div>
-                <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
-                <div className="flex items-center gap-2 text-amber-700">
-                  <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
-                </div>
-                <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
-              </div>
-
-              {/* Bouton pour afficher les livraisons liées */}
-              <div className="flex justify-center mt-6">
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Filtres et recherche
+                </CardTitle>
                 <Button
-                  onClick={() => {
-                    // Rediriger vers la page des livraisons avec un filtre sur cette commande
-                    window.location.href = `/deliveries?orderId=${viewingOrder.id}`;
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                  onClick={handleCreate}
+                  className="bg-accent hover:bg-accent-hover"
                 >
-                  <Truck className="w-5 h-5" />
-                  Voir les livraisons de cette commande
+                  Ajouter une commande
                 </Button>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6  gap-3 items-end">
+                <div className="col-span-1">
+                  {/* Statut */}
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger data-testid="select-filter-status" className="h-9 text-sm">
+                      <SelectValue placeholder="Statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous</SelectItem>
+                      {Object.entries(orderStatusLabels).map(([status, label]) => (
+                        <SelectItem key={status} value={status}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="col-span-2">
+                  {/* État production */}
+                  <Select value={filterProductionStatus} onValueChange={setFilterProductionStatus}>
+                    <SelectTrigger data-testid="select-filter-production" className="h-9 text-sm">
+                      <SelectValue placeholder="⚙️ Prod." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous</SelectItem>
+                      {Object.entries(productionStatusLabels).map(([status, label]) => (
+                        <SelectItem key={status} value={status}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Client */}
+                <div className="col-span-3">
+                  <label className="text-xs text-gray-600"> Client</label>
+                  <Select value={filterClient} onValueChange={setFilterClient}>
+                    <SelectTrigger data-testid="select-filter-client" className="h-9 text-sm">
+                      <SelectValue placeholder="👤 Client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id.toString()}>
+                          {client.type !== 'societe'
+                            ? `${client.firstName} ${client.lastName}`
+                            : client.companyName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Dates */}
+                <div className="flex gap-2 col-span-3">
+                  <div className="flex flex-col space-y-1 flex-1">
+                    <label className="text-xs text-gray-600">📅 Début</label>
+                    <Input
+                      type="date"
+                      value={filterDateFrom}
+                      onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
+                      data-testid="input-date-from"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1 flex-1">
+                    <label className="text-xs text-gray-600">📅 Fin</label>
+                    <Input
+                      type="date"
+                      value={filterDateTo}
+                      onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
+                      data-testid="input-date-to"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Boutons rapides */}
+                <div className="flex  col-span-3 items-center justify-center gap-2">
+                  {[
+                    { label: "Aujourd'hui", value: "today" },
+                    { label: "Hier", value: "yesterday" },
+                    { label: "Demain", value: "tomorrow" },
+                  ].map(({ label, value }) => (
+                    <Button
+                      key={value}
+                      variant={filterDate === value ? "default" : "outline"}
+                      size="sm"
+                      className={`rounded-full ${filterDate === value ? "bg-blue-600 text-white" : ""
+                        }`}
+                      onClick={() => {
+                        const base = new Date();
+                        let d: Date;
+                        if (value === "yesterday") d = new Date(base.getTime() - 86400000);
+                        else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
+                        else d = base;
+                        const iso = d.toISOString().split("T")[0];
+                        setFilterDate(value);
+
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+
+                  {/* Bouton reset */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
+                    onClick={() => {
+                      setFilterDate("all");
+                      setFilterDateFrom("");
+                      setFilterDateTo("");
+                    }}
+                  >
+                    Réinitialiser
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+
+
+          {/* Onglets: Liste des commandes / Récap */}
+          <Tabs defaultValue="list" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="list">Liste des commandes</TabsTrigger>
+              <TabsTrigger value="recap">Récap</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="list" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5" />
+                    Liste des commandes ({filteredAndSortedOrders.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <OrdersTable
+                    orders={filteredAndSortedOrders}
+                    clients={clients}
+                    products={products}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    onView={setViewingOrder}
+                    onEdit={handleEdit}
+                    onReorder={handleReorder}
+                    orderStatusLabels={orderStatusLabels}
+                    orderStatusColors={orderStatusColors}
+                    isLoading={ordersLoading}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="recap" className="space-y-4">
+              <ProductsRecapServer
+                filters={{
+                  search: searchTerm,
+                  status: filterStatus,
+                  type: filterType,
+                  clientId: filterClient,
+                  date: filterDate,
+                  dateFrom: filterDateFrom,
+                  dateTo: filterDateTo,
+                }}
+              />
+            </TabsContent>
+          </Tabs>
+
+          {/* Modale de consultation */}
+          <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
+            <DialogContent className="max-w-2xl p-0">
+              <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-6">
+                <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
+                  <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
+                </DialogTitle>
+              </DialogHeader>
+              {viewingOrder && (
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
+                    </span>
+                    <Badge
+                      variant={orderStatusColors[viewingOrder.status as keyof typeof orderStatusColors] as any}
+                      className="text-xs px-3 py-1 rounded-full capitalize"
+                    >
+                      {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
+                    </Badge>
+                  </div>
+                  <hr className="my-2" />
+                  <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-orange-400" />
+                      <span>Date de création :</span>
+                    </div>
+                    <span>{formatDate(viewingOrder.orderDate || viewingOrder.createdAt)}</span>
+                    {viewingOrder.deliveryDate && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-orange-400" />
+                          <span>Date de livraison :</span>
+                        </div>
+                        <span>{formatDate(viewingOrder.deliveryDate)}</span>
+                      </>
+                    )}
+                    {viewingOrder.notes && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Edit className="w-4 h-4 text-orange-400" />
+                          <span>Notes :</span>
+                        </div>
+                        <span className="italic text-gray-500">{viewingOrder.notes}</span>
+                      </>
+                    )}
+                  </div>
+                  <hr className="my-2" />
+                  <div className="mt-2">
+                    <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                    </div>
+                    <OrderItemsSummary orderId={viewingOrder.id} products={products} />
+                  </div>
+                  <hr className="my-2" />
+                  <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
+                    <div className="flex items-center gap-2 text-orange-700">
+                      Total TTC
+                    </div>
+                    <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                    </div>
+                    <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
+                  </div>
+
+                  {/* Bouton pour afficher les livraisons liées */}
+                  <div className="flex justify-center mt-6">
+                    <Button
+                      onClick={() => {
+                        // Rediriger vers la page des livraisons avec un filtre sur cette commande
+                        window.location.href = `/deliveries?orderId=${viewingOrder.id}`;
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                    >
+                      <Truck className="w-5 h-5" />
+                      Voir les livraisons de cette commande
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </>
   );
 }
 
