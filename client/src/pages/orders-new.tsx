@@ -357,16 +357,7 @@ export default function OrdersPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Rechercher une commande..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-orders"
-              />
-            </div>
+
 
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger data-testid="select-filter-status">
@@ -382,7 +373,7 @@ export default function OrdersPage() {
               </SelectContent>
             </Select>
 
-            <Select value={filterType} onValueChange={setFilterType}>
+            {/* <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger data-testid="select-filter-type">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -391,7 +382,7 @@ export default function OrdersPage() {
                 <SelectItem value="quote">Devis</SelectItem>
                 <SelectItem value="order">Commande</SelectItem>
               </SelectContent>
-            </Select>
+            </Select> */}
 
             <Select value={filterClient} onValueChange={setFilterClient}>
               <SelectTrigger data-testid="select-filter-client">
