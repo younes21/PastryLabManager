@@ -24,6 +24,7 @@ interface OrderRowProps {
   onStatusChange: (order: Order, newStatus: string) => void;
   onDelete: (order: Order) => void;
   onView: (order: Order) => void;
+  onEdit?: (order: Order) => void;
   orderStatusLabels: Record<string, string>;
   orderStatusColors: Record<string, string>;
   productionStatus?: ProductionStatus;
@@ -38,6 +39,7 @@ export function OrderRow({
   onStatusChange,
   onDelete,
   onView,
+  onEdit,
   orderStatusLabels,
   orderStatusColors,
   productionStatus,
@@ -112,113 +114,116 @@ export function OrderRow({
         data-testid={`row-order-${order.id}`}
         className={isDragging ? "opacity-50" : ""}
       >
-      <TableCell className="w-12 p-0">
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex items-center justify-center h-full cursor-grab active:cursor-grabbing p-2 hover:bg-muted/50 rounded"
-          title="Glisser pour réordonner"
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </div>
-      </TableCell>
-      <TableCell className="font-medium">{order.code}</TableCell>
-      {/* <TableCell>
-        <Badge variant="outline">
-          {order.type === "quote" ? "Devis" : "Commande"}
-        </Badge>
-      </TableCell> */}
-      <TableCell>
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <span className="font-bold">{getClientName(order.clientId)}</span>
-        </div>
-      </TableCell>
-      {/* <TableCell className="font-bold">{getClientPhone(order.clientId)}</TableCell> */}
-      <TableCell>{formatDate(order.orderDate || null)}</TableCell>
-      <TableCell>{formatDate(order.deliveryDate || null)}</TableCell>
-      <TableCell className="font-semibold">
-        {parseFloat(order.totalTTC || "0").toFixed(2)} DA
-      </TableCell>
-      <TableCell>
-        <Select
-          value={order.status}
-          onValueChange={(value) => onStatusChange(order, value)}
-        >
-          <SelectTrigger className="w-auto">
-            <Badge variant="outline">
-              {orderStatusLabels[order.status as keyof typeof orderStatusLabels]}
-            </Badge>
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(orderStatusLabels).map(([status, label]) => (
-              <SelectItem key={status} value={status}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell>
-        {productionStatusLoading ? (
+        <TableCell className="w-12 p-0">
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex items-center justify-center h-full cursor-grab active:cursor-grabbing p-2 hover:bg-muted/50 rounded"
+            title="Glisser pour réordonner"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </TableCell>
+        <TableCell className="font-medium">{order.code}</TableCell>
+        {/* <TableCell>
+          <Badge variant="outline">
+            {order.type === "quote" ? "Devis" : "Commande"}
+          </Badge>
+        </TableCell> */}
+        <TableCell>
           <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-            <span className="text-sm text-muted-foreground">Chargement...</span>
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="font-bold">{getClientName(order.clientId)}</span>
           </div>
-        ) : productionStatus ? (
-          <div 
-            className="flex flex-col gap-1 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
-            onClick={() => setIsProductionDialogOpen(true)}
-            title="Cliquer pour voir le détail de la préparation"
+        </TableCell>
+        {/* <TableCell className="font-bold">{getClientPhone(order.clientId)}</TableCell> */}
+        <TableCell>{formatDate(order.orderDate || null)}</TableCell>
+        <TableCell>{formatDate(order.deliveryDate || null)}</TableCell>
+        <TableCell className="font-semibold">
+          {parseFloat(order.totalTTC || "0").toFixed(2)} DA
+        </TableCell>
+        <TableCell>
+          <Select
+            value={order.status}
+            onValueChange={(value) => onStatusChange(order, value)}
           >
-            <Badge 
-              className={`${getProductionStatusColor(productionStatus.etat)} border`}
-              variant="outline"
+            <SelectTrigger className="w-auto">
+              <Badge variant="outline">
+                {orderStatusLabels[order.status as keyof typeof orderStatusLabels]}
+              </Badge>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(orderStatusLabels).map(([status, label]) => (
+                <SelectItem key={status} value={status}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </TableCell>
+        <TableCell>
+          {productionStatusLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+              <span className="text-sm text-muted-foreground">Chargement...</span>
+            </div>
+          ) : productionStatus ? (
+            <div 
+              className="flex flex-col gap-1 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+              onClick={() => setIsProductionDialogOpen(true)}
+              title="Cliquer pour voir le détail de la préparation"
             >
-              {getProductionStatusLabel(productionStatus.etat)}
-            </Badge>
-           
+              <Badge 
+                className={`${getProductionStatusColor(productionStatus.etat)} border`}
+                variant="outline"
+              >
+                {getProductionStatusLabel(productionStatus.etat)}
+              </Badge>
+             
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid={`button-view-order-${order.id}`}
+              onClick={() => onView(order)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid={`button-edit-order-${order.id}`}
+                onClick={() => onEdit(order)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(order)}
+              disabled={order.status === "confirmed" || order.status === "delivered"}
+              data-testid={`button-delete-order-${order.id}`}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
           </div>
-        ) : (
-          <span className="text-sm text-muted-foreground">-</span>
-        )}
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid={`button-view-order-${order.id}`}
-            onClick={() => onView(order)}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid={`button-edit-order-${order.id}`}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(order)}
-            disabled={order.status === "confirmed" || order.status === "delivered"}
-            data-testid={`button-delete-order-${order.id}`}
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
-    
-    <ProductionSummaryDialog
-      order={order}
-      isOpen={isProductionDialogOpen}
-      onClose={() => setIsProductionDialogOpen(false)}
-      clients={clients}
-    />
+        </TableCell>
+      </TableRow>
+      
+      <ProductionSummaryDialog
+        order={order}
+        isOpen={isProductionDialogOpen}
+        onClose={() => setIsProductionDialogOpen(false)}
+        clients={clients}
+      />
     </>
   );
 }

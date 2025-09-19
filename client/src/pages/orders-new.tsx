@@ -83,7 +83,8 @@ export default function OrdersPage() {
   const [filterProductionStatus, setFilterProductionStatus] = useState("");
   const [sortBy, setSortBy] = useState<"order" | "orderDate" | "code" | "totalTTC">("order");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [currentView, setCurrentView] = useState<"list" | "create" | "edit">("list");
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [recapLoading, setRecapLoading] = useState(false);
 
@@ -278,7 +279,12 @@ export default function OrdersPage() {
 
   // Handlers
   const handleCreate = () => {
-    setShowCreateForm(true);
+    setCurrentView("create");
+  };
+
+  const handleEdit = (order: Order) => {
+    setEditingOrder(order);
+    setCurrentView("edit");
   };
 
   const handleStatusChange = (order: Order, newStatus: string) => {
@@ -340,32 +346,29 @@ export default function OrdersPage() {
     return new Date(dateString).toLocaleDateString("fr-FR");
   };
 
-  if (showCreateForm) {
+  // Navigation vers les formulaires
+  if (currentView === "create") {
     return (
-      <div className="container mx-auto min-w-full p-6 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Nouvelle Commande</h1>
-            <p className="text-muted-foreground">
-              Créer une nouvelle commande ou devis client
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => setShowCreateForm(false)}
-          >
-            Retour à la liste
-          </Button>
-        </div>
-        {/* TODO: Ajouter le formulaire de création de commande */}
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">
-              Formulaire de création de commande en cours de développement...
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <OrderForm
+        onSuccess={() => setCurrentView("list")}
+        onCancel={() => setCurrentView("list")}
+      />
+    );
+  }
+
+  if (currentView === "edit" && editingOrder) {
+    return (
+      <OrderForm
+        order={editingOrder}
+        onSuccess={() => {
+          setEditingOrder(null);
+          setCurrentView("list");
+        }}
+        onCancel={() => {
+          setEditingOrder(null);
+          setCurrentView("list");
+        }}
+      />
     );
   }
 
@@ -374,15 +377,22 @@ export default function OrdersPage() {
   return (
     <div className="container mx-auto min-w-full p-6 space-y-8">
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filtres et recherche
-            </CardTitle>
-            <OrderForm />
-          </div>
-        </CardHeader>
+      <CardHeader>
+  <div className="flex justify-between items-center">
+    <CardTitle className="flex items-center gap-2">
+      <Filter className="h-5 w-5" />
+      Filtres et recherche
+    </CardTitle>
+
+    <Button
+      onClick={handleCreate}
+      className="bg-accent hover:bg-accent-hover"
+    >
+      Ajouter une commande
+    </Button>
+  </div>
+</CardHeader>
+
 
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6  gap-3 items-end">
@@ -530,6 +540,7 @@ export default function OrdersPage() {
                 onStatusChange={handleStatusChange}
                 onDelete={handleDelete}
                 onView={setViewingOrder}
+                onEdit={handleEdit}
                 onReorder={handleReorder}
                 orderStatusLabels={orderStatusLabels}
                 orderStatusColors={orderStatusColors}

@@ -195,6 +195,8 @@ function ProtectedRouter() {
       <Route path="/products" component={Products} />
       <Route path="/ingredients" component={IngredientsNew} />
       <Route path="/orders" component={OrdersPage} />
+      <Route path="/orders/edit" component={OrdersPage} />
+      <Route path="/orders/new" component={OrdersPage} />
       <Route path="/client_orders" component={ClientOrdersPage} />
       {/* <Route path="/inventory-operations" component={InventoryOperationsPage} /> */}
       <Route path="/invoices/:id" component={InvoiceDetailPage} />

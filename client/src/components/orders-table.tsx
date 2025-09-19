@@ -25,6 +25,7 @@ interface OrdersTableProps {
   onStatusChange: (order: Order, newStatus: string) => void;
   onDelete: (order: Order) => void;
   onView: (order: Order) => void;
+  onEdit?: (order: Order) => void;
   onReorder: (orders: Order[]) => void;
   orderStatusLabels: Record<string, string>;
   orderStatusColors: Record<string, string>;
@@ -38,6 +39,7 @@ export function OrdersTable({
   onStatusChange,
   onDelete,
   onView,
+  onEdit,
   onReorder,
   orderStatusLabels,
   orderStatusColors,
@@ -116,6 +118,7 @@ export function OrdersTable({
                   onStatusChange={onStatusChange}
                   onDelete={onDelete}
                   onView={onView}
+                  onEdit={onEdit}
                   orderStatusLabels={orderStatusLabels}
                   orderStatusColors={orderStatusColors}
                   productionStatus={productionStatuses.find(ps => ps.orderId === order.id)}
