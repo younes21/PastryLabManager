@@ -36,7 +36,7 @@ import {
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
   InventoryOperation,
-  stock,
+  stock as stockTable,
   articles,
   storageZones,
   lots,
@@ -3007,17 +3007,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Retirer du stock
-            await db.insert(stock).values({
-              articleId: item.articleId,
-              storageZoneId: item.toStorageZoneId,
-              lotId: item.lotId ?? null,
-              serialNumber: item.serialNumber ?? null,
-              quantity: -qty,
-              updatedAt: new Date()
+            await db.insert(stockTable).values({
+              articleId: item.articleId as typeof stockTable.$inferInsert["articleId"],
+              storageZoneId: item.toStorageZoneId as typeof stockTable.$inferInsert["storageZoneId"],
+              lotId: (item.lotId ?? null) as typeof stockTable.$inferInsert["lotId"],
+              serialNumber: (item.serialNumber ?? null) as typeof stockTable.$inferInsert["serialNumber"],
+              quantity: (-qty).toString(),
+              updatedAt: new Date().toISOString()
             }).onConflictDoUpdate({
-              target: ["article_id", "storage_zone_id", "lot_id", "serial_number"],
+              target: [stockTable.articleId, stockTable.storageZoneId, stockTable.lotId, stockTable.serialNumber],
               set: {
-                quantity: sql`${stock.quantity} - ${qty}`,
+                quantity: sql`${stockTable.quantity} - ${qty}`,
                 updatedAt: sql`now()`
               }
             });
@@ -3077,7 +3077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Si l'opération est maintenant complétée, ajouter les nouveaux stocks
-      if (updatedOp.status === 'completed') {
+      if (updatedOp && updatedOp.status === 'completed') {
         for (const it of body.items ?? []) {
           const qty = Number(it.quantityOrdered) || 0;
           if (qty > 0) {
@@ -3086,17 +3086,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Ajouter au stock
-            await db.insert(stock).values({
-              articleId: it.articleId,
-              storageZoneId: it.storageZoneId,
-              lotId: it.lotId ?? null,
-              serialNumber: it.serialNumber ?? null,
-              quantity: qty,
-              updatedAt: new Date()
+            await db.insert(stockTable).values({
+              articleId: it.articleId as typeof stockTable.$inferInsert["articleId"],
+              storageZoneId: it.storageZoneId as typeof stockTable.$inferInsert["storageZoneId"],
+              lotId: (it.lotId ?? null) as typeof stockTable.$inferInsert["lotId"],
+              serialNumber: (it.serialNumber ?? null) as typeof stockTable.$inferInsert["serialNumber"],
+              quantity: qty.toString(),
+              updatedAt: new Date().toISOString()
             }).onConflictDoUpdate({
-              target: ["article_id", "storage_zone_id", "lot_id", "serial_number"],
+              target: [stockTable.articleId, stockTable.storageZoneId, stockTable.lotId, stockTable.serialNumber],
               set: {
-                quantity: sql`${stock.quantity} + ${qty}`,
+                quantity: sql`${stockTable.quantity} + ${qty}`,
                 updatedAt: sql`now()`
               }
             });
@@ -3369,11 +3369,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const stockItems = await db
         .select({
-          id: stock.id,
-          articleId: stock.articleId,
-          storageZoneId: stock.storageZoneId,
-          quantity: stock.quantity,
-          lotId: stock.lotId,
+          id: stockTable.id,
+          articleId: stockTable.articleId,
+          storageZoneId: stockTable.storageZoneId,
+          quantity: stockTable.quantity,
+          lotId: stockTable.lotId,
           article: {
             id: articles.id,
             code: articles.code,
@@ -3396,10 +3396,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             expirationDate: lots.expirationDate,
           },
         })
-        .from(stock)
-        .leftJoin(articles, eq(stock.articleId, articles.id))
-        .leftJoin(storageZones, eq(stock.storageZoneId, storageZones.id))
-        .leftJoin(lots, eq(stock.lotId, lots.id))
+        .from(stockTable)
+        .leftJoin(articles, eq(stockTable.articleId, articles.id))
+        .leftJoin(storageZones, eq(stockTable.storageZoneId, storageZones.id))
+        .leftJoin(lots, eq(stockTable.lotId, lots.id))
         .where(eq(articles.active, true));
 
       res.json(stockItems);
@@ -3567,8 +3567,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoice = await storage.createInvoiceFromDelivery(operationId, invoiceData);
       res.status(201).json(invoice);
     } catch (error) {
-      console.error("Error creating invoice from delivery:", error);
-      res.status(400).json({ message: error.message || "Failed to create invoice from delivery" });
+      console.error("Error creating invoice from delivery:", error instanceof Error ? error.message : error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create invoice from delivery" });
     }
   });
 
@@ -3872,10 +3872,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(storageZones)
         .where(
           sql`EXISTS (
-            SELECT 1 FROM ${stock} 
-            WHERE ${stock.articleId} = ${articleIdNum} 
-            AND ${stock.storageZoneId} = ${storageZones.id}
-            AND ${stock.quantity} > 0
+            SELECT 1 FROM ${stockTable} 
+            WHERE ${stockTable.articleId} = ${articleIdNum} 
+            AND ${stockTable.storageZoneId} = ${storageZones.id}
+            AND ${stockTable.quantity} > 0
           )`
         );
 
@@ -3889,14 +3889,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const zone of articleZones) {
           // Récupérer le stock disponible pour ce lot et cette zone
           const stockQuery = await db
-            .select({ quantity: stock.quantity })
-            .from(stock)
+            .select({ quantity: stockTable.quantity })
+            .from(stockTable)
             .where(
               and(
-                eq(stock.articleId, articleIdNum),
-                eq(stock.storageZoneId, zone.id),
-                eq(stock.lotId, lot.id),
-                sql`${stock.quantity} > 0`
+                eq(stockTable.articleId, articleIdNum),
+                eq(stockTable.storageZoneId, zone.id),
+                eq(stockTable.lotId, lot.id),
+                sql`${stockTable.quantity} > 0`
               )
             );
 
@@ -3934,22 +3934,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (articleLots.length === 0 || availability.length==0) {
         for (const zone of articleZones) {
           const stockQuery = await db
-            .select({ quantity: stock.quantity })
-            .from(stock)
+            .select({ quantity: stockTable.quantity })
+            .from(stockTable)
             .where(
               and(
-                eq(stock.articleId, articleIdNum),
-                eq(stock.storageZoneId, zone.id),
-                isNull(stock.lotId),
-                sql`${stock.quantity} > 0`
+                eq(stockTable.articleId, articleIdNum),
+                eq(stockTable.storageZoneId, zone.id),
+                isNull(stockTable.lotId),
+                sql`${stockTable.quantity} > 0`
               )
             );
 
           if (stockQuery.length > 0) {
             const stockQuantity = parseFloat(stockQuery[0].quantity);
 
+            // Calculer les réservations pour cette zone (sans lot)
+            // ATTENTION : StockReservation n'a pas de fromStorageZoneId
+            // On additionne toutes les réservations de l'article (approximation)
             const reservedQuantity = reservations
-              .filter(r => !r.lotId && r.fromStorageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
 
             const availableQuantity = stockQuantity - reservedQuantity;
@@ -4201,8 +4203,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Vérifier s'il y a des stocks associés à ce lot
       const stockWithLot = await db
         .select()
-        .from(stock)
-        .where(eq(stock.lotId, parseInt(id)))
+        .from(stockTable)
+        .where(eq(stockTable.lotId, parseInt(id)))
         .limit(1);
 
       if (stockWithLot.length > 0) {
