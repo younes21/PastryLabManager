@@ -2029,6 +2029,313 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Récap global des produits: calcule qté commandée, qté à prélever (stock), qté à produire
+  app.get("/api/orders/production-summary", async (req, res) => {
+    try {
+      const { search, status, type, clientId, date, dateFrom, dateTo } = req.query as Record<string, string | undefined>;
+  
+      // 1) charger toutes les commandes confirmées
+      let allOrders = await storage.getAllOrders();
+      allOrders = allOrders.filter((o: any) => o.status === "confirmed");
+  
+      // Helper: normaliser une date en "date only" (00:00:00 locale). Retourne null si invalide.
+      const toDateOnly = (input?: string | Date | null): Date | null => {
+        if (!input) return null;
+        const d = (input instanceof Date) ? input : new Date(input);
+        if (isNaN(d.getTime())) return null;
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      };
+  
+      const today = toDateOnly(new Date())!;
+      const yesterday = toDateOnly(new Date(Date.now() - 86400000))!;
+      const tomorrow = toDateOnly(new Date(Date.now() + 86400000))!;
+  
+      // Charger clients (map)
+      const clientsList = await storage.getAllClients();
+      const clientsMap: Record<number, any> = {};
+      clientsList.forEach((c: any) => { clientsMap[c.id] = c; });
+  
+      // Fonction de filtrage pour l'AFFICHAGE SEUL (ne modifie pas la consommation)
+      const isInFilter = (o: any): boolean => {
+        if (status && status !== "all" && o.status !== status) return false;
+        if (type && type !== "all" && o.type !== type) return false;
+        if (clientId && clientId !== "all" && o.clientId !== parseInt(clientId)) return false;
+  
+        if (date && date !== "all") {
+          const raw = o.orderDate || o.createdAt;
+          if (!raw) return false;
+          const od = toDateOnly(raw);
+          if (!od) return false;
+  
+          if (date === "today" && od.getTime() !== today.getTime()) return false;
+          if (date === "yesterday" && od.getTime() !== yesterday.getTime()) return false;
+          if (date === "tomorrow" && od.getTime() !== tomorrow.getTime()) return false;
+  
+          if (date === "range") {
+            const from = toDateOnly(dateFrom);
+            const to = toDateOnly(dateTo);
+          
+            if (!from && !to) {
+              // aucun filtre appliqué
+            } else if (from && !to) {
+              if (od.getTime() < from.getTime()) return false;
+            } else if (!from && to) {
+              if (od.getTime() > to.getTime()) return false;
+            } else if (from && to) {
+              // swap si inversé
+              const start = from.getTime() <= to.getTime() ? from : to;
+              const end = from.getTime() <= to.getTime() ? to : from;
+              if (od.getTime() < start.getTime() || od.getTime() > end.getTime()) return false;
+            }
+          }
+        }
+  
+        if (search && search.trim()) {
+          const s = search.toLowerCase();
+          const client = clientsMap[o.clientId];
+          const clientName = client ? (client.type !== "societe" ? `${client.firstName} ${client.lastName}` : client.companyName) : "";
+          const code = (o.code || "").toString().toLowerCase();
+          if (!code.includes(s) && !clientName.toLowerCase().includes(s)) return false;
+        }
+  
+        return true;
+      };
+  
+      // 2) trier par priorité
+      const allOrdersSorted = allOrders.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+      const filteredIds = new Set<number>(allOrdersSorted.filter(isInFilter).map((o: any) => o.id));
+  
+      // 3) charger items pour TOUTES les commandes (consommation virtuelle se fait sur toutes)
+      const ordersWithItems = await Promise.all(
+        allOrdersSorted.map(async (o: any) => ({ ...o, items: await storage.getOrderItems(o.id) }))
+      );
+  
+      // 4) préparer stock initial (par article) et info article
+      const articleIds = new Set<number>();
+      ordersWithItems.forEach(o => o.items.forEach((it: any) => articleIds.add(it.articleId)));
+  
+      const stockVirtuel: Record<number, number> = {};
+      const articleInfo: Record<number, any> = {};
+  
+      // paralléliser les fetchs pour perf
+      await Promise.all(Array.from(articleIds).map(async (articleId) => {
+        stockVirtuel[articleId] = await storage.getAvailableStock(articleId) || 0;
+        const art = await storage.getArticle(articleId);
+        articleInfo[articleId] = { name: art?.name || `Article ${articleId}`, photo: art?.photo || null, unit: art?.saleUnit || art?.unit || null };
+      }));
+  
+      // 5) agrégation : on CONSUME le stock sur toutes les commandes (ordre priorité),
+      // mais on n'AGREGATE (ordered/toPick/toProduce) que si la commande est dans le filtre
+      const agg: Record<number, { articleId: number; ordered: number; toPick: number; toProduce: number }> = {};
+  
+      for (const order of ordersWithItems) {
+        const shouldAggregate = filteredIds.has(order.id);
+  
+        for (const item of order.items) {
+          const articleId = item.articleId as number;
+          const qCommande = Number(item.quantity) || 0;
+  
+          if (!agg[articleId]) agg[articleId] = { articleId, ordered: 0, toPick: 0, toProduce: 0 };
+  
+          // 1) si la commande est dans le filtre, on compte Ordered (TOUJOURS)
+          if (shouldAggregate) {
+            agg[articleId].ordered += qCommande;
+          }
+  
+          let remaining = qCommande;
+  
+          // 2) prélever sur stock virtuel (toujours consommé)
+          const qStock = stockVirtuel[articleId] || 0;
+          if (qStock > 0) {
+            const qFromStock = Math.min(remaining, qStock);
+            if (shouldAggregate) {
+              agg[articleId].toPick += qFromStock;
+            }
+            stockVirtuel[articleId] = qStock - qFromStock;
+            remaining -= qFromStock;
+          }
+  
+          // 3) le reste est à produire => uniquement agrégé si commande filtrée
+          if (remaining > 0 && shouldAggregate) {
+            agg[articleId].toProduce += remaining;
+          }
+        }
+      }
+  
+      // 6) construire la réponse (par défaut on renvoie uniquement les articles avec ordered>0)
+      const result = Object.values(agg)
+        .filter(r => r.ordered > 0)
+        .map(r => ({
+          articleId: r.articleId,
+          name: articleInfo[r.articleId]?.name || `Article ${r.articleId}`,
+          photo: articleInfo[r.articleId]?.photo || null,
+          unit: articleInfo[r.articleId]?.unit || null,
+          ordered: r.ordered,
+          toPick: r.toPick,
+          toProduce: r.toProduce
+        }))
+        .sort((a, b) => b.toProduce - a.toProduce);
+  
+      res.json(result);
+  
+    } catch (error) {
+      console.error("Erreur production-summary:", error);
+      res.status(500).json({ message: "Échec du calcul du récapitulatif" });
+    }
+  });
+  
+  
+  // app.get("/api/orders/production-summary", async (req, res) => {
+  //   try {
+  //     const { search, status, type, clientId, date, dateFrom, dateTo } = req.query as Record<string, string | undefined>;
+
+  //     // Charger toutes les commandes actives (consommation virtuelle se fait sur TOUTES)
+  //     let allActiveOrders = await storage.getAllOrders();
+  //     allActiveOrders = allActiveOrders
+  //       .filter((o: any) => o.status == 'confirmed' );
+
+  //     // Préparer fonctions pour filtrage (uniquement pour la sélection à agréger, PAS pour la consommation)
+  //     const normalizeDate = (d: Date) => { const n = new Date(d); n.setHours(0,0,0,0); return n; };
+  //     const today = normalizeDate(new Date());
+  //     const yesterday = normalizeDate(new Date(Date.now() - 24*60*60*1000));
+  //     const tomorrow = normalizeDate(new Date(Date.now() + 24*60*60*1000));
+  //     // Construire l'ensemble des IDs filtrés, sans impacter la consommation
+  //     const clientsMap: Record<number, any> = {};
+  //     const clients = await storage.getAllClients();
+  //     clients.forEach((c: any) => { clientsMap[c.id] = c; });
+  //     const isInFilter = (o: any) => {
+  //       // status/type
+  //       if (status && status !== 'all' && o.status !== status) return false;
+  //       if (type && type !== 'all' && o.type !== type) return false;
+  //       if (clientId && clientId !== 'all' && o.clientId !== parseInt(clientId)) return false;
+  //       if (date && date !== 'all') {
+  //         const d = o.orderDate || o.createdAt;
+  //         if (!d) return false;
+  //         const od = normalizeDate(new Date(d));
+  //         if (date === 'today' && od.getTime() !== today.getTime()) return false;
+  //         if (date === 'yesterday' && od.getTime() !== yesterday.getTime()) return false;
+  //         if (date === 'tomorrow' && od.getTime() !== tomorrow.getTime()) return false;
+  //         if (date === 'range') {
+  //           if (dateFrom && dateTo) {
+  //             const from = normalizeDate(new Date(dateFrom));
+  //             const to = normalizeDate(new Date(dateTo));
+  //             if (!(od >= from && od <= to)) return false;
+  //           }
+  //         }
+  //       }
+  //       if (search && search.trim().length > 0) {
+  //         const s = search.toLowerCase();
+  //         const client = clientsMap[o.clientId];
+  //         const clientName = client ? (client.type !== 'societe' ? `${client.firstName} ${client.lastName}` : client.companyName) : '';
+  //         const match = (o.code || '').toLowerCase().includes(s) || clientName.toLowerCase().includes(s);
+  //         if (!match) return false;
+  //       }
+  //       return true;
+  //     };
+  //     // Trier toutes les commandes actives par priorité
+  //     const allOrdersSorted = allActiveOrders.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+  //     const filteredIds = new Set<number>(allOrdersSorted.filter(isInFilter).map((o: any) => o.id));
+
+  //     // Charger items pour toutes les commandes actives (consommation) dans l'ordre
+  //     const ordersWithItems = await Promise.all(
+  //       allOrdersSorted.map(async (o: any) => ({ ...o, items: await storage.getOrderItems(o.id) }))
+  //     );
+
+  //     // Collecte des articles
+  //     const allArticleIds = new Set<number>();
+  //     ordersWithItems.forEach(order => {
+  //       order.items.forEach((it: any) => allArticleIds.add(it.articleId));
+  //     });
+
+  //     // Stock dispo et infos articles
+  //     const stockData: Record<number, number> = {};
+  //     const articleInfo: Record<number, { name: string; photo?: string | null; unit?: string | null }> = {};
+  //     for (const articleId of Array.from(allArticleIds)) {
+  //       stockData[articleId] = await storage.getAvailableStock(articleId);
+  //       const art = await storage.getArticle(articleId);
+  //       articleInfo[articleId] = { name: art?.name || `Article ${articleId}`, photo: art?.photo, unit: art?.saleUnit || art?.unit };
+  //     }
+
+  //     // Opérations de fabrication en cours
+  //     const operations = await storage.getInventoryOperationsByType('fabrication');
+  //     const opsByArticle: Record<number, Array<{ id: number; quantity: number }>> = {};
+  //     if (Array.isArray(operations)) {
+  //       for (const op of operations) {
+  //         if (op.status === 'en_cours' && Array.isArray(op.items)) {
+  //           for (const item of op.items) {
+  //             if (!opsByArticle[item.articleId]) opsByArticle[item.articleId] = [];
+  //             opsByArticle[item.articleId].push({ id: op.id, quantity: parseFloat(item.quantity) });
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     // Copies virtuelles
+  //     const stockVirtuel: Record<number, number> = { ...stockData };
+  //     const opsVirtuelles: Record<number, Array<{ id: number; quantity: number }>> = JSON.parse(JSON.stringify(opsByArticle));
+
+  //     // Agrégation
+  //     const agg: Record<number, { articleId: number; ordered: number; toPick: number; toProduce: number }>= {};
+
+  //     for (const order of ordersWithItems) {
+  //       for (const item of order.items) {
+  //         const articleId = item.articleId as number;
+  //         const qCommande = parseFloat(item.quantity);
+  //         const shouldAggregate = filteredIds.has(order.id);
+  //         if (shouldAggregate) {
+  //           if (!agg[articleId]) agg[articleId] = { articleId, ordered: 0, toPick: 0, toProduce: 0 };
+  //           agg[articleId].ordered += qCommande;
+  //         } else {
+  //           if (!agg[articleId]) agg[articleId] = { articleId, ordered: 0, toPick: 0, toProduce: 0 };
+  //         }
+
+  //         let remaining = qCommande;
+
+  //         // 1) Prélever sur stock
+  //         const qStock = stockVirtuel[articleId] || 0;
+  //         if (qStock > 0) {
+  //           const qFromStock = Math.min(remaining, qStock);
+  //           if (shouldAggregate) agg[articleId].toPick += qFromStock;
+  //           stockVirtuel[articleId] = qStock - qFromStock;
+  //           remaining -= qFromStock;
+  //         }
+
+  //         // 2) Couvrir par opérations en cours
+  //         let ops = opsVirtuelles[articleId];
+  //         while (remaining > 0 && ops && ops.length > 0) {
+  //           const use = Math.min(remaining, ops[0].quantity);
+  //           ops[0].quantity -= use;
+  //           if (ops[0].quantity <= 0) ops.shift();
+  //           remaining -= use;
+  //         }
+  //         opsVirtuelles[articleId] = ops || [];
+
+  //         // 3) Ce qui reste est à produire
+  //         if (remaining > 0) {
+  //           if (shouldAggregate) agg[articleId].toProduce += remaining;
+  //           remaining = 0;
+  //         }
+  //       }
+  //     }
+
+  //     // Construire la réponse
+  //     const result = Object.values(agg).filter(row => row.ordered > 0).map(row => ({
+  //       articleId: row.articleId,
+  //       name: articleInfo[row.articleId]?.name || `Article ${row.articleId}`,
+  //       photo: articleInfo[row.articleId]?.photo || null,
+  //       unit: articleInfo[row.articleId]?.unit || null,
+  //       ordered: row.ordered,
+  //       toPick: row.toPick,
+  //       toProduce: row.toProduce,
+  //     })).sort((a, b) => b.toProduce - a.toProduce);
+
+  //     res.json(result);
+  //   } catch (error) {
+  //     console.error("Erreur production-summary:", error);
+  //     res.status(500).json({ message: "Échec du calcul du récapitulatif" });
+  //   }
+  // });
+
   app.get("/api/orders/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -3905,7 +4212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Calculer les réservations pour ce lot et cette zone
             const reservedQuantity = reservations
-              .filter(r => r.lotId === lot.id && r.fromStorageZoneId === zone.id)
+              .filter(r => (r as any).lotId === lot.id && (r as any).fromStorageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
 
             const availableQuantity = stockQuantity - reservedQuantity;

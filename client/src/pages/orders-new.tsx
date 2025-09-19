@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search,
@@ -83,6 +85,7 @@ export default function OrdersPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [recapLoading, setRecapLoading] = useState(false);
 
   // Queries
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
@@ -147,7 +150,7 @@ export default function OrdersPage() {
     if (order.status === "draft" || order.status === "cancelled") {
       return "not_started";
     }
-    
+
     // Pour les commandes confirmées, on peut déterminer l'état de production
     // basé sur les quantités préparées vs commandées
     // Note: Cette logique pourrait être améliorée avec des données réelles de production
@@ -160,48 +163,66 @@ export default function OrdersPage() {
     } else if (order.status === "delivered") {
       return "completed";
     }
-    
+
     return "not_started";
   };
 
   // Fonction pour vérifier si une date correspond au filtre
   const matchesDateFilter = (orderDate: string | null) => {
     if (!orderDate) return false;
-    
+
     const orderDateObj = new Date(orderDate);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     // Normaliser les dates (ignorer l'heure)
     const normalizeDate = (date: Date) => {
       const normalized = new Date(date);
       normalized.setHours(0, 0, 0, 0);
       return normalized;
     };
-    
+
     const normalizedOrderDate = normalizeDate(orderDateObj);
     const normalizedToday = normalizeDate(today);
     const normalizedYesterday = normalizeDate(yesterday);
     const normalizedTomorrow = normalizeDate(tomorrow);
-    
+
     switch (filterDate) {
       case "today":
         return normalizedOrderDate.getTime() === normalizedToday.getTime();
+    
       case "yesterday":
         return normalizedOrderDate.getTime() === normalizedYesterday.getTime();
+    
       case "tomorrow":
         return normalizedOrderDate.getTime() === normalizedTomorrow.getTime();
-      case "range":
-        if (!filterDateFrom || !filterDateTo) return true;
-        const fromDate = normalizeDate(new Date(filterDateFrom));
-        const toDate = normalizeDate(new Date(filterDateTo));
-        return normalizedOrderDate >= fromDate && normalizedOrderDate <= toDate;
+    
+      case "range": {
+        // Si les deux vides → pas de filtre
+        if (!filterDateFrom && !filterDateTo) return true;
+    
+        const fromDate = filterDateFrom ? normalizeDate(new Date(filterDateFrom)) : null;
+        const toDate = filterDateTo ? normalizeDate(new Date(filterDateTo)) : null;
+    
+        if (fromDate && toDate) {
+          return normalizedOrderDate >= fromDate && normalizedOrderDate <= toDate;
+        }
+        if (fromDate) {
+          return normalizedOrderDate >= fromDate;
+        }
+        if (toDate) {
+          return normalizedOrderDate <= toDate;
+        }
+        return true;
+      }
+    
       default:
         return true;
     }
+    
   };
 
   // Filtrage et tri
@@ -212,10 +233,10 @@ export default function OrdersPage() {
       const matchesStatus = !filterStatus || filterStatus === "all" || order.status === filterStatus;
       const matchesType = !filterType || filterType === "all" || order.type === filterType;
       const matchesClient = !filterClient || filterClient === "all" || order.clientId.toString() === filterClient;
-      const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(order.orderDate || order.createdAt);
-      const matchesProductionStatus = !filterProductionStatus || filterProductionStatus === "all" || 
+      const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(order.orderDate);
+      const matchesProductionStatus = !filterProductionStatus || filterProductionStatus === "all" ||
         getProductionStatus(order) === filterProductionStatus;
-      
+
       return matchesSearch && matchesStatus && matchesType && matchesClient && matchesDate && matchesProductionStatus;
     })
     .sort((a, b) => {
@@ -238,6 +259,22 @@ export default function OrdersPage() {
         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
       }
     });
+
+  // Récupération des lignes d'articles pour les commandes filtrées
+  const orderIds = filteredAndSortedOrders.map(o => o.id);
+  const { data: orderItemsByOrder = {}, isLoading: orderItemsLoading } = useQueryTanstack<{ [orderId: number]: any[] }>({
+    queryKey: ["/api/orders/items", orderIds],
+    enabled: orderIds.length > 0,
+    queryFn: async () => {
+      const result: { [orderId: number]: any[] } = {};
+      await Promise.all(orderIds.map(async (id) => {
+        const res = await fetch(`/api/orders/${id}/items`);
+        const json = await res.json();
+        result[id] = json || [];
+      }));
+      return result;
+    }
+  });
 
   // Handlers
   const handleCreate = () => {
@@ -331,181 +368,191 @@ export default function OrdersPage() {
       </div>
     );
   }
-  
-  usePageTitle('Gestion des commandes'); 
-  
+
+  usePageTitle('Gestion des commandes');
+
   return (
     <div className="container mx-auto min-w-full p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-muted-foreground">
-            Gestion des commandes et devis clients
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <OrderForm />
-        </div>
-      </div>
-
-      {/* Filtres et recherche */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtres et recherche
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filtres et recherche
+            </CardTitle>
+            <OrderForm />
+          </div>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-
-
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger data-testid="select-filter-status">
-                <SelectValue placeholder="Filtrer par statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                {Object.entries(orderStatusLabels).map(([status, label]) => (
-                  <SelectItem key={status} value={status}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger data-testid="select-filter-type">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="quote">Devis</SelectItem>
-                <SelectItem value="order">Commande</SelectItem>
-              </SelectContent>
-            </Select> */}
-
-            <Select value={filterClient} onValueChange={setFilterClient}>
-              <SelectTrigger data-testid="select-filter-client">
-                <SelectValue placeholder="👤 Client" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les clients</SelectItem>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id.toString()}>
-                    {client.type !== 'societe' 
-                      ? `${client.firstName} ${client.lastName}` 
-                      : client.companyName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={filterDate} onValueChange={setFilterDate}>
-              <SelectTrigger data-testid="select-filter-date">
-                <SelectValue placeholder="📅 Date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les dates</SelectItem>
-                <SelectItem value="today">Aujourd'hui</SelectItem>
-                <SelectItem value="yesterday">Hier</SelectItem>
-                <SelectItem value="tomorrow">Demain</SelectItem>
-                <SelectItem value="range">Intervalle personnalisé</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={filterProductionStatus} onValueChange={setFilterProductionStatus}>
-              <SelectTrigger data-testid="select-filter-production">
-                <SelectValue placeholder="⚙️ État de production" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les états</SelectItem>
-                {Object.entries(productionStatusLabels).map(([status, label]) => (
-                  <SelectItem key={status} value={status}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="flex gap-2">
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                <SelectTrigger data-testid="select-sort-by">
-                  <SelectValue placeholder="Trier par" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6  gap-3 items-end">
+            <div className="col-span-1">
+              {/* Statut */}
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger data-testid="select-filter-status" className="h-9 text-sm">
+                  <SelectValue placeholder="Statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="order">Ordre personnalisé</SelectItem>
-                  <SelectItem value="orderDate">Date</SelectItem>
-                  <SelectItem value="code">Référence</SelectItem>
-                  <SelectItem value="totalTTC">Montant</SelectItem>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {Object.entries(orderStatusLabels).map(([status, label]) => (
+                    <SelectItem key={status} value={status}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                data-testid="button-sort-order"
-              >
-                {sortOrder === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
-              </Button>
             </div>
-          </div>
-          
-          {/* Filtres de date personnalisés */}
-          {filterDate === "range" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t bg-gray-50 p-4 rounded-lg">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Date de début
-                </label>
+
+            <div className="col-span-2">
+              {/* État production */}
+              <Select value={filterProductionStatus} onValueChange={setFilterProductionStatus}>
+                <SelectTrigger data-testid="select-filter-production" className="h-9 text-sm">
+                  <SelectValue placeholder="⚙️ Prod." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {Object.entries(productionStatusLabels).map(([status, label]) => (
+                    <SelectItem key={status} value={status}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Client */}
+            <div className="col-span-3">
+              <label className="text-xs text-gray-600"> Client</label>
+              <Select value={filterClient} onValueChange={setFilterClient}>
+                <SelectTrigger data-testid="select-filter-client" className="h-9 text-sm">
+                  <SelectValue placeholder="👤 Client" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.type !== 'societe'
+                        ? `${client.firstName} ${client.lastName}`
+                        : client.companyName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Dates */}
+            <div className="flex gap-2 col-span-3">
+              <div className="flex flex-col space-y-1 flex-1">
+                <label className="text-xs text-gray-600">📅 Début</label>
                 <Input
                   type="date"
                   value={filterDateFrom}
-                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
                   data-testid="input-date-from"
+                  className="h-9 text-sm"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Date de fin
-                </label>
+              <div className="flex flex-col space-y-1 flex-1">
+                <label className="text-xs text-gray-600">📅 Fin</label>
                 <Input
                   type="date"
                   value={filterDateTo}
-                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
                   data-testid="input-date-to"
+                  className="h-9 text-sm"
                 />
               </div>
             </div>
-          )}
+
+            {/* Boutons rapides */}
+            <div className="flex  col-span-3 items-center justify-center gap-2">
+              {[
+                { label: "Aujourd'hui", value: "today" },
+                { label: "Hier", value: "yesterday" },
+                { label: "Demain", value: "tomorrow" },
+              ].map(({ label, value }) => (
+                <Button
+                  key={value}
+                  variant={filterDate === value ? "default" : "outline"}
+                  size="sm"
+                  className={`rounded-full ${filterDate === value ? "bg-blue-600 text-white" : ""
+                    }`}
+                  onClick={() => {
+                    const base = new Date();
+                    let d: Date;
+                    if (value === "yesterday") d = new Date(base.getTime() - 86400000);
+                    else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
+                    else d = base;
+                    const iso = d.toISOString().split("T")[0];
+                    setFilterDate(value);
+
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+
+              {/* Bouton reset */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
+                onClick={() => {
+                  setFilterDate("all");
+                  setFilterDateFrom("");
+                  setFilterDateTo("");
+                }}
+              >
+                Réinitialiser
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Tableau des commandes */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Liste des commandes ({filteredAndSortedOrders.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <OrdersTable
-            orders={filteredAndSortedOrders}
-            clients={clients}
-            products={products}
-            onStatusChange={handleStatusChange}
-            onDelete={handleDelete}
-            onView={setViewingOrder}
-            onReorder={handleReorder}
-            orderStatusLabels={orderStatusLabels}
-            orderStatusColors={orderStatusColors}
-            isLoading={ordersLoading}
+
+
+      {/* Onglets: Liste des commandes / Récap */}
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="list">Liste des commandes</TabsTrigger>
+          <TabsTrigger value="recap">Récap</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Liste des commandes ({filteredAndSortedOrders.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <OrdersTable
+                orders={filteredAndSortedOrders}
+                clients={clients}
+                products={products}
+                onStatusChange={handleStatusChange}
+                onDelete={handleDelete}
+                onView={setViewingOrder}
+                onReorder={handleReorder}
+                orderStatusLabels={orderStatusLabels}
+                orderStatusColors={orderStatusColors}
+                isLoading={ordersLoading}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recap" className="space-y-4">
+          <ProductsRecapServer
+            filters={{
+              search: searchTerm,
+              status: filterStatus,
+              type: filterType,
+              clientId: filterClient,
+              date: filterDate,
+              dateFrom: filterDateFrom,
+              dateTo: filterDateTo,
+            }}
           />
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Modale de consultation */}
       <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
@@ -572,7 +619,7 @@ export default function OrdersPage() {
                 </div>
                 <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
               </div>
-              
+
               {/* Bouton pour afficher les livraisons liées */}
               <div className="flex justify-center mt-6">
                 <Button
@@ -603,12 +650,12 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
     },
     enabled: !!orderId,
   });
-  
+
   if (isLoading) return <div>Chargement des articles...</div>;
   if (!items || items.length === 0) return <div className="text-gray-400 italic">Aucun article</div>;
 
   const totalHT = items.reduce((sum: number, item: any) => sum + parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0"), 0);
-  
+
   return (
     <>
       <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm">
@@ -641,4 +688,104 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
       </div>
     </>
   );
+}
+
+function ProductsRecapServer({ filters }: { filters: { search: string; status: string; type: string; clientId: string; date: string; dateFrom: string; dateTo: string; } }) {
+  const params = new URLSearchParams();
+  if (filters.search) params.set('search', filters.search);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.type) params.set('type', filters.type);
+  if (filters.clientId) params.set('clientId', filters.clientId);
+  if (filters.date) params.set('date', filters.date);
+  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+  if (filters.dateTo) params.set('dateTo', filters.dateTo);
+
+  const { data, isLoading } = useQueryTanstack<any[]>({
+    queryKey: ["/api/orders/production-summary", Object.fromEntries(params.entries())],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/production-summary?${params.toString()}`);
+      return res.json();
+    }
+  });
+
+  const rows = (data || []) as Array<{ articleId: number; name: string; photo?: string | null; unit?: string | null; ordered: number; toPick: number; toProduce: number }>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Package className="h-5 w-5" /> Récap par produit ({rows.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-sm text-gray-500">Chargement...</div>
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-gray-500 italic">Aucun article à afficher</div>
+        ) : (
+          <ScrollArea className="h-[60vh]">
+            <div className="w-full border rounded-lg overflow-hidden">
+              {/* Header du tableau */}
+              <div className="grid grid-cols-5 bg-slate-100 text-sm font-semibold text-slate-700">
+                <div className="p-3 col-span-2">Produit</div>
+                <div className="p-3 text-center">Qté commandée</div>
+                <div className="p-3 text-center">Qté à prélever</div>
+                <div className="p-3 text-center">Qté à produire</div>
+              </div>
+
+              {/* Lignes produits */}
+              <div className="divide-y divide-slate-200">
+                {rows.map((row) => (
+                  <div
+                    key={row.articleId}
+                    className="grid grid-cols-5 items-center hover:bg-slate-50 transition-colors"
+                  >
+                    {/* Produit */}
+                    <div className="flex items-center gap-3 p-3 col-span-2">
+                      <div className="w-12 h-12 rounded-md overflow-hidden bg-slate-100">
+                        {row.photo ? (
+                          <img
+                            src={row.photo}
+                            alt={row.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
+                            Aucune photo
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium text-slate-900">{row.name}</div>
+                        {/* <div className="text-xs text-slate-500">ID: {row.articleId}</div> */}
+                      </div>
+                    </div>
+
+                    {/* Qtés */}
+                    <div className="p-3 text-center">
+                      <div className="text-lg font-semibold text-slate-900">
+                        {row.ordered.toFixed(2)} {row.unit || ""}
+                      </div>
+                    </div>
+                    <div className="p-3 text-center">
+                      <div className="text-lg font-semibold text-blue-700">
+                        {row.toPick.toFixed(2)} {row.unit || ""}
+                      </div>
+                    </div>
+                    <div className="p-3 text-center">
+                      <div className="text-lg font-semibold text-amber-700">
+                        {row.toProduce.toFixed(2)} {row.unit || ""}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+
 }

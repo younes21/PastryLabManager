@@ -741,7 +741,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                       <SelectContent>
                         <SelectItem value="none">Aucune unité</SelectItem>
                         {measurementUnits?.map((unit) => (
-                          <SelectItem key={unit.id} value={unit.label}>
+                          <SelectItem key={unit.id} value={unit.abbreviation}>
                             {unit.label} ({unit.abbreviation})
                           </SelectItem>
                         ))}
