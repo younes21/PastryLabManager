@@ -20,6 +20,8 @@ import {
   Check,
   X,
   DollarSign,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type {
@@ -88,7 +90,7 @@ export default function ClientOrdersPage() {
   const [orderNotes, setOrderNotes] = useState("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-
+  const [isOpen, setIsOpen] = useState(true);
   // Récupérer le client connecté via son userId
   const storedUser = localStorage.getItem("user");
   let currentClientId = null;
@@ -681,47 +683,58 @@ export default function ClientOrdersPage() {
             {/* Sidebar des catégories */}
             <div className="lg:col-span-1">
               <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg sticky top-6">
-                <CardHeader>
-                  <CardTitle className="text-lg">Catégories</CardTitle>
+                <CardHeader
+                  className="flex flex-row items-center justify-between cursor-pointer"
+                  onClick={() => setIsOpen(!isOpen)}
+                >
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    Catégories
+                  </CardTitle>
+                  {isOpen ? (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-500" />
+                  )}
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setSelectedCategory(null)}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-all ${!selectedCategory
-                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
-                          : "hover:bg-orange-50 text-gray-700"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Package className="w-5 h-5" />
-                        <span className="font-medium">Tous les produits</span>
-                      </div>
-                    </button>
 
-                    {categories.map((category) => (
+                {isOpen && (
+                  <CardContent className="p-0">
+                    <div className="space-y-2">
+                      {/* Tous les produits */}
                       <button
-                        key={category.id}
-                        onClick={() => setSelectedCategory(category.id)}
-                        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${selectedCategory === category.id
+                        onClick={() => setSelectedCategory(null)}
+                        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${!selectedCategory
                             ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
                             : "hover:bg-orange-50 text-gray-700"
                           }`}
                       >
                         <div className="flex items-center gap-3">
                           <Package className="w-5 h-5" />
-                          <div>
-                            <div className="font-medium">
-                              {category.designation}
-                            </div>
-                            {/* Les catégories n'ont pas de description pour l'instant */}
-                          </div>
+                          <span className="font-medium">Tous les produits</span>
                         </div>
                       </button>
-                    ))}
-                  </div>
-                </CardContent>
+
+                      {/* Catégories */}
+                      {categories.map((category) => (
+                        <button
+                          key={category.id}
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={`w-full text-left px-4 py-3 rounded-lg transition-all ${selectedCategory === category.id
+                              ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                              : "hover:bg-orange-50 text-gray-700"
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Package className="w-5 h-5" />
+                            <div className="font-medium">{category.designation}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
+
             </div>
 
             {/* Grille des produits */}
@@ -749,101 +762,128 @@ export default function ClientOrdersPage() {
                       (item) => item.articleId === product.id,
                     );
                     const quantity = cartItem?.quantity || 0;
+                    const isUnavailable = product.saleStatus === "repture" || product.saleStatus === "nonDispo";
+                    let saleStatusLabel = "";
+                    if (product.saleStatus === "repture") saleStatusLabel = "Rupture";
+                    else if (product.saleStatus === "nonDispo") saleStatusLabel = "Non disponible";
+                    else if (product.saleStatus === "none" || !product.saleStatus) saleStatusLabel = "Disponible";
+                    else saleStatusLabel = product.saleStatus;
+
 
                     return (
                       <Card
                         key={product.id}
-                        className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all"
+
                       >
-                        <CardContent className="p-0">
-                          {/* Image du produit */}
-                          <div className="h-48 bg-gradient-to-br from-orange-100 to-amber-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
-                            {product.photo ? (
-                              <img
-                                src={product.photo}
-                                alt={product.name}
-                                className="w-full h-full object-cover rounded-t-lg mw-12 mh-12"
-                              />
-                            ) : (
-                              <Package className="w-16 h-16 text-orange-400" />
-                            )}
+                        <CardContent className="p-0 h-full relative">
 
-                            {/* Badge quantité dans le panier */}
-                            {quantity > 0 && (
-                              <Badge className="absolute top-2 right-2 bg-orange-500 text-white">
-                                {quantity}
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Informations produit */}
-                          <div className="p-4">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                              {product.name}
-                            </h3>
-
-                            <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                              {product.description || "\u00A0"}
+                          {/* Badge état de vente */}
+                          {saleStatusLabel && (
+                            <Badge className={`absolute z-10 top-2 left-2 ${isUnavailable ? "bg-red-800 text-white" : "bg-green-500 text-white"}`}>
+                              {saleStatusLabel}
+                            </Badge>
+                          )}
+                          {/* Badge état de vente */}
+                          {product.saleStatusReason && (
+                            <p className="absolute z-10 bottom-0 flex justify-center items-center min-h-24 font-bold w-full text-justify  bg-red-50 text-red-700 text-xs p-3 shadow-inner max-h-24 overflow-y-auto">
+                              🚫{product.saleStatusReason}
                             </p>
 
-                            <div className="flex justify-between items-center mb-4">
-                              <span className="text-2xl font-bold text-orange-600">
-                                {parseFloat(product.salePrice || "0").toFixed(
-                                  2,
-                                )}{" "}
-                                DA
-                              </span>
-                              <span className="text-sm text-gray-500">
-                                par {product.saleUnit}
-                              </span>
-                            </div>
-
-                            {/* Contrôles quantité */}
-                            <div className="flex items-center justify-between">
-                              {quantity === 0 ? (
-                                <Button
-                                  onClick={() => addToCart(product)}
-                                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-                                >
-                                  <Plus className="w-4 h-4 mr-2" />
-                                  Ajouter
-                                </Button>
+                          )}
+                          <div className={`h-full bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all ${isUnavailable ? "opacity-80 grayscale pointer-events-none" : ""}`}>
+                            {/* Image du produit */}
+                            <div className="h-48 bg-gradient-to-br from-orange-100 to-amber-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
+                              {product.photo ? (
+                                <img
+                                  src={product.photo}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover rounded-t-lg mw-12 mh-12"
+                                />
                               ) : (
-                                <div className="flex items-center justify-between w-full">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      updateCartQuantity(
-                                        product.id,
-                                        quantity - 1,
-                                      )
-                                    }
-                                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                                  >
-                                    <Minus className="w-4 h-4" />
-                                  </Button>
+                                <Package className="w-16 h-16 text-orange-400" />
+                              )}
 
-                                  <span className="text-lg font-semibold text-gray-900 px-4">
-                                    {quantity}
-                                  </span>
-
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      updateCartQuantity(
-                                        product.id,
-                                        quantity + 1,
-                                      )
-                                    }
-                                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                                  >
-                                    <Plus className="w-4 h-4" />
-                                  </Button>
-                                </div>
+                              {/* Badge quantité dans le panier */}
+                              {quantity > 0 && (
+                                <Badge className="absolute top-2 right-2 bg-orange-500 text-white">
+                                  {quantity}
+                                </Badge>
                               )}
                             </div>
+
+                            {/* Informations produit */}
+                            <div className="p-4">
+                              <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                                {product.name}
+                              </h3>
+
+                              <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                                {product.description || "\u00A0"}
+                              </p>
+
+                              <div className="flex justify-between items-center mb-4">
+                                <span className="text-2xl font-bold text-orange-600">
+                                  {parseFloat(product.salePrice || "0").toFixed(
+                                    2,
+                                  )}{" "}
+                                  DA
+                                </span>
+                                <span className="text-sm text-gray-500">
+                                  par {product.saleUnit}
+                                </span>
+                              </div>
+
+                              {/* Contrôles quantité */}
+                              <div className="flex items-center justify-between">
+                                {quantity === 0 ? (
+                                  <Button
+                                    onClick={() => addToCart(product)}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+                                    disabled={isUnavailable}
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Ajouter
+                                  </Button>
+                                ) : (
+                                  <div className="flex items-center justify-between w-full">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        updateCartQuantity(
+                                          product.id,
+                                          quantity - 1,
+                                        )
+                                      }
+                                      className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                                      disabled={isUnavailable}
+                                    >
+                                      <Minus className="w-4 h-4" />
+                                    </Button>
+
+                                    <span className="text-lg font-semibold text-gray-900 px-4">
+                                      {quantity}
+                                    </span>
+
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        updateCartQuantity(
+                                          product.id,
+                                          quantity + 1,
+                                        )
+                                      }
+                                      className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                                      disabled={isUnavailable}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
                           </div>
                         </CardContent>
                       </Card>
@@ -1119,8 +1159,8 @@ export default function ClientOrdersPage() {
       </div>
     );
   }
-  usePageTitle('Gestion des commandes'); 
-  return (result) ;
+  usePageTitle('Gestion des commandes');
+  return (result);
 }
 
 function OrderItemsSummary({ orderId, products }: { orderId: number; products: Article[] }) {
@@ -1155,7 +1195,12 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
               const product = products.find((p) => p.id === item.articleId);
               return (
                 <tr key={item.articleId}>
-                  <td className="p-2 font-semibold">{product ? product.name : item.articleId}</td>
+                  <td className="p-2 font-semibold">
+                    <div>
+                      <img src="product.photo"/>
+                    {product ? product.name : item.articleId}
+                    </div>
+                   </td>
                   <td className="p-2 text-right">{item.quantity}</td>
                   <td className="p-2 text-right">{parseFloat(item.unitPrice || "0").toFixed(2)} DA</td>
                   <td className="p-2 text-right font-semibold">{(parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0")).toFixed(2)} DA</td>

@@ -169,10 +169,10 @@ export default function OrdersPage() {
   };
 
   // Fonction pour vérifier si une date correspond au filtre
-  const matchesDateFilter = (orderDate: string | null) => {
-    if (!orderDate) return false;
+  const matchesDateFilter = (DeliveryDate: string | null) => {
+    if (!DeliveryDate) return false;
 
-    const orderDateObj = new Date(orderDate);
+    const DeliveryDateObj = new Date(DeliveryDate);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -186,20 +186,20 @@ export default function OrdersPage() {
       return normalized;
     };
 
-    const normalizedOrderDate = normalizeDate(orderDateObj);
+    const normalizedDeliveryDate = normalizeDate(DeliveryDateObj);
     const normalizedToday = normalizeDate(today);
     const normalizedYesterday = normalizeDate(yesterday);
     const normalizedTomorrow = normalizeDate(tomorrow);
 
     switch (filterDate) {
       case "today":
-        return normalizedOrderDate.getTime() === normalizedToday.getTime();
+        return normalizedDeliveryDate.getTime() === normalizedToday.getTime();
     
       case "yesterday":
-        return normalizedOrderDate.getTime() === normalizedYesterday.getTime();
+        return normalizedDeliveryDate.getTime() === normalizedYesterday.getTime();
     
       case "tomorrow":
-        return normalizedOrderDate.getTime() === normalizedTomorrow.getTime();
+        return normalizedDeliveryDate.getTime() === normalizedTomorrow.getTime();
     
       case "range": {
         // Si les deux vides → pas de filtre
@@ -209,13 +209,13 @@ export default function OrdersPage() {
         const toDate = filterDateTo ? normalizeDate(new Date(filterDateTo)) : null;
     
         if (fromDate && toDate) {
-          return normalizedOrderDate >= fromDate && normalizedOrderDate <= toDate;
+          return normalizedDeliveryDate >= fromDate && normalizedDeliveryDate <= toDate;
         }
         if (fromDate) {
-          return normalizedOrderDate >= fromDate;
+          return normalizedDeliveryDate >= fromDate;
         }
         if (toDate) {
-          return normalizedOrderDate <= toDate;
+          return normalizedDeliveryDate <= toDate;
         }
         return true;
       }
@@ -234,7 +234,7 @@ export default function OrdersPage() {
       const matchesStatus = !filterStatus || filterStatus === "all" || order.status === filterStatus;
       const matchesType = !filterType || filterType === "all" || order.type === filterType;
       const matchesClient = !filterClient || filterClient === "all" || order.clientId.toString() === filterClient;
-      const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(order.orderDate);
+      const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(order.deliveryDate);
       const matchesProductionStatus = !filterProductionStatus || filterProductionStatus === "all" ||
         getProductionStatus(order) === filterProductionStatus;
 
@@ -511,9 +511,9 @@ export default function OrdersPage() {
 
           {/* Onglets: Liste des commandes / Récap */}
           <Tabs defaultValue="list" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="list">Liste des commandes</TabsTrigger>
-              <TabsTrigger value="recap">Récap</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 ">
+              <TabsTrigger value="list" className="hover:bg-orange-200">Liste des commandes</TabsTrigger>
+              <TabsTrigger value="recap" className="[aria-selected]:bg-orange-200">Récap</TabsTrigger>
             </TabsList>
 
             <TabsContent value="list" className="space-y-4">
@@ -560,13 +560,13 @@ export default function OrdersPage() {
           {/* Modale de consultation */}
           <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
             <DialogContent className="max-w-2xl p-0">
-              <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-6">
+              <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-2">
                 <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
                   <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
                 </DialogTitle>
               </DialogHeader>
               {viewingOrder && (
-                <div className="p-6 space-y-4">
+                <div className="p-6 pt-0 space-y-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-gray-700 flex items-center gap-2">
                       <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
@@ -579,7 +579,7 @@ export default function OrdersPage() {
                     </Badge>
                   </div>
                   <hr className="my-2" />
-                  <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-orange-400" />
                       <span>Date de création :</span>
@@ -604,15 +604,15 @@ export default function OrdersPage() {
                       </>
                     )}
                   </div>
-                  <hr className="my-2" />
-                  <div className="mt-2">
+                  <hr className="my-1" />
+                  <div className="mt-1">
                     <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
                       <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
                     </div>
                     <OrderItemsSummary orderId={viewingOrder.id} products={products} />
                   </div>
-                  <hr className="my-2" />
-                  <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
+                  {/* <hr className="my-1" /> */}
+                  <div className="grid grid-cols-2 gap-1 text-base font-semibold ">
                     <div className="flex items-center gap-2 text-orange-700">
                       Total TTC
                     </div>
@@ -624,7 +624,7 @@ export default function OrdersPage() {
                   </div>
 
                   {/* Bouton pour afficher les livraisons liées */}
-                  <div className="flex justify-center mt-6">
+                  <div className="flex justify-center mt-2">
                     <Button
                       onClick={() => {
                         // Rediriger vers la page des livraisons avec un filtre sur cette commande
@@ -663,7 +663,7 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm">
+      <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm overflow-auto max-h-[50vh]">
         <table className="w-full text-sm">
           <thead className="bg-orange-100 sticky top-0 z-10">
             <tr>
@@ -678,7 +678,10 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
               const product = products.find((p) => p.id === item.articleId);
               return (
                 <tr key={item.articleId}>
-                  <td className="p-2 font-semibold">{product ? product.name : item.articleId}</td>
+                  <td className="p-2 font-semibold"> <div className="flex items-center gap-4">
+                      <img src={product?.photo}   alt={product?.name}  className="w-[5rem] h-[4rem] object-cover rounded-t-lg"/>
+                    {product ? product.name : item.articleId}
+                    </div></td>
                   <td className="p-2 text-right">{item.quantity}</td>
                   <td className="p-2 text-right">{parseFloat(item.unitPrice || "0").toFixed(2)} DA</td>
                   <td className="p-2 text-right font-semibold">{(parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0")).toFixed(2)} DA</td>

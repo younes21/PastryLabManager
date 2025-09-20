@@ -16,6 +16,7 @@ import { Trash2, Plus, MoveUp, MoveDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Recipe, InsertRecipe, Article, RecipeIngredient, RecipeOperation, WorkStation, MeasurementUnit } from "@shared/schema";
+import ProductSelectorCompact from "./modal-product";
 
 const recipeSchema = z.object({
   designation: z.string().min(1, "La désignation est requise"),
@@ -524,7 +525,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
               {!articleId && (
                 <div className="col-span-2">
                   <Label htmlFor="articleId" className="text-xs">Produit *</Label>
-                  <Select
+                  {/* <Select
                     value={form.watch("articleId")?.toString()}
                     onValueChange={(value) => form.setValue("articleId", parseInt(value))}
                     data-testid="select-articleId"
@@ -539,7 +540,9 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
+                  </Select> */}
+                  <ProductSelectorCompact products={products} value={form.watch("articleId")?.toString()}
+                    onSelect={(value: any) => form.setValue("articleId", parseInt(value))}></ProductSelectorCompact>
                 </div>
               )}
               {/* Si articleId fourni, afficher le nom du produit en lecture seule */}
@@ -576,9 +579,9 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
 
               <div>
                 <Label htmlFor="unit" className="text-xs">Unité *</Label>
-                
-               <div className="px-3 py-2 border h-8 flex items-center  border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
-                 Unité de l'article:  <b className="ml-2">{selectedArticle?.unit}</b></div>
+
+                <div className="px-3 py-2 border h-8 flex items-center  border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
+                  Unité de l'article:  <b className="ml-2">{selectedArticle?.unit}</b></div>
               </div>
 
               <div className="flex items-center space-x-2 ">

@@ -2062,7 +2062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (clientId && clientId !== "all" && o.clientId !== parseInt(clientId)) return false;
   
         if (date && date !== "all") {
-          const raw = o.orderDate || o.createdAt;
+          const raw = o.deliveryDate || o.orderDate || o.createdAt;
           if (!raw) return false;
           const od = toDateOnly(raw);
           if (!od) return false;

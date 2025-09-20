@@ -21,6 +21,8 @@ import {
   Check,
   X,
   DollarSign,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { type Order, type Client, type Article, type ArticleCategory, type Tax } from "@shared/schema";
 
@@ -106,7 +108,7 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
-
+  const [isOpen, setIsOpen] = useState(true);
   // Queries
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -326,7 +328,7 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
 
   // Vue catalogue des produits
   if (currentView === "catalog") {
-  return (
+    return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -360,8 +362,8 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white min-w-[20px] h-5 flex items-center justify-center text-xs">
                     {cart.reduce((sum, item) => sum + item.quantity, 0)}
                   </Badge>
-          </Button>
-        )}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -372,8 +374,8 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
                 <label className="text-sm font-medium text-gray-700 min-w-[100px]">
                   Client *
                 </label>
-                <Select 
-                  value={selectedClientId.toString()} 
+                <Select
+                  value={selectedClientId.toString()}
                   onValueChange={(value) => setSelectedClientId(parseInt(value))}
                   disabled={!!order} // Désactiver en mode édition
                 >
@@ -400,48 +402,59 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
           <div className="grid lg:grid-cols-4 gap-6">
             {/* Sidebar des catégories */}
             <div className="lg:col-span-1">
-              <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg sticky top-6">
-                <CardHeader>
-                  <CardTitle className="text-lg">Catégories</CardTitle>
+            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg sticky top-6">
+                <CardHeader
+                  className="flex flex-row items-center justify-between cursor-pointer"
+                  onClick={() => setIsOpen(!isOpen)}
+                >
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    Catégories
+                  </CardTitle>
+                  {isOpen ? (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-500" />
+                  )}
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setSelectedCategory(null)}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-all ${!selectedCategory
-                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
-                          : "hover:bg-orange-50 text-gray-700"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Package className="w-5 h-5" />
-                        <span className="font-medium">Tous les produits</span>
-                </div>
-                    </button>
 
-                    {categories.map((category) => (
+                {isOpen && (
+                  <CardContent className="p-0">
+                    <div className="space-y-2">
+                      {/* Tous les produits */}
                       <button
-                        key={category.id}
-                        onClick={() => setSelectedCategory(category.id)}
-                        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${selectedCategory === category.id
+                        onClick={() => setSelectedCategory(null)}
+                        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${!selectedCategory
                             ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
                             : "hover:bg-orange-50 text-gray-700"
                           }`}
                       >
                         <div className="flex items-center gap-3">
                           <Package className="w-5 h-5" />
-                          <div>
-                            <div className="font-medium">
-                              {category.designation}
-                        </div>
-                        </div>
+                          <span className="font-medium">Tous les produits</span>
                         </div>
                       </button>
-                    ))}
-                      </div>
-                </CardContent>
+
+                      {/* Catégories */}
+                      {categories.map((category) => (
+                        <button
+                          key={category.id}
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={`w-full text-left px-4 py-3 rounded-lg transition-all ${selectedCategory === category.id
+                              ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                              : "hover:bg-orange-50 text-gray-700"
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Package className="w-5 h-5" />
+                            <div className="font-medium">{category.designation}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
-                      </div>
+            </div>
 
             {/* Grille des produits */}
             <div className="lg:col-span-3">
@@ -468,13 +481,24 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
                       (item) => item.articleId === product.id,
                     );
                     const quantity = cartItem?.quantity || 0;
-
+                    const isUnavailable = product.saleStatus === "repture" || product.saleStatus === "nonDispo";
+                    let saleStatusLabel = "";
+                    if (product.saleStatus === "repture") saleStatusLabel = "Rupture";
+                    else if (product.saleStatus === "nonDispo") saleStatusLabel = "Non disponible";
+                    else if (product.saleStatus === "none" || !product.saleStatus) saleStatusLabel = "Disponible";
+                    else saleStatusLabel = product.saleStatus;
                     return (
                       <Card
                         key={product.id}
                         className="bg-white/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all"
                       >
                         <CardContent className="p-0">
+                          {/* Badge état de vente */}
+                          {saleStatusLabel && (
+                            <Badge className={`absolute z-10 top-2 left-2 ${isUnavailable ? "bg-red-800 text-white" : "bg-green-500 text-white"}`}>
+                              {saleStatusLabel}
+                            </Badge>
+                          )}
                           {/* Image du produit */}
                           <div className="h-48 bg-gradient-to-br from-orange-100 to-amber-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
                             {product.photo ? (
@@ -541,22 +565,22 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
                                     {quantity}
                                   </span>
 
-                              <Button
-                                variant="outline"
-                                size="sm"
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() =>
                                       updateCartQuantity(product.id, quantity + 1)
                                     }
                                     className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                              >
+                                  >
                                     <Plus className="w-4 h-4" />
-                              </Button>
+                                  </Button>
                                 </div>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
                     );
                   })}
                 </div>
@@ -670,7 +694,7 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
                           >
                             <X className="w-4 h-4" />
-              </Button>
+                          </Button>
                         </div>
 
                         <div className="text-right font-semibold text-gray-900 min-w-[80px]">

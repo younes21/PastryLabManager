@@ -299,6 +299,8 @@ export const articles = pgTable("articles", {
 
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  saleStatus: text("sale_status"), // état de vente (ex: 'disponible', 'suspendu', 'retiré', etc.)
+  saleStatusReason: text("sale_status_reason"), // motif de l'état de vente
 });
 
 // Recettes - attachées aux articles de type "product"
@@ -429,6 +431,8 @@ export const insertArticleSchema = createInsertSchema(articles)
       if (typeof val === "number") return val.toString();
       return val;
     }),
+    saleStatus: z.union([z.string(), z.null()]).optional(),
+    saleStatusReason: z.union([z.string(), z.null()]).optional(),
   });
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({
   id: true,

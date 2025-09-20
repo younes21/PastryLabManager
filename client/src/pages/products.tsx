@@ -347,6 +347,8 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       storageConditions: product?.storageConditions || "",
       active: Boolean(product?.active ?? true),
       photo: product?.photo || "",
+      saleStatus: product?.saleStatus || null,
+      saleStatusReason: product?.saleStatusReason || null,
     },
   });
 
@@ -813,14 +815,56 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                                    <SelectItem value="none">Aucune TVA</SelectItem>
-                                    {(taxes as any[])?.map((tax: any) => (
-                                      <SelectItem key={tax.id} value={tax.id.toString()}>
-                                        {tax.designation} ({tax.rate}%)
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
+                        <SelectItem value="none">Aucune TVA</SelectItem>
+                        {(taxes as any[])?.map((tax: any) => (
+                          <SelectItem key={tax.id} value={tax.id.toString()}>
+                            {tax.designation} ({tax.rate}%)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Ajout des deux nouveaux champs */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="saleStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>État de vente</FormLabel>
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={ (value) => field.onChange(value === "none" ? null : value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-sale-status">
+                          <SelectValue placeholder="Sélectionner un état" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun</SelectItem>
+                        <SelectItem value="nonDispo">Non disponible</SelectItem>
+                        <SelectItem value="repture">Repture</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="saleStatusReason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motif de l'état de vente</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} placeholder="ex: rupture, saisonnalité, décision du gérant..." data-testid="input-sale-status-reason" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
