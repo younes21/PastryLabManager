@@ -576,7 +576,7 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   deliveryNotes: text("delivery_notes"),
 
-  
+
 
   // Audit
   createdBy: integer("created_by").references(() => users.id),
@@ -624,7 +624,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
   code: text("code").notNull().unique(), // ex: REC-000001, PREP-000001
   type: text("type").notNull(), // reception, livraison, ajustement, inventaire, fabrication...
   status: text("status").notNull().default("draft"), // draft, pending, ready, completed, cancelled, etc.
-
+  statusDate: timestamp("status_date", { mode: "string" }), // date etat
   // Références
   supplierId: integer("supplier_id").references(() => suppliers.id), // si réception
   clientId: integer("customer_id").references(() => clients.id), // si livraison
@@ -633,14 +633,15 @@ export const inventoryOperations = pgTable("inventory_operations", {
     (): AnyPgColumn => inventoryOperations.id,
   ),
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
-  operatorId: integer("operator_id").references(() => users.id),
+  operatorId: integer("operator_id").references(() => users.id),// preprateur
 
   // Dates
-  scheduledDate: timestamp("scheduled_date", { mode: "string" }),
-  startedAt: timestamp("started_at", { mode: "string" }),
-  completedAt: timestamp("completed_at", { mode: "string" }),
+  scheduledDate: timestamp("scheduled_date", { mode: "string" }), // preparation
+  startedAt: timestamp("started_at", { mode: "string" }), // preparation
+  completedAt: timestamp("completed_at", { mode: "string" }), // preparation
   validatedAt: timestamp("validated_at", { mode: "string" }), // quand verrouillé
-
+  recipeId: integer("recipe_id").references(() => recipes.id), // preparation
+  
   // Montants (pour réceptions/ventes)
   currency: text("currency").default("DZD"),
   subtotalHT: decimal("subtotal_ht", { precision: 12, scale: 2 }).default(
@@ -958,7 +959,7 @@ export const deliveryStockReservations = pgTable("delivery_stock_reservations", 
   orderItemId: integer("order_item_id")
     .references(() => orderItems.id)
     .notNull(),
-  
+
   // Quantités
   reservedQuantity: decimal("reserved_quantity", {
     precision: 10,
@@ -968,17 +969,17 @@ export const deliveryStockReservations = pgTable("delivery_stock_reservations", 
     precision: 10,
     scale: 3,
   }).default("0.00"),
-  
+
   // Statut de la réservation
   status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
-  
+
   // Traçabilité
   parentOperationId: integer("parent_operation_id").references(() => inventoryOperations.id), // Opération mère (livraison)
-  
+
   // Dates
   reservedAt: timestamp("reserved_at", { mode: "string" }).defaultNow(),
   expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
-  
+
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
