@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -209,15 +209,15 @@ export default function MeasurementUnitsPage() {
 
   const filteredUnits = units.filter(unit => {
     const matchesCategory = selectedCategory ? unit.categoryId === selectedCategory : true;
-    const matchesSearch = searchTerm 
+    const matchesSearch = searchTerm
       ? unit.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        unit.abbreviation.toLowerCase().includes(searchTerm.toLowerCase())
+      unit.abbreviation.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
     return matchesCategory && matchesSearch;
   });
 
   const filteredCategories = categories.filter(category =>
-    searchTerm 
+    searchTerm
       ? category.name.toLowerCase().includes(searchTerm.toLowerCase())
       : true
   );
@@ -225,10 +225,10 @@ export default function MeasurementUnitsPage() {
   usePageTitle(' Unités de Mesure');
 
   return (
-      <div className="p-8 space-y-8" data-testid="page-measurement-units">
-        <div className="flex items-center justify-between">
+    <div className="p-8 space-y-8" data-testid="page-measurement-units">
+      <div className="flex items-center justify-between">
         <div>
-         
+
           <p className="text-lg text-gray-600">
             Configuration des unités pour le laboratoire
           </p>
@@ -258,9 +258,9 @@ export default function MeasurementUnitsPage() {
           </div>
           <Scale className="h-10 w-10 text-blue-600" />
         </div>
-        </div>
+      </div>
 
-        <Tabs defaultValue="categories" className="space-y-8">
+      <Tabs defaultValue="categories" className="space-y-8">
         <TabsList className="grid w-full grid-cols-2 h-12 w-1/2 m-auto" data-testid="tabs-list">
           <TabsTrigger value="categories" className="text-lg font-medium" data-testid="tab-categories">
             Catégories ({categories.length})
@@ -276,9 +276,9 @@ export default function MeasurementUnitsPage() {
             <h2 className="text-xl font-semibold text-gray-800">Catégories de Mesure</h2>
             <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
-                  onClick={resetCategoryForm} 
-                  className="bg-accent hover:bg-accent-hover" 
+                <Button
+                  onClick={resetCategoryForm}
+                  className="bg-accent hover:bg-accent-hover"
                   data-testid="button-add-category"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -291,61 +291,63 @@ export default function MeasurementUnitsPage() {
                     {editingCategory ? "Modifier la Catégorie" : "Nouvelle Catégorie"}
                   </DialogTitle>
                   <DialogDescription>
-                    {editingCategory 
+                    {editingCategory
                       ? "Modifiez les informations de cette catégorie de mesure."
                       : "Créez une nouvelle catégorie de mesure."
                     }
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCategorySubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="category-name">Nom de la catégorie</Label>
-                    <Input
-                      id="category-name"
-                      value={categoryForm.name}
-                      onChange={(e) => setCategoryForm({...categoryForm, name: e.target.value})}
-                      placeholder="Ex: Poids, Volume, Quantité..."
-                      required
-                      data-testid="input-category-name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category-description">Description</Label>
-                    <Textarea
-                      id="category-description"
-                      value={categoryForm.description ?? ""}
-                      onChange={(e) => setCategoryForm({...categoryForm, description: e.target.value})}
-                      placeholder="Description de la catégorie"
-                      data-testid="textarea-category-description"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="category-active"
-                      checked={categoryForm.active ?? true}
-                      onCheckedChange={(checked) => setCategoryForm({...categoryForm, active: checked})}
-                      data-testid="switch-category-active"
-                    />
-                    <Label htmlFor="category-active">Catégorie active</Label>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" data-testid="button-save-category">
-                      {editingCategory ? "Modifier" : "Créer"}
-                    </Button>
-                  </DialogFooter>
-                </form>
+                <DialogBody>
+                  <form onSubmit={handleCategorySubmit} className="space-y-4">
+                    <div>
+                      <Label htmlFor="category-name">Nom de la catégorie</Label>
+                      <Input
+                        id="category-name"
+                        value={categoryForm.name}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                        placeholder="Ex: Poids, Volume, Quantité..."
+                        required
+                        data-testid="input-category-name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="category-description">Description</Label>
+                      <Textarea
+                        id="category-description"
+                        value={categoryForm.description ?? ""}
+                        onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                        placeholder="Description de la catégorie"
+                        data-testid="textarea-category-description"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="category-active"
+                        checked={categoryForm.active ?? true}
+                        onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, active: checked })}
+                        data-testid="switch-category-active"
+                      />
+                      <Label htmlFor="category-active">Catégorie active</Label>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" data-testid="button-save-category">
+                        {editingCategory ? "Modifier" : "Créer"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogBody>
               </DialogContent>
             </Dialog>
           </div>
 
           <div className="space-y-4">
             {filteredCategories.map((category) => (
-              <Card 
-                key={category.id} 
+              <Card
+                key={category.id}
                 className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500"
                 data-testid={`card-category-${category.id}`}
               >
-               <CardContent className="px-4 py-2">
+                <CardContent className="px-4 py-2">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-800 mb-1">
@@ -357,7 +359,7 @@ export default function MeasurementUnitsPage() {
                         </p>
                       )}
                       <div className="flex items-center space-x-2">
-                        <Badge 
+                        <Badge
                           variant={category.active ? "default" : "secondary"}
                           className="px-2 py-0.5 text-xs font-medium"
                         >
@@ -402,8 +404,8 @@ export default function MeasurementUnitsPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-6">
               <h2 className="text-xl font-semibold text-gray-800">Unités de Mesure</h2>
-              <Select 
-                value={selectedCategory?.toString() || "all"} 
+              <Select
+                value={selectedCategory?.toString() || "all"}
                 onValueChange={(value) => {
                   setSelectedCategory(value === "all" ? null : parseInt(value));
                 }}
@@ -423,9 +425,9 @@ export default function MeasurementUnitsPage() {
             </div>
             <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
-                  onClick={resetUnitForm} 
-                  className="bg-accent hover:bg-accent-hover" 
+                <Button
+                  onClick={resetUnitForm}
+                  className="bg-accent hover:bg-accent-hover"
                   data-testid="button-add-unit"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -438,7 +440,7 @@ export default function MeasurementUnitsPage() {
                     {editingUnit ? "Modifier l'Unité" : "Nouvelle Unité"}
                   </DialogTitle>
                   <DialogDescription>
-                    {editingUnit 
+                    {editingUnit
                       ? "Modifiez les informations de cette unité de mesure."
                       : "Créez une nouvelle unité de mesure."
                     }
@@ -449,7 +451,7 @@ export default function MeasurementUnitsPage() {
                     <Label htmlFor="unit-category">Catégorie</Label>
                     <Select
                       value={unitForm.categoryId?.toString() || undefined}
-                      onValueChange={(value) => setUnitForm({...unitForm, categoryId: parseInt(value)})}
+                      onValueChange={(value) => setUnitForm({ ...unitForm, categoryId: parseInt(value) })}
                     >
                       <SelectTrigger data-testid="select-unit-category">
                         <SelectValue placeholder="Sélectionner une catégorie" />
@@ -469,7 +471,7 @@ export default function MeasurementUnitsPage() {
                       <Input
                         id="unit-label"
                         value={unitForm.label}
-                        onChange={(e) => setUnitForm({...unitForm, label: e.target.value})}
+                        onChange={(e) => setUnitForm({ ...unitForm, label: e.target.value })}
                         placeholder="Ex: Kilogramme"
                         required
                         data-testid="input-unit-label"
@@ -480,7 +482,7 @@ export default function MeasurementUnitsPage() {
                       <Input
                         id="unit-abbreviation"
                         value={unitForm.abbreviation}
-                        onChange={(e) => setUnitForm({...unitForm, abbreviation: e.target.value})}
+                        onChange={(e) => setUnitForm({ ...unitForm, abbreviation: e.target.value })}
                         placeholder="Ex: kg"
                         required
                         data-testid="input-unit-abbreviation"
@@ -491,7 +493,7 @@ export default function MeasurementUnitsPage() {
                     <Label htmlFor="unit-type">Type</Label>
                     <Select
                       value={unitForm.type}
-                      onValueChange={(value) => setUnitForm({...unitForm, type: value as "reference" | "larger" | "smaller"})}
+                      onValueChange={(value) => setUnitForm({ ...unitForm, type: value as "reference" | "larger" | "smaller" })}
                     >
                       <SelectTrigger data-testid="select-unit-type">
                         <SelectValue />
@@ -509,7 +511,7 @@ export default function MeasurementUnitsPage() {
                       id="unit-factor"
                       type="number"
                       value={unitForm.factor}
-                      onChange={(e) => setUnitForm({...unitForm, factor: parseFloat(e.target.value)})}
+                      onChange={(e) => setUnitForm({ ...unitForm, factor: parseFloat(e.target.value) })}
                       placeholder="1"
                       required
                       data-testid="input-unit-factor"
@@ -522,7 +524,7 @@ export default function MeasurementUnitsPage() {
                     <Switch
                       id="unit-active"
                       checked={unitForm.active ?? true}
-                      onCheckedChange={(checked) => setUnitForm({...unitForm, active: checked})}
+                      onCheckedChange={(checked) => setUnitForm({ ...unitForm, active: checked })}
                       data-testid="switch-unit-active"
                     />
                     <Label htmlFor="unit-active">Unité active</Label>
@@ -541,8 +543,8 @@ export default function MeasurementUnitsPage() {
             {filteredUnits.map((unit) => {
               const category = categories.find(c => c.id === unit.categoryId);
               return (
-                <Card 
-                  key={unit.id} 
+                <Card
+                  key={unit.id}
                   className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500"
                   data-testid={`card-unit-${unit.id}`}
                 >
@@ -570,12 +572,12 @@ export default function MeasurementUnitsPage() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <Badge 
+                          <Badge
                             className={`${getTypeColor(unit.type)} px-2 py-0.5 text-xs font-medium`}
                           >
                             {getTypeName(unit.type)}
                           </Badge>
-                          <Badge 
+                          <Badge
                             variant={unit.active ? "default" : "secondary"}
                             className="px-2 py-0.5 text-xs font-medium"
                           >
@@ -612,8 +614,8 @@ export default function MeasurementUnitsPage() {
             })}
           </div>
         </TabsContent>
-        </Tabs>
-      </div>
-    
+      </Tabs>
+    </div>
+
   );
 }

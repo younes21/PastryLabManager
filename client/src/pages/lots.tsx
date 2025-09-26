@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,7 +57,7 @@ export default function LotsPage() {
   usePageTitle("Gestion des Lots");
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
+
   // États locaux
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedArticle, setSelectedArticle] = useState<string>("all");
@@ -208,11 +208,11 @@ export default function LotsPage() {
 
   const getExpirationStatus = (expirationDate: string | null, alertDate: string | null) => {
     if (!expirationDate) return { status: 'unknown', label: 'Inconnu', color: 'gray' };
-    
+
     const now = new Date();
     const expDate = new Date(expirationDate);
     const alertDateObj = alertDate ? new Date(alertDate) : null;
-    
+
     if (expDate < now) {
       return { status: 'expired', label: 'Expiré', color: 'red' };
     } else if (alertDateObj && alertDateObj <= now) {
@@ -225,11 +225,11 @@ export default function LotsPage() {
   // Filtrage des lots
   const filteredLots = lots.filter((lot: Lot) => {
     const matchesSearch = lot.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lot.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lot.supplierName?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      lot.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lot.supplierName?.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesArticle = selectedArticle === "all" || lot.articleId.toString() === selectedArticle;
-    
+
     return matchesSearch && matchesArticle;
   });
 
@@ -259,130 +259,132 @@ export default function LotsPage() {
               Nouveau Lot
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl ">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5" />
+                <Package />
                 Créer un nouveau lot
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <DialogBody>
+              <form onSubmit={handleSubmit} className="space-y-4 ">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="articleId">Article *</Label>
+                    <Select value={formData.articleId} onValueChange={(value) => setFormData(prev => ({ ...prev, articleId: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un article" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {articles.map((article: Article) => (
+                          <SelectItem key={article.id} value={article.id.toString()}>
+                            {article.name} ({article.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="code">Code du lot *</Label>
+                    <Input
+                      id="code"
+                      value={formData.code}
+                      onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                      placeholder="Ex: LOT-2024-001"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manufacturingDate">Date de fabrication</Label>
+                    <Input
+                      id="manufacturingDate"
+                      type="date"
+                      value={formData.manufacturingDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, manufacturingDate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="useDate">Date limite d'utilisation</Label>
+                    <Input
+                      id="useDate"
+                      type="date"
+                      value={formData.useDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, useDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="expirationDate">Date de péremption</Label>
+                    <Input
+                      id="expirationDate"
+                      type="date"
+                      value={formData.expirationDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, expirationDate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="alertDate">Date d'alerte</Label>
+                    <Input
+                      id="alertDate"
+                      type="date"
+                      value={formData.alertDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, alertDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="articleId">Article *</Label>
-                  <Select value={formData.articleId} onValueChange={(value) => setFormData(prev => ({ ...prev, articleId: value }))}>
+                  <Label htmlFor="supplierId">Fournisseur</Label>
+                  <Select value={formData.supplierId} onValueChange={(value) => setFormData(prev => ({ ...prev, supplierId: value }))}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un article" />
+                      <SelectValue placeholder="Sélectionner un fournisseur" />
                     </SelectTrigger>
                     <SelectContent>
-                      {articles.map((article: Article) => (
-                        <SelectItem key={article.id} value={article.id.toString()}>
-                          {article.name} ({article.code})
+                      <SelectItem value="all">Aucun fournisseur</SelectItem>
+                      {suppliers.map((supplier: Supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                          {supplier.companyName} ({supplier.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="code">Code du lot *</Label>
-                  <Input
-                    id="code"
-                    value={formData.code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                    placeholder="Ex: LOT-2024-001"
-                    required
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Informations supplémentaires sur ce lot..."
+                    rows={3}
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="manufacturingDate">Date de fabrication</Label>
-                  <Input
-                    id="manufacturingDate"
-                    type="date"
-                    value={formData.manufacturingDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, manufacturingDate: e.target.value }))}
-                  />
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="flex-1"
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={createLotMutation.isPending || !formData.articleId || !formData.code}
+                  >
+                    {createLotMutation.isPending ? "Création..." : "Créer le lot"}
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="useDate">Date limite d'utilisation</Label>
-                  <Input
-                    id="useDate"
-                    type="date"
-                    value={formData.useDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, useDate: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expirationDate">Date de péremption</Label>
-                  <Input
-                    id="expirationDate"
-                    type="date"
-                    value={formData.expirationDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, expirationDate: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alertDate">Date d'alerte</Label>
-                  <Input
-                    id="alertDate"
-                    type="date"
-                    value={formData.alertDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, alertDate: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="supplierId">Fournisseur</Label>
-                <Select value={formData.supplierId} onValueChange={(value) => setFormData(prev => ({ ...prev, supplierId: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un fournisseur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Aucun fournisseur</SelectItem>
-                    {suppliers.map((supplier: Supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier.companyName} ({supplier.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Informations supplémentaires sur ce lot..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="flex-1"
-                >
-                  Annuler
-                </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  disabled={createLotMutation.isPending || !formData.articleId || !formData.code}
-                >
-                  {createLotMutation.isPending ? "Création..." : "Créer le lot"}
-                </Button>
-              </div>
-            </form>
+              </form>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>
@@ -520,123 +522,125 @@ export default function LotsPage() {
               Modifier le lot
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <DialogBody>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-articleId">Article *</Label>
+                  <Select value={formData.articleId} onValueChange={(value) => setFormData(prev => ({ ...prev, articleId: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un article" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {articles.map((article: Article) => (
+                        <SelectItem key={article.id} value={article.id.toString()}>
+                          {article.name} ({article.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-code">Code du lot *</Label>
+                  <Input
+                    id="edit-code"
+                    value={formData.code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                    placeholder="Ex: LOT-2024-001"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-manufacturingDate">Date de fabrication</Label>
+                  <Input
+                    id="edit-manufacturingDate"
+                    type="date"
+                    value={formData.manufacturingDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, manufacturingDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-useDate">Date limite d'utilisation</Label>
+                  <Input
+                    id="edit-useDate"
+                    type="date"
+                    value={formData.useDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, useDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expirationDate">Date de péremption</Label>
+                  <Input
+                    id="edit-expirationDate"
+                    type="date"
+                    value={formData.expirationDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, expirationDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-alertDate">Date d'alerte</Label>
+                  <Input
+                    id="edit-alertDate"
+                    type="date"
+                    value={formData.alertDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, alertDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="edit-articleId">Article *</Label>
-                <Select value={formData.articleId} onValueChange={(value) => setFormData(prev => ({ ...prev, articleId: value }))}>
+                <Label htmlFor="edit-supplierId">Fournisseur</Label>
+                <Select value={formData.supplierId} onValueChange={(value) => setFormData(prev => ({ ...prev, supplierId: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un article" />
+                    <SelectValue placeholder="Sélectionner un fournisseur" />
                   </SelectTrigger>
                   <SelectContent>
-                    {articles.map((article: Article) => (
-                      <SelectItem key={article.id} value={article.id.toString()}>
-                        {article.name} ({article.code})
+                    <SelectItem value="null">Aucun fournisseur</SelectItem>
+                    {suppliers.map((supplier: Supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                        {supplier.companyName} ({supplier.code})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="edit-code">Code du lot *</Label>
-                <Input
-                  id="edit-code"
-                  value={formData.code}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                  placeholder="Ex: LOT-2024-001"
-                  required
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea
+                  id="edit-notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Informations supplémentaires sur ce lot..."
+                  rows={3}
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-manufacturingDate">Date de fabrication</Label>
-                <Input
-                  id="edit-manufacturingDate"
-                  type="date"
-                  value={formData.manufacturingDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, manufacturingDate: e.target.value }))}
-                />
+              <div className="flex gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  disabled={updateLotMutation.isPending || !formData.articleId || !formData.code}
+                >
+                  {updateLotMutation.isPending ? "Mise à jour..." : "Mettre à jour"}
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-useDate">Date limite d'utilisation</Label>
-                <Input
-                  id="edit-useDate"
-                  type="date"
-                  value={formData.useDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, useDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-expirationDate">Date de péremption</Label>
-                <Input
-                  id="edit-expirationDate"
-                  type="date"
-                  value={formData.expirationDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expirationDate: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-alertDate">Date d'alerte</Label>
-                <Input
-                  id="edit-alertDate"
-                  type="date"
-                  value={formData.alertDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, alertDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-supplierId">Fournisseur</Label>
-              <Select value={formData.supplierId} onValueChange={(value) => setFormData(prev => ({ ...prev, supplierId: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un fournisseur" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Aucun fournisseur</SelectItem>
-                  {suppliers.map((supplier: Supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                      {supplier.companyName} ({supplier.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Textarea
-                id="edit-notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Informations supplémentaires sur ce lot..."
-                rows={3}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsEditModalOpen(false)}
-                className="flex-1"
-              >
-                Annuler
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-                disabled={updateLotMutation.isPending || !formData.articleId || !formData.code}
-              >
-                {updateLotMutation.isPending ? "Mise à jour..." : "Mettre à jour"}
-              </Button>
-            </div>
-          </form>
+            </form>
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </div>

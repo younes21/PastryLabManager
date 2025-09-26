@@ -133,7 +133,7 @@ export function OrderRow({
         <TableCell>
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="font-bold">{getClientName(order.clientId)}</span>
+            <span className="font-bold text-red-900">{getClientName(order.clientId)}</span>
           </div>
         </TableCell>
         {/* <TableCell className="font-bold">{getClientPhone(order.clientId)}</TableCell> */}
@@ -148,7 +148,8 @@ export function OrderRow({
             onValueChange={(value) => onStatusChange(order, value)}
           >
             <SelectTrigger className="w-auto">
-              <Badge variant="outline">
+              <Badge variant="outline"  className={`text-xs px-2 py-1 ${orderStatusColors[order.status as keyof typeof orderStatusLabels]} `
+              }>
                 {orderStatusLabels[order.status as keyof typeof orderStatusLabels]}
               </Badge>
             </SelectTrigger>
@@ -209,7 +210,7 @@ export function OrderRow({
               variant="ghost"
               size="sm"
               onClick={() => onDelete(order)}
-              disabled={order.status === "confirmed" || order.status === "delivered"}
+              disabled={order.status != "draft" && order.status != "confirmed"}
               data-testid={`button-delete-order-${order.id}`}
             >
               <Trash2 className="h-4 w-4 text-red-500" />

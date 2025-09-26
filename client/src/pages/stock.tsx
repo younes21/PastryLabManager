@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Package, Warehouse, QrCode, Calendar, User, MapPin,
@@ -117,7 +117,7 @@ export default function Stock() {
   const [selectedStockItem, setSelectedStockItem] = useState<StockItem | null>(null);
   const [isOperationsDialogOpen, setIsOperationsDialogOpen] = useState(false);
   // Ajout état pour filtrer les opérations par zone/lot
-  const [operationZoneLotFilter, setOperationZoneLotFilter] = useState<{zoneId?: number, lotId?: number} | null>(null);
+  const [operationZoneLotFilter, setOperationZoneLotFilter] = useState<{ zoneId?: number, lotId?: number } | null>(null);
 
   // Fetch stock data with article and storage zone information
   const { data: stockItems = [], isLoading: stockLoading } = useQuery<StockItem[]>({
@@ -433,127 +433,127 @@ export default function Stock() {
               Historique des Opérations - {selectedStockItem?.article.name}
             </DialogTitle>
           </DialogHeader>
-
-          {operationsLoading ? (
-            <div className="text-center py-8">Chargement des opérations...</div>
-          ) : inventoryOperations.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              Aucune opération trouvée pour cet article
-            </div>
-          ) : (
-            <>
-              {/* Tableau récapitulatif par zone/lot */}
-              <div className="mb-4">
-                <div className="flex flex-wrap gap-2 items-center mb-2">
-                  <Button size="sm" variant={!operationZoneLotFilter ? "default" : "outline"} onClick={() => setOperationZoneLotFilter(null)}>
-                    Afficher tout
-                  </Button>
-                 
-                </div>
-                {/* Tableau détail par zone/lot */}
-                <Table className="border">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Zone</TableHead>
-                      <TableHead>Lot</TableHead>
-                      <TableHead>Quantité</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {stockItems
-                      .filter(item => item.articleId === selectedStockItem?.articleId)
-                      .map((item, idx) => (
-                        <TableRow
-                          key={item.id}
-                          className={operationZoneLotFilter && operationZoneLotFilter.zoneId === item.storageZoneId && operationZoneLotFilter.lotId === item.lot?.id ? 'bg-blue-100 cursor-pointer' : 'cursor-pointer'}
-                          onClick={() => setOperationZoneLotFilter({ zoneId: item.storageZoneId, lotId: item.lot?.id })}
-                        >
-                          <TableCell>{item.storageZone?.designation || '-'}</TableCell>
-                          <TableCell>{item.lot?.code || '-'}</TableCell>
-                          <TableCell>{parseFloat(item.quantity).toFixed(3)} {item.article.unit}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+          <DialogBody>
+            {operationsLoading ? (
+              <div className="text-center py-8">Chargement des opérations...</div>
+            ) : inventoryOperations.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Aucune opération trouvée pour cet article
               </div>
-              {/* Tableau des opérations filtré */}
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px]">Date</TableHead>
-                      <TableHead className="w-[120px]">Type</TableHead>
-                      <TableHead className="w-[100px]">Statut</TableHead>
-                      <TableHead className="w-[80px]">Direction</TableHead>
-                      <TableHead className="w-[100px]">Quantité</TableHead>
-                      <TableHead className="w-[100px]">Stock Avant</TableHead>
-                      <TableHead className="w-[100px]">Stock Après</TableHead>
-                      <TableHead className="w-[100px]">Coût Unitaire</TableHead>
-                      {/* <TableHead className="w-[150px]">Zones</TableHead> */}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inventoryOperations.flatMap((operation) =>
-                      operation.items
+            ) : (
+              <>
+                {/* Tableau récapitulatif par zone/lot */}
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2 items-center mb-2">
+                    <Button size="sm" variant={!operationZoneLotFilter ? "default" : "outline"} onClick={() => setOperationZoneLotFilter(null)}>
+                      Afficher tout
+                    </Button>
+
+                  </div>
+                  {/* Tableau détail par zone/lot */}
+                  <Table className="border">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Zone</TableHead>
+                        <TableHead>Lot</TableHead>
+                        <TableHead>Quantité</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockItems
                         .filter(item => item.articleId === selectedStockItem?.articleId)
-                        .filter(item => {
-                          if (!operationZoneLotFilter) return true;
-                          const zoneMatch = !operationZoneLotFilter.zoneId ||item.toStorageZoneId === operationZoneLotFilter.zoneId|| item.fromStorageZoneId === operationZoneLotFilter.zoneId;
-                          const lotMatch = !operationZoneLotFilter.lotId || item.lot?.id === operationZoneLotFilter.lotId;
-                          return zoneMatch && lotMatch;
-                        })
-                        .sort((a, b) =>
-                          new Date(b.createdAt.replace(" ", "T")).getTime() -
-                          new Date(a.createdAt.replace(" ", "T")).getTime()
-                        )
-                        .map((item) => {
-                          const direction = getOperationDirection(parseFloat(item.quantityBefore || "0"), parseFloat(item.quantityAfter || "0"));
-                          return (
-                            <TableRow key={`${operation.id}-${item.id}`}>
-                              <TableCell className="text-sm">
-                                {formatDate(item.createdAt)}
-                              </TableCell>
-                              {/* <TableCell>
+                        .map((item, idx) => (
+                          <TableRow
+                            key={item.id}
+                            className={operationZoneLotFilter && operationZoneLotFilter.zoneId === item.storageZoneId && operationZoneLotFilter.lotId === item.lot?.id ? 'bg-blue-100 cursor-pointer' : 'cursor-pointer'}
+                            onClick={() => setOperationZoneLotFilter({ zoneId: item.storageZoneId, lotId: item.lot?.id })}
+                          >
+                            <TableCell>{item.storageZone?.designation || '-'}</TableCell>
+                            <TableCell>{item.lot?.code || '-'}</TableCell>
+                            <TableCell>{parseFloat(item.quantity).toFixed(3)} {item.article.unit}</TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {/* Tableau des opérations filtré */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Date</TableHead>
+                        <TableHead className="w-[120px]">Type</TableHead>
+                        <TableHead className="w-[100px]">Statut</TableHead>
+                        <TableHead className="w-[80px]">Direction</TableHead>
+                        <TableHead className="w-[100px]">Quantité</TableHead>
+                        <TableHead className="w-[100px]">Stock Avant</TableHead>
+                        <TableHead className="w-[100px]">Stock Après</TableHead>
+                        <TableHead className="w-[100px]">Coût Unitaire</TableHead>
+                        {/* <TableHead className="w-[150px]">Zones</TableHead> */}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {inventoryOperations.flatMap((operation) =>
+                        operation.items
+                          .filter(item => item.articleId === selectedStockItem?.articleId)
+                          .filter(item => {
+                            if (!operationZoneLotFilter) return true;
+                            const zoneMatch = !operationZoneLotFilter.zoneId || item.toStorageZoneId === operationZoneLotFilter.zoneId || item.fromStorageZoneId === operationZoneLotFilter.zoneId;
+                            const lotMatch = !operationZoneLotFilter.lotId || item.lot?.id === operationZoneLotFilter.lotId;
+                            return zoneMatch && lotMatch;
+                          })
+                          .sort((a, b) =>
+                            new Date(b.createdAt.replace(" ", "T")).getTime() -
+                            new Date(a.createdAt.replace(" ", "T")).getTime()
+                          )
+                          .map((item) => {
+                            const direction = getOperationDirection(parseFloat(item.quantityBefore || "0"), parseFloat(item.quantityAfter || "0"));
+                            return (
+                              <TableRow key={`${operation.id}-${item.id}`}>
+                                <TableCell className="text-sm">
+                                  {formatDate(item.createdAt)}
+                                </TableCell>
+                                {/* <TableCell>
                                 <Badge variant="outline" className="text-xs">
                                   {operation.code}
                                 </Badge>
                               </TableCell> */}
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  {getOperationTypeIcon(operation.type)}
-                                  <span className="text-sm">{getOperationTypeLabel(operation.type)}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={`text-xs ${operation.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                  operation.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                  {operation.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className={`flex items-center gap-1 ${direction.color}`}>
-                                  {direction.icon}
-                                  <span className="text-sm">
-                                    {direction.direction === 'in' ? 'Entrée' :
-                                      direction.direction === 'out' ? 'Sortie' : 'Transfert'}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell className={`font-medium ${direction.color}`}>
-                                {direction.direction === 'in' ? '+' : ''}{parseFloat(item.quantity).toFixed(3)} {item.article.unit}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {parseFloat(item.quantityBefore || '0').toFixed(3)} {item.article.unit}
-                              </TableCell>
-                              <TableCell className="font-medium text-sm">
-                                {parseFloat(item.quantityAfter || '0').toFixed(3)} {item.article.unit}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {parseFloat(item.unitCost || '0').toFixed(2)} DA
-                              </TableCell>
-                              {/* <TableCell className="text-sm">
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    {getOperationTypeIcon(operation.type)}
+                                    <span className="text-sm">{getOperationTypeLabel(operation.type)}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={`text-xs ${operation.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                    operation.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                      'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                    {operation.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className={`flex items-center gap-1 ${direction.color}`}>
+                                    {direction.icon}
+                                    <span className="text-sm">
+                                      {direction.direction === 'in' ? 'Entrée' :
+                                        direction.direction === 'out' ? 'Sortie' : 'Transfert'}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className={`font-medium ${direction.color}`}>
+                                  {direction.direction === 'in' ? '+' : ''}{parseFloat(item.quantity).toFixed(3)} {item.article.unit}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {parseFloat(item.quantityBefore || '0').toFixed(3)} {item.article.unit}
+                                </TableCell>
+                                <TableCell className="font-medium text-sm">
+                                  {parseFloat(item.quantityAfter || '0').toFixed(3)} {item.article.unit}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {parseFloat(item.unitCost || '0').toFixed(2)} DA
+                                </TableCell>
+                                {/* <TableCell className="text-sm">
                                 {(item.fromStorageZoneId || item.toStorageZoneId) ? (
                                   <div className="space-y-1">
                                     {item.fromStorageZoneId && (
@@ -575,20 +575,21 @@ export default function Stock() {
                                   <span className="text-gray-400">-</span>
                                 )}
                               </TableCell> */}
-                              {/* <TableCell className="text-sm">
+                                {/* <TableCell className="text-sm">
                                 <div className="max-w-[180px] truncate" title={item.notes || ''}>
                                   {item.notes || '-'}
                                 </div>
                               </TableCell> */}
-                            </TableRow>
-                          );
-                        })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
+                              </TableRow>
+                            );
+                          })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </div>

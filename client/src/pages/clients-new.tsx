@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +36,7 @@ const algerianWilayas = [
 function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => void }) {
   const { toast } = useToast();
   const isEditing = !!client;
-  
+
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
@@ -110,12 +110,12 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
       data.companyType = "";
       data.companyName = "";
     }
-    
+
     // Si tarif particulier désactivé, vider l'offre tarifaire
     if (!data.tarifParticulier) {
       data.priceListId = undefined;
     }
-    
+
     if (isEditing) {
       updateMutation.mutate(data);
     } else {
@@ -489,8 +489,8 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Offre tarifaire *</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
                       value={field.value?.toString() || "none"}
                     >
                       <FormControl>
@@ -519,8 +519,8 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Compte utilisateur lié</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                  <Select
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
                     value={field.value?.toString() || "none"}
                   >
                     <FormControl>
@@ -553,8 +553,8 @@ function ClientForm({ client, onSuccess }: { client?: Client; onSuccess: () => v
             {createMutation.isPending || updateMutation.isPending
               ? "Enregistrement..."
               : isEditing
-              ? "Modifier"
-              : "Créer"}
+                ? "Modifier"
+                : "Créer"}
           </Button>
         </div>
       </form>
@@ -600,7 +600,7 @@ export default function Clients() {
   };
 
   const handleDelete = (client: Client) => {
-    const displayName = client.type === "societe" 
+    const displayName = client.type === "societe"
       ? client.companyName || "Nom d'entreprise non défini"
       : `${client.lastName || ""} ${client.firstName || ""}`.trim() || "Nom non défini";
     if (confirm(`Êtes-vous sûr de vouloir supprimer le client ${displayName} ?`)) {
@@ -612,18 +612,18 @@ export default function Clients() {
     setIsDialogOpen(false);
     setSelectedClient(undefined);
   };
-  usePageTitle('Gestion des Clients'); 
+  usePageTitle('Gestion des Clients');
   if (isLoading) {
     return (
-   
-        <div className="p-6">Chargement...</div>
-      
+
+      <div className="p-6">Chargement...</div>
+
     );
   }
 
 
-return (
-      <div className="space-y-6">
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-2xl font-bold">Clients</CardTitle>
@@ -637,24 +637,25 @@ return (
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  {viewMode === "view" 
-                    ? `Détails du client` 
-                    : selectedClient 
-                      ? "Modifier le client" 
+                  {viewMode === "view"
+                    ? `Détails du client`
+                    : selectedClient
+                      ? "Modifier le client"
                       : "Nouveau client"
                   }
                 </DialogTitle>
                 <DialogDescription>
-                  {viewMode === "view" 
-                    ? "Consultation des informations détaillées du client" 
-                    : selectedClient 
-                      ? "Modification des informations du client existant" 
+                  {viewMode === "view"
+                    ? "Consultation des informations détaillées du client"
+                    : selectedClient
+                      ? "Modification des informations du client existant"
                       : "Création d'un nouveau client dans le système"
                   }
                 </DialogDescription>
               </DialogHeader>
-              
-              <ClientForm client={selectedClient} onSuccess={handleDialogClose} />
+              <DialogBody>
+                <ClientForm client={selectedClient} onSuccess={handleDialogClose} />
+              </DialogBody>
             </DialogContent>
           </Dialog>
         </CardHeader>
@@ -676,14 +677,14 @@ return (
               </TableHeader>
               <TableBody>
                 {clients.map((client) => {
-                  const displayName = client.type === "societe" 
+                  const displayName = client.type === "societe"
                     ? client.companyName || "Nom d'entreprise non défini"
                     : `${client.lastName || ""} ${client.firstName || ""}`.trim() || "Nom non défini";
-                  
-                  const priceListName = client.priceListId 
+
+                  const priceListName = client.priceListId
                     ? priceLists?.find(pl => pl.id === client.priceListId)?.designation || "Offre inconnue"
                     : "-";
-                  
+
                   return (
                     <TableRow key={client.id}>
                       <TableCell className="font-medium">{client.code}</TableCell>
@@ -731,13 +732,13 @@ return (
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.location.href = `/client-payment-history/${client.id}`}
-                        data-testid={`button-payment-${client.id}`}
-                      >
-                        <DollarSign className="h-4 w-4" />
-                      </Button>
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.location.href = `/client-payment-history/${client.id}`}
+                            data-testid={`button-payment-${client.id}`}
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -760,7 +761,7 @@ return (
           )}
         </CardContent>
       </Card>
-      </div>
-    
+    </div>
+
   );
 }

@@ -1630,7 +1630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/production-status-batch", async (req, res) => {
     try {
       // Récupérer toutes les commandes avec leurs articles
-      const orders = (await storage.getAllOrders())?.filter(f => f.status !== 'cancelled' && f.status != 'delivered' && f.status != 'draft')
+      const orders = (await storage.getAllOrders())?.filter(f => f.status =='validated')
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
         orders.map(async (order) => {
@@ -1778,7 +1778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Récupérer toutes les commandes avec leurs articles (même logique que production-status-batch)
-      const orders = (await storage.getAllOrders())?.filter(f => f.status !== 'cancelled' && f.status != 'delivered' && f.status != 'draft')
+      const orders = (await storage.getAllOrders())?.filter(f => f.status === 'validated')
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
         orders.map(async (order) => {
@@ -1796,10 +1796,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Récupérer le stock disponible et les noms des articles pour tous les articles en une fois
       const stockData: Record<number, number> = {};
       const articleNames: Record<number, string> = {};
+      const articleImages: Record<number, string> = {};
       for (const articleId of Array.from(allArticleIds)) {
         stockData[articleId] = await storage.getAvailableStock(articleId);
         const article = await storage.getArticle(articleId);
         articleNames[articleId] = article?.name || `Article ${articleId}`;
+        articleImages[articleId] = article?.photo || '';
       }
 
       // Récupérer toutes les opérations de fabrication en cours
@@ -2004,6 +2006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return {
           articleId: item.articleId,
+          articleImage:articleImages[item.articleId],
           articleName: articleNames[item.articleId],
           quantity: qCommande,
           stockAvailable: qStockInitial, // Stock initial pour référence
@@ -2036,7 +2039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
       // 1) charger toutes les commandes confirmées
       let allOrders = await storage.getAllOrders();
-      allOrders = allOrders.filter((o: any) => o.status === "confirmed");
+      allOrders = allOrders.filter((o: any) => o.status === "validated");
   
       // Helper: normaliser une date en "date only" (00:00:00 locale). Retourne null si invalide.
       const toDateOnly = (input?: string | Date | null): Date | null => {

@@ -322,13 +322,13 @@ export interface IStorage {
   createInvoiceAfterDelivery(deliveryId: number): Promise<Invoice>;
 
   // ============ LIVRAISONS ============
-  
+
   // Deliveries
   getAllDeliveries(): Promise<Delivery[]>;
   getDelivery(id: number): Promise<Delivery | undefined>;
   getDeliveriesByOrder(orderId: number): Promise<Delivery[]>;
   createDelivery(insertDelivery: InsertDelivery): Promise<Delivery>;
-  createDeliveryWithItems(insertDelivery: InsertDelivery, orderItems: any[], splits?: Record<number, Array<{ lotId: number|null, fromStorageZoneId: number|null, quantity: number }>>): Promise<Delivery>;
+  createDeliveryWithItems(insertDelivery: InsertDelivery, orderItems: any[], splits?: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>): Promise<Delivery>;
   updateDelivery(id: number, updateData: Partial<InsertDelivery>): Promise<Delivery | undefined>;
   deleteDelivery(id: number): Promise<boolean>;
 }
@@ -1363,6 +1363,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateOrder(id: number, updateData: Partial<InsertOrder>): Promise<Order | undefined> {
+    const foundOrders = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
+    if (foundOrders[0]?.status != updateData.status) {
+      updateData.statusDate = new Date().toISOString();
+      if (updateData.status == 'validated') {
+        updateData.validatedAt = new Date().toISOString();
+        // updateData.validatedBy = ...userId...when implementing user token...;
+      }
+    }
+
     const [order] = await db.update(orders)
       .set({ ...updateData, updatedAt: new Date().toISOString() })
       .where(eq(orders.id, id))
@@ -2192,7 +2201,7 @@ export class DatabaseStorage implements IStorage {
               .where(eq(articles.id, article.id));
 
             await tx.update(inventoryOperationItems)
-              .set({ 
+              .set({
                 toStorageZoneId: preparationZoneId,
                 lotId: lotId
               })
@@ -2244,7 +2253,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createLotForPreparationOperation(operationId: number, totalProducedQuantity: number, manufacturingDate: string): Promise<number|undefined> {
+  async createLotForPreparationOperation(operationId: number, totalProducedQuantity: number, manufacturingDate: string): Promise<number | undefined> {
     return await db.transaction(async (tx) => {
       try {
         // Get the operation and its items
@@ -2256,7 +2265,7 @@ export class DatabaseStorage implements IStorage {
         // Find the main product (positive quantity)
         const items = await this.getInventoryOperationItems(operationId);
         const mainProductItem = items.find(item => parseFloat(item.quantity || '0') > 0);
-        
+
         if (!mainProductItem) {
           console.log('No main product found for lot creation');
           return;
@@ -2270,7 +2279,7 @@ export class DatabaseStorage implements IStorage {
         // Generate lot code: {ArticleCode}-{yyyyMMdd}-{seq}
         const today = new Date(manufacturingDate);
         const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-        
+
         // Get the next sequence number for this article and date
         const existingLots = await tx.query.lots.findMany({
           where: and(
@@ -2288,7 +2297,7 @@ export class DatabaseStorage implements IStorage {
         const manufacturingDateObj = new Date(manufacturingDate);
         const useDate = new Date(manufacturingDateObj);
         useDate.setDate(useDate.getDate() + shelfLifeDays);
-        
+
         const expirationDate = new Date(useDate);
         const alertDate = new Date(expirationDate);
         alertDate.setDate(alertDate.getDate() - 3);
@@ -2615,9 +2624,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDeliveryWithItems(
-    insertDelivery: InsertDelivery, 
-    orderItems: any[], 
-    splits?: Record<number, Array<{ lotId: number|null, fromStorageZoneId: number|null, quantity: number }>>
+    insertDelivery: InsertDelivery,
+    orderItems: any[],
+    splits?: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>
   ): Promise<Delivery> {
     return await db.transaction(async (tx) => {
       // 1. Générer le code de livraison
@@ -2649,10 +2658,10 @@ export class DatabaseStorage implements IStorage {
       for (const orderItem of orderItems) {
         const articleId = orderItem.articleId;
         const totalQuantity = parseFloat(orderItem.quantity);
-        
+
         // Vérifier s'il y a des répartitions pour cet article
         const articleSplits = splits?.[articleId];
-        
+
         if (articleSplits && articleSplits.length > 0) {
           // Créer un item par répartition
           for (const split of articleSplits) {
@@ -2730,32 +2739,32 @@ export class DatabaseStorage implements IStorage {
     if (!delivery) {
       throw new Error(`Livraison ${deliveryId} non trouvée`);
     }
-    
+
     const order = await this.getOrder(delivery.orderId);
     if (!order) {
       throw new Error(`Commande ${delivery.orderId} non trouvée`);
     }
-    
+
     // Créer la facture avec les items de la commande
     const orderItems = await this.getOrderItems(order.id);
-    
+
     // Calculer les totaux
     let subtotalHT = 0;
     let totalTax = 0;
-    
+
     for (const item of orderItems) {
       const itemTotal = parseFloat(item.quantity) * parseFloat(item.unitPrice);
       subtotalHT += itemTotal;
       // TODO: Ajouter le calcul des taxes si nécessaire
     }
-    
+
     const totalTTC = subtotalHT + totalTax;
-    
+
     // Générer le code de facture
     const existingInvoices = await this.getAllInvoices();
     const nextNumber = existingInvoices.length + 1;
     const invoiceCode = `FAC-${nextNumber.toString().padStart(6, '0')}`;
-    
+
     // Créer la facture
     const [invoice] = await db.insert(invoices).values({
       code: invoiceCode,
@@ -2768,7 +2777,7 @@ export class DatabaseStorage implements IStorage {
       amountPaid: '0.00',
       createdBy: delivery.createdBy,
     }).returning();
-    
+
     // Créer les items de facture
     for (const item of orderItems) {
       await db.insert(invoiceItems).values({
@@ -2779,7 +2788,7 @@ export class DatabaseStorage implements IStorage {
         totalPrice: (parseFloat(item.quantity) * parseFloat(item.unitPrice)).toString(),
       });
     }
-    
+
     return invoice;
   }
   async createDeliveryPayment(deliveryId: number, paymentData: { amount: number, method: string, reference?: string, notes?: string }): Promise<Payment> {
@@ -2788,13 +2797,13 @@ export class DatabaseStorage implements IStorage {
     if (!delivery) {
       throw new Error(`Livraison ${deliveryId} non trouvée`);
     }
-    
+
     // Créer une facture si elle n'existe pas
     let invoice = await this.getInvoiceByOrder(delivery.orderId);
     if (!invoice) {
       invoice = await this.createInvoiceAfterDelivery(deliveryId);
     }
-    
+
     // Créer le paiement
     const [payment] = await db.insert(payments).values({
       invoiceId: invoice.id,
@@ -2803,10 +2812,10 @@ export class DatabaseStorage implements IStorage {
       reference: paymentData.reference,
       notes: paymentData.notes,
     }).returning();
-    
+
     // Mettre à jour le montant payé de la facture
     await this.updateInvoiceStatus(invoice.id);
-    
+
     return payment;
   }
   async getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
@@ -2883,7 +2892,7 @@ export class DatabaseStorage implements IStorage {
       dimensions: packageData.dimensions,
       notes: packageData.notes,
     }).returning();
-    
+
     return deliveryPackage;
   }
 
@@ -2892,11 +2901,11 @@ export class DatabaseStorage implements IStorage {
       .set(packageData)
       .where(eq(deliveryPackages.id, packageId))
       .returning();
-    
+
     if (!deliveryPackage) {
       throw new Error(`Colis ${packageId} non trouvé`);
     }
-    
+
     return deliveryPackage;
   }
 
@@ -2909,15 +2918,15 @@ export class DatabaseStorage implements IStorage {
   async addTrackingNumber(deliveryId: number, trackingNumber: string): Promise<Delivery> {
     const [delivery] = await db.select().from(deliveries)
       .where(eq(deliveries.id, deliveryId));
-    
+
     if (!delivery) {
       throw new Error(`Livraison ${deliveryId} non trouvée`);
     }
-    
+
     // Ajouter le numéro de suivi à la liste existante
     const existingNumbers = delivery.trackingNumbers ? JSON.parse(delivery.trackingNumbers) : [];
     const updatedNumbers = [...existingNumbers, trackingNumber];
-    
+
     const [updatedDelivery] = await db.update(deliveries)
       .set({
         trackingNumbers: JSON.stringify(updatedNumbers),
@@ -2925,26 +2934,26 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(deliveries.id, deliveryId))
       .returning();
-    
+
     return updatedDelivery;
   }
 
   async updatePackageTrackingStatus(packageId: number, status: string, location?: string): Promise<DeliveryPackage> {
     const updateData: any = { status };
-    
+
     if (location) {
       updateData.location = location;
     }
-    
+
     const [deliveryPackage] = await db.update(deliveryPackages)
       .set(updateData)
       .where(eq(deliveryPackages.id, packageId))
       .returning();
-    
+
     if (!deliveryPackage) {
       throw new Error(`Colis ${packageId} non trouvé`);
     }
-    
+
     return deliveryPackage;
   }
   // ============ FACTURATION ============
@@ -3364,7 +3373,7 @@ export class DatabaseStorage implements IStorage {
 
   async assignDeliveryPerson(deliveryId: number, deliveryPersonId: number): Promise<Delivery> {
     const [delivery] = await db.update(deliveries)
-      .set({ 
+      .set({
         deliveryPersonId: deliveryPersonId,
         updatedAt: new Date().toISOString()
       })
@@ -3380,7 +3389,7 @@ export class DatabaseStorage implements IStorage {
 
   async getDeliveriesByDeliveryPerson(deliveryPersonId: number, status?: string): Promise<Delivery[]> {
     const conditions = [eq(deliveries.deliveryPersonId, deliveryPersonId)];
-    
+
     if (status) {
       conditions.push(eq(deliveries.status, status));
     }
@@ -3391,7 +3400,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateDeliveryStatusByDeliveryPerson(deliveryId: number, status: string, notes?: string): Promise<Delivery> {
-    const updateData: any = { 
+    const updateData: any = {
       status: status,
       updatedAt: new Date().toISOString()
     };

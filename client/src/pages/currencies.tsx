@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, Star } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -138,17 +138,17 @@ export default function CurrenciesPage() {
     );
   }
 
- return (
-      <div className="p-6 space-y-6">
+  return (
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           Gestion des Devises
         </h1>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
+            <Button
               onClick={handleNewCurrency}
-              className="bg-accent hover:bg-accent-hover" 
+              className="bg-accent hover:bg-accent-hover"
               data-testid="button-add-currency"
             >
               <Plus className="mr-2 h-5 w-5" />
@@ -161,153 +161,155 @@ export default function CurrenciesPage() {
                 {editingCurrency ? "Modifier la Devise" : "Nouvelle Devise"}
               </DialogTitle>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code (ISO)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="EUR"
-                          maxLength={3}
-                          className="h-12 text-lg uppercase"
-                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                          data-testid="input-currency-code"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <DialogBody>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Code (ISO)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="EUR"
+                            maxLength={3}
+                            className="h-12 text-lg uppercase"
+                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                            data-testid="input-currency-code"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Désignation</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="Euro"
-                          className="h-12 text-lg"
-                          data-testid="input-currency-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Désignation</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Euro"
+                            className="h-12 text-lg"
+                            data-testid="input-currency-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="symbol"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Symbole</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="DA"
-                          className="h-12 text-lg"
-                          data-testid="input-currency-symbol"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="symbol"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Symbole</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="DA"
+                            className="h-12 text-lg"
+                            data-testid="input-currency-symbol"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="rate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Taux de Change</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="0.0001"
-                          min="0.0001"
-                          placeholder="1.0000"
-                          className="h-12 text-lg"
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
-                          data-testid="input-currency-rate"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="rate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Taux de Change</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            step="0.0001"
+                            min="0.0001"
+                            placeholder="1.0000"
+                            className="h-12 text-lg"
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                            data-testid="input-currency-rate"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="isBase"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Devise de Base
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-currency-base"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="isBase"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Devise de Base
+                          </FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-currency-base"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="active"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Active
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-currency-active"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="active"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Active
+                          </FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-currency-active"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    className="flex-1 h-12 text-lg"
-                    data-testid="button-cancel-currency-form"
-                  >
-                    Annuler
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 h-12 text-lg"
-                    disabled={createCurrencyMutation.isPending || updateCurrencyMutation.isPending}
-                    data-testid="button-submit-currency-form"
-                  >
-                    {editingCurrency ? "Modifier" : "Créer"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setDialogOpen(false)}
+                      className="flex-1 h-12 text-lg"
+                      data-testid="button-cancel-currency-form"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 h-12 text-lg"
+                      disabled={createCurrencyMutation.isPending || updateCurrencyMutation.isPending}
+                      data-testid="button-submit-currency-form"
+                    >
+                      {editingCurrency ? "Modifier" : "Créer"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>
@@ -372,7 +374,7 @@ export default function CurrenciesPage() {
           ))
         )}
       </div>
-      </div>
-    
+    </div>
+
   );
 }

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,33 +122,34 @@ export default function StorageZonesPage() {
   usePageTitle('Gestion des Zones de Stockage');
   if (isLoading) {
     return (
-    
-        <div className="p-6">
-          <div className="text-center">Chargement...</div>
-        </div>
-   
+
+      <div className="p-6">
+        <div className="text-center">Chargement...</div>
+      </div>
+
     );
   }
 
- return (
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Zones de Stockage
-          </h1>
-          <Button className="bg-accent hover:bg-accent-hover"  onClick={openCreateDialog} data-testid="button-create-zone">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvelle Zone
-          </Button>
-        </div>
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Zones de Stockage
+        </h1>
+        <Button className="bg-accent hover:bg-accent-hover" onClick={openCreateDialog} data-testid="button-create-zone">
+          <Plus className="mr-2 h-4 w-4" />
+          Nouvelle Zone
+        </Button>
+      </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingZone ? "Modifier la zone" : "Nouvelle zone de stockage"}
-              </DialogTitle>
-            </DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingZone ? "Modifier la zone" : "Nouvelle zone de stockage"}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogBody>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -164,7 +165,7 @@ export default function StorageZonesPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -230,8 +231,8 @@ export default function StorageZonesPage() {
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createZoneMutation.isPending || updateZoneMutation.isPending}
                     data-testid="button-submit"
                   >
@@ -240,75 +241,76 @@ export default function StorageZonesPage() {
                 </div>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.isArray(storageZones) && storageZones.length === 0 ? (
-            <div className="col-span-full text-center py-8 text-gray-500">
-              Aucune zone de stockage trouvée
-            </div>
-          ) : (
-            Array.isArray(storageZones) && storageZones.map((zone: StorageZone) => (
-              <div
-                key={zone.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
-                data-testid={`card-zone-${zone.id}`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                    {zone.designation}
-                  </h3>
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(zone)}
-                      data-testid={`button-edit-${zone.id}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteZoneMutation.mutate(zone.id)}
-                      data-testid={`button-delete-${zone.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Code:</span> {zone.code}
-                  </p>
-                  {zone.description && (
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Description:</span> {zone.description}
-                    </p>
-                  )}
-                  {zone.temperature && (
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Température:</span> {zone.temperature}
-                    </p>
-                  )}
-                  {zone.capacity && (
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Capacité:</span> {zone.capacity}
-                    </p>
-                  )}
-                  <p className="text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Statut:</span>{" "}
-                    <span className={zone.active !== false ? "text-green-600" : "text-red-600"}>
-                      {zone.active !== false ? "Actif" : "Inactif"}
-                    </span>
-                  </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.isArray(storageZones) && storageZones.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-gray-500">
+            Aucune zone de stockage trouvée
+          </div>
+        ) : (
+          Array.isArray(storageZones) && storageZones.map((zone: StorageZone) => (
+            <div
+              key={zone.id}
+              className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
+              data-testid={`card-zone-${zone.id}`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                  {zone.designation}
+                </h3>
+                <div className="flex space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openEditDialog(zone)}
+                    data-testid={`button-edit-${zone.id}`}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteZoneMutation.mutate(zone.id)}
+                    data-testid={`button-delete-${zone.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+              <div className="space-y-1 text-sm">
+                <p className="text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">Code:</span> {zone.code}
+                </p>
+                {zone.description && (
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Description:</span> {zone.description}
+                  </p>
+                )}
+                {zone.temperature && (
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Température:</span> {zone.temperature}
+                  </p>
+                )}
+                {zone.capacity && (
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Capacité:</span> {zone.capacity}
+                  </p>
+                )}
+                <p className="text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">Statut:</span>{" "}
+                  <span className={zone.active !== false ? "text-green-600" : "text-red-600"}>
+                    {zone.active !== false ? "Actif" : "Inactif"}
+                  </span>
+                </p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
-    
+    </div>
+
   );
 }

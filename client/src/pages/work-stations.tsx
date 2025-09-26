@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -133,33 +133,34 @@ export default function WorkStationsPage() {
 
   if (isLoading) {
     return (
-    
-        <div className="p-6">
-          <div className="text-center">Chargement...</div>
-        </div>
+
+      <div className="p-6">
+        <div className="text-center">Chargement...</div>
+      </div>
 
     );
   }
 
- return (
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Postes de Travail
-          </h1>
-          <Button className="bg-accent hover:bg-accent-hover"  onClick={openCreateDialog} data-testid="button-create-station">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau Poste
-          </Button>
-        </div>
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Postes de Travail
+        </h1>
+        <Button className="bg-accent hover:bg-accent-hover" onClick={openCreateDialog} data-testid="button-create-station">
+          <Plus className="mr-2 h-4 w-4" />
+          Nouveau Poste
+        </Button>
+      </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingStation ? "Modifier le poste" : "Nouveau poste de travail"}
-              </DialogTitle>
-            </DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingStation ? "Modifier le poste" : "Nouveau poste de travail"}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogBody>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -175,7 +176,7 @@ export default function WorkStationsPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -252,8 +253,8 @@ export default function WorkStationsPage() {
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createStationMutation.isPending || updateStationMutation.isPending}
                     data-testid="button-submit"
                   >
@@ -262,73 +263,74 @@ export default function WorkStationsPage() {
                 </div>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.isArray(workStations) && workStations.length === 0 ? (
-            <div className="col-span-full text-center py-8 text-gray-500">
-              Aucun poste de travail trouvé
-            </div>
-          ) : (
-            Array.isArray(workStations) && workStations.map((station: WorkStation) => (
-              <div
-                key={station.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
-                data-testid={`card-station-${station.id}`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
-                    {station.designation}
-                  </h3>
-                  <div className="flex space-x-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditDialog(station)}
-                      data-testid={`button-edit-${station.id}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteStationMutation.mutate(station.id)}
-                      data-testid={`button-delete-${station.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p className="text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Code:</span> {station.code}
-                  </p>
-                  {station.description && (
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Description:</span> {station.description}
-                    </p>
-                  )}
-                  <p className="text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Type:</span> {stationTypes.find(t => t.value === station.type)?.label || station.type}
-                  </p>
-                  {station.capacity && (
-                    <p className="text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Capacité:</span> {station.capacity}
-                    </p>
-                  )}
-                  <p className="text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Statut:</span>{" "}
-                    <span className={station.active !== false ? "text-green-600" : "text-red-600"}>
-                      {station.active !== false ? "Actif" : "Inactif"}
-                    </span>
-                  </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.isArray(workStations) && workStations.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-gray-500">
+            Aucun poste de travail trouvé
+          </div>
+        ) : (
+          Array.isArray(workStations) && workStations.map((station: WorkStation) => (
+            <div
+              key={station.id}
+              className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700"
+              data-testid={`card-station-${station.id}`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+                  {station.designation}
+                </h3>
+                <div className="flex space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openEditDialog(station)}
+                    data-testid={`button-edit-${station.id}`}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteStationMutation.mutate(station.id)}
+                    data-testid={`button-delete-${station.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+              <div className="space-y-1 text-sm">
+                <p className="text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">Code:</span> {station.code}
+                </p>
+                {station.description && (
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Description:</span> {station.description}
+                  </p>
+                )}
+                <p className="text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">Type:</span> {stationTypes.find(t => t.value === station.type)?.label || station.type}
+                </p>
+                {station.capacity && (
+                  <p className="text-gray-600 dark:text-gray-300">
+                    <span className="font-medium">Capacité:</span> {station.capacity}
+                  </p>
+                )}
+                <p className="text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">Statut:</span>{" "}
+                  <span className={station.active !== false ? "text-green-600" : "text-red-600"}>
+                    {station.active !== false ? "Actif" : "Inactif"}
+                  </span>
+                </p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
-    
+    </div>
+
   );
 }

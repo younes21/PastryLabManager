@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,7 +103,7 @@ export function DeliveryPackagesModal({ open, onOpenChange, delivery, onSuccess 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!packageData.name.trim()) {
       toast({
         title: "Erreur",
@@ -144,130 +144,132 @@ export function DeliveryPackagesModal({ open, onOpenChange, delivery, onSuccess 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Formulaire de création/édition */}
-          {isCreating && (
-            <div className="p-4 border rounded-lg bg-muted/50">
-              <h3 className="font-medium mb-4">
-                {editingPackage ? "Modifier le colis" : "Nouveau colis"}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+        <DialogBody>
+          <div className="space-y-6">
+            {/* Formulaire de création/édition */}
+            {isCreating && (
+              <div className="p-4 border rounded-lg bg-muted/50">
+                <h3 className="font-medium mb-4">
+                  {editingPackage ? "Modifier le colis" : "Nouveau colis"}
+                </h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="name">Nom du colis *</Label>
+                      <Input
+                        id="name"
+                        value={packageData.name}
+                        onChange={(e) => setPackageData({ ...packageData, name: e.target.value })}
+                        placeholder="Ex: Colis principal"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="weight">Poids (kg)</Label>
+                      <Input
+                        id="weight"
+                        type="number"
+                        step="0.1"
+                        value={packageData.weight || ""}
+                        onChange={(e) => setPackageData({ ...packageData, weight: e.target.value ? parseFloat(e.target.value) : undefined })}
+                        placeholder="0.0"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <Label htmlFor="name">Nom du colis *</Label>
+                    <Label htmlFor="dimensions">Dimensions</Label>
                     <Input
-                      id="name"
-                      value={packageData.name}
-                      onChange={(e) => setPackageData({ ...packageData, name: e.target.value })}
-                      placeholder="Ex: Colis principal"
-                      required
+                      id="dimensions"
+                      value={packageData.dimensions}
+                      onChange={(e) => setPackageData({ ...packageData, dimensions: e.target.value })}
+                      placeholder="Ex: 30x20x15 cm"
                     />
                   </div>
+
                   <div>
-                    <Label htmlFor="weight">Poids (kg)</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      step="0.1"
-                      value={packageData.weight || ""}
-                      onChange={(e) => setPackageData({ ...packageData, weight: e.target.value ? parseFloat(e.target.value) : undefined })}
-                      placeholder="0.0"
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      value={packageData.notes}
+                      onChange={(e) => setPackageData({ ...packageData, notes: e.target.value })}
+                      placeholder="Notes sur le colis..."
+                      rows={3}
                     />
                   </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="dimensions">Dimensions</Label>
-                  <Input
-                    id="dimensions"
-                    value={packageData.dimensions}
-                    onChange={(e) => setPackageData({ ...packageData, dimensions: e.target.value })}
-                    placeholder="Ex: 30x20x15 cm"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={packageData.notes}
-                    onChange={(e) => setPackageData({ ...packageData, notes: e.target.value })}
-                    placeholder="Notes sur le colis..."
-                    rows={3}
-                  />
-                </div>
 
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={resetForm}>
-                    Annuler
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={createPackageMutation.isPending || updatePackageMutation.isPending}
-                  >
-                    {editingPackage ? "Modifier" : "Créer"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Bouton pour créer un nouveau colis */}
-          {!isCreating && (
-            <Button onClick={() => setIsCreating(true)} className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un colis
-            </Button>
-          )}
-
-          {/* Liste des colis */}
-          <div>
-            <h3 className="font-medium mb-3">Colis de la livraison ({packages.length})</h3>
-            {packages.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Aucun colis créé pour cette livraison</p>
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={resetForm}>
+                      Annuler
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createPackageMutation.isPending || updatePackageMutation.isPending}
+                    >
+                      {editingPackage ? "Modifier" : "Créer"}
+                    </Button>
+                  </div>
+                </form>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Poids</TableHead>
-                    <TableHead>Dimensions</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {packages.map((pkg: any) => (
-                    <TableRow key={pkg.id}>
-                      <TableCell className="font-medium">{pkg.name}</TableCell>
-                      <TableCell>{pkg.weight ? `${pkg.weight} kg` : "-"}</TableCell>
-                      <TableCell>{pkg.dimensions || "-"}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          {pkg.status || "En préparation"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(pkg)}
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             )}
+
+            {/* Bouton pour créer un nouveau colis */}
+            {!isCreating && (
+              <Button onClick={() => setIsCreating(true)} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter un colis
+              </Button>
+            )}
+
+            {/* Liste des colis */}
+            <div>
+              <h3 className="font-medium mb-3">Colis de la livraison ({packages.length})</h3>
+              {packages.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Aucun colis créé pour cette livraison</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nom</TableHead>
+                      <TableHead>Poids</TableHead>
+                      <TableHead>Dimensions</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {packages.map((pkg: any) => (
+                      <TableRow key={pkg.id}>
+                        <TableCell className="font-medium">{pkg.name}</TableCell>
+                        <TableCell>{pkg.weight ? `${pkg.weight} kg` : "-"}</TableCell>
+                        <TableCell>{pkg.dimensions || "-"}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                            {pkg.status || "En préparation"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(pkg)}
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Package, Search, Download, RotateCcw } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -95,7 +95,7 @@ export default function IngredientsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: IngredientFormData) => 
+    mutationFn: (data: IngredientFormData) =>
       apiRequest(`/api/ingredients/${editingIngredient?.id}`, "PATCH", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
@@ -161,22 +161,22 @@ export default function IngredientsPage() {
   }
 
 
- return (
-      <div className="container mx-auto p-6 space-y-6">
-       
-        {/* Barre de menu/toolbar */}
-        <Card>
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+
+      {/* Barre de menu/toolbar */}
+      <Card>
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              
+
             {/* Recherche et filtres */}
             <div className="flex flex-wrap gap-2 items-center">
-            <Button variant="outline" onClick={() => window.location.reload()}>
+              <Button variant="outline" onClick={() => window.location.reload()}>
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Actualiser
               </Button>
               <div className="relative">
-                
+
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher un ingrédient..."
@@ -211,28 +211,28 @@ export default function IngredientsPage() {
               </Select>
             </div>
             <div className="flex flex-wrap gap-2">
-              
-              
+
+
               <Button className="bg-accent hover:bg-accent-hover" onClick={() => setIsDialogOpen(true)} data-testid="button-add-ingredient">
                 <Plus className="w-4 h-4 mr-2" />
                 Nouvel Ingrédient
               </Button>
-             
+
             </div>
           </div>
 
-         
-        </CardContent>
-        </Card>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingIngredient ? "Modifier l'ingrédient" : "Ajouter un ingrédient"}
-              </DialogTitle>
-            </DialogHeader>
-            
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingIngredient ? "Modifier l'ingrédient" : "Ajouter un ingrédient"}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogBody>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <Tabs defaultValue="general" className="w-full">
@@ -266,8 +266,8 @@ export default function IngredientsPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Catégorie</FormLabel>
-                            <Select 
-                              onValueChange={(value) => field.onChange(value === "no-category" ? undefined : parseInt(value))} 
+                            <Select
+                              onValueChange={(value) => field.onChange(value === "no-category" ? undefined : parseInt(value))}
                               defaultValue={field.value?.toString() || "no-category"}
                             >
                               <FormControl>
@@ -360,8 +360,8 @@ export default function IngredientsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Zone de stockage</FormLabel>
-                          <Select 
-                            onValueChange={(value) => field.onChange(value === "no-zone" ? undefined : parseInt(value))} 
+                          <Select
+                            onValueChange={(value) => field.onChange(value === "no-zone" ? undefined : parseInt(value))}
                             defaultValue={field.value?.toString() || "no-zone"}
                           >
                             <FormControl>
@@ -390,12 +390,12 @@ export default function IngredientsPage() {
                         <FormItem>
                           <FormLabel>Stock minimum</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
+                            <Input
+                              type="number"
+                              {...field}
                               value={field.value || ""}
                               onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
-                              data-testid="input-ingredient-min-stock" 
+                              data-testid="input-ingredient-min-stock"
                             />
                           </FormControl>
                           <FormMessage />
@@ -437,8 +437,8 @@ export default function IngredientsPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Catégorie de vente</FormLabel>
-                                <Select 
-                                  onValueChange={(value) => field.onChange(value === "no-category" ? undefined : parseInt(value))} 
+                                <Select
+                                  onValueChange={(value) => field.onChange(value === "no-category" ? undefined : parseInt(value))}
                                   defaultValue={field.value?.toString() || "no-category"}
                                 >
                                   <FormControl>
@@ -513,8 +513,8 @@ export default function IngredientsPage() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>TVA</FormLabel>
-                                <Select 
-                                  onValueChange={(value) => field.onChange(value === "no-tax" ? undefined : parseInt(value))} 
+                                <Select
+                                  onValueChange={(value) => field.onChange(value === "no-tax" ? undefined : parseInt(value))}
                                   defaultValue={field.value?.toString() || "no-tax"}
                                 >
                                   <FormControl>
@@ -549,8 +549,8 @@ export default function IngredientsPage() {
                         <FormItem>
                           <FormLabel>URL de la photo</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
+                            <Input
+                              {...field}
                               placeholder="https://exemple.com/photo.jpg"
                               data-testid="input-ingredient-photo"
                             />
@@ -566,8 +566,8 @@ export default function IngredientsPage() {
                   <Button type="button" variant="outline" onClick={handleClose}>
                     Annuler
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
                     data-testid="button-submit-ingredient"
                   >
@@ -576,11 +576,12 @@ export default function IngredientsPage() {
                 </div>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Statistiques */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Ingrédients</CardTitle>
@@ -616,11 +617,11 @@ export default function IngredientsPage() {
             </div>
           </CardContent>
         </Card>
-        </div>
+      </div>
 
-        {/* Table des ingrédients selon spécifications */}
-        <Card>
-       
+      {/* Table des ingrédients selon spécifications */}
+      <Card>
+
         <CardContent>
           <Table>
             <TableHeader>
@@ -635,58 +636,58 @@ export default function IngredientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ingredients?.filter(ingredient=>   ingredient.name?.toLowerCase().includes(searchTerm?.toLowerCase()))
-                           ?.map((ingredient) => (
-                <TableRow key={ingredient.id} data-testid={`row-ingredient-${ingredient.id}`}>
-                  <TableCell className="font-medium">
-                    {ingredient.photo ?(<img
-                       src={ingredient.photo}
-                       alt={ingredient.name}
-                       className="w-[7rem] h-[5rem] object-cover rounded-t-lg"
-                     />) : (<Package className="w-16 h-16 text-orange-400" />)}
-                   </TableCell>
-                  <TableCell>
-                    <Badge variant={ingredient.active ? "default" : "secondary"}>
-                      {ingredient.active ? "Actif" : "Inactif"}
-                    </Badge>
-                  </TableCell>
-                 
-                  <TableCell className="font-medium">{ingredient.name}</TableCell>
-                  <TableCell>
-                    {ingredient.categoryId 
-                      ? (categories as any[])?.find((c: any) => c.id === ingredient.categoryId)?.designation || "Sans catégorie" 
-                      : "Sans catégorie"
-                    }
-                  </TableCell>
-                  <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
-                  <TableCell>{Number(ingredient.minStock) || 0}</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(ingredient)}
-                        data-testid={`button-edit-ingredient-${ingredient.id}`}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(ingredient.id)}
-                        data-testid={`button-delete-ingredient-${ingredient.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {ingredients?.filter(ingredient => ingredient.name?.toLowerCase().includes(searchTerm?.toLowerCase()))
+                ?.map((ingredient) => (
+                  <TableRow key={ingredient.id} data-testid={`row-ingredient-${ingredient.id}`}>
+                    <TableCell className="font-medium">
+                      {ingredient.photo ? (<img
+                        src={ingredient.photo}
+                        alt={ingredient.name}
+                        className="w-[7rem] h-[5rem] object-cover rounded-t-lg"
+                      />) : (<Package className="w-16 h-16 text-orange-400" />)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={ingredient.active ? "default" : "secondary"}>
+                        {ingredient.active ? "Actif" : "Inactif"}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell className="font-medium">{ingredient.name}</TableCell>
+                    <TableCell>
+                      {ingredient.categoryId
+                        ? (categories as any[])?.find((c: any) => c.id === ingredient.categoryId)?.designation || "Sans catégorie"
+                        : "Sans catégorie"
+                      }
+                    </TableCell>
+                    <TableCell>{Number(ingredient.costPerUnit) || 0} DA</TableCell>
+                    <TableCell>{Number(ingredient.minStock) || 0}</TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(ingredient)}
+                          data-testid={`button-edit-ingredient-${ingredient.id}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(ingredient.id)}
+                          data-testid={`button-delete-ingredient-${ingredient.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      </div>
-    
+    </div>
+
   );
 }

@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,14 +86,14 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
       type: "reception",
       scheduledDate: new Date().toISOString().split('T')[0],
       notes: "",
-      items: [{ 
-        articleId: 0, 
-        quantityPlanned: 0, 
-        quantityReal: 0, 
-        unitCost: 0, 
-        lotNumber: "", 
+      items: [{
+        articleId: 0,
+        quantityPlanned: 0,
+        quantityReal: 0,
+        unitCost: 0,
+        lotNumber: "",
         expiryDate: "",
-        notes: "" 
+        notes: ""
       }]
     }
   });
@@ -112,7 +112,7 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
         totalTax: calculateTax(),
         totalTTC: calculateTotal()
       };
-      
+
       if (operation) {
         return await apiRequest(`/api/inventory-operations/${operation.id}`, "PUT", operationData);
       } else {
@@ -121,7 +121,7 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-operations"] });
-      toast({ 
+      toast({
         title: operation ? "Opération mise à jour" : "Opération créée",
         description: "L'opération s'est déroulée avec succès"
       });
@@ -130,10 +130,10 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
       onSuccess?.();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Une erreur est survenue",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -156,14 +156,14 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
   // Gestion des articles
   const addItem = () => {
     const currentItems = getValues("items");
-    setValue("items", [...currentItems, { 
-      articleId: 0, 
-      quantityPlanned: 0, 
-      quantityReal: 0, 
-      unitCost: 0, 
-      lotNumber: "", 
+    setValue("items", [...currentItems, {
+      articleId: 0,
+      quantityPlanned: 0,
+      quantityReal: 0,
+      unitCost: 0,
+      lotNumber: "",
       expiryDate: "",
-      notes: "" 
+      notes: ""
     }]);
   };
 
@@ -184,14 +184,14 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
         operatorId: operation.operatorId || undefined,
         scheduledDate: operation.scheduledDate ? new Date(operation.scheduledDate).toISOString().split('T')[0] : "",
         notes: operation.notes || "",
-        items: [{ 
-          articleId: 0, 
-          quantityPlanned: 0, 
-          quantityReal: 0, 
-          unitCost: 0, 
-          lotNumber: "", 
+        items: [{
+          articleId: 0,
+          quantityPlanned: 0,
+          quantityReal: 0,
+          unitCost: 0,
+          lotNumber: "",
           expiryDate: "",
-          notes: "" 
+          notes: ""
         }]
       });
     }
@@ -222,404 +222,405 @@ export function InventoryOperationForm({ operation, trigger, onSuccess }: Invent
             {operation ? "Modifier l'opération" : "Nouvelle opération d'inventaire"}
           </DialogTitle>
         </DialogHeader>
+        <DialogBody>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Tabs defaultValue="general" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="general">Général</TabsTrigger>
+                  <TabsTrigger value="items">Articles</TabsTrigger>
+                  <TabsTrigger value="summary">Résumé</TabsTrigger>
+                </TabsList>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="general">Général</TabsTrigger>
-                <TabsTrigger value="items">Articles</TabsTrigger>
-                <TabsTrigger value="summary">Résumé</TabsTrigger>
-              </TabsList>
+                <TabsContent value="general" className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Type d'opération *</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-operation-type">
+                                <SelectValue placeholder="Sélectionner le type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Object.entries(operationTypeLabels).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-              <TabsContent value="general" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type d'opération *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormField
+                      control={form.control}
+                      name="scheduledDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date programmée</FormLabel>
                           <FormControl>
-                            <SelectTrigger data-testid="select-operation-type">
-                              <SelectValue placeholder="Sélectionner le type" />
-                            </SelectTrigger>
+                            <Input
+                              type="datetime-local"
+                              {...field}
+                              data-testid="input-scheduled-date"
+                            />
                           </FormControl>
-                          <SelectContent>
-                            {Object.entries(operationTypeLabels).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>
-                                {label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {showSupplier && (
+                      <FormField
+                        control={form.control}
+                        name="supplierId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fournisseur</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner un fournisseur" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {suppliers.map((supplier) => (
+                                  <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                                    {supplier.companyName || `${supplier.firstName} ${supplier.lastName}`} ({supplier.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+
+                    {showOrder && (
+                      <FormField
+                        control={form.control}
+                        name="orderId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Commande</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner une commande" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {orders.map((order) => (
+                                  <SelectItem key={order.id} value={order.id.toString()}>
+                                    {order.code} - {order.type === "quote" ? "Devis" : "Commande"}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    <FormField
+                      control={form.control}
+                      name="storageZoneId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Zone de stockage</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner une zone" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {storageZones.map((zone) => (
+                                <SelectItem key={zone.id} value={zone.id.toString()}>
+                                  {zone.designation}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="operatorId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Opérateur</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner un opérateur" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users.filter((user: any) => ["admin", "preparateur", "gerant"].includes(user.role)).map((user: any) => (
+                                <SelectItem key={user.id} value={user.id.toString()}>
+                                  {user.username} ({user.role})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}
-                    name="scheduledDate"
+                    name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Date programmée</FormLabel>
+                        <FormLabel>Notes</FormLabel>
                         <FormControl>
-                          <Input
-                            type="datetime-local"
+                          <Textarea
+                            placeholder="Notes sur l'opération..."
                             {...field}
-                            data-testid="input-scheduled-date"
+                            data-testid="textarea-operation-notes"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </TabsContent>
 
-                  {showSupplier && (
-                    <FormField
-                      control={form.control}
-                      name="supplierId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fournisseur</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sélectionner un fournisseur" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {suppliers.map((supplier) => (
-                                <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                                  {supplier.companyName || `${supplier.firstName} ${supplier.lastName}`} ({supplier.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                <TabsContent value="items" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Articles de l'opération</h3>
+                    <Button type="button" onClick={addItem} size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter un article
+                    </Button>
+                  </div>
 
-                  {showOrder && (
-                    <FormField
-                      control={form.control}
-                      name="orderId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Commande</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sélectionner une commande" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {orders.map((order) => (
-                                <SelectItem key={order.id} value={order.id.toString()}>
-                                  {order.code} - {order.type === "quote" ? "Devis" : "Commande"}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                  <div className="space-y-4">
+                    {watchedItems.map((item, index) => (
+                      <Card key={index}>
+                        <CardContent className="pt-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.articleId`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Article *</FormLabel>
+                                  <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Choisir un article" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {(articles as any[]).map((article: any) => (
+                                        <SelectItem key={article.id} value={article.id.toString()}>
+                                          {article.name} ({article.code || 'N/A'})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-                  <FormField
-                    control={form.control}
-                    name="storageZoneId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Zone de stockage</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner une zone" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {storageZones.map((zone) => (
-                              <SelectItem key={zone.id} value={zone.id.toString()}>
-                                {zone.designation}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="operatorId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Opérateur</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner un opérateur" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {users.filter((user: any) => ["admin", "preparateur", "gerant"].includes(user.role)).map((user: any) => (
-                              <SelectItem key={user.id} value={user.id.toString()}>
-                                {user.username} ({user.role})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Notes sur l'opération..."
-                          {...field}
-                          data-testid="textarea-operation-notes"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </TabsContent>
-
-              <TabsContent value="items" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Articles de l'opération</h3>
-                  <Button type="button" onClick={addItem} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ajouter un article
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  {watchedItems.map((item, index) => (
-                    <Card key={index}>
-                      <CardContent className="pt-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.articleId`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Article *</FormLabel>
-                                <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quantityPlanned`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Qté prévue</FormLabel>
                                   <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Choisir un article" />
-                                    </SelectTrigger>
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    />
                                   </FormControl>
-                                  <SelectContent>
-                                    {(articles as any[]).map((article: any) => (
-                                      <SelectItem key={article.id} value={article.id.toString()}>
-                                        {article.name} ({article.code || 'N/A'})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quantityReal`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Qté réelle</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.unitCost`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Coût unitaire (DA)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            {showLotInfo && (
+                              <>
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.lotNumber`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>N° Lot</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Numéro de lot..." {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.expiryDate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Date expiration</FormLabel>
+                                      <FormControl>
+                                        <Input type="date" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </>
                             )}
-                          />
 
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.quantityPlanned`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Qté prévue</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.quantityReal`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Qté réelle</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.unitCost`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Coût unitaire (DA)</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="1"
-                                    min="0"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          {showLotInfo && (
-                            <>
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.lotNumber`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>N° Lot</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Numéro de lot..." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.expiryDate`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Date expiration</FormLabel>
-                                    <FormControl>
-                                      <Input type="date" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </>
-                          )}
-
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.notes`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Notes</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Notes article..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="flex justify-between items-center mt-4 pt-4 border-t">
-                          <div className="text-sm font-medium">
-                            Total article: {(item.quantityReal * item.unitCost).toFixed(2)} DA
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.notes`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Notes</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Notes article..." {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           </div>
-                          {watchedItems.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeItem(index)}
-                            >
-                              Supprimer
-                            </Button>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
 
-              <TabsContent value="summary" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      Résumé de l'opération
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span>Sous-total HT:</span>
-                          <span className="font-medium">{calculateSubtotal().toFixed(2)} DA</span>
+                          <div className="flex justify-between items-center mt-4 pt-4 border-t">
+                            <div className="text-sm font-medium">
+                              Total article: {(item.quantityReal * item.unitCost).toFixed(2)} DA
+                            </div>
+                            {watchedItems.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeItem(index)}
+                              >
+                                Supprimer
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="summary" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Résumé de l'opération
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span>Sous-total HT:</span>
+                            <span className="font-medium">{calculateSubtotal().toFixed(2)} DA</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>TVA (20%):</span>
+                            <span className="font-medium">{calculateTax().toFixed(2)} DA</span>
+                          </div>
+                          <div className="flex justify-between text-lg font-bold border-t pt-2">
+                            <span>Total TTC:</span>
+                            <span>{calculateTotal().toFixed(2)} DA</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span>TVA (20%):</span>
-                          <span className="font-medium">{calculateTax().toFixed(2)} DA</span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold border-t pt-2">
-                          <span>Total TTC:</span>
-                          <span>{calculateTotal().toFixed(2)} DA</span>
+                        <div className="space-y-2">
+                          <div className="text-sm text-muted-foreground">
+                            <div>Type: {operationTypeLabels[watchedType]}</div>
+                            <div>Nombre d'articles: {watchedItems.length}</div>
+                            <div>Quantité totale prévue: {watchedItems.reduce((sum, item) => sum + item.quantityPlanned, 0)}</div>
+                            <div>Quantité totale réelle: {watchedItems.reduce((sum, item) => sum + item.quantityReal, 0)}</div>
+                          </div>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="text-sm text-muted-foreground">
-                          <div>Type: {operationTypeLabels[watchedType]}</div>
-                          <div>Nombre d'articles: {watchedItems.length}</div>
-                          <div>Quantité totale prévue: {watchedItems.reduce((sum, item) => sum + item.quantityPlanned, 0)}</div>
-                          <div>Quantité totale réelle: {watchedItems.reduce((sum, item) => sum + item.quantityReal, 0)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
 
-            <div className="flex justify-end space-x-2 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Annuler
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? (
-                  "Enregistrement..."
-                ) : (
-                  operation ? "Mettre à jour" : "Créer l'opération"
-                )}
-              </Button>
-            </div>
-          </form>
-        </Form>
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? (
+                    "Enregistrement..."
+                  ) : (
+                    operation ? "Mettre à jour" : "Créer l'opération"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

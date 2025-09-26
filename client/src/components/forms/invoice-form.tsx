@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,7 +80,7 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
         discount: data.discount || "0.00",
         amountPaid: "0.00"
       };
-      
+
       if (invoice) {
         return await apiRequest(`/api/invoices/${invoice.id}`, "PUT", invoiceData);
       } else {
@@ -89,7 +89,7 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ 
+      toast({
         title: invoice ? "Facture mise à jour" : "Facture créée",
         description: "L'opération s'est déroulée avec succès"
       });
@@ -98,10 +98,10 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
       onSuccess?.();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Une erreur est survenue",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -155,257 +155,35 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
             {invoice ? "Modifier la facture" : "Nouvelle facture"}
           </DialogTitle>
         </DialogHeader>
+        <DialogBody>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Tabs defaultValue="general" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="general">Général</TabsTrigger>
+                  <TabsTrigger value="payment">Paiement</TabsTrigger>
+                </TabsList>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="general">Général</TabsTrigger>
-                <TabsTrigger value="payment">Paiement</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="general" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client *</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-invoice-client">
-                              <SelectValue placeholder="Sélectionner un client" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id.toString()}>
-                                {getClientName(client.id)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="orderId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Commande/Devis</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner une commande" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="0">Aucune commande</SelectItem>
-                            {orders.filter(o => o.status === "confirmed" || o.status === "delivered").map((order) => (
-                              <SelectItem key={order.id} value={order.id.toString()}>
-                                {getOrderCode(order.id)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Statut</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner le statut" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="draft">Brouillon</SelectItem>
-                            <SelectItem value="partial">Partiellement payé</SelectItem>
-                            <SelectItem value="paid">Payé</SelectItem>
-                            <SelectItem value="cancelled">Annulé</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="subtotalHT"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sous-total HT (DA)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            data-testid="input-invoice-subtotal"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="totalTax"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>TVA (DA)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            data-testid="input-invoice-tax"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="discount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Remise (DA)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            data-testid="input-invoice-discount"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="totalTTC"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total TTC (DA)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            {...field}
-                            data-testid="input-invoice-total"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="issueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date émission</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            data-testid="input-issue-date"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date échéance</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            data-testid="input-due-date"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Notes sur la facture..."
-                          {...field}
-                          data-testid="textarea-invoice-notes"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </TabsContent>
-
-              <TabsContent value="payment" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calculator className="h-5 w-5" />
-                      Conditions de paiement
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                <TabsContent value="general" className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="paymentTerms"
+                      name="clientId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Conditions de paiement</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>Client *</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sélectionner les conditions" />
+                              <SelectTrigger data-testid="select-invoice-client">
+                                <SelectValue placeholder="Sélectionner un client" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="cash">Comptant</SelectItem>
-                              <SelectItem value="15 jours">15 jours</SelectItem>
-                              <SelectItem value="30 jours">30 jours</SelectItem>
-                              <SelectItem value="45 jours">45 jours</SelectItem>
-                              <SelectItem value="60 jours">60 jours</SelectItem>
+                              {clients.map((client) => (
+                                <SelectItem key={client.id} value={client.id.toString()}>
+                                  {getClientName(client.id)}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -413,34 +191,257 @@ export function InvoiceForm({ invoice, trigger, onSuccess }: InvoiceFormProps) {
                       )}
                     />
 
-                    <div className="p-4 bg-muted rounded-lg">
-                      <h4 className="font-medium mb-2">Informations de paiement</h4>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <p>• Paiement par chèque à l'ordre de la société</p>
-                        <p>• Virement bancaire accepté</p>
-                        <p>• Espèces pour montants inférieurs à 10,000 DA</p>
-                        <p>• Pénalités de retard : 3% par mois de retard</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                    <FormField
+                      control={form.control}
+                      name="orderId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Commande/Devis</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner une commande" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="0">Aucune commande</SelectItem>
+                              {orders.filter(o => o.status === "confirmed" || o.status === "delivered").map((order) => (
+                                <SelectItem key={order.id} value={order.id.toString()}>
+                                  {getOrderCode(order.id)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-            <div className="flex justify-end space-x-2 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Annuler
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? (
-                  "Enregistrement..."
-                ) : (
-                  invoice ? "Mettre à jour" : "Créer la facture"
-                )}
-              </Button>
-            </div>
-          </form>
-        </Form>
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Statut</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner le statut" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="draft">Brouillon</SelectItem>
+                              <SelectItem value="partial">Partiellement payé</SelectItem>
+                              <SelectItem value="paid">Payé</SelectItem>
+                              <SelectItem value="cancelled">Annulé</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="subtotalHT"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sous-total HT (DA)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              data-testid="input-invoice-subtotal"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="totalTax"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>TVA (DA)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              data-testid="input-invoice-tax"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="discount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Remise (DA)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              data-testid="input-invoice-discount"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalTTC"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Total TTC (DA)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              data-testid="input-invoice-total"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="issueDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date émission</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              data-testid="input-issue-date"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dueDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date échéance</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              data-testid="input-due-date"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Notes sur la facture..."
+                            {...field}
+                            data-testid="textarea-invoice-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                <TabsContent value="payment" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Calculator className="h-5 w-5" />
+                        Conditions de paiement
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="paymentTerms"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Conditions de paiement</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner les conditions" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="cash">Comptant</SelectItem>
+                                <SelectItem value="15 jours">15 jours</SelectItem>
+                                <SelectItem value="30 jours">30 jours</SelectItem>
+                                <SelectItem value="45 jours">45 jours</SelectItem>
+                                <SelectItem value="60 jours">60 jours</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="font-medium mb-2">Informations de paiement</h4>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>• Paiement par chèque à l'ordre de la société</p>
+                          <p>• Virement bancaire accepté</p>
+                          <p>• Espèces pour montants inférieurs à 10,000 DA</p>
+                          <p>• Pénalités de retard : 3% par mois de retard</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? (
+                    "Enregistrement..."
+                  ) : (
+                    invoice ? "Mettre à jour" : "Créer la facture"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

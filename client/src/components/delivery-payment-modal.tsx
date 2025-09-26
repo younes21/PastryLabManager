@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,7 +109,7 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (paymentData.amount <= 0) {
       toast({
         title: "Erreur",
@@ -153,167 +153,168 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
             Paiement à la livraison - #{delivery?.code}
           </DialogTitle>
         </DialogHeader>
+        <DialogBody>
+          <div className="space-y-6">
+            {/* Informations de la commande */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Total commande</Label>
+                <p className="text-lg font-semibold">{parseFloat(orderDetails?.totalTTC || "0").toFixed(2)} DA</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Montant payé</Label>
+                <p className="text-lg font-semibold text-green-600">{totalPaid.toFixed(2)} DA</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Reste à payer</Label>
+                <p className="text-lg font-semibold text-orange-600">{remainingAmount.toFixed(2)} DA</p>
+              </div>
+            </div>
 
-        <div className="space-y-6">
-          {/* Informations de la commande */}
-          <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Total commande</Label>
-              <p className="text-lg font-semibold">{parseFloat(orderDetails?.totalTTC || "0").toFixed(2)} DA</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Montant payé</Label>
-              <p className="text-lg font-semibold text-green-600">{totalPaid.toFixed(2)} DA</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Reste à payer</Label>
-              <p className="text-lg font-semibold text-orange-600">{remainingAmount.toFixed(2)} DA</p>
-            </div>
-          </div>
+            {/* Formulaire de paiement */}
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-medium mb-4">Nouveau paiement</h3>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="amount">Montant *</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      value={paymentData.amount || ""}
+                      onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="method">Méthode de paiement *</Label>
+                    <Select value={paymentData.method} onValueChange={(value) => setPaymentData({ ...paymentData, method: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">
+                          <div className="flex items-center gap-2">
+                            <Banknote className="h-4 w-4" />
+                            Espèces
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="card">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            Carte bancaire
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="bank">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="h-4 w-4" />
+                            Virement
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="cheque">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="h-4 w-4" />
+                            Chèque
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-          {/* Formulaire de paiement */}
-          <div className="p-4 border rounded-lg">
-            <h3 className="font-medium mb-4">Nouveau paiement</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="amount">Montant *</Label>
+                  <Label htmlFor="reference">Référence</Label>
                   <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    value={paymentData.amount || ""}
-                    onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                    required
+                    id="reference"
+                    value={paymentData.reference}
+                    onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
+                    placeholder="N° de transaction, chèque, etc."
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="method">Méthode de paiement *</Label>
-                  <Select value={paymentData.method} onValueChange={(value) => setPaymentData({ ...paymentData, method: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">
-                        <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4" />
-                          Espèces
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="card">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
-                          Carte bancaire
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="bank">
-                        <div className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4" />
-                          Virement
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="cheque">
-                        <div className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4" />
-                          Chèque
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={paymentData.notes}
+                    onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                    placeholder="Notes sur le paiement..."
+                    rows={3}
+                  />
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="reference">Référence</Label>
-                <Input
-                  id="reference"
-                  value={paymentData.reference}
-                  onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
-                  placeholder="N° de transaction, chèque, etc."
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={paymentData.notes}
-                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                  placeholder="Notes sur le paiement..."
-                  rows={3}
-                />
-              </div>
 
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Annuler
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={createPaymentMutation.isPending}
-                >
-                  {createPaymentMutation.isPending ? "Enregistrement..." : "Enregistrer le paiement"}
-                </Button>
-              </div>
-            </form>
-          </div>
-
-          {/* Historique des paiements */}
-          <div>
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-medium">Historique des paiements</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => createInvoiceMutation.mutate()}
-                disabled={createInvoiceMutation.isPending}
-              >
-                <Receipt className="h-4 w-4 mr-2" />
-                Créer facture
-              </Button>
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={resetForm}>
+                    Annuler
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createPaymentMutation.isPending}
+                  >
+                    {createPaymentMutation.isPending ? "Enregistrement..." : "Enregistrer le paiement"}
+                  </Button>
+                </div>
+              </form>
             </div>
-            
-            {existingPayments.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Aucun paiement enregistré</p>
+
+            {/* Historique des paiements */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-medium">Historique des paiements</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => createInvoiceMutation.mutate()}
+                  disabled={createInvoiceMutation.isPending}
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Créer facture
+                </Button>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Montant</TableHead>
-                    <TableHead>Méthode</TableHead>
-                    <TableHead>Référence</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {existingPayments.map((payment: any) => (
-                    <TableRow key={payment.id}>
-                      <TableCell>
-                        {new Date(payment.date).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {parseFloat(payment.amount).toFixed(2)} DA
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getMethodIcon(payment.method)}
-                          {getMethodLabel(payment.method)}
-                        </div>
-                      </TableCell>
-                      <TableCell>{payment.reference || "-"}</TableCell>
-                      <TableCell>{payment.notes || "-"}</TableCell>
+
+              {existingPayments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Aucun paiement enregistré</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Montant</TableHead>
+                      <TableHead>Méthode</TableHead>
+                      <TableHead>Référence</TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                  </TableHeader>
+                  <TableBody>
+                    {existingPayments.map((payment: any) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>
+                          {new Date(payment.date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {parseFloat(payment.amount).toFixed(2)} DA
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getMethodIcon(payment.method)}
+                            {getMethodLabel(payment.method)}
+                          </div>
+                        </TableCell>
+                        <TableCell>{payment.reference || "-"}</TableCell>
+                        <TableCell>{payment.notes || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +29,7 @@ type RecipeForm = z.infer<typeof recipeSchema>;
 export function RecipeDisplay({ articleId }: { articleId: number }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
-  
+
   const { data: recipe, isLoading, error } = useQuery<Recipe | null>({
     queryKey: ["/api/articles", articleId, "recipe"],
     queryFn: async () => {
@@ -104,11 +104,12 @@ export function RecipeDisplay({ articleId }: { articleId: number }) {
                 <DialogHeader>
                   <DialogTitle>Créer une recette</DialogTitle>
                 </DialogHeader>
-                <RecipeForm 
-                  articleId={articleId} 
-                  onSuccess={() => setIsDialogOpen(false)}
-                  mutation={createRecipeMutation}
-                />
+                <DialogBody>
+                  <RecipeForm
+                    articleId={articleId}
+                    onSuccess={() => setIsDialogOpen(false)}
+                    mutation={createRecipeMutation}
+                  /></DialogBody>
               </DialogContent>
             </Dialog>
           </CardTitle>
@@ -152,7 +153,7 @@ export function RecipeDisplay({ articleId }: { articleId: number }) {
             <Badge variant="secondary">Sous-recette</Badge>
           )}
         </div>
-        
+
         {recipe.description && (
           <div>
             <h4 className="font-medium mb-2">Description</h4>
@@ -178,12 +179,12 @@ export function RecipeDisplay({ articleId }: { articleId: number }) {
   );
 }
 
-function RecipeForm({ 
-  articleId, 
-  onSuccess, 
-  mutation 
-}: { 
-  articleId: number; 
+function RecipeForm({
+  articleId,
+  onSuccess,
+  mutation
+}: {
+  articleId: number;
   onSuccess: () => void;
   mutation: any;
 }) {
@@ -269,8 +270,8 @@ function RecipeForm({
           <Button type="button" variant="outline" onClick={onSuccess}>
             Annuler
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={mutation.isPending}
             data-testid="button-submit-recipe"
           >

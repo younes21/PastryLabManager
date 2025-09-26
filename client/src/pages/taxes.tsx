@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -83,7 +83,7 @@ export default function TaxesPage() {
       ...values,
       rate: parseFloat(values.rate).toString(), // Convert to decimal string
     };
-    
+
     if (editingTax) {
       updateTaxMutation.mutate({ id: editingTax.id, data: taxData });
     } else {
@@ -134,17 +134,17 @@ export default function TaxesPage() {
     );
   }
 
- return (
-      <div className="p-6 space-y-6">
+  return (
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           Gestion des Taxes
         </h1>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
+            <Button
               onClick={handleNewTax}
-              className="bg-accent hover:bg-accent-hover" 
+              className="bg-accent hover:bg-accent-hover"
               data-testid="button-add-tax"
             >
               <Plus className="mr-2 h-5 w-5" />
@@ -157,111 +157,113 @@ export default function TaxesPage() {
                 {editingTax ? "Modifier la Taxe" : "Nouvelle Taxe"}
               </DialogTitle>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="designation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Désignation</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="Nom de la taxe"
-                          className="h-12 text-lg"
-                          data-testid="input-tax-designation"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <DialogBody>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="designation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Désignation</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Nom de la taxe"
+                            className="h-12 text-lg"
+                            data-testid="input-tax-designation"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="rate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Taux (%)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="1"
-                          min="0"
-                          max="100"
-                          placeholder="19.5"
-                          className="h-12 text-lg"
-                          data-testid="input-tax-rate"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="rate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Taux (%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="100"
+                            placeholder="19.5"
+                            className="h-12 text-lg"
+                            data-testid="input-tax-rate"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description (optionnel)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Description de la taxe..."
-                          className="h-12 text-lg"
-                          data-testid="input-tax-description"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (optionnel)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Description de la taxe..."
+                            className="h-12 text-lg"
+                            data-testid="input-tax-description"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="active"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Active
-                        </FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-tax-active"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="active"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Active
+                          </FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-tax-active"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                    className="flex-1 h-12 text-lg"
-                    data-testid="button-cancel-tax-form"
-                  >
-                    Annuler
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 h-12 text-lg"
-                    disabled={createTaxMutation.isPending || updateTaxMutation.isPending}
-                    data-testid="button-submit-tax-form"
-                  >
-                    {editingTax ? "Modifier" : "Créer"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setDialogOpen(false)}
+                      className="flex-1 h-12 text-lg"
+                      data-testid="button-cancel-tax-form"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 h-12 text-lg"
+                      disabled={createTaxMutation.isPending || updateTaxMutation.isPending}
+                      data-testid="button-submit-tax-form"
+                    >
+                      {editingTax ? "Modifier" : "Créer"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>
@@ -326,7 +328,7 @@ export default function TaxesPage() {
           ))
         )}
       </div>
-      </div>
-    
+    </div>
+
   );
 }

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -77,7 +77,7 @@ export function PaymentManager({ invoice }: PaymentManagerProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ 
+      toast({
         title: "Paiement enregistré",
         description: "Le paiement a été ajouté avec succès"
       });
@@ -92,10 +92,10 @@ export function PaymentManager({ invoice }: PaymentManagerProps) {
       });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Erreur lors de l'enregistrement du paiement",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -107,16 +107,16 @@ export function PaymentManager({ invoice }: PaymentManagerProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ 
+      toast({
         title: "Paiement supprimé",
         description: "Le paiement a été supprimé avec succès"
       });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Erreur lors de la suppression",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -169,11 +169,11 @@ export function PaymentManager({ invoice }: PaymentManagerProps) {
 
           <div className="flex justify-between items-center pt-4 border-t">
             <Badge variant={invoice.status === "paid" ? "default" : invoice.status === "partial" ? "secondary" : "outline"}>
-              {invoice.status === "paid" ? "Payé" : 
-               invoice.status === "partial" ? "Partiellement payé" : 
-               "Non payé"}
+              {invoice.status === "paid" ? "Payé" :
+                invoice.status === "partial" ? "Partiellement payé" :
+                  "Non payé"}
             </Badge>
-            
+
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button disabled={remainingAmount <= 0} data-testid="button-add-payment">
@@ -188,120 +188,121 @@ export function PaymentManager({ invoice }: PaymentManagerProps) {
                     Nouveau paiement
                   </DialogTitle>
                 </DialogHeader>
-
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Montant (DA) *</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              max={remainingAmount.toString()}
-                              placeholder={`Max: ${remainingAmount.toFixed(2)} DA`}
-                              {...field}
-                              data-testid="input-payment-amount"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="method"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Méthode de paiement *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <DialogBody>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Montant (DA) *</FormLabel>
                             <FormControl>
-                              <SelectTrigger data-testid="select-payment-method">
-                                <SelectValue placeholder="Sélectionner la méthode" />
-                              </SelectTrigger>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                max={remainingAmount.toString()}
+                                placeholder={`Max: ${remainingAmount.toFixed(2)} DA`}
+                                {...field}
+                                data-testid="input-payment-amount"
+                              />
                             </FormControl>
-                            <SelectContent>
-                              {Object.entries(paymentMethodLabels).map(([method, label]) => (
-                                <SelectItem key={method} value={method}>
-                                  {label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="reference"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Référence</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="N° de chèque, référence virement..."
-                              {...field}
-                              data-testid="input-payment-reference"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="method"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Méthode de paiement *</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-payment-method">
+                                  <SelectValue placeholder="Sélectionner la méthode" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {Object.entries(paymentMethodLabels).map(([method, label]) => (
+                                  <SelectItem key={method} value={method}>
+                                    {label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="paymentDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date de paiement</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              {...field}
-                              data-testid="input-payment-date"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="reference"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Référence</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="N° de chèque, référence virement..."
+                                {...field}
+                                data-testid="input-payment-reference"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Notes</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Notes sur le paiement..."
-                              {...field}
-                              data-testid="textarea-payment-notes"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="paymentDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date de paiement</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                {...field}
+                                data-testid="input-payment-date"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <div className="flex justify-end space-x-2 pt-4 border-t">
-                      <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                        Annuler
-                      </Button>
-                      <Button type="submit" disabled={createPaymentMutation.isPending}>
-                        {createPaymentMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Notes sur le paiement..."
+                                {...field}
+                                data-testid="textarea-payment-notes"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex justify-end space-x-2 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                          Annuler
+                        </Button>
+                        <Button type="submit" disabled={createPaymentMutation.isPending}>
+                          {createPaymentMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogBody>
               </DialogContent>
             </Dialog>
           </div>

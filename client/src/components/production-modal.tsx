@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,7 +63,7 @@ export function ProductionModal({ isOpen, onClose }: ProductionModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.recipeId || !formData.preparerId || !formData.quantity || !formData.scheduledTime) {
       toast({
         title: "Erreur",
@@ -74,7 +74,7 @@ export function ProductionModal({ isOpen, onClose }: ProductionModalProps) {
     }
 
     const scheduledDateTime = new Date(formData.scheduledTime);
-    
+
     createProductionMutation.mutate({
       recipeId: parseInt(formData.recipeId),
       preparerId: parseInt(formData.preparerId),
@@ -90,72 +90,73 @@ export function ProductionModal({ isOpen, onClose }: ProductionModalProps) {
         <DialogHeader>
           <DialogTitle>Nouvelle Production</DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="recipe">Produit</Label>
-              <Select value={formData.recipeId || undefined} onValueChange={(value) => setFormData({...formData, recipeId: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un produit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {recipes?.map((recipe: any) => (
-                    <SelectItem key={recipe.id} value={recipe.id.toString()}>
-                      {recipe.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <DialogBody>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="recipe">Produit</Label>
+                <Select value={formData.recipeId || undefined} onValueChange={(value) => setFormData({ ...formData, recipeId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un produit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recipes?.map((recipe: any) => (
+                      <SelectItem key={recipe.id} value={recipe.id.toString()}>
+                        {recipe.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="quantity">Quantité</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="scheduledTime">Date et heure</Label>
+                <Input
+                  id="scheduledTime"
+                  type="datetime-local"
+                  value={formData.scheduledTime}
+                  onChange={(e) => setFormData({ ...formData, scheduledTime: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="preparer">Préparateur</Label>
+                <Select value={formData.preparerId || undefined} onValueChange={(value) => setFormData({ ...formData, preparerId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un préparateur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {preparers?.map((preparer: any) => (
+                      <SelectItem key={preparer.id} value={preparer.id.toString()}>
+                        {preparer.firstName} {preparer.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            
-            <div>
-              <Label htmlFor="quantity">Quantité</Label>
-              <Input
-                id="quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                min="1"
-              />
+
+            <div className="flex items-center justify-end space-x-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={createProductionMutation.isPending}>
+                {createProductionMutation.isPending ? "Programmation..." : "Programmer"}
+              </Button>
             </div>
-            
-            <div>
-              <Label htmlFor="scheduledTime">Date et heure</Label>
-              <Input
-                id="scheduledTime"
-                type="datetime-local"
-                value={formData.scheduledTime}
-                onChange={(e) => setFormData({...formData, scheduledTime: e.target.value})}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="preparer">Préparateur</Label>
-              <Select value={formData.preparerId || undefined} onValueChange={(value) => setFormData({...formData, preparerId: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un préparateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  {preparers?.map((preparer: any) => (
-                    <SelectItem key={preparer.id} value={preparer.id.toString()}>
-                      {preparer.firstName} {preparer.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={createProductionMutation.isPending}>
-              {createProductionMutation.isPending ? "Programmation..." : "Programmer"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

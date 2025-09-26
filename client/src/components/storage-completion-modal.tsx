@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar, MapPin, User, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -46,14 +46,14 @@ interface StorageCompletionModalProps {
   onClose: () => void;
 }
 
-export default function StorageCompletionModal({ 
-  production, 
-  isOpen, 
-  onClose 
+export default function StorageCompletionModal({
+  production,
+  isOpen,
+  onClose
 }: StorageCompletionModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [storageLocationId, setStorageLocationId] = useState<string>("");
   const [expirationDate, setExpirationDate] = useState<string>("");
   const [customerName, setCustomerName] = useState<string>("");
@@ -145,109 +145,110 @@ export default function StorageCompletionModal({
             Finaliser la Production
           </DialogTitle>
         </DialogHeader>
+        <DialogBody>
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <h4 className="font-medium">{recipe?.name}</h4>
+              <p className="text-sm text-gray-600">Quantité: {production.quantity}</p>
+            </div>
 
-        <div className="space-y-4">
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <h4 className="font-medium">{recipe?.name}</h4>
-            <p className="text-sm text-gray-600">Quantité: {production.quantity}</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="storage-location" className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Lieu de stockage *
-            </Label>
-            <Select value={storageLocationId} onValueChange={setStorageLocationId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un lieu" />
-              </SelectTrigger>
-              <SelectContent>
-                {storageLocations.map((location) => (
-                  <SelectItem key={location.id} value={location.id.toString()}>
-                    {location.name} ({location.temperature}°C)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="expiration-date" className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Date d'expiration *
-            </Label>
-            <Input
-              id="expiration-date"
-              type="date"
-              value={expirationDate}
-              onChange={(e) => setExpirationDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpirationDate(suggestExpirationDate())}
-              className="text-xs"
-            >
-              Suggérer 7 jours
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Commande associée (optionnel)
-            </Label>
-            <Select value={orderId} onValueChange={setOrderId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner une commande" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Aucune commande</SelectItem>
-                {orders
-                  .filter(order => order.status !== "delivered")
-                  .map((order) => (
-                    <SelectItem key={order.id} value={order.id.toString()}>
-                      #{order.id} - {order.customerName}
+            <div className="space-y-2">
+              <Label htmlFor="storage-location" className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Lieu de stockage *
+              </Label>
+              <Select value={storageLocationId} onValueChange={setStorageLocationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un lieu" />
+                </SelectTrigger>
+                <SelectContent>
+                  {storageLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id.toString()}>
+                      {location.name} ({location.temperature}°C)
                     </SelectItem>
                   ))}
-              </SelectContent>
-            </Select>
-          </div>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {!orderId && (
             <div className="space-y-2">
-              <Label htmlFor="customer-name" className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Nom du client (optionnel)
+              <Label htmlFor="expiration-date" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Date d'expiration *
               </Label>
               <Input
-                id="customer-name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Laisser vide pour stock général"
+                id="expiration-date"
+                type="date"
+                value={expirationDate}
+                onChange={(e) => setExpirationDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setExpirationDate(suggestExpirationDate())}
+                className="text-xs"
+              >
+                Suggérer 7 jours
+              </Button>
             </div>
-          )}
 
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={handleClose}
-              className="flex-1"
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={completeMutation.isPending || !storageLocationId || !expirationDate}
-              className="flex-1"
-            >
-              {completeMutation.isPending ? "Finalisation..." : "Finaliser"}
-            </Button>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Commande associée (optionnel)
+              </Label>
+              <Select value={orderId} onValueChange={setOrderId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une commande" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Aucune commande</SelectItem>
+                  {orders
+                    .filter(order => order.status !== "delivered")
+                    .map((order) => (
+                      <SelectItem key={order.id} value={order.id.toString()}>
+                        #{order.id} - {order.customerName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!orderId && (
+              <div className="space-y-2">
+                <Label htmlFor="customer-name" className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Nom du client (optionnel)
+                </Label>
+                <Input
+                  id="customer-name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Laisser vide pour stock général"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={completeMutation.isPending || !storageLocationId || !expirationDate}
+                className="flex-1"
+              >
+                {completeMutation.isPending ? "Finalisation..." : "Finaliser"}
+              </Button>
+            </div>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

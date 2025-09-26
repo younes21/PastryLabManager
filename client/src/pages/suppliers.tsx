@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -454,12 +454,12 @@ export default function SuppliersPage() {
         },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) {
         const error = await response.text();
         throw new Error(error || "Erreur lors de la création");
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -502,7 +502,7 @@ export default function SuppliersPage() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof supplierFormSchema> }) => {
       console.log("Updating supplier:", id, data);
-      
+
       const response = await fetch(`/api/suppliers/${id}`, {
         method: "PATCH",
         headers: {
@@ -510,13 +510,13 @@ export default function SuppliersPage() {
         },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) {
         const error = await response.text();
         console.error("Update error:", error);
         throw new Error(error || "Erreur lors de la mise à jour");
       }
-      
+
       const result = await response.json();
       console.log("Update success:", result);
       return result;
@@ -563,12 +563,12 @@ export default function SuppliersPage() {
       const response = await fetch(`/api/suppliers/${id}`, {
         method: "DELETE",
       });
-      
+
       if (!response.ok) {
         const error = await response.text();
         throw new Error(error || "Erreur lors de la suppression");
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -666,66 +666,67 @@ export default function SuppliersPage() {
 
   // Filtrage des fournisseurs
   const filteredSuppliers = (suppliers as Supplier[]).filter((supplier: Supplier) => {
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       supplier.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       getSupplierDisplayName(supplier).toLowerCase().includes(searchTerm.toLowerCase()) ||
       (supplier.email && supplier.email.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     const matchesType = filterType === "all" || supplier.type === filterType;
-    
+
     return matchesSearch && matchesType;
   });
 
-usePageTitle('Gestion des Fournisseurs');
- return (
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-           
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Gérez vos fournisseurs, leurs informations et leurs coordonnées
-            </p>
-          </div>
+  usePageTitle('Gestion des Fournisseurs');
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
 
-          <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
-            setIsCreateDialogOpen(open);
-            if (open) {
-              setActiveTab("general");
-              form.reset({
-                type: "societe",
-                active: true,
-                firstName: "",
-                lastName: "",
-                companyName: "",
-                companyType: "",
-                phone: "",
-                mobile: "",
-                email: "",
-                contactName: "",
-                address: "",
-                city: "",
-                postalCode: "",
-                country: "",
-                taxId: "",
-                commercialRegister: "",
-                photo: "",
-              });
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700" data-testid="button-add-supplier">
-                <Plus className="mr-2 h-4 w-4" />
-                Nouveau Fournisseur
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Nouveau Fournisseur</DialogTitle>
-                <DialogDescription>
-                  Créez un nouveau fournisseur avec toutes ses informations
-                </DialogDescription>
-              </DialogHeader>
-              <StableSupplierForm 
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Gérez vos fournisseurs, leurs informations et leurs coordonnées
+          </p>
+        </div>
+
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (open) {
+            setActiveTab("general");
+            form.reset({
+              type: "societe",
+              active: true,
+              firstName: "",
+              lastName: "",
+              companyName: "",
+              companyType: "",
+              phone: "",
+              mobile: "",
+              email: "",
+              contactName: "",
+              address: "",
+              city: "",
+              postalCode: "",
+              country: "",
+              taxId: "",
+              commercialRegister: "",
+              photo: "",
+            });
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700" data-testid="button-add-supplier">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau Fournisseur
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nouveau Fournisseur</DialogTitle>
+              <DialogDescription>
+                Créez un nouveau fournisseur avec toutes ses informations
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody>
+              <StableSupplierForm
                 form={form}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -733,125 +734,127 @@ usePageTitle('Gestion des Fournisseurs');
                 onCancel={handleCancel}
                 submitting={createMutation.isPending}
               />
-            </DialogContent>
-          </Dialog>
-        </div>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-        {/* Filtres et recherche */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Rechercher par code, nom, raison sociale, email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-suppliers"
-                />
-              </div>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[200px]" data-testid="select-filter-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les types</SelectItem>
-                  <SelectItem value="particulier">Particuliers</SelectItem>
-                  <SelectItem value="societe">Sociétés</SelectItem>
-                </SelectContent>
-              </Select>
+      {/* Filtres et recherche */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Rechercher par code, nom, raison sociale, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-suppliers"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[200px]" data-testid="select-filter-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="particulier">Particuliers</SelectItem>
+                <SelectItem value="societe">Sociétés</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Liste des fournisseurs */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {isLoading ? (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-500">Chargement des fournisseurs...</p>
-            </div>
-          ) : filteredSuppliers.length === 0 ? (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-500">Aucun fournisseur trouvé</p>
-            </div>
-          ) : (
-            filteredSuppliers.map((supplier) => (
-              <Card key={supplier.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {supplier.type === "particulier" ? (
-                        <User className="h-8 w-8 text-blue-600" />
-                      ) : (
-                        <Building2 className="h-8 w-8 text-green-600" />
-                      )}
-                      <div>
-                        <CardTitle className="text-lg">{getSupplierDisplayName(supplier)}</CardTitle>
-                        <CardDescription className="flex items-center gap-2">
-                          <Badge variant="outline">{supplier.code}</Badge>
-                          <Badge variant={supplier.active ? "default" : "secondary"}>
-                            {supplier.active ? "Actif" : "Inactif"}
-                          </Badge>
-                        </CardDescription>
-                      </div>
+      {/* Liste des fournisseurs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {isLoading ? (
+          <div className="col-span-full text-center py-8">
+            <p className="text-gray-500">Chargement des fournisseurs...</p>
+          </div>
+        ) : filteredSuppliers.length === 0 ? (
+          <div className="col-span-full text-center py-8">
+            <p className="text-gray-500">Aucun fournisseur trouvé</p>
+          </div>
+        ) : (
+          filteredSuppliers.map((supplier) => (
+            <Card key={supplier.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    {supplier.type === "particulier" ? (
+                      <User className="h-8 w-8 text-blue-600" />
+                    ) : (
+                      <Building2 className="h-8 w-8 text-green-600" />
+                    )}
+                    <div>
+                      <CardTitle className="text-lg">{getSupplierDisplayName(supplier)}</CardTitle>
+                      <CardDescription className="flex items-center gap-2">
+                        <Badge variant="outline">{supplier.code}</Badge>
+                        <Badge variant={supplier.active ? "default" : "secondary"}>
+                          {supplier.active ? "Actif" : "Inactif"}
+                        </Badge>
+                      </CardDescription>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {supplier.email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Mail className="h-4 w-4" />
-                      <span>{supplier.email}</span>
-                    </div>
-                  )}
-                  {(supplier.phone || supplier.mobile) && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Phone className="h-4 w-4" />
-                      <span>{supplier.mobile || supplier.phone}</span>
-                    </div>
-                  )}
-                  {supplier.address && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="h-4 w-4" />
-                      <span className="truncate">{supplier.address}</span>
-                    </div>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(supplier)}
-                      data-testid={`button-edit-supplier-${supplier.id}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(supplier.id)}
-                      className="text-red-600 hover:text-red-700"
-                      data-testid={`button-delete-supplier-${supplier.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {supplier.email && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Mail className="h-4 w-4" />
+                    <span>{supplier.email}</span>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                )}
+                {(supplier.phone || supplier.mobile) && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Phone className="h-4 w-4" />
+                    <span>{supplier.mobile || supplier.phone}</span>
+                  </div>
+                )}
+                {supplier.address && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <MapPin className="h-4 w-4" />
+                    <span className="truncate">{supplier.address}</span>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(supplier)}
+                    data-testid={`button-edit-supplier-${supplier.id}`}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(supplier.id)}
+                    className="text-red-600 hover:text-red-700"
+                    data-testid={`button-delete-supplier-${supplier.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
-        {/* Dialog de modification */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Modifier le Fournisseur</DialogTitle>
-              <DialogDescription>
-                Modifiez les informations du fournisseur
-              </DialogDescription>
-            </DialogHeader>
-            <StableSupplierForm 
+      {/* Dialog de modification */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Modifier le Fournisseur</DialogTitle>
+            <DialogDescription>
+              Modifiez les informations du fournisseur
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <StableSupplierForm
               form={form}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -859,9 +862,10 @@ usePageTitle('Gestion des Fournisseurs');
               onCancel={handleCancel}
               submitting={updateMutation.isPending}
             />
-          </DialogContent>
-        </Dialog>
-      </div>
-    
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    </div>
+
   );
 }

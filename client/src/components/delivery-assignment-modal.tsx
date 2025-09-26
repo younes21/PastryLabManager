@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -76,46 +76,47 @@ export function DeliveryAssignmentModal({ open, onOpenChange, delivery, onSucces
             Assigner un livreur
           </DialogTitle>
         </DialogHeader>
+        <DialogBody>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-sm font-medium">Livraison #{delivery?.code}</p>
+              <p className="text-sm text-muted-foreground">
+                Commande #{delivery?.orderId}
+              </p>
+            </div>
 
-        <div className="space-y-4">
-          <div className="p-3 bg-muted rounded-lg">
-            <p className="text-sm font-medium">Livraison #{delivery?.code}</p>
-            <p className="text-sm text-muted-foreground">
-              Commande #{delivery?.orderId}
-            </p>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="deliveryPerson">Livreur *</Label>
+              <Select value={selectedDeliveryPersonId} onValueChange={setSelectedDeliveryPersonId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un livreur" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.isArray(availableDeliveryPersons) && availableDeliveryPersons.map((person: any) => (
+                    <SelectItem key={person.id} value={person.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        {person.firstName} {person.lastName}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="deliveryPerson">Livreur *</Label>
-            <Select value={selectedDeliveryPersonId} onValueChange={setSelectedDeliveryPersonId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un livreur" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.isArray(availableDeliveryPersons) && availableDeliveryPersons.map((person: any) => (
-                  <SelectItem key={person.id} value={person.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      {person.firstName} {person.lastName}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Annuler
+              </Button>
+              <Button
+                onClick={handleAssign}
+                disabled={assignMutation.isPending || !selectedDeliveryPersonId}
+              >
+                {assignMutation.isPending ? "Assignation..." : "Assigner"}
+              </Button>
+            </div>
           </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Annuler
-            </Button>
-            <Button 
-              onClick={handleAssign}
-              disabled={assignMutation.isPending || !selectedDeliveryPersonId}
-            >
-              {assignMutation.isPending ? "Assignation..." : "Assigner"}
-            </Button>
-          </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

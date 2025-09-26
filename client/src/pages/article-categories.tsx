@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Edit, Trash2, Package, ChevronRight, Search, ChevronDown, FolderOpen, Folder } from "lucide-react";
@@ -299,7 +299,7 @@ export default function ArticleCategories() {
       parentId: undefined,
       forSale: false,
       active: true,
-      type:'produit'
+      type: 'produit'
     });
     setEditingCategory(null);
     setParentForNewCategory(null);
@@ -483,91 +483,94 @@ export default function ArticleCategories() {
                 }
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="designation">Désignation</Label>
-                <Input
-                  id="designation"
-                  value={categoryForm.designation}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, designation: e.target.value })}
-                  placeholder="Ex: Pâtisseries, Ingrédients de base..."
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="type">Type</Label>
-                <Select
-                  value={categoryForm.type || "produit"}
-                  onValueChange={(value) => setCategoryForm({ ...categoryForm, type: value as "produit" | "ingredient" | "service" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="produit">Produit</SelectItem>
-                    <SelectItem value="ingredient">Ingrédient</SelectItem>
-                    <SelectItem value="service">Service</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {!parentForNewCategory && (
+
+            <DialogBody>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="parent">Catégorie parent (optionnel)</Label>
+                  <Label htmlFor="designation">Désignation</Label>
+                  <Input
+                    id="designation"
+                    value={categoryForm.designation}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, designation: e.target.value })}
+                    placeholder="Ex: Pâtisseries, Ingrédients de base..."
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="type">Type</Label>
                   <Select
-                    value={categoryForm.parentId?.toString() || "none"}
-                    onValueChange={(value) => {
-                      setCategoryForm({
-                        ...categoryForm,
-                        parentId: value === "none" ? undefined : parseInt(value)
-                      });
-                    }}
+                    value={categoryForm.type || "produit"}
+                    onValueChange={(value) => setCategoryForm({ ...categoryForm, type: value as "produit" | "ingredient" | "service" })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Aucune catégorie parent" />
+                      <SelectValue placeholder="Sélectionner un type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Aucune catégorie parent</SelectItem>
-                      {getAvailableParents(editingCategory?.id).map((category) => (
-                        <SelectItem key={category.id} value={category.id.toString()}>
-                          {buildCategoryPath(category, categories)}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="produit">Produit</SelectItem>
+                      <SelectItem value="ingredient">Ingrédient</SelectItem>
+                      <SelectItem value="service">Service</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-              {parentForNewCategory && (
-                <div>
-                  <Label>Catégorie parent</Label>
-                  <div className="p-3 bg-gray-50 rounded-md border">
-                    <span className="text-sm font-medium">
-                      {buildCategoryPath(parentForNewCategory, categories)}
-                    </span>
+                {!parentForNewCategory && (
+                  <div>
+                    <Label htmlFor="parent">Catégorie parent (optionnel)</Label>
+                    <Select
+                      value={categoryForm.parentId?.toString() || "none"}
+                      onValueChange={(value) => {
+                        setCategoryForm({
+                          ...categoryForm,
+                          parentId: value === "none" ? undefined : parseInt(value)
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Aucune catégorie parent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune catégorie parent</SelectItem>
+                        {getAvailableParents(editingCategory?.id).map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {buildCategoryPath(category, categories)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                )}
+                {parentForNewCategory && (
+                  <div>
+                    <Label>Catégorie parent</Label>
+                    <div className="p-3 bg-gray-50 rounded-md border">
+                      <span className="text-sm font-medium">
+                        {buildCategoryPath(parentForNewCategory, categories)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="for-sale"
+                    checked={categoryForm.forSale || false}
+                    onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, forSale: checked })}
+                  />
+                  <Label htmlFor="for-sale">Catégorie pour la vente</Label>
                 </div>
-              )}
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="for-sale"
-                  checked={categoryForm.forSale || false}
-                  onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, forSale: checked })}
-                />
-                <Label htmlFor="for-sale">Catégorie pour la vente</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="active"
-                  checked={categoryForm.active || false}
-                  onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, active: checked })}
-                />
-                <Label htmlFor="active">Catégorie active</Label>
-              </div>
-              <DialogFooter>
-                <Button type="submit">
-                  {editingCategory ? "Modifier" : "Créer"}
-                </Button>
-              </DialogFooter>
-            </form>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="active"
+                    checked={categoryForm.active || false}
+                    onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, active: checked })}
+                  />
+                  <Label htmlFor="active">Catégorie active</Label>
+                </div>
+                <DialogFooter>
+                  <Button type="submit">
+                    {editingCategory ? "Modifier" : "Créer"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>

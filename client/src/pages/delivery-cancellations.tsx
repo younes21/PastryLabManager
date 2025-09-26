@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Calendar, 
-  Truck, 
-  XCircle, 
-  RotateCcw, 
-  Trash2, 
+import {
+  Calendar,
+  Truck,
+  XCircle,
+  RotateCcw,
+  Trash2,
   Eye,
   Filter,
   Search,
@@ -17,27 +17,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -98,7 +99,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
   const cancelMutation = useMutation({
     mutationFn: async () => {
       if (!delivery) return;
-      
+
       if (delivery.isValidated) {
         // Annulation après validation
         const response = await fetch(`/api/deliveries/${delivery.id}/cancel-after-validation`, {
@@ -106,12 +107,12 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reason, isReturnToStock })
         });
-        
+
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || 'Erreur lors de l\'annulation');
         }
-        
+
         return response.json();
       } else {
         // Annulation avant validation
@@ -120,12 +121,12 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reason })
         });
-        
+
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || 'Erreur lors de l\'annulation');
         }
-        
+
         return response.json();
       }
     },
@@ -150,7 +151,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!reason.trim() || reason.trim().length < 3) {
       toast({
         title: "Raison invalide",
@@ -186,81 +187,82 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
             Annuler la livraison {delivery.code}
           </DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Raison de l'annulation *
-            </label>
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ex: Client a refusé la livraison"
-              minLength={3}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Minimum 3 caractères requis
-            </p>
-          </div>
-
-          {delivery.isValidated && (
+        <DialogBody>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Type d'annulation
+                Raison de l'annulation *
               </label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={isReturnToStock ? "default" : "outline"}
-                  onClick={() => setIsReturnToStock(true)}
-                  className="flex-1"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Retour au stock
-                </Button>
-                <Button
-                  type="button"
-                  variant={!isReturnToStock ? "default" : "outline"}
-                  onClick={() => setIsReturnToStock(false)}
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Rebut
-                </Button>
-              </div>
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Ex: Client a refusé la livraison"
+                minLength={3}
+                required
+              />
               <p className="text-xs text-muted-foreground">
-                {isReturnToStock 
-                  ? "Les articles seront remis en stock"
-                  : "Les articles seront marqués comme perdus/endommagés"
-                }
+                Minimum 3 caractères requis
               </p>
             </div>
-          )}
 
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Annuler
-            </Button>
-            <Button 
-              type="submit" 
-              variant="destructive"
-              disabled={isSubmitting || !reason.trim()}
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Traitement...
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Annuler la livraison
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
+            {delivery.isValidated && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Type d'annulation
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={isReturnToStock ? "default" : "outline"}
+                    onClick={() => setIsReturnToStock(true)}
+                    className="flex-1"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Retour au stock
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!isReturnToStock ? "default" : "outline"}
+                    onClick={() => setIsReturnToStock(false)}
+                    className="flex-1"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Rebut
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isReturnToStock
+                    ? "Les articles seront remis en stock"
+                    : "Les articles seront marqués comme perdus/endommagés"
+                  }
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={isSubmitting || !reason.trim()}
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Traitement...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Annuler la livraison
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
@@ -269,7 +271,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
 // Page principale
 export default function DeliveryCancellationsPage() {
   usePageTitle('Gestion des annulations de livraisons');
-  
+
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -300,7 +302,7 @@ export default function DeliveryCancellationsPage() {
   const filteredDeliveries = deliveries.filter((delivery: Delivery) => {
     const matchesStatus = statusFilter === 'all' || delivery.status === statusFilter;
     const matchesSearch = delivery.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         delivery.order?.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+      delivery.order?.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -338,8 +340,8 @@ export default function DeliveryCancellationsPage() {
 
   // Obtenir les opérations d'inventaire liées à une livraison
   const getRelatedOperations = (deliveryId: number): InventoryOperation[] => {
-    return inventoryOperations.filter((op: InventoryOperation) => 
-      op.parentOperationId === deliveryId || 
+    return inventoryOperations.filter((op: InventoryOperation) =>
+      op.parentOperationId === deliveryId ||
       (op.type === 'livraison' && op.orderId === deliveryId)
     );
   };
@@ -499,7 +501,7 @@ export default function DeliveryCancellationsPage() {
               <TableBody>
                 {filteredDeliveries.map((delivery: Delivery) => {
                   const relatedOperations = getRelatedOperations(delivery.id);
-                  
+
                   return (
                     <TableRow key={delivery.id}>
                       <TableCell className="font-mono">{delivery.code}</TableCell>

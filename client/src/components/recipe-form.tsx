@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, MoveUp, MoveDown } from "lucide-react";
@@ -515,17 +515,17 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
             {recipe ? "Modifier la recette" : "Nouvelle recette"}
           </DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          {/* Section Générale compacte */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Informations générales</h3>
-            <div className="grid grid-cols-4 gap-3">
-              {/* Si pas de articleId, afficher le select produit */}
-              {!articleId && (
-                <div className="col-span-2">
-                  <Label htmlFor="articleId" className="text-xs">Produit *</Label>
-                  {/* <Select
+        <DialogBody>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            {/* Section Générale compacte */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Informations générales</h3>
+              <div className="grid grid-cols-4 gap-3">
+                {/* Si pas de articleId, afficher le select produit */}
+                {!articleId && (
+                  <div className="col-span-2">
+                    <Label htmlFor="articleId" className="text-xs">Produit *</Label>
+                    {/* <Select
                     value={form.watch("articleId")?.toString()}
                     onValueChange={(value) => form.setValue("articleId", parseInt(value))}
                     data-testid="select-articleId"
@@ -541,292 +541,292 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                       ))}
                     </SelectContent>
                   </Select> */}
-                  <ProductSelectorCompact products={products} value={form.watch("articleId")?.toString()}
-                    onSelect={(value: any) => form.setValue("articleId", parseInt(value))}></ProductSelectorCompact>
-                </div>
-              )}
-              {/* Si articleId fourni, afficher le nom du produit en lecture seule */}
-              {articleId && (
-                <div className="col-span-2 flex items-center">
-                  <Label className="text-xs mr-2">Produit :</Label>
-                  <span className="font-medium text-sm">
-                    {allArticles.find((a: Article) => a.id === articleId)?.name || "Produit inconnu"}
-                  </span>
-                </div>
-              )}
-              <div className="col-span-2 ">
-                <Label className="text-xs" htmlFor="designation">Désignation *</Label>
-                <Input
-                  className="h-8 text-sm"
-                  {...form.register("designation")}
-                  data-testid="input-designation"
-                />
-                {form.formState.errors.designation && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {form.formState.errors.designation.message}
-                  </p>
+                    <ProductSelectorCompact products={products} value={form.watch("articleId")?.toString()}
+                      onSelect={(value: any) => form.setValue("articleId", parseInt(value))}></ProductSelectorCompact>
+                  </div>
                 )}
-              </div>
+                {/* Si articleId fourni, afficher le nom du produit en lecture seule */}
+                {articleId && (
+                  <div className="col-span-2 flex items-center">
+                    <Label className="text-xs mr-2">Produit :</Label>
+                    <span className="font-medium text-sm">
+                      {allArticles.find((a: Article) => a.id === articleId)?.name || "Produit inconnu"}
+                    </span>
+                  </div>
+                )}
+                <div className="col-span-2 ">
+                  <Label className="text-xs" htmlFor="designation">Désignation *</Label>
+                  <Input
+                    className="h-8 text-sm"
+                    {...form.register("designation")}
+                    data-testid="input-designation"
+                  />
+                  {form.formState.errors.designation && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {form.formState.errors.designation.message}
+                    </p>
+                  )}
+                </div>
 
-              <div>
-                <Label htmlFor="quantity" className="text-xs">Quantité *</Label>
-                <Input
-                  {...form.register("quantity")}
-                  data-testid="input-quantity"
-                  className="h-8 text-sm"
-                />
-              </div>
+                <div>
+                  <Label htmlFor="quantity" className="text-xs">Quantité *</Label>
+                  <Input
+                    {...form.register("quantity")}
+                    data-testid="input-quantity"
+                    className="h-8 text-sm"
+                  />
+                </div>
 
-              <div>
-                <Label htmlFor="unit" className="text-xs">Unité *</Label>
+                <div>
+                  <Label htmlFor="unit" className="text-xs">Unité *</Label>
 
-                <div className="px-3 py-2 border h-8 flex items-center  border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
-                  Unité de l'article:  <b className="ml-2">{selectedArticle?.unit}</b></div>
-              </div>
+                  <div className="px-3 py-2 border h-8 flex items-center  border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
+                    Unité de l'article:  <b className="ml-2">{selectedArticle?.unit}</b></div>
+                </div>
 
-              <div className="flex items-center space-x-2 ">
-                <Checkbox
-                  checked={form.watch("isSubRecipe")}
-                  onCheckedChange={(checked) => form.setValue("isSubRecipe", Boolean(checked))}
-                  data-testid="checkbox-isSubRecipe"
-                />
-                <Label className="text-xs">Sous-recette</Label>
-              </div>
+                <div className="flex items-center space-x-2 ">
+                  <Checkbox
+                    checked={form.watch("isSubRecipe")}
+                    onCheckedChange={(checked) => form.setValue("isSubRecipe", Boolean(checked))}
+                    data-testid="checkbox-isSubRecipe"
+                  />
+                  <Label className="text-xs">Sous-recette</Label>
+                </div>
 
-              <div className="col-span-4">
-                <Label htmlFor="description" className="text-xs">Description</Label>
-                <Textarea
-                  {...form.register("description")}
-                  rows={2}
-                  data-testid="textarea-description"
-                  className="text-sm"
-                  placeholder="Description de la recette..."
-                />
+                <div className="col-span-4">
+                  <Label htmlFor="description" className="text-xs">Description</Label>
+                  <Textarea
+                    {...form.register("description")}
+                    rows={2}
+                    data-testid="textarea-description"
+                    className="text-sm"
+                    placeholder="Description de la recette..."
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          {/* Boutons d'action */}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel">
-              Annuler
-            </Button>
-            <Button type="submit" data-testid="button-submit">
-              {recipe ? "Modifier" : "Créer"} la recette
-            </Button>
-          </div>
+            {/* Boutons d'action */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel">
+                Annuler
+              </Button>
+              <Button type="submit" data-testid="button-submit">
+                {recipe ? "Modifier" : "Créer"} la recette
+              </Button>
+            </div>
 
-          {/* Onglets Ingrédients et Opérations - seulement si la recette existe */}
-          {recipe?.id ? (
-            <>
-              <Tabs defaultValue="ingredients" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="ingredients">Ingrédients</TabsTrigger>
-                  <TabsTrigger value="operations">Opérations</TabsTrigger>
-                </TabsList>
+            {/* Onglets Ingrédients et Opérations - seulement si la recette existe */}
+            {recipe?.id ? (
+              <>
+                <Tabs defaultValue="ingredients" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="ingredients">Ingrédients</TabsTrigger>
+                    <TabsTrigger value="operations">Opérations</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="ingredients" className="space-y-4">
-                  <div className="border rounded-lg p-4 bg-gray-50">
-                    <h3 className="font-medium mb-3">Ajouter un ingrédient</h3>
-                    <div className="grid grid-cols-4 gap-3 mb-3">
-                      <div className="col-span-2">
-                        <Select
-                          value={currentIngredient.articleId}
-                          onValueChange={(value) => setCurrentIngredient(prev => ({ ...prev, articleId: value }))}
-                          data-testid="select-ingredient-article"
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Article" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(allArticles as Article[])
-                              .filter((art: Article) => {
-                                if (art.type === 'ingredient') return true;
-                                if (art.type === 'product') {
-                                  // On cherche une recette pour ce produit qui est une sous-recette
-                                  return existingRecipes.some((rec: any) => rec.articleId === art.id && rec.isSubRecipe);
-                                }
-                                return false;
-                              })
-                              .map((article: Article) => (
-                                <SelectItem key={article.id} value={article.id.toString()}>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant={article.type === 'ingredient' ? 'default' : 'secondary'}>
-                                      {article.type === 'ingredient' ? 'ING' : 'PROD'}
-                                    </Badge>
-                                    {article.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Input
-                        placeholder="Quantité"
-                        value={currentIngredient.quantity}
-                        onChange={(e) => setCurrentIngredient(prev => ({ ...prev, quantity: e.target.value }))}
-                        data-testid="input-ingredient-quantity"
-                      />
-                      <div className="flex gap-2">
-                        <div>
-                          {currentIngredient.articleId ? (
-                            <div className="flex flex-col">
-                              <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
-                                {(() => {
-                                  const selectedIngredientArticle = (allArticles as Article[]).find((art: Article) => art.id === parseInt(currentIngredient.articleId));
-                                  return selectedIngredientArticle ? selectedIngredientArticle.unit : "Unité";
-                                })()}
-                              </div>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Unité imposée de l'article
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-sm text-gray-400">
-                              Sélectionnez d'abord un ingrédient
-                            </div>
-                          )}
+                  <TabsContent value="ingredients" className="space-y-4">
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <h3 className="font-medium mb-3">Ajouter un ingrédient</h3>
+                      <div className="grid grid-cols-4 gap-3 mb-3">
+                        <div className="col-span-2">
+                          <Select
+                            value={currentIngredient.articleId}
+                            onValueChange={(value) => setCurrentIngredient(prev => ({ ...prev, articleId: value }))}
+                            data-testid="select-ingredient-article"
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Article" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(allArticles as Article[])
+                                .filter((art: Article) => {
+                                  if (art.type === 'ingredient') return true;
+                                  if (art.type === 'product') {
+                                    // On cherche une recette pour ce produit qui est une sous-recette
+                                    return existingRecipes.some((rec: any) => rec.articleId === art.id && rec.isSubRecipe);
+                                  }
+                                  return false;
+                                })
+                                .map((article: Article) => (
+                                  <SelectItem key={article.id} value={article.id.toString()}>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant={article.type === 'ingredient' ? 'default' : 'secondary'}>
+                                        {article.type === 'ingredient' ? 'ING' : 'PROD'}
+                                      </Badge>
+                                      {article.name}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <Button
-                          type="button"
-                          className="rounded-full w-10 h-10"
-                          onClick={(e) => {
-                            console.log("Button clicked");
-                            try {
-                              addIngredient();
-                            } catch (error) {
-                              console.error("Error in addIngredient:", error);
-                            }
-                          }}
-                          data-testid="button-add-ingredient"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        <Input
+                          placeholder="Quantité"
+                          value={currentIngredient.quantity}
+                          onChange={(e) => setCurrentIngredient(prev => ({ ...prev, quantity: e.target.value }))}
+                          data-testid="input-ingredient-quantity"
+                        />
+                        <div className="flex gap-2">
+                          <div>
+                            {currentIngredient.articleId ? (
+                              <div className="flex flex-col">
+                                <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700">
+                                  {(() => {
+                                    const selectedIngredientArticle = (allArticles as Article[]).find((art: Article) => art.id === parseInt(currentIngredient.articleId));
+                                    return selectedIngredientArticle ? selectedIngredientArticle.unit : "Unité";
+                                  })()}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Unité imposée de l'article
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-sm text-gray-400">
+                                Sélectionnez d'abord un ingrédient
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            className="rounded-full w-10 h-10"
+                            onClick={(e) => {
+                              console.log("Button clicked");
+                              try {
+                                addIngredient();
+                              } catch (error) {
+                                console.error("Error in addIngredient:", error);
+                              }
+                            }}
+                            data-testid="button-add-ingredient"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+
                       </div>
 
-
+                      <Input
+                        placeholder="Notes (optionnel)"
+                        value={currentIngredient.notes}
+                        onChange={(e) => setCurrentIngredient(prev => ({ ...prev, notes: e.target.value }))}
+                        data-testid="input-ingredient-notes"
+                      />
                     </div>
 
-                    <Input
-                      placeholder="Notes (optionnel)"
-                      value={currentIngredient.notes}
-                      onChange={(e) => setCurrentIngredient(prev => ({ ...prev, notes: e.target.value }))}
-                      data-testid="input-ingredient-notes"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Ingrédients de la recette ({ingredients.length})</h3>
-                    {ingredients.map((ingredient, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={ingredient.article?.type === 'ingredient' ? 'default' : 'secondary'}>
-                              {ingredient.article?.type === 'ingredient' ? 'ING' : 'PROD'}
-                            </Badge>
-                            <span className="font-medium">{ingredient.article?.name}</span>
-                            <span className="text-gray-600">
-                              {ingredient.quantity} {ingredient.unit}
-                            </span>
+                    <div className="space-y-2">
+                      <h3 className="font-medium">Ingrédients de la recette ({ingredients.length})</h3>
+                      {ingredients.map((ingredient, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={ingredient.article?.type === 'ingredient' ? 'default' : 'secondary'}>
+                                {ingredient.article?.type === 'ingredient' ? 'ING' : 'PROD'}
+                              </Badge>
+                              <span className="font-medium">{ingredient.article?.name}</span>
+                              <span className="text-gray-600">
+                                {ingredient.quantity} {ingredient.unit}
+                              </span>
+                            </div>
+                            {ingredient.notes && (
+                              <p className="text-sm text-gray-500 mt-1">{ingredient.notes}</p>
+                            )}
                           </div>
-                          {ingredient.notes && (
-                            <p className="text-sm text-gray-500 mt-1">{ingredient.notes}</p>
-                          )}
+
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => moveIngredient(index, 'up')}
+                              disabled={index === 0}
+                              data-testid={`button-move-ingredient-up-${index}`}
+                            >
+                              <MoveUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => moveIngredient(index, 'down')}
+                              disabled={index === ingredients.length - 1}
+                              data-testid={`button-move-ingredient-down-${index}`}
+                            >
+                              <MoveDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeIngredient(index).catch(console.error)}
+                              data-testid={`button-remove-ingredient-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                  </TabsContent>
 
-                        <div className="flex items-center gap-1">
+                  <TabsContent value="operations" className="space-y-4">
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <h3 className="font-medium mb-3">Ajouter une opération</h3>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <Input className="col-span-2"
+                          placeholder="Description *"
+                          value={currentOperation.description}
+                          onChange={(e) => setCurrentOperation(prev => ({ ...prev, description: e.target.value }))}
+                          data-testid="input-operation-description"
+                        />
+
+                        <Input
+                          placeholder="Durée (min)"
+                          type="number"
+                          value={currentOperation.duration}
+                          onChange={(e) => setCurrentOperation(prev => ({ ...prev, duration: e.target.value }))}
+                          data-testid="input-operation-duration"
+                        />
+                        <div className="flex gap-2">
+                          <Select
+                            value={currentOperation.workStationId}
+                            onValueChange={(value) => setCurrentOperation(prev => ({ ...prev, workStationId: value }))}
+                            data-testid="select-operation-workstation"
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Poste de travail" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {workStations?.map((station: WorkStation) => (
+                                <SelectItem key={station.id} value={station.id.toString()}>
+                                  {station.designation}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveIngredient(index, 'up')}
-                            disabled={index === 0}
-                            data-testid={`button-move-ingredient-up-${index}`}
+                            className="rounded-full w-10 h-10"
+                            onClick={(e) => {
+                              console.log("Operation button clicked");
+                              try {
+                                addOperation();
+                              } catch (error) {
+                                console.error("Error in addOperation:", error);
+                              }
+                            }}
+                            data-testid="button-add-operation"
                           >
-                            <MoveUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveIngredient(index, 'down')}
-                            disabled={index === ingredients.length - 1}
-                            data-testid={`button-move-ingredient-down-${index}`}
-                          >
-                            <MoveDown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeIngredient(index).catch(console.error)}
-                            data-testid={`button-remove-ingredient-${index}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="operations" className="space-y-4">
-                  <div className="border rounded-lg p-4 bg-gray-50">
-                    <h3 className="font-medium mb-3">Ajouter une opération</h3>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <Input className="col-span-2"
-                        placeholder="Description *"
-                        value={currentOperation.description}
-                        onChange={(e) => setCurrentOperation(prev => ({ ...prev, description: e.target.value }))}
-                        data-testid="input-operation-description"
-                      />
-
-                      <Input
-                        placeholder="Durée (min)"
-                        type="number"
-                        value={currentOperation.duration}
-                        onChange={(e) => setCurrentOperation(prev => ({ ...prev, duration: e.target.value }))}
-                        data-testid="input-operation-duration"
-                      />
-                      <div className="flex gap-2">
-                        <Select
-                          value={currentOperation.workStationId}
-                          onValueChange={(value) => setCurrentOperation(prev => ({ ...prev, workStationId: value }))}
-                          data-testid="select-operation-workstation"
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Poste de travail" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {workStations?.map((station: WorkStation) => (
-                              <SelectItem key={station.id} value={station.id.toString()}>
-                                {station.designation}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          className="rounded-full w-10 h-10"
-                          onClick={(e) => {
-                            console.log("Operation button clicked");
-                            try {
-                              addOperation();
-                            } catch (error) {
-                              console.error("Error in addOperation:", error);
-                            }
-                          }}
-                          data-testid="button-add-operation"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {/* <Input 
+                        {/* <Input 
                       placeholder="Température" 
                       value={currentOperation.temperature}
                       onChange={(e) => setCurrentOperation(prev => ({ ...prev, temperature: e.target.value }))}
                       data-testid="input-operation-temperature"
                     /> */}
-                      {/*  <div >
+                        {/*  <div >
                     <Input 
                       placeholder="Notes (optionnel)" 
                       value={currentOperation.notes}
@@ -836,77 +836,78 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                     /> */}
 
 
+                      </div>
+
+
                     </div>
 
-
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Opérations de la recette ({operations.length})</h3>
-                    {operations.map((operation, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium">
-                          {index + 1}
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="font-medium">{operation.description}</div>
-                          <div className="text-sm text-gray-600 flex gap-4 mt-1">
-                            {operation.duration && <span>⏱️ {operation.duration} min</span>}
-                            {operation.workStation && <span>🏭 {operation.workStation.designation}</span>}
-                            {operation.temperature && <span>🌡️ {operation.temperature}</span>}
+                    <div className="space-y-2">
+                      <h3 className="font-medium">Opérations de la recette ({operations.length})</h3>
+                      {operations.map((operation, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium">
+                            {index + 1}
                           </div>
-                          {operation.notes && (
-                            <p className="text-sm text-gray-500 mt-1">{operation.notes}</p>
-                          )}
-                        </div>
 
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveOperation(index, 'up')}
-                            disabled={index === 0}
-                            data-testid={`button-move-operation-up-${index}`}
-                          >
-                            <MoveUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => moveOperation(index, 'down')}
-                            disabled={index === operations.length - 1}
-                            data-testid={`button-move-operation-down-${index}`}
-                          >
-                            <MoveDown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeOperation(index).catch(console.error)}
-                            data-testid={`button-remove-operation-${index}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </>
-          ) : (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                💡 Créez d'abord la recette pour pouvoir ajouter des ingrédients et des opérations
-              </p>
-            </div>
-          )}
+                          <div className="flex-1">
+                            <div className="font-medium">{operation.description}</div>
+                            <div className="text-sm text-gray-600 flex gap-4 mt-1">
+                              {operation.duration && <span>⏱️ {operation.duration} min</span>}
+                              {operation.workStation && <span>🏭 {operation.workStation.designation}</span>}
+                              {operation.temperature && <span>🌡️ {operation.temperature}</span>}
+                            </div>
+                            {operation.notes && (
+                              <p className="text-sm text-gray-500 mt-1">{operation.notes}</p>
+                            )}
+                          </div>
 
-        </form>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => moveOperation(index, 'up')}
+                              disabled={index === 0}
+                              data-testid={`button-move-operation-up-${index}`}
+                            >
+                              <MoveUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => moveOperation(index, 'down')}
+                              disabled={index === operations.length - 1}
+                              data-testid={`button-move-operation-down-${index}`}
+                            >
+                              <MoveDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeOperation(index).catch(console.error)}
+                              data-testid={`button-remove-operation-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </>
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  💡 Créez d'abord la recette pour pouvoir ajouter des ingrédients et des opérations
+                </p>
+              </div>
+            )}
+
+          </form>
+        </DialogBody>
       </DialogContent>
     </Dialog >
   );

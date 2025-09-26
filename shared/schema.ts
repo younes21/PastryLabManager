@@ -557,12 +557,14 @@ export const orders = pgTable("orders", {
     .references(() => clients.id)
     .notNull(),
   status: text("status").notNull().default("draft"), // draft, confirmed, prepared, ready, partially_delivered, delivered, cancelled
+  statusDate: timestamp("status_date", { mode: "string" }), // date etat
   order: integer("order").default(0), // Ordre d'affichage pour le drag and drop
 
   // Dates
   orderDate: timestamp("order_date", { mode: "string" }).defaultNow(),
   deliveryDate: timestamp("delivery_date", { mode: "string" }),
   confirmedAt: timestamp("confirmed_at", { mode: "string" }),
+  validatedAt: timestamp("validated_at", { mode: "string" }),
 
   // Totaux
   subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).default(
@@ -580,7 +582,7 @@ export const orders = pgTable("orders", {
 
   // Audit
   createdBy: integer("created_by").references(() => users.id),
-  confirmedBy: integer("confirmed_by").references(() => users.id),
+  validatedBy: integer("validated_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
 });
@@ -641,7 +643,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
   completedAt: timestamp("completed_at", { mode: "string" }), // preparation
   validatedAt: timestamp("validated_at", { mode: "string" }), // quand verrouillé
   recipeId: integer("recipe_id").references(() => recipes.id), // preparation
-  
+
   // Montants (pour réceptions/ventes)
   currency: text("currency").default("DZD"),
   subtotalHT: decimal("subtotal_ht", { precision: 12, scale: 2 }).default(

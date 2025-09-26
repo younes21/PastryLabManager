@@ -9,26 +9,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Package, DollarSign, Search, Filter, MoreHorizontal, ChefHat, Clock, Shield, Warehouse } from "lucide-react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -42,7 +42,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { z } from "zod";
-import { 
+import {
   Article,
   InsertArticle,
   insertArticleSchema,
@@ -71,7 +71,7 @@ type ProductForm = z.infer<typeof productSchema>;
 
 export default function Products() {
   console.log("🔥 PRODUCTS PAGE - Début de rendu");
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Article | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -121,7 +121,7 @@ export default function Products() {
     setSelectedProduct(null);
     setIsEditing(false);
   };
-  usePageTitle('Gestion des produits'); 
+  usePageTitle('Gestion des produits');
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -131,200 +131,204 @@ export default function Products() {
       </div>
     );
   }
-  
-  return (  
-  <>
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          
-          <p className="text-muted-foreground">Gérez vos produits finis et leurs recettes</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-accent hover:bg-accent-hover"  onClick={handleCreateProduct} data-testid="button-create-product">
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau Produit
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {isEditing ? "Modifier le Produit" : "Nouveau Produit"}
-              </DialogTitle>
-            </DialogHeader>
-            <ProductForm product={selectedProduct} onSuccess={handleCloseDialog} />
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Barre de recherche et filtres */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-4 items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Rechercher par nom ou code..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search"
-              />
-            </div>
-            <Button variant="outline" size="sm">
-              <Filter className="mr-2 h-4 w-4" />
-              Filtres
-            </Button>
+  return (
+    <>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+
+            <p className="text-muted-foreground">Gérez vos produits finis et leurs recettes</p>
           </div>
-        </CardContent>
-      </Card>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-accent hover:bg-accent-hover" onClick={handleCreateProduct} data-testid="button-create-product">
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau Produit
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {isEditing ? "Modifier le Produit" : "Nouveau Produit"}
+                </DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                <ProductForm product={selectedProduct} onSuccess={handleCloseDialog} />
+              </DialogBody>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-      {/* Tableau des produits */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Photo</TableHead>
-                <TableHead>Nom</TableHead>
-                <TableHead>Conservation</TableHead>
-                <TableHead>D.L.C</TableHead>
-                <TableHead>Conditions</TableHead>
-                <TableHead>Prix</TableHead>
-                <TableHead>Zone stockage</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProducts.length === 0 ? (
+        {/* Barre de recherche et filtres */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex gap-4 items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Rechercher par nom ou code..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtres
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tableau des produits */}
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <div className="flex flex-col items-center space-y-2">
-                      <Package className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-muted-foreground">
-                        {searchTerm ? "Aucun produit trouvé" : "Aucun produit enregistré"}
-                      </p>
-                      {!searchTerm && (
-                        <Button onClick={handleCreateProduct} variant="outline" size="sm">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Créer le premier produit
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+                  <TableHead>Photo</TableHead>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Conservation</TableHead>
+                  <TableHead>D.L.C</TableHead>
+                  <TableHead>Conditions</TableHead>
+                  <TableHead>Prix</TableHead>
+                  <TableHead>Zone stockage</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
-              ) : (
-                filteredProducts.map((product) => {
-                  // Récupérer les données des zones de stockage
-                  const storageZone = storageZones?.find((zone: StorageZone) => zone.id === product.storageZoneId);
-                  
-                  return (
-                  <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                    <TableCell className="font-medium">
-                      {product.photo ?(<img
-                         src={product.photo}
-                         alt={product.name}
-                         className="w-[7rem] h-[5rem] object-cover rounded-t-lg"
-                       />) : (<Package className="w-16 h-16 text-orange-400" />)}
-                     </TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                      {product.isPerishable ? (
-                        <Badge variant="destructive" className="bg-orange-500">
-                          <Clock className="w-3 h-3 mr-1" />
-                          Périssable
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          <Shield className="w-3 h-3 mr-1" />
-                          Non périssable
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {product.isPerishable && product.shelfLife ? (
-                        <span className="text-sm font-medium">
-                          {product.shelfLife} jours
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {product.isPerishable && product.storageConditions ? (
-                        <span className="text-sm font-medium">
-                          {product.storageConditions}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">
-                        {product.salePrice || product.price ? `${product.salePrice || product.price} DA` : "Non défini"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {storageZone ? (
-                        <Badge variant="outline">
-                          <Warehouse className="w-3 h-3 mr-1" />
-                          {storageZone.designation}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Non assignée</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0" data-testid={`menu-product-${product.id}`}>
-                            <MoreHorizontal className="h-4 w-4" />
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center space-y-2">
+                        <Package className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">
+                          {searchTerm ? "Aucun produit trouvé" : "Aucun produit enregistré"}
+                        </p>
+                        {!searchTerm && (
+                          <Button onClick={handleCreateProduct} variant="outline" size="sm">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Créer le premier produit
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditProduct(product)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Modifier
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setRecipeDialogProduct(product)}>
-                            <ChefHat className="mr-2 h-4 w-4" />
-                            Gérer recette
-                          </DropdownMenuItem>
-                          <DeleteProductDialog productId={product.id} productName={product.name} />
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-    {recipeDialogProduct && (
-      <Dialog open={!!recipeDialogProduct} onOpenChange={() => setRecipeDialogProduct(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Gérer la recette pour {recipeDialogProduct.name}</DialogTitle>
-          </DialogHeader>
-          {/* On charge la recette existante pour ce produit */}
-          <RecipeDialogRecipeLoader articleId={recipeDialogProduct.id} onCancel={() => setRecipeDialogProduct(null)} />
-        </DialogContent>
-      </Dialog>
-    )}
+                ) : (
+                  filteredProducts.map((product) => {
+                    // Récupérer les données des zones de stockage
+                    const storageZone = storageZones?.find((zone: StorageZone) => zone.id === product.storageZoneId);
+
+                    return (
+                      <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
+                        <TableCell className="font-medium">
+                          {product.photo ? (<img
+                            src={product.photo}
+                            alt={product.name}
+                            className="w-[7rem] h-[5rem] object-cover rounded-t-lg"
+                          />) : (<Package className="w-16 h-16 text-orange-400" />)}
+                        </TableCell>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>
+                          {product.isPerishable ? (
+                            <Badge variant="destructive" className="bg-orange-500">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Périssable
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              <Shield className="w-3 h-3 mr-1" />
+                              Non périssable
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {product.isPerishable && product.shelfLife ? (
+                            <span className="text-sm font-medium">
+                              {product.shelfLife} jours
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {product.isPerishable && product.storageConditions ? (
+                            <span className="text-sm font-medium">
+                              {product.storageConditions}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">
+                            {product.salePrice || product.price ? `${product.salePrice || product.price} DA` : "Non défini"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {storageZone ? (
+                            <Badge variant="outline">
+                              <Warehouse className="w-3 h-3 mr-1" />
+                              {storageZone.designation}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Non assignée</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0" data-testid={`menu-product-${product.id}`}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditProduct(product)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setRecipeDialogProduct(product)}>
+                                <ChefHat className="mr-2 h-4 w-4" />
+                                Gérer recette
+                              </DropdownMenuItem>
+                              <DeleteProductDialog productId={product.id} productName={product.name} />
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+      {recipeDialogProduct && (
+        <Dialog open={!!recipeDialogProduct} onOpenChange={() => setRecipeDialogProduct(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Gérer la recette pour {recipeDialogProduct.name}</DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              {/* On charge la recette existante pour ce produit */}
+              <RecipeDialogRecipeLoader articleId={recipeDialogProduct.id} onCancel={() => setRecipeDialogProduct(null)} />
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
 
 function ProductForm({ product, onSuccess }: { product?: Article | null; onSuccess: () => void }) {
   console.log("🔥 PRODUCT FORM - Produit reçu:", product);
-  
+
   const { toast } = useToast();
   const isEditing = !!product;
-  
+
   const form = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -375,7 +379,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
-      toast({ title: "Produit créé avec succès",variant:'success' });
+      toast({ title: "Produit créé avec succès", variant: 'success' });
       onSuccess();
     },
     onError: (error) => {
@@ -391,7 +395,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/articles"] });
-      toast({ title: "Produit modifié avec succès",variant:'success' });
+      toast({ title: "Produit modifié avec succès", variant: 'success' });
       onSuccess();
     },
     onError: (error) => {
@@ -402,7 +406,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
 
   const onSubmit = (formData: ProductForm) => {
     console.log("🔥 PRODUCT FORM - Soumission des données:", formData);
-    
+
     // Conversion des types pour l'API - en gardant les strings car le schéma les attend comme ça
     const transformedData = {
       ...formData,
@@ -411,9 +415,9 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
       minStock: formData.minStock || "0.00",
       maxStock: formData.maxStock || "0.00",
     };
-    
+
     console.log("🔥 PRODUCT FORM - Données transformées:", transformedData);
-    
+
     if (isEditing) {
       updateMutation.mutate(transformedData);
     } else {
@@ -466,8 +470,8 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Catégorie</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                  <Select
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
                     value={field.value?.toString() || "none"}
                   >
                     <FormControl>
@@ -586,8 +590,8 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Zone de stockage</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
                       value={field.value?.toString() || "none"}
                     >
                       <FormControl>
@@ -643,7 +647,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
             {/* Section Conservation */}
             <div className="space-y-4 border-t pt-4">
               <h3 className="text-lg font-medium">Conservation</h3>
-              
+
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
                   <FormLabel className="text-base">Produit périssable</FormLabel>
@@ -760,8 +764,8 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Catégorie de vente</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))} 
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
                       value={field.value?.toString() || "none"}
                     >
                       <FormControl>
@@ -805,8 +809,8 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>TVA</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))} 
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
                       value={field.value?.toString() || "none"}
                     >
                       <FormControl>
@@ -839,7 +843,7 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
                     <FormLabel>État de vente</FormLabel>
                     <Select
                       value={field.value || "none"}
-                      onValueChange={ (value) => field.onChange(value === "none" ? null : value)}
+                      onValueChange={(value) => field.onChange(value === "none" ? null : value)}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-sale-status">
@@ -877,15 +881,15 @@ function ProductForm({ product, onSuccess }: { product?: Article | null; onSucce
           <Button type="button" variant="outline" onClick={onSuccess}>
             Annuler
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={createMutation.isPending || updateMutation.isPending}
             data-testid="button-submit"
           >
-            {createMutation.isPending || updateMutation.isPending 
-              ? "Enregistrement..." 
-              : isEditing 
-                ? "Modifier" 
+            {createMutation.isPending || updateMutation.isPending
+              ? "Enregistrement..."
+              : isEditing
+                ? "Modifier"
                 : "Créer"
             }
           </Button>

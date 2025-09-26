@@ -31,27 +31,31 @@ import { apiRequest } from "@/lib/queryClient";
 import { OrderForm } from "@/components/forms/order-form";
 import type { Order, Client, Article } from "@shared/schema";
 import { Layout } from "@/components/layout";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery as useQueryTanstack } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { OrdersTable } from "@/components/orders-table";
 
 const orderStatusLabels = {
-  draft: "Brouillon",
-  confirmed: "Confirmé",
-  partially_delivered: "Livré partiellement",
-  delivered: "Livré",
-  cancelled: "Annulé"
+  draft: "Devis (brouillon)",
+  confirmed: "Confirmée",
+  validated: "Validée",
+  prepared: "Préparée",
+  ready: "Prête",
+  partially_delivered: "Livrée partiellement",
+  delivered: "Livrée",
+  cancelled: "Annulée",
 };
 
 const orderStatusColors = {
-  draft: "secondary",
-  confirmed: "default",
-  prepared: "outline",
-  ready: "default",
-  partially_delivered: "secondary",
-  delivered: "default",
-  cancelled: "destructive"
+  draft: "bg-gray-200 text-gray-800",
+  confirmed: "bg-blue-400 text-white",
+  validated: "bg-green-500 text-white",
+  prepared: "bg-indigo-300 text-white",
+  ready: "bg-yellow-400 text-black",
+  partially_delivered: "bg-orange-400 text-white",
+  delivered: "bg-green-700 text-white",
+  cancelled: "bg-red-500 text-white"
 } as const;
 
 const productionStatusLabels = {
@@ -155,7 +159,7 @@ export default function OrdersPage() {
     // Pour les commandes confirmées, on peut déterminer l'état de production
     // basé sur les quantités préparées vs commandées
     // Note: Cette logique pourrait être améliorée avec des données réelles de production
-    if (order.status === "confirmed") {
+    if (order.status === "validated") {
       return "in_progress";
     } else if (order.status === "prepared" || order.status === "ready") {
       return "completed";
@@ -194,20 +198,20 @@ export default function OrdersPage() {
     switch (filterDate) {
       case "today":
         return normalizedDeliveryDate.getTime() === normalizedToday.getTime();
-    
+
       case "yesterday":
         return normalizedDeliveryDate.getTime() === normalizedYesterday.getTime();
-    
+
       case "tomorrow":
         return normalizedDeliveryDate.getTime() === normalizedTomorrow.getTime();
-    
+
       case "range": {
         // Si les deux vides → pas de filtre
         if (!filterDateFrom && !filterDateTo) return true;
-    
+
         const fromDate = filterDateFrom ? normalizeDate(new Date(filterDateFrom)) : null;
         const toDate = filterDateTo ? normalizeDate(new Date(filterDateTo)) : null;
-    
+
         if (fromDate && toDate) {
           return normalizedDeliveryDate >= fromDate && normalizedDeliveryDate <= toDate;
         }
@@ -219,11 +223,11 @@ export default function OrdersPage() {
         }
         return true;
       }
-    
+
       default:
         return true;
     }
-    
+
   };
 
   // Filtrage et tri
@@ -231,7 +235,7 @@ export default function OrdersPage() {
     .filter((order) => {
       const matchesSearch = order.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         getClientName(order.clientId).toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = !filterStatus || filterStatus === "all" || order.status === filterStatus;
+      const matchesStatus = ((!filterStatus || filterStatus === "all") && order.status != 'draft') || order.status === filterStatus;
       const matchesType = !filterType || filterType === "all" || order.type === filterType;
       const matchesClient = !filterClient || filterClient === "all" || order.clientId.toString() === filterClient;
       const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(order.deliveryDate);
@@ -289,21 +293,21 @@ export default function OrdersPage() {
 
   const handleStatusChange = (order: Order, newStatus: string) => {
     // Vérifications de règles métier
-    if (order.status === "confirmed" && newStatus === "draft") {
-      toast({
-        title: "Action non autorisée",
-        description: "Une commande confirmée ne peut pas revenir en brouillon",
-        variant: "destructive"
-      });
-      return;
-    }
+    // if ( newStatus != "draft" && order.status === "confirmed") {
+    //   toast({
+    //     title: "Action non autorisée",
+    //     description: "Une commande confirmée ne peut pas revenir en brouillon",
+    //     variant: "destructive"
+    //   });
+    //   return;
+    // }
 
     updateStatusMutation.mutate({ id: order.id, status: newStatus });
   };
 
   const handleDelete = (order: Order) => {
     // Vérifications de règles métier
-    if (order.status === "confirmed" || order.status === "delivered") {
+    if (order.status != "draft" && order.status != "confirmed") {
       toast({
         title: "Action non autorisée",
         description: "Une commande confirmée ou livrée ne peut pas être supprimée",
@@ -395,8 +399,10 @@ export default function OrdersPage() {
                       <SelectValue placeholder="Statut" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Tous</SelectItem>
-                      {Object.entries(orderStatusLabels).map(([status, label]) => (
+                      <SelectItem value="draft">Devis (brouillon)</SelectItem>
+                      <hr className="my-1 border-orange-400" />
+                      <SelectItem value="all">Toutes commandes</SelectItem>
+                      {Object.entries(orderStatusLabels).filter(f => f[0] != 'draft').map(([status, label]) => (
                         <SelectItem key={status} value={status}>{label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -559,85 +565,88 @@ export default function OrdersPage() {
 
           {/* Modale de consultation */}
           <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
-            <DialogContent className="max-w-2xl p-0">
-              <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-2">
+            <DialogContent className="max-w-2xl max-h-[100vh] overflow-y-auto">
+              <DialogHeader >
                 <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
-                  <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
+                  <Eye className="w-6 h-6 text-orange-400" /> <span>Consultation de la commande</span>
                 </DialogTitle>
               </DialogHeader>
-              {viewingOrder && (
-                <div className="p-6 pt-0 space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-gray-700 flex items-center gap-2">
-                      <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
-                    </span>
-                    <Badge
-                      variant={orderStatusColors[viewingOrder.status as keyof typeof orderStatusColors] as any}
-                      className="text-xs px-3 py-1 rounded-full capitalize"
-                    >
-                      {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
-                    </Badge>
-                  </div>
-                  <hr className="my-2" />
-                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-orange-400" />
-                      <span>Date de création :</span>
+              <DialogBody>
+                {viewingOrder && (
+                  <div className="p-6 pt-0 space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-gray-700 flex items-center gap-2">
+                        <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs px-2 py-1 ${orderStatusColors[viewingOrder.status as keyof typeof orderStatusLabels]} `
+                        }
+                      >
+                        {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
+                      </Badge>
                     </div>
-                    <span>{formatDate(viewingOrder.orderDate || viewingOrder.createdAt)}</span>
-                    {viewingOrder.deliveryDate && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-orange-400" />
-                          <span>Date de livraison :</span>
-                        </div>
-                        <span>{formatDate(viewingOrder.deliveryDate)}</span>
-                      </>
-                    )}
-                    {viewingOrder.notes && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Edit className="w-4 h-4 text-orange-400" />
-                          <span>Notes :</span>
-                        </div>
-                        <span className="italic text-gray-500">{viewingOrder.notes}</span>
-                      </>
-                    )}
-                  </div>
-                  <hr className="my-1" />
-                  <div className="mt-1">
-                    <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
-                      <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                    <hr className="my-2" />
+                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-orange-400" />
+                        <span>Date de création :</span>
+                      </div>
+                      <span>{formatDate(viewingOrder.orderDate || viewingOrder.createdAt)}</span>
+                      {viewingOrder.deliveryDate && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-orange-400" />
+                            <span>Date de livraison :</span>
+                          </div>
+                          <span>{formatDate(viewingOrder.deliveryDate)}</span>
+                        </>
+                      )}
+                      {viewingOrder.notes && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Edit className="w-4 h-4 text-orange-400" />
+                            <span>Notes :</span>
+                          </div>
+                          <span className="italic text-gray-500">{viewingOrder.notes}</span>
+                        </>
+                      )}
                     </div>
-                    <OrderItemsSummary orderId={viewingOrder.id} products={products} />
-                  </div>
-                  {/* <hr className="my-1" /> */}
-                  <div className="grid grid-cols-2 gap-1 text-base font-semibold ">
-                    <div className="flex items-center gap-2 text-orange-700">
-                      Total TTC
+                    <hr className="my-1" />
+                    <div className="mt-1">
+                      <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
+                        <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                      </div>
+                      <OrderItemsSummary orderId={viewingOrder.id} products={products} />
                     </div>
-                    <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
-                    <div className="flex items-center gap-2 text-amber-700">
-                      <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                    {/* <hr className="my-1" /> */}
+                    <div className="grid grid-cols-2 gap-1 text-base font-semibold ">
+                      <div className="flex items-center gap-2 text-orange-700">
+                        Total TTC
+                      </div>
+                      <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
+                      <div className="flex items-center gap-2 text-amber-700">
+                        <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                      </div>
+                      <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
                     </div>
-                    <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
-                  </div>
 
-                  {/* Bouton pour afficher les livraisons liées */}
-                  <div className="flex justify-center mt-2">
-                    <Button
-                      onClick={() => {
-                        // Rediriger vers la page des livraisons avec un filtre sur cette commande
-                        window.location.href = `/deliveries?orderId=${viewingOrder.id}`;
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
-                    >
-                      <Truck className="w-5 h-5" />
-                      Voir les livraisons de cette commande
-                    </Button>
+                    {/* Bouton pour afficher les livraisons liées */}
+                    <div className="flex justify-center mt-2">
+                      <Button
+                        onClick={() => {
+                          // Rediriger vers la page des livraisons avec un filtre sur cette commande
+                          window.location.href = `/deliveries?orderId=${viewingOrder.id}`;
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"
+                      >
+                        <Truck className="w-5 h-5" />
+                        Voir les livraisons de cette commande
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </DialogBody>
             </DialogContent>
           </Dialog>
         </div>
@@ -663,7 +672,7 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm overflow-auto max-h-[50vh]">
+      <div className="overflow-x-auto rounded-lg border border-gray-100 shadow-sm  overflow-y-auto">
         <table className="w-full text-sm">
           <thead className="bg-orange-100 sticky top-0 z-10">
             <tr>
@@ -673,15 +682,15 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
               <th className="p-2 text-right font-semibold text-gray-700">Total</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody >
             {items.map((item: any, idx: number) => {
               const product = products.find((p) => p.id === item.articleId);
               return (
                 <tr key={item.articleId}>
                   <td className="p-2 font-semibold"> <div className="flex items-center gap-4">
-                      <img src={product?.photo}   alt={product?.name}  className="w-[5rem] h-[4rem] object-cover rounded-t-lg"/>
+                    <img src={product?.photo} alt={product?.name} className="w-[5rem] h-[4rem] object-cover rounded-t-lg" />
                     {product ? product.name : item.articleId}
-                    </div></td>
+                  </div></td>
                   <td className="p-2 text-right">{item.quantity}</td>
                   <td className="p-2 text-right">{parseFloat(item.unitPrice || "0").toFixed(2)} DA</td>
                   <td className="p-2 text-right font-semibold">{(parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0")).toFixed(2)} DA</td>

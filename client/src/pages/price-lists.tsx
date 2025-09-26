@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -114,7 +114,7 @@ export default function PriceListsPage() {
   const handlePriceListSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     const data: InsertPriceList = {
       designation: formData.get("designation") as string,
       description: formData.get("description") as string,
@@ -140,13 +140,13 @@ export default function PriceListsPage() {
   usePageTitle('Listes de Prix');
   if (priceListsLoading) return <div>Chargement...</div>;
 
- return (
-      <div className="container mx-auto p-4 space-y-6">
-        <div className="flex justify-between items-center">
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex justify-between items-center">
         <p >  <span className="hidden md:block ">Creer des prix personnalisé pour vos clients fidèles </span> </p>
-          <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
+        <Dialog open={isNewPriceListDialogOpen} onOpenChange={setIsNewPriceListDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-accent hover:bg-accent-hover"  data-testid="button-new-price-list">
+            <Button className="bg-accent hover:bg-accent-hover" data-testid="button-new-price-list">
               <Plus className="w-4 h-4 mr-2" />
               Nouvelle Liste
             </Button>
@@ -158,42 +158,44 @@ export default function PriceListsPage() {
                 Créer une nouvelle liste de prix avec ses paramètres
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handlePriceListSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="designation">Désignation</Label>
-                <Input
-                  id="designation"
-                  name="designation"
-                  required
-                  data-testid="input-designation"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="currency">Monnaie</Label>
-                <Select name="currency" defaultValue="DA">
-                  <SelectTrigger data-testid="select-currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
-                    {/* <SelectItem value="EUR">EUR (Euro)</SelectItem>
+            <DialogBody>
+              <form onSubmit={handlePriceListSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="designation">Désignation</Label>
+                  <Input
+                    id="designation"
+                    name="designation"
+                    required
+                    data-testid="input-designation"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Monnaie</Label>
+                  <Select name="currency" defaultValue="DA">
+                    <SelectTrigger data-testid="select-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
+                      {/* <SelectItem value="EUR">EUR (Euro)</SelectItem>
                     <SelectItem value="USD">USD (Dollar)</SelectItem> */}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="active" name="active" defaultChecked />
-                <Label htmlFor="active">Active</Label>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsNewPriceListDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit" data-testid="button-submit-price-list">
-                  Créer
-                </Button>
-              </div>
-            </form>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="active" name="active" defaultChecked />
+                  <Label htmlFor="active">Active</Label>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setIsNewPriceListDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button type="submit" data-testid="button-submit-price-list">
+                    Créer
+                  </Button>
+                </div>
+              </form>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>
@@ -201,7 +203,7 @@ export default function PriceListsPage() {
       <Tabs defaultValue="lists" className="w-full">
         <TabsList className="grid w-full grid-cols-2 h-12">
           <TabsTrigger value="lists" className="h-10">Listes de Prix</TabsTrigger>
-          <TabsTrigger value="rules" className="h-10"  disabled={!selectedPriceListId}>
+          <TabsTrigger value="rules" className="h-10" disabled={!selectedPriceListId}>
             Règles {selectedPriceListId && `(${priceLists.find(p => p.id === selectedPriceListId)?.designation})`}
           </TabsTrigger>
         </TabsList>
@@ -209,11 +211,10 @@ export default function PriceListsPage() {
         <TabsContent value="lists" className="space-y-4">
           <div className="grid gap-4">
             {priceLists.map((priceList: PriceList) => (
-              <Card 
-                key={priceList.id} 
-                className={`cursor-pointer transition-colors hover:bg-gray-50 ${
-                  selectedPriceListId === priceList.id ? 'ring-2 ring-blue-500' : ''
-                }`}
+              <Card
+                key={priceList.id}
+                className={`cursor-pointer transition-colors hover:bg-gray-50 ${selectedPriceListId === priceList.id ? 'ring-2 ring-blue-500' : ''
+                  }`}
                 onClick={() => setSelectedPriceListId(priceList.id)}
                 data-testid={`card-price-list-${priceList.id}`}
               >
@@ -223,7 +224,7 @@ export default function PriceListsPage() {
                       <CardTitle className="text-lg">{priceList.designation}</CardTitle>
                       <div className="flex items-center space-x-1">
                         {priceList.description}
-                       
+
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -280,14 +281,15 @@ export default function PriceListsPage() {
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <PriceRuleForm
-                      priceListId={selectedPriceListId}
-                      articles={articles}
-                      categories={categories}
-                      onSubmit={(data) => createRuleMutation.mutate(data)}
-                      onCancel={() => setIsNewRuleDialogOpen(false)}
-                      isLoading={createRuleMutation.isPending}
-                    />
+                    <DialogBody>
+                      <PriceRuleForm
+                        priceListId={selectedPriceListId}
+                        articles={articles}
+                        categories={categories}
+                        onSubmit={(data) => createRuleMutation.mutate(data)}
+                        onCancel={() => setIsNewRuleDialogOpen(false)}
+                        isLoading={createRuleMutation.isPending}
+                      /></DialogBody>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -324,15 +326,17 @@ export default function PriceListsPage() {
                                 </Button>
                               </DialogTrigger>
                               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                                <PriceRuleForm
-                                  priceListId={selectedPriceListId}
-                                  articles={articles}
-                                  categories={categories}
-                                  editingRule={rule}
-                                  onSubmit={(data) => updateRuleMutation.mutate({ id: rule.id, data })}
-                                  onCancel={() => setEditingRule(null)}
-                                  isLoading={updateRuleMutation.isPending}
-                                />
+                                <DialogBody>
+                                  <PriceRuleForm
+                                    priceListId={selectedPriceListId}
+                                    articles={articles}
+                                    categories={categories}
+                                    editingRule={rule}
+                                    onSubmit={(data) => updateRuleMutation.mutate({ id: rule.id, data })}
+                                    onCancel={() => setEditingRule(null)}
+                                    isLoading={updateRuleMutation.isPending}
+                                  />
+                                </DialogBody>
                               </DialogContent>
                             </Dialog>
                             <Button
@@ -378,47 +382,49 @@ export default function PriceListsPage() {
           <DialogHeader>
             <DialogTitle>Modifier la Liste de Prix</DialogTitle>
           </DialogHeader>
-          {editingPriceList && (
-            <form onSubmit={handlePriceListSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="designation">Désignation</Label>
-                <Input
-                  id="designation"
-                  name="designation"
-                  defaultValue={editingPriceList.designation}
-                  required
-                  data-testid="input-edit-designation"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="currency">Monnaie</Label>
-                <Select name="currency" defaultValue={editingPriceList.currency}>
-                  <SelectTrigger data-testid="select-edit-currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
-                    
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="active" name="active" defaultChecked={editingPriceList.active} />
-                <Label htmlFor="active">Active</Label>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setEditingPriceList(null)}>
-                  Annuler
-                </Button>
-                <Button type="submit" data-testid="button-update-price-list">
-                  Modifier
-                </Button>
-              </div>
-            </form>
-          )}
+          <DialogBody>
+            {editingPriceList && (
+              <form onSubmit={handlePriceListSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="designation">Désignation</Label>
+                  <Input
+                    id="designation"
+                    name="designation"
+                    defaultValue={editingPriceList.designation}
+                    required
+                    data-testid="input-edit-designation"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Monnaie</Label>
+                  <Select name="currency" defaultValue={editingPriceList.currency}>
+                    <SelectTrigger data-testid="select-edit-currency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DA">DA (Dinar Algérien)</SelectItem>
+
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="active" name="active" defaultChecked={editingPriceList.active} />
+                  <Label htmlFor="active">Active</Label>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setEditingPriceList(null)}>
+                    Annuler
+                  </Button>
+                  <Button type="submit" data-testid="button-update-price-list">
+                    Modifier
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
-      </div>
-    
+    </div>
+
   );
 }

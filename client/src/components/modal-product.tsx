@@ -4,6 +4,7 @@ import {
     DialogTrigger,
     DialogContent,
     DialogTitle,
+    DialogBody,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Search, Delete, LayoutGrid, RotateCcw, Package, Utensils } from "lucide-react";
@@ -75,105 +76,106 @@ export default function ProductSelectorCompact({
             {/* Dialog compacte */}
             <DialogContent className="max-w-6xl max-h-[100vh] flex flex-col p-4">
                 <DialogTitle className="sr-only">Sélection de produit</DialogTitle>
+                <DialogBody>
+                    {/* Recherche rapide */}
+                    <div className="flex flex-col sm:flex-row gap-2 mb-3 w-[95%] sm:w-[70%]">
+                        {/* Ligne recherche + boutons */}
+                        <div className="flex items-center gap-2 flex-1">
+                            {/* Input prend toute la place dispo */}
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Rechercher..."
+                                className="flex-1 px-3 py-2 border rounded-lg text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-orange-400"
+                            />
 
-                {/* Recherche rapide */}
-                <div className="flex flex-col sm:flex-row gap-2 mb-3 w-[95%] sm:w-[70%]">
-                    {/* Ligne recherche + boutons */}
-                    <div className="flex items-center gap-2 flex-1">
-                        {/* Input prend toute la place dispo */}
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Rechercher..."
-                            className="flex-1 px-3 py-2 border rounded-lg text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-orange-400"
-                        />
+                            {/* Bouton Delete */}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={handleBackspace}
+                                className="shrink-0 h-10 w-10"
+                            >
+                                <Delete className="w-4 h-4" />
+                            </Button>
 
-                        {/* Bouton Delete */}
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleBackspace}
-                            className="shrink-0 h-10 w-10"
-                        >
-                            <Delete className="w-4 h-4" />
-                        </Button>
+                            {/* Bouton Reset */}
+                            <button
+                                onClick={() => setSearch("")}
+                                className="h-10 w-10 flex items-center justify-center bg-red-400 text-white rounded-md shadow-md hover:bg-red-600"
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                            </button>
+                        </div>
 
-                        {/* Bouton Reset */}
-                        <button
-                            onClick={() => setSearch("")}
-                            className="h-10 w-10 flex items-center justify-center bg-red-400 text-white rounded-md shadow-md hover:bg-red-600"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                        </button>
+                        {/* Filtres en dessous */}
+                        <ProductFilter onFilter={(activeFilters) => setFilter(activeFilters)} />
                     </div>
 
-                    {/* Filtres en dessous */}
-                    <ProductFilter onFilter={(activeFilters) => setFilter(activeFilters)} />
-                </div>
 
 
+                    {/* Clavier tactile compact */}
+                    <div className="grid grid-cols-9 gap-1 mb-3">
+                        {alphabet.map((letter) => (
+                            <Button
+                                key={letter}
+                                onClick={() => handleAddLetter(letter)}
+                                className="px-0 py-2 text-xs font-medium bg-gray-100 hover:bg-orange-200 text-gray-800"
+                            >
+                                {letter}
+                            </Button>
+                        ))}
+                    </div>
 
-                {/* Clavier tactile compact */}
-                <div className="grid grid-cols-9 gap-1 mb-3">
-                    {alphabet.map((letter) => (
-                        <Button
-                            key={letter}
-                            onClick={() => handleAddLetter(letter)}
-                            className="px-0 py-2 text-xs font-medium bg-gray-100 hover:bg-orange-200 text-gray-800"
-                        >
-                            {letter}
-                        </Button>
-                    ))}
-                </div>
-
-                {/* Grille produits */}
-                <div className="flex-1 overflow-y-auto">
-                    {filteredProducts.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-4">
-                            Aucun produit trouvé
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 gap-3 p-4">
-                            {filteredProducts.map((product) => (
-                                <DialogTrigger asChild key={product.id}>
-                                    <button
-                                        onClick={() => handleSelectProduct(product)}
-                                        className={`bg-white relative rounded-lg shadow hover:shadow-lg transition-all flex flex-col ${selected?.id === product.id
-                                            ? "ring-2 ring-orange-500"
-                                            : ""
-                                            }`}
-                                    >
-                                        <div className={`absolute top-1 left-1 flex text-xs font-bold shadow-md  rounded-xl  p-1  justify-center items-center ${product.type == 'product' ? 'bg-orange-400 ' : 'bg-green-300'} `}>
-                                            <span>{product.type == 'product' ? 'PROD' : 'ING'}</span>
-                                        </div>
-                                        <img
-                                            src={product.photo}
-                                            alt={product.name}
-                                            className="w-full h-28 object-cover rounded-t-lg"
-                                        />
-                                        <div className="p-2 text-center">
-                                            <TooltipProvider delayDuration={100}>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <p className="text-sm font-medium text-gray-900 truncate cursor-help">
+                    {/* Grille produits */}
+                    <div className="flex-1 overflow-y-auto">
+                        {filteredProducts.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-4">
+                                Aucun produit trouvé
+                            </p>
+                        ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 gap-3 p-4">
+                                {filteredProducts.map((product) => (
+                                    <DialogTrigger asChild key={product.id}>
+                                        <button
+                                            onClick={() => handleSelectProduct(product)}
+                                            className={`bg-white relative rounded-lg shadow hover:shadow-lg transition-all flex flex-col ${selected?.id === product.id
+                                                ? "ring-2 ring-orange-500"
+                                                : ""
+                                                }`}
+                                        >
+                                            <div className={`absolute top-1 left-1 flex text-xs font-bold shadow-md  rounded-xl  p-1  justify-center items-center ${product.type == 'product' ? 'bg-orange-400 ' : 'bg-green-300'} `}>
+                                                <span>{product.type == 'product' ? 'PROD' : 'ING'}</span>
+                                            </div>
+                                            <img
+                                                src={product.photo}
+                                                alt={product.name}
+                                                className="w-full h-28 object-cover rounded-t-lg"
+                                            />
+                                            <div className="p-2 text-center">
+                                                <TooltipProvider delayDuration={100}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <p className="text-sm font-medium text-gray-900 truncate cursor-help">
+                                                                {product.name}
+                                                            </p>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top" className="max-w-xs break-words">
                                                             {product.name}
-                                                        </p>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="top" className="max-w-xs break-words">
-                                                        {product.name}
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
 
 
-                                        </div>
-                                    </button>
-                                </DialogTrigger>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                                            </div>
+                                        </button>
+                                    </DialogTrigger>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </DialogBody>
             </DialogContent>
         </Dialog>
     );

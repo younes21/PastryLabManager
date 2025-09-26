@@ -22,6 +22,8 @@ import {
   DollarSign,
   ChevronDown,
   ChevronRight,
+  CheckCircle,
+  Undo2,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type {
@@ -33,27 +35,33 @@ import type {
   Tax,
 } from "@shared/schema";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
+const orderTypeLabels = {
+  quote: 'Devis',
+  order: 'Commande'
+}
 const orderStatusLabels = {
-  draft: "Brouillon",
-  confirmed: "Confirmé",
-  prepared: "Préparé",
-  ready: "Prêt",
-  partially_delivered: "Livré partiellement",
-  delivered: "Livré",
-  cancelled: "Annulé",
+  draft: "Devis (brouillon)",
+  confirmed: "Confirmée",
+  validated: "Validée",
+  prepared: "Préparée",
+  ready: "Prête",
+  partially_delivered: "Livrée partiellement",
+  delivered: "Livrée",
+  cancelled: "Annulée",
 };
 
 const orderStatusColors = {
-  draft: "secondary",
-  confirmed: "blue",
-  prepared: "orange",
-  ready: "green",
-  partially_delivered: "yellow",
-  delivered: "green",
-  cancelled: "red",
+  draft: "bg-gray-200 text-gray-800",
+  confirmed: "bg-blue-400 text-white",
+  validated: "bg-green-500 text-white",
+  prepared: "bg-indigo-300 text-white",
+  ready: "bg-yellow-400 text-black",
+  partially_delivered: "bg-orange-400 text-white",
+  delivered: "bg-green-700 text-white",
+  cancelled: "bg-red-500 text-white"
 } as const;
 
 interface CartItem {
@@ -65,6 +73,7 @@ interface CartItem {
 interface OrderFormData {
   clientId: number;
   deliveryDate: string;
+  status: string;
   notes: string;
   items: Array<{
     articleId: number;
@@ -88,6 +97,7 @@ export default function ClientOrdersPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
+  const [orderStatus, setOrderStatus] = useState<string>("draft");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [isOpen, setIsOpen] = useState(true);
@@ -170,11 +180,10 @@ export default function ClientOrdersPage() {
         "PUT",
         {
           order: {
-            type: "order",
             clientId: orderData.clientId,
             deliveryDate: orderData.deliveryDate,
             notes: orderData.notes,
-            status: "draft",
+            status: orderData.status,
           },
           items: orderData.items.map((f) => ({ orderId: 0, ...f })),
         },
@@ -196,6 +205,19 @@ export default function ClientOrdersPage() {
         title: "Erreur lors de la modification",
         variant: "destructive",
       });
+    },
+  });
+
+  const changeOrderStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      return await apiRequest(`/api/orders/${id}`, "PUT", { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({ title: "Statut changé avec succès" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors du changement de statut", variant: "destructive" });
     },
   });
 
@@ -291,6 +313,7 @@ export default function ClientOrdersPage() {
     setCart([]);
     setDeliveryDate("");
     setOrderNotes("");
+    setOrderStatus("draft");
     setEditingOrder(null);
   };
 
@@ -315,6 +338,7 @@ export default function ClientOrdersPage() {
       clientId: currentClientId,
       deliveryDate: deliveryDate,
       notes: orderNotes,
+      status: editingOrder?.status || orderStatus || "draft",
       items: cart.map((item) => ({
         articleId: item.articleId,
         quantity: item.quantity,
@@ -371,6 +395,7 @@ export default function ClientOrdersPage() {
       setCart(cartItems);
       setDeliveryDate(order.deliveryDate?.split(" ")[0] || "");
       setOrderNotes(order.notes || "");
+      (order.status || "draft");
       setCurrentView("shop");
     } catch (error) {
       console.error(
@@ -398,6 +423,24 @@ export default function ClientOrdersPage() {
 
     if (confirm("Êtes-vous sûr de vouloir supprimer cette commande ?")) {
       deleteOrderMutation.mutate(order.id);
+    }
+  };
+
+  const handleValidateQuote = (order: Order) => {
+    if (confirm("Confirmer la validation de cette commande ?")) {
+      changeOrderStatusMutation.mutate({
+        id: order.id,
+        status: "confirmed",
+      });
+    }
+  };
+
+  const handleRevertOrder = (order: Order) => {
+    if (confirm("Annuler la validation de la commande ?")) {
+      changeOrderStatusMutation.mutate({
+        id: order.id,
+        status: "draft",
+      });
     }
   };
 
@@ -470,20 +513,24 @@ export default function ClientOrdersPage() {
                           <h3 className="font-semibold text-gray-900 text-base">
                             {order.code}
                           </h3>
-                          <Badge
-                            variant={
-                              orderStatusColors[
-                              order.status as keyof typeof orderStatusColors
-                              ] as any
-                            }
-                            className="text-xs px-2 py-1"
-                          >
-                            {
-                              orderStatusLabels[
-                              order.status as keyof typeof orderStatusLabels
-                              ]
-                            }
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="text-xs px-3 py-1 rounded-full border-gray-300 text-gray-800 "
+                            >
+                              {order.status == 'draft' ? 'Devis' : 'Commande'}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs px-2 py-1 ${orderStatusColors[order.status as keyof typeof orderStatusLabels]} `
+
+                              }
+                            >
+                              {
+                                orderStatusLabels[order.status as keyof typeof orderStatusLabels]
+                              }
+                            </Badge>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 text-xs text-gray-600 mb-2">
@@ -524,34 +571,59 @@ export default function ClientOrdersPage() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                          {order.status === "draft" && (
+                          {(order.status === "draft" || order.status === "confirmed") && (
                             <>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
                                 onClick={() => handleEditOrder(order)}
+                                title="Modifier la commmande"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
-
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                                 onClick={() => handleDeleteOrder(order)}
+                                title="Supprimer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </>
                           )}
-                          {order.status !== "draft" && (
+                          {order.status === "draft" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                              onClick={() => handleValidateQuote(order)}
+                              title="Confirmer la commande"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                          )}
+
+                          {order.status === "confirmed" && (
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-yellow-700"
+                              onClick={() => handleRevertOrder(order)}
+                              title="Annuler la validation"
+                            >
+                              <Undo2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {order.status !== "draft" && order.status !== "confirmed" && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 p-0 text-gray-700 hover:text-orange-600"
                               onClick={() => setViewingOrder(order)}
-                              title="Consulter la commande"
+                              title="Consulter"
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
@@ -567,74 +639,84 @@ export default function ClientOrdersPage() {
         </div>
         {/* Modale de consultation */}
         <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
-          <DialogContent className="max-w-2xl p-0">
-            <DialogHeader className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-6">
+          <DialogContent className="max-w-2xl  max-h-[100vh] overflow-y-auto">
+            <DialogHeader className="sticky  top-0 z-10 bg-gradient-to-r from-orange-100 to-amber-100 rounded-t-xl p-2">
               <DialogTitle className="text-2xl font-bold text-orange-700 flex items-center gap-2">
                 <Eye className="w-6 h-6 text-orange-400" /> Consultation de la commande
               </DialogTitle>
             </DialogHeader>
-            {viewingOrder && (
-              <div className="p-6 space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
-                  </span>
-                  <Badge
-                    variant={orderStatusColors[viewingOrder.status as keyof typeof orderStatusColors] as any}
-                    className="text-xs px-3 py-1 rounded-full capitalize"
-                  >
-                    {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
-                  </Badge>
-                </div>
-                <hr className="my-2" />
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-orange-400" />
-                    <span>Date de création :</span>
+            <DialogBody>
+              {viewingOrder && (
+                <div className="p-6 pt-0 space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="bg-orange-200 text-orange-800 rounded px-2 py-1 text-xs font-mono">{viewingOrder.code}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="text-xs px-2 py-1 rounded-full border-gray-300 text-gray-600"
+                      >
+                        {orderTypeLabels[viewingOrder.type as keyof typeof orderTypeLabels] || viewingOrder.type}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs px-2 py-1  rounded-full capitalize ${orderStatusColors[viewingOrder.status as keyof typeof orderStatusLabels]} `}
+                      >
+                        {orderStatusLabels[viewingOrder.status as keyof typeof orderStatusLabels]}
+                      </Badge>
+                    </div>
                   </div>
-                  <span>{formatDate(viewingOrder.createdAt)}</span>
-                  {viewingOrder.deliveryDate && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-orange-400" />
-                        <span>Date de livraison :</span>
-                      </div>
-                      <span>{formatDate(viewingOrder.deliveryDate)}</span>
-                    </>
-                  )}
-                  {viewingOrder.notes && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Edit className="w-4 h-4 text-orange-400" />
-                        <span>Notes :</span>
-                      </div>
-                      <span className="italic text-gray-500">{viewingOrder.notes}</span>
-                    </>
-                  )}
-                </div>
-                <hr className="my-2" />
-                <div className="mt-2">
-                  <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                  <hr className="my-2" />
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-orange-400" />
+                      <span>Date de création :</span>
+                    </div>
+                    <span>{formatDate(viewingOrder.createdAt)}</span>
+                    {viewingOrder.deliveryDate && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-orange-400" />
+                          <span>Date de livraison :</span>
+                        </div>
+                        <span>{formatDate(viewingOrder.deliveryDate)}</span>
+                      </>
+                    )}
+                    {viewingOrder.notes && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Edit className="w-4 h-4 text-orange-400" />
+                          <span>Notes :</span>
+                        </div>
+                        <span className="italic text-gray-500">{viewingOrder.notes}</span>
+                      </>
+                    )}
                   </div>
-                  <OrderItemsSummary orderId={viewingOrder.id} products={products} />
-                </div>
-                <hr className="my-2" />
-                <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
-                  <div className="flex items-center gap-2 text-orange-700">
-                    Total TTC
+                  <hr className="my-1" />
+                  <div className="mt-1">
+                    <div className="font-semibold mb-2 text-gray-700 text-base flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5 text-orange-400" /> Articles de la commande
+                    </div>
+                    <OrderItemsSummary orderId={viewingOrder.id} products={products} />
                   </div>
-                  <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
-                  <div className="flex items-center gap-2 text-amber-700">
-                    <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                  <hr className="my-2" />
+                  <div className="grid grid-cols-2 gap-4 text-base font-semibold mt-4">
+                    <div className="flex items-center gap-2 text-orange-700">
+                      Total TTC
+                    </div>
+                    <span className="text-right text-orange-700">{parseFloat(viewingOrder.totalTTC?.toString() || "0").toFixed(2)} DA</span>
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <Badge className="bg-amber-200 text-amber-800 px-2 py-1">TVA</Badge>
+                    </div>
+                    <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
                   </div>
-                  <span className="text-right text-amber-700">{parseFloat(viewingOrder.totalTax?.toString() || "0").toFixed(2)} DA</span>
                 </div>
-              </div>
-            )}
+              )}
+            </DialogBody>
           </DialogContent>
         </Dialog>
-      </div>
+      </div >
     );
   }
 
@@ -704,8 +786,8 @@ export default function ClientOrdersPage() {
                       <button
                         onClick={() => setSelectedCategory(null)}
                         className={`w-full text-left px-4 py-3 rounded-lg transition-all ${!selectedCategory
-                            ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
-                            : "hover:bg-orange-50 text-gray-700"
+                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                          : "hover:bg-orange-50 text-gray-700"
                           }`}
                       >
                         <div className="flex items-center gap-3">
@@ -720,8 +802,8 @@ export default function ClientOrdersPage() {
                           key={category.id}
                           onClick={() => setSelectedCategory(category.id)}
                           className={`w-full text-left px-4 py-3 rounded-lg transition-all ${selectedCategory === category.id
-                              ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
-                              : "hover:bg-orange-50 text-gray-700"
+                            ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                            : "hover:bg-orange-50 text-gray-700"
                             }`}
                         >
                           <div className="flex items-center gap-3">
@@ -1195,12 +1277,10 @@ function OrderItemsSummary({ orderId, products }: { orderId: number; products: A
               const product = products.find((p) => p.id === item.articleId);
               return (
                 <tr key={item.articleId}>
-                  <td className="p-2 font-semibold">
-                    <div>
-                      <img src="product.photo"/>
+                  <td className="p-2 font-semibold"> <div className="flex items-center gap-4">
+                    <img src={product?.photo} alt={product?.name} className="w-[5rem] h-[4rem] object-cover rounded-t-lg" />
                     {product ? product.name : item.articleId}
-                    </div>
-                   </td>
+                  </div></td>
                   <td className="p-2 text-right">{item.quantity}</td>
                   <td className="p-2 text-right">{parseFloat(item.unitPrice || "0").toFixed(2)} DA</td>
                   <td className="p-2 text-right font-semibold">{(parseFloat(item.unitPrice || "0") * parseFloat(item.quantity || "0")).toFixed(2)} DA</td>
