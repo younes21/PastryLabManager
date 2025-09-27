@@ -107,12 +107,13 @@ export default function DeliveriesPage() {
     fetch('/api/storage-zones').then(r => r.json()).then(setZones);
   }, []);
 
-  // Charger les opérations d'inventaire pour la traçabilité
-  useEffect(() => {
-    fetch('/api/inventory-operations').then(r => r.json()).then(setInventoryOperations);
-  }, []);
+  // // Charger les opérations d'inventaire pour la traçabilité
+  // useEffect(() => {
+  //   fetch('/api/inventory-operations').then(r => r.json()).then(setInventoryOperations);
+  // }, []);
 
   // Queries
+  // Adaptation de la récupération des livraisons (liste)
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<any[]>({
     queryKey: ["/api/deliveries", { orderId }],
     queryFn: async () => {
@@ -122,7 +123,21 @@ export default function DeliveriesPage() {
       }
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch deliveries");
-      return response.json();
+      // Adapter la structure si besoin (ex: mapping des champs)
+      const data = await response.json();
+      setInventoryOperations(data)
+      return data.map((d: any) => ({
+        ...d,
+        scheduledDate: d.deliveryDate || d.scheduledDate, // compatibilité
+        notes: d.notes,
+        orderId: d.orderId,
+        clientId: d.clientId,
+        code: d.code,
+        totalTTC: d.totalTTC,
+        status: d.status,
+        items: d.items,
+        // autres champs si besoin
+      }));
     },
     enabled: true,
   });
@@ -164,9 +179,22 @@ export default function DeliveriesPage() {
   });
 
   // Mutations
+  // Adaptation de la mutation création
   const createDeliveryMutation = useMutation({
-    mutationFn: async (data: { deliveryData: any, orderItems: any[], splits?: any }) => {
-      return await apiRequest("/api/deliveries/with-items", "POST", data);
+    mutationFn: async (data: any) => {
+      // Adapter le payload pour l'API backend
+      const payload = {
+        deliveryDate: data.deliveryDate,
+        note: data.note,
+        orderId: data.orderId,
+        items: data.items.map((item: any) => ({
+          idArticle: item.idArticle,
+          idzone: item.idzone,
+          idlot: item.idlot,
+          qteLivree: item.qteLivree,
+        })),
+      };
+      return await apiRequest("/api/deliveries", "POST", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
@@ -185,9 +213,21 @@ export default function DeliveriesPage() {
     },
   });
 
+  // Adaptation de la mutation modification
   const updateDeliveryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await apiRequest(`/api/deliveries/${id}`, "PUT", data);
+      const payload = {
+        deliveryDate: data.deliveryDate,
+        note: data.note,
+        orderId: data.orderId,
+        items: data.items.map((item: any) => ({
+          idArticle: item.idArticle,
+          idzone: item.idzone,
+          idlot: item.idlot,
+          qteLivree: item.qteLivree,
+        })),
+      };
+      return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
@@ -420,51 +460,32 @@ export default function DeliveriesPage() {
     const allItems = items.flatMap(item => {
       if (splits[item.articleId] && splits[item.articleId].length > 0) {
         return splits[item.articleId].map(split => ({
-          articleId: item.articleId,
-          quantity: split.quantity.toString(),
-          lotId: split.lotId,
-          fromStorageZoneId: split.fromStorageZoneId,
-          notes: item.notes,
+          idArticle: item.articleId,
+          qteLivree: split.quantity.toString(),
+          idlot: split.lotId ?? null,
+          idzone: split.fromStorageZoneId ?? null,
         }));
       } else {
         return [{
-          articleId: item.articleId,
-          quantity: item.quantity.toString(),
-          notes: item.notes,
+          idArticle: item.articleId,
+          qteLivree: item.quantity.toString(),
+          idlot: null,
+          idzone: null,
         }];
       }
     });
 
-    // Préparer les données de livraison
-    const deliveryData = {
+    const payload = {
+      deliveryDate: currentDelivery.scheduledDate || null,
+      note: currentDelivery.notes || null,
       orderId: currentDelivery.orderId,
-      deliveryPersonId: currentDelivery.deliveryPersonId || null,
-      scheduledDate: currentDelivery.scheduledDate || null,
-      status: currentDelivery.status || "pending",
-      deliveryAddress: currentDelivery.deliveryAddress || null,
-      deliveryNotes: currentDelivery.notes || null,
-      packageCount: currentDelivery.packageCount || 1,
-      trackingNumbers: currentDelivery.trackingNumbers || null,
-      createdBy: 1, // TODO: Récupérer l'ID de l'utilisateur connecté
+      items: allItems,
     };
 
-    // Préparer les orderItems pour l'API
-    const orderItemsForAPI = items.map(item => ({
-      id: item.id,
-      articleId: item.articleId,
-      quantity: item.quantity.toString(),
-      unitPrice: item.unitPrice || "0.000",
-      taxRate: item.taxRate || "0.000",
-    }));
-
     if (currentDelivery.id) {
-      updateDeliveryMutation.mutate({ id: currentDelivery.id, data: deliveryData });
+      updateDeliveryMutation.mutate({ id: currentDelivery.id, data: payload });
     } else {
-      createDeliveryMutation.mutate({
-        deliveryData,
-        orderItems: orderItemsForAPI,
-        splits: Object.keys(splits).length > 0 ? splits : undefined
-      });
+      createDeliveryMutation.mutate(payload);
     }
   };
 

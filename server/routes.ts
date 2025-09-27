@@ -4180,6 +4180,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  //        ----------------------- DELIVERIES -----------------------
+  app.get("/api/deliveries", async (req, res) => {
+    try {
+      // On pourra ajouter des filtres (orderId, clientId, etc.) plus tard si besoin
+      const deliveries = await storage.getInventoryOperationsByType('livraison', false);
+      // Pour chaque livraison, on récupère aussi les items
+      // Si getInventoryOperationsByType ne retourne pas les items, il faudra adapter
+      // Pour l'instant, on suppose que chaque livraison a un id et on va chercher les items
+      const deliveriesWithItems = await Promise.all(
+        deliveries.map(async (delivery) => {
+          const items = await storage.getInventoryOperationItems(delivery.id);
+          return { ...delivery, items };
+        })
+      );
+      res.json(deliveriesWithItems);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des livraisons:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des livraisons" });
+    }
+  });
+
+  // API pour détails commande (tableau Articles)
+  app.get("/api/orders/:id/delivery-details", async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: "Commande introuvable" });
+      const client = order.clientId ? await storage.getClient(order.clientId) : null;
+      const items = await storage.getOrderItems(orderId);
+      // Récupérer toutes les livraisons (inventory_operations type livraison) liées à cette commande
+      const deliveries = await storage.getInventoryOperationsByOrder(orderId);
+      // Pour chaque item, calculer qté déjà livrée et qté restante
+      const itemsWithDelivery = items.map(item => {
+        // Somme des quantités livrées pour cet article dans toutes les livraisons
+        let delivered = 0;
+        deliveries.forEach(delivery => {
+          delivery.items.forEach(deliveryItem => {
+            if (deliveryItem.articleId === item.articleId) {
+              delivered += parseFloat(deliveryItem.quantity);
+            }
+          });
+        });
+        const quantityOrdered = parseFloat(item.quantity);
+        return {
+          articleId: item.articleId,
+          article: item.articleId, // à enrichir si besoin
+          quantityOrdered,
+          quantityDelivered: delivered,
+          quantityRemaining: Math.max(0, quantityOrdered - delivered),
+        };
+      });
+      res.json({
+        code: order.code,
+        client: client ? client.type==='societe' ? { id: client.id, name: client.companyName } : { id: client.id, name: client.firstName + ' ' + client.lastName } : null,
+        orderDate: order.createdAt,
+        total: order.totalTTC,
+        scheduledDate: order.deliveryDate,
+        note: order.notes,
+        items: itemsWithDelivery,
+      });
+    } catch (error) {
+      console.error("Erreur détails livraison:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des détails de la commande" });
+    }
+  });
+
+  // Création d'une livraison
+  app.post("/api/deliveries", async (req, res) => {
+    try {
+      // Validation input
+      const { deliveryDate, note, orderId, items } = req.body;
+      if (!orderId || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "orderId et items sont requis" });
+      }
+      // Construction de l'opération
+      const operation = {
+        type: 'livraison',
+        orderId,
+        notes: note,
+        deliveryDate,
+        status: 'draft',
+      };
+      // Construction des items
+      const opItems = items.map((it: any) => ({
+        articleId: it.idArticle,
+        toStorageZoneId: it.idzone,
+        lotId: it.idlot,
+        quantity: it.qteLivree,
+      }));
+      // Création transactionnelle
+      const created = await storage.createInventoryOperationWithItems(operation, opItems);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Erreur création livraison:", error);
+      res.status(500).json({ message: "Erreur lors de la création de la livraison" });
+    }
+  });
+
+  // Modification d'une livraison
+  app.put("/api/deliveries/:id", async (req, res) => {
+    try {
+      const operationId = parseInt(req.params.id);
+      const { deliveryDate, note, orderId, items } = req.body;
+      if (!orderId || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "orderId et items sont requis" });
+      }
+      // Construction de l'opération
+      const operation = {
+        type: 'livraison',
+        orderId,
+        notes: note,
+        deliveryDate,
+        status: 'draft',
+      };
+      // Construction des items
+      const opItems = items.map((it: any) => ({
+        articleId: it.idArticle,
+        toStorageZoneId: it.idzone,
+        lotId: it.idlot,
+        quantity: it.qteLivree,
+      }));
+      // Update transactionnel
+      const updated = await storage.updateInventoryOperationWithItems(operationId, operation, opItems);
+      res.json(updated);
+    } catch (error) {
+      console.error("Erreur modification livraison:", error);
+      res.status(500).json({ message: "Erreur lors de la modification de la livraison" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
