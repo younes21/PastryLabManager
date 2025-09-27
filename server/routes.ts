@@ -4282,7 +4282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [allClients, allOrders, allArticles] = await Promise.all([
         storage.getAllClients(),
         storage.getAllOrders(),
-        storage.getAllArticles()
+        storage.getAllArticlesWithStock()
       ]);
       
       // Créer des maps pour un accès rapide
@@ -4376,7 +4376,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: a.code,
           unit: a.unit,
           photo:a.photo,
-          unitPrice: a.salePrice
+          stockInfo:a.stockInfo,
+          unitPrice: a.salePrice,
+          isPerishable :a.is_perishable 
         }))
       });
     } catch (error) {

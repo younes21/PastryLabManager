@@ -3,7 +3,7 @@ import {
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
-  orders, orderItems, inventoryOperations, inventoryOperationItems, 
+  orders, orderItems, inventoryOperations, inventoryOperationItems,
   invoices, invoiceItems, stockReservations,
   lots,
 
@@ -19,11 +19,11 @@ import {
   type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation,
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
-  
-  
+
+
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
   type Payment, type InsertPayment,
-  
+
   InventoryOperationWithItems,
   type StockReservation, type InsertStockReservation,
   stock,
@@ -76,6 +76,7 @@ export interface IStorage {
   // Articles (unified)
   getArticle(id: number): Promise<Article | undefined>;
   getAllArticles(): Promise<Article[]>;
+  getAllArticlesWithStock(): Promise<any[]>;
   getActiveArticles(): Promise<Article[]>;
   createArticle(article: InsertArticle): Promise<Article>;
   updateArticle(id: number, article: Partial<InsertArticle>): Promise<Article | undefined>;
@@ -526,6 +527,55 @@ export class DatabaseStorage implements IStorage {
 
   async getAllArticles(): Promise<Article[]> {
     return await db.select().from(articles).orderBy(articles.name);
+  }
+
+  async getAllArticlesWithStock(): Promise<any[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          a.*,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', s.id,
+                'storageZoneId', s.storage_zone_id,
+                'lotId', s.lot_id,
+                'quantity', s.quantity,
+                'storageZone', CASE 
+                  WHEN sz.id IS NOT NULL THEN json_build_object(   
+                    'designation', sz.designation,
+                    'code', sz.code
+                  )
+                  ELSE NULL
+                END,
+                'lot', CASE 
+                  WHEN l.id IS NOT NULL THEN json_build_object(
+                    'code', l.code,
+                    'expirationDate', l.expiration_date
+                  )
+                  ELSE NULL
+                END
+              )
+            ) FILTER (WHERE s.id IS NOT NULL),
+            '[]'
+          ) AS stockInfo
+        FROM articles a
+        LEFT JOIN stock s ON s.article_id = a.id
+        LEFT JOIN storage_zones sz ON sz.id = s.storage_zone_id
+        LEFT JOIN lots l ON l.id = s.lot_id
+        WHERE a.active = true
+        GROUP BY a.id, a.code, a.name, a.type, a.description, a.cost_per_unit, a.price, a.current_stock, a.storage_zone_id, a.min_stock, a.max_stock, a.active, a.created_at
+        ORDER BY a.name
+      `);
+
+      return result.rows.map(row => ({
+        ...row,
+        stockInfo: row.stockinfo || []
+      }));
+    } catch (error) {
+      console.error('Error in getAllArticlesWithStock:', error);
+      throw error;
+    }
   }
 
   async getActiveArticles(): Promise<Article[]> {
