@@ -812,6 +812,7 @@ export default function DeliveriesPage() {
         </TabsContent>
 
         <TabsContent value="form">
+          
           {(isEditing || isViewing) && currentDelivery && (
             <div className="space-y-6">
               {/* Header */}
@@ -869,107 +870,8 @@ export default function DeliveriesPage() {
                   </div>
                 )}
               </div>
-
-              {/* Form */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Basic Info */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Informations générales</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    
-
-                    {/* Affichage des informations de la commande liée */}
-                    {currentDelivery.orderId && currentOrder && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Package className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-800">
-                            Commande liée: {currentOrder.code}
-                          </span>
-                        </div>
-                        <div className="text-xs text-blue-700 space-y-1">
-                          <p>Client: {getClientName(currentOrder.clientId)}</p>
-                          <p>Date de commande: {currentOrder.createdAt ? new Date(currentOrder.createdAt).toLocaleDateString('fr-FR') : 'N/A'}</p>
-                          <p>Total: {parseFloat(currentOrder.totalTTC?.toString() || "0").toFixed(2)} DA</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-sm font-medium">Date prévue</label>
-                      <Input
-                        type="date"
-                        value={currentDelivery.scheduledDate?.split('T')[0] || ""}
-                        onChange={(e) => setCurrentDelivery({
-                          ...currentDelivery,
-                          scheduledDate: e.target.value
-                        })}
-                        disabled={!isEditing}
-                        data-testid="input-scheduled-date"
-                      />
-                    </div>
-
-
-
-                    <div>
-                      <label className="text-sm font-medium">Notes</label>
-                      <Textarea
-                        value={currentDelivery.notes || ""}
-                        onChange={(e) => setCurrentDelivery({
-                          ...currentDelivery,
-                          notes: e.target.value
-                        })}
-                        placeholder="Notes sur la livraison..."
-                        disabled={!isEditing}
-                        data-testid="textarea-notes"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Totals */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Résumé financier</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sous-total HT</span>
-                        <span>
-                          {currentDelivery.subtotalHT 
-                            ? parseFloat(currentDelivery.subtotalHT.toString()).toFixed(2) 
-                            : "0.00"} DA
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">TVA (19%)</span>
-                        <span>
-                          {currentDelivery.totalTax 
-                            ? parseFloat(currentDelivery.totalTax.toString()).toFixed(2) 
-                            : "0.00"} DA
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-lg font-bold border-t pt-2">
-                        <span>Total TTC</span>
-                        <span>
-                          {currentDelivery.totalTTC 
-                            ? parseFloat(currentDelivery.totalTTC.toString()).toFixed(2) 
-                            : "0.00"} DA
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Détails de paiement */}
-                <DeliveryPaymentDetails deliveryId={currentDelivery.id} />
-              </div>
-
-              {/* Articles */}
-              <Card>
+  {/* Articles */}
+  <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>Articles à livrer ({items.length})</span>
@@ -1097,6 +999,105 @@ export default function DeliveriesPage() {
                   </Table>
                 </CardContent>
               </Card>
+              {/* Form */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Basic Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Informations générales</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    
+
+                    {/* Affichage des informations de la commande liée */}
+                    {currentDelivery.orderId && currentOrder && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-800">
+                            Commande liée: {currentOrder.code}
+                          </span>
+                        </div>
+                        <div className="text-xs text-blue-700 space-y-1">
+                          <p>Client: {getClientName(currentOrder.clientId)}</p>
+                          <p>Date de commande: {currentOrder.createdAt ? new Date(currentOrder.createdAt).toLocaleDateString('fr-FR') : 'N/A'}</p>
+                          <p>Total: {parseFloat(currentOrder.totalTTC?.toString() || "0").toFixed(2)} DA</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-sm font-medium">Date prévue</label>
+                      <Input
+                        type="date"
+                        value={currentDelivery.scheduledDate?.split('T')[0] || ""}
+                        onChange={(e) => setCurrentDelivery({
+                          ...currentDelivery,
+                          scheduledDate: e.target.value
+                        })}
+                        disabled={!isEditing}
+                        data-testid="input-scheduled-date"
+                      />
+                    </div>
+
+
+
+                    <div>
+                      <label className="text-sm font-medium">Notes</label>
+                      <Textarea
+                        value={currentDelivery.notes || ""}
+                        onChange={(e) => setCurrentDelivery({
+                          ...currentDelivery,
+                          notes: e.target.value
+                        })}
+                        placeholder="Notes sur la livraison..."
+                        disabled={!isEditing}
+                        data-testid="textarea-notes"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Totals */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Résumé financier</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sous-total HT</span>
+                        <span>
+                          {currentDelivery.subtotalHT 
+                            ? parseFloat(currentDelivery.subtotalHT.toString()).toFixed(2) 
+                            : "0.00"} DA
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">TVA (19%)</span>
+                        <span>
+                          {currentDelivery.totalTax 
+                            ? parseFloat(currentDelivery.totalTax.toString()).toFixed(2) 
+                            : "0.00"} DA
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold border-t pt-2">
+                        <span>Total TTC</span>
+                        <span>
+                          {currentDelivery.totalTTC 
+                            ? parseFloat(currentDelivery.totalTTC.toString()).toFixed(2) 
+                            : "0.00"} DA
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Détails de paiement */}
+                <DeliveryPaymentDetails deliveryId={currentDelivery.id} />
+              </div>
+
+            
             </div>
           )}
         </TabsContent>
