@@ -74,13 +74,12 @@ export default function DeliveriesPage() {
   const [activeTab, setActiveTab] = useState("list");
   const [splitModal, setSplitModal] = useState<{ open: boolean, articleId: number | null }>({ open: false, articleId: null });
   const [splits, setSplits] = useState<Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>>({});
-  const [lots, setLots] = useState<any[]>([]); // à charger via API
-  const [zones, setZones] = useState<any[]>([]); // à charger via API
-  const [splitError, setSplitError] = useState<string>("");
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [inventoryOperations, setInventoryOperations] = useState<any[]>([]);
-
+  const [filterDate, setFilterDate] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   // Nouveaux modals
   const [assignmentModal, setAssignmentModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
   const [packagesModal, setPackagesModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
@@ -101,32 +100,27 @@ export default function DeliveriesPage() {
     }
   }, []);
 
-  // Charger lots et zones au montage
-  useEffect(() => {
-    fetch('/api/lots').then(r => r.json()).then(setLots);
-    fetch('/api/storage-zones').then(r => r.json()).then(setZones);
-  }, []);
 
-  // // Charger les opérations d'inventaire pour la traçabilité
-  // useEffect(() => {
-  //   fetch('/api/inventory-operations').then(r => r.json()).then(setInventoryOperations);
-  // }, []);
 
-  // Queries
-  // Adaptation de la récupération des livraisons (liste)
-  const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<any[]>({
-    queryKey: ["/api/deliveries", { orderId }],
+  // Query optimisée - récupère toutes les données nécessaires en un seul appel
+  const { data: pageData, isLoading: deliveriesLoading } = useQuery<{
+    deliveries: any[];
+    clients: any[];
+    orders: Order[];
+    articles: Article[];
+  }>({
+    queryKey: ["/api/deliveries/page-data", { orderId }],
     queryFn: async () => {
-      let url = "/api/deliveries";
+      let url = "/api/deliveries/page-data";
       if (orderId) {
         url += `?orderId=${orderId}`;
       }
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch deliveries");
-      // Adapter la structure si besoin (ex: mapping des champs)
+      if (!response.ok) throw new Error("Failed to fetch deliveries page data");
       const data = await response.json();
-      setInventoryOperations(data)
-      return data.map((d: any) => ({
+
+      // Adapter la structure des livraisons pour la compatibilité
+      const adaptedDeliveries = data.deliveries.map((d: any) => ({
         ...d,
         scheduledDate: d.deliveryDate || d.scheduledDate, // compatibilité
         notes: d.notes,
@@ -138,45 +132,63 @@ export default function DeliveriesPage() {
         items: d.items,
         // autres champs si besoin
       }));
+
+      setInventoryOperations(adaptedDeliveries);
+
+      return {
+        deliveries: adaptedDeliveries,
+        clients: data.clients,
+        orders: data.orders,
+        articles: data.articles
+      };
     },
     enabled: true,
   });
 
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-  });
+  // Extraire les données de la réponse
+  const deliveries = pageData?.deliveries || [];
+  const clients = pageData?.clients || [];
+  const orders = pageData?.orders || [];
+  const articles = pageData?.articles || [];
 
-  const { data: orders = [] } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-  });
-
-  const { data: articles = [] } = useQuery<Article[]>({
-    queryKey: ["/api/articles"],
-  });
-
-  // Query pour récupérer la commande spécifique si orderId est présent
-  const { data: currentOrder } = useQuery<Order>({
-    queryKey: ["/api/orders", orderId],
+  // Query pour récupérer les détails de la commande avec les quantités livrées
+  const { data: orderDetails } = useQuery<{
+    code: string;
+    client: { id: number; name: string } | null;
+    orderDate: string;
+    total: string;
+    scheduledDate: string | null;
+    note: string | null;
+    items: Array<{
+      articleId: number;
+      article: { id: number; name: string; code: string; unit: string; unitPrice: string } | null;
+      quantityOrdered: number;
+      quantityDelivered: number;
+      quantityRemaining: number;
+    }>;
+  }>({
+    queryKey: ["/api/orders", orderId, "delivery-details"],
     queryFn: async () => {
       if (!orderId) return null;
-      const response = await fetch(`/api/orders/${orderId}`);
-      if (!response.ok) throw new Error("Failed to fetch order");
+      const response = await fetch(`/api/orders/${orderId}/delivery-details`);
+      if (!response.ok) throw new Error("Failed to fetch order delivery details");
       return response.json();
     },
     enabled: !!orderId,
   });
 
-  // Query pour récupérer les articles de la commande si orderId est présent
-  const { data: orderItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/orders", orderId, "items"],
-    queryFn: async () => {
-      if (!orderId) return [];
-      const response = await fetch(`/api/orders/${orderId}/items`);
-      if (!response.ok) throw new Error("Failed to fetch order items");
-      return response.json();
-    },
-    enabled: !!orderId,
-  });
+  // Extraire les données de la commande
+  const currentOrder = orderDetails ? {
+    id: orderId,
+    code: orderDetails.code,
+    clientId: orderDetails.client?.id || null,
+    totalTTC: orderDetails.total,
+    createdAt: orderDetails.orderDate,
+    deliveryDate: orderDetails.scheduledDate,
+    notes: orderDetails.note
+  } : null;
+
+  const orderItems = orderDetails?.items || [];
 
   // Mutations
   // Adaptation de la mutation création
@@ -197,7 +209,8 @@ export default function DeliveriesPage() {
       return await apiRequest("/api/deliveries", "POST", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
       toast({
         title: "Livraison créée",
         description: "La livraison a été créée avec succès"
@@ -230,7 +243,8 @@ export default function DeliveriesPage() {
       return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
       toast({
         title: "Livraison mise à jour",
         description: "La livraison a été modifiée avec succès"
@@ -251,7 +265,8 @@ export default function DeliveriesPage() {
       return await apiRequest(`/api/deliveries/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
       toast({
         title: "Livraison supprimée",
         description: "La livraison a été supprimée avec succès"
@@ -278,7 +293,7 @@ export default function DeliveriesPage() {
   };
 
   const startNewDelivery = () => {
-    if (orderId && currentOrder) {
+    if (orderId && currentOrder && orderDetails) {
       // Si on a un orderId, pré-remplir avec les données de la commande
       setCurrentDelivery({
         type: "delivery",
@@ -291,16 +306,16 @@ export default function DeliveriesPage() {
         // Ne plus initialiser les totaux - ils seront calculés côté serveur
       });
 
-      // Pré-remplir avec les articles de la commande (exclure ceux avec quantité 0)
-      setItems(orderItems
-        .filter((item: any) => parseFloat(item.quantity) > 0)
+      // Pré-remplir avec les articles de la commande (exclure ceux avec quantité restante 0)
+      setItems(orderDetails.items
+        .filter((item: any) => item.quantityRemaining > 0)
         .map((item: any) => ({
           id: Date.now() + Math.random(), // Nouvel ID temporaire
           articleId: item.articleId,
-          article: articles.find(a => a.id === item.articleId),
-          quantity: parseFloat(item.quantity),
+          article: item.article,
+          quantity: item.quantityRemaining, // Utiliser la quantité restante
           // Ne plus gérer unitPrice et totalPrice côté client
-          notes: item.notes || "",
+          notes: "",
         })));
     } else {
       // Formulaire vide normal
@@ -363,11 +378,10 @@ export default function DeliveriesPage() {
     setItems(items.map(item => {
       if (item.id === itemId) {
         // Vérifier les limites avant de mettre à jour
-        const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
+        const orderItem = orderDetails?.items.find(oi => oi.articleId === item.articleId);
         if (orderItem) {
-          const orderedQuantity = parseFloat(orderItem.quantity);
-          const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
-          const remainingQuantity = orderedQuantity - deliveredQuantity;
+          const remainingQuantity = orderItem.quantityRemaining;
+          const orderedQuantity = orderItem.quantityOrdered;
 
           // Ne pas dépasser la quantité restante ni la quantité commandée
           const finalQuantity = Math.min(quantity, remainingQuantity, orderedQuantity);
@@ -430,11 +444,10 @@ export default function DeliveriesPage() {
 
     // Vérifier que les quantités ne dépassent pas les limites
     for (const item of items) {
-      const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
+      const orderItem = orderDetails?.items.find(oi => oi.articleId === item.articleId);
       if (orderItem) {
-        const orderedQuantity = parseFloat(orderItem.quantity);
-        const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
-        const remainingQuantity = orderedQuantity - deliveredQuantity;
+        const remainingQuantity = orderItem.quantityRemaining;
+        const orderedQuantity = orderItem.quantityOrdered;
 
         if (item.quantity > remainingQuantity) {
           toast({
@@ -490,32 +503,18 @@ export default function DeliveriesPage() {
   };
 
   const getClientName = (clientId: number) => {
-    const client = clients.find(c => c.id === clientId);
+    const client = pageData?.clients.find(c => c.id === clientId);
     if (!client) return "Client inconnu";
-    return client.companyName || `${client.firstName} ${client.lastName}`;
+    return client.name;
   };
 
   const getOrderCode = (orderId: number | null) => {
     if (!orderId) return "-";
-    const order = orders.find(o => o.id === orderId);
+    const order = pageData?.orders.find(o => o.id === orderId);
     return order ? order.code : `CMD-${orderId}`;
   };
 
-  // Fonction pour calculer la quantité déjà livrée pour un article donné
-  const getDeliveredQuantity = (articleId: number, orderId: number) => {
-    if (!orderId) return 0;
 
-    // Filtrer les livraisons pour cette commande (exclure la livraison actuelle et les annulées)
-    const relevantDeliveries = deliveries.filter(d =>
-      d.orderId === orderId &&
-      d.id !== currentDelivery?.id &&
-      d.status !== 'cancelled'
-    );
-
-    // Pour simplifier, on retourne 0 car on n'a pas accès aux items des livraisons
-    // Dans une vraie implémentation, il faudrait récupérer les items de chaque livraison
-    return 0;
-  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -556,98 +555,235 @@ export default function DeliveriesPage() {
   const getRelatedOperations = (deliveryId: number) => {
     return inventoryOperations.filter(op => op.parentOperationId === deliveryId || (op.type === 'livraison' && op.orderId === deliveryId));
   };
+  // Fonction pour vérifier si une date correspond au filtre
+  const matchesDateFilter = (DeliveryDate: string | null) => {
+    if (!DeliveryDate) return false;
 
+    const DeliveryDateObj = new Date(DeliveryDate);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Normaliser les dates (ignorer l'heure)
+    const normalizeDate = (date: Date) => {
+      const normalized = new Date(date);
+      normalized.setHours(0, 0, 0, 0);
+      return normalized;
+    };
+
+    const normalizedDeliveryDate = normalizeDate(DeliveryDateObj);
+    const normalizedToday = normalizeDate(today);
+    const normalizedYesterday = normalizeDate(yesterday);
+    const normalizedTomorrow = normalizeDate(tomorrow);
+
+    switch (filterDate) {
+      case "today":
+        return normalizedDeliveryDate.getTime() === normalizedToday.getTime();
+
+      case "yesterday":
+        return normalizedDeliveryDate.getTime() === normalizedYesterday.getTime();
+
+      case "tomorrow":
+        return normalizedDeliveryDate.getTime() === normalizedTomorrow.getTime();
+
+      case "range": {
+        // Si les deux vides → pas de filtre
+        if (!filterDateFrom && !filterDateTo) return true;
+
+        const fromDate = filterDateFrom ? normalizeDate(new Date(filterDateFrom)) : null;
+        const toDate = filterDateTo ? normalizeDate(new Date(filterDateTo)) : null;
+
+        if (fromDate && toDate) {
+          return normalizedDeliveryDate >= fromDate && normalizedDeliveryDate <= toDate;
+        }
+        if (fromDate) {
+          return normalizedDeliveryDate >= fromDate;
+        }
+        if (toDate) {
+          return normalizedDeliveryDate <= toDate;
+        }
+        return true;
+      }
+
+      default:
+        return true;
+    }
+
+  };
 
   // Les totaux sont maintenant calculés côté serveur
   // const totals = calculateTotals();
 
   const filteredDeliveries = deliveries.filter((delivery) => {
     const matchesOrder = orderIdFilter === 'all' || String(delivery.orderId ?? '') === orderIdFilter;
+    const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(delivery?.order?.deliveryDate);
     const matchesClient = clientIdFilter === 'all' || String(delivery.clientId ?? '') === clientIdFilter;
     const matchesStatus = statusFilter === 'all' || delivery.status === statusFilter;
     // Ajoutez ici la logique de recherche si besoin
-    return matchesOrder && matchesClient && matchesStatus;
+    return matchesOrder && matchesClient && matchesStatus && matchesDate;
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Truck className="h-8 w-8" />
-            Livraisons
-            {orderId && (
-              <span className="text-lg text-muted-foreground font-normal">
-                - Commande #{orderId}
-              </span>
-            )}
-          </h1>
-          <p className="text-muted-foreground">
-            {orderId
-              ? `Livraisons liées à la commande #${orderId}`
-              : "Gestion des livraisons clients"
-            }
-          </p>
-          {orderId && (
-            <Button
-              variant="outline"
-              onClick={() => window.location.href = '/orders'}
-              className="mt-2"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour aux commandes
-            </Button>
+    <div className=" mx-auto p-6 pt-2 space-y-6">
+      {/* livraisons d'une commande spécifique */}
+      {orderId && (
+        <div className="flex items-center ">
+
+          <Button
+            className="bg-primary text-white hover:bg-primary-hover "
+            variant="outline"
+            onClick={() => window.location.href = '/orders'}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Retour aux commandes
+          </Button>
+          {/* Affichage des informations de la commande liée */}
+          {orderDetails && (
+            <div className="p-3 flex gap-3 m-auto text-blue-800 text-xs bg-blue-50 border border-blue-200 rounded-lg">
+              <Package className="h-4 w-4 text-blue-600" />
+              <p className="font-medium">Commande: <b>{orderDetails.code}</b></p>
+              <p>Client: <b>{orderDetails.client?.name}</b></p>
+              <p>Date de commande: <b>{formatDate(orderDetails.orderDate)}</b></p>
+              <p>Date prévu: <b>{formatDate(orderDetails.scheduledDate)}</b></p>
+              <p>Total: <b>{parseFloat(orderDetails.total?.toString() || "0").toFixed(2)} DA</b></p>
+
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          {/* Filtres avancés */}
-          <Select value={orderIdFilter} onValueChange={setOrderIdFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filtrer par commande" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes les commandes</SelectItem>
-              {orders.map(order => (
-                <SelectItem key={order.id} value={String(order.id)}>
-                  {order.code} - {getClientName(order.clientId)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={clientIdFilter} onValueChange={setClientIdFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filtrer par client" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les clients</SelectItem>
-              {clients.map(client => (
-                <SelectItem key={client.id} value={String(client.id)}>
-                  {getClientName(client.id)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filtrer par statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="draft">Brouillon</SelectItem>
-              <SelectItem value="pending">En attente</SelectItem>
-              <SelectItem value="ready">Prêt</SelectItem>
-              <SelectItem value="completed">Livré</SelectItem>
-              <SelectItem value="cancelled">Annulé</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input placeholder="Recherche..." className="w-64" disabled />
-        </div>
-        {/* Désactiver le bouton Nouvelle livraison */}
-        {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
-          <FileText className="h-4 w-4 mr-2" />
-          Nouvelle livraison
-        </Button>}
-      </div>
+      )}
+
+      <Card className="flex  items-center justify-between p-4">
+        <CardContent className="p-0 w-full">
+          <div className="flex flex-wrap items-center  gap-4">
+            {/* Filtres avancés */}
+            {!orderId && (
+              <>
+
+                <Select value={orderIdFilter} onValueChange={setOrderIdFilter}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Filtrer par commande" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les commandes</SelectItem>
+                    {pageData?.orders.map(order => (
+                      <SelectItem key={order.id} value={String(order.id)}>
+                        {order.code} - {getClientName(order.clientId)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientIdFilter} onValueChange={setClientIdFilter}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Filtrer par client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les clients</SelectItem>
+                    {clients.map(client => (
+                      <SelectItem key={client.id} value={String(client.id)}>
+                        {getClientName(client.id)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Filtrer par statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="draft">Brouillon</SelectItem>
+                <SelectItem value="pending">En attente</SelectItem>
+                <SelectItem value="ready">Prêt</SelectItem>
+                <SelectItem value="completed">Livré</SelectItem>
+                <SelectItem value="cancelled">Annulé</SelectItem>
+              </SelectContent>
+            </Select>
+            {/* Désactiver le bouton Nouvelle livraison */}
+            {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
+              <FileText className="h-4 w-4 mr-2" />
+              Nouvelle livraison
+            </Button>}
+            {/* Dates */}
+            <div className="flex  gap-3 items-end w-full">
+
+              <div className="flex flex-1 gap-2 col-span-3">
+                <div className="flex flex-col space-y-1 flex-1">
+                  <label className="text-xs text-gray-600">📅 Début</label>
+                  <Input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
+                    data-testid="input-date-from"
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col space-y-1 flex-1">
+                  <label className="text-xs text-gray-600">📅 Fin</label>
+                  <Input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
+                    data-testid="input-date-to"
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Boutons rapides */}
+              <div className="flex  col-span-3 items-center justify-center gap-2">
+                {[
+                  { label: "Aujourd'hui", value: "today" },
+                  { label: "Hier", value: "yesterday" },
+                  { label: "Demain", value: "tomorrow" },
+                ].map(({ label, value }) => (
+                  <Button
+                    key={value}
+                    variant={filterDate === value ? "default" : "outline"}
+                    size="sm"
+                    className={`rounded-full ${filterDate === value ? "bg-blue-600 text-white" : ""
+                      }`}
+                    onClick={() => {
+                      const base = new Date();
+                      let d: Date;
+                      if (value === "yesterday") d = new Date(base.getTime() - 86400000);
+                      else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
+                      else d = base;
+                      const iso = d.toISOString().split("T")[0];
+                      setFilterDate(value);
+
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+
+                {/* Bouton reset */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
+                  onClick={() => {
+                    setFilterDate("all");
+                    setFilterDateFrom("");
+                    setFilterDateTo("");
+                  }}
+                >
+                  Réinitialiser
+                </Button>
+              </div>
+            </div>
+          </div>
+
+        </CardContent>
+      </Card>
+
+
+
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
@@ -672,18 +808,20 @@ export default function DeliveriesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Code</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Commande</TableHead>
-                    <TableHead>Date prévue</TableHead>
+                    {!orderId && (<TableHead>Client</TableHead>)}
+                    {!orderId && (<TableHead>Commande</TableHead>)}
+                   
                     <TableHead>Total TTC</TableHead>
+                    <TableHead>etat</TableHead>
                     <TableHead>Statut</TableHead>
+                    <TableHead>Date valdiation</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {deliveriesLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
+                      <TableCell colSpan={orderId ? 6 : 8} className="text-center py-8">
                         Chargement des livraisons...
                       </TableCell>
                     </TableRow>
@@ -697,23 +835,54 @@ export default function DeliveriesPage() {
                     filteredDeliveries.map((delivery) => (
                       <TableRow key={delivery.id} data-testid={`row-delivery-${delivery.id}`}>
                         <TableCell className="font-medium">{delivery.code}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            {getClientName(delivery.clientId || 0)}
-                          </div>
-                        </TableCell>
-                        <TableCell>{getOrderCode(delivery.orderId)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {formatDate(delivery.scheduledDate)}
-                          </div>
-                        </TableCell>
+
+                        {!orderId && (
+                          <>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                {getClientName(delivery.clientId || 0)}
+                              </div>
+                            </TableCell>
+                            <TableCell>{getOrderCode(delivery.orderId)}</TableCell>
+                          </>
+                        )}
+                       
                         <TableCell className="font-semibold">
                           {parseFloat(delivery.totalTTC || "0").toFixed(2)} DA
                         </TableCell>
-                        <TableCell>{getStatusBadge(delivery.status)}</TableCell>
+                        <TableCell>{getStatusBadge(delivery.isPartial)}</TableCell>
+                        <TableCell>
+                        <Select
+                              value={delivery.status}
+                              onValueChange={(newStatus) => {
+                                if (newStatus !== delivery.status) {
+                                  updateDeliveryMutation.mutate({
+                                    id: delivery.id,
+                                    data: { status: newStatus }
+                                  });
+                                }
+                              }}
+                              disabled={delivery.status === "completed"}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="draft">Brouillon</SelectItem>
+                                <SelectItem value="pending">En attente</SelectItem>
+                                <SelectItem value="ready">Prêt</SelectItem>
+                                <SelectItem value="completed">Livré</SelectItem>
+                                <SelectItem value="cancelled">Annulé</SelectItem>
+                              </SelectContent>
+                            </Select>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {formatDate(delivery.validatedAt)}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 flex-wrap">
                             <Button
@@ -767,29 +936,7 @@ export default function DeliveriesPage() {
                             >
                               <CreditCard className="h-4 w-4" />
                             </Button>
-                            <Select
-                              value={delivery.status}
-                              onValueChange={(newStatus) => {
-                                if (newStatus !== delivery.status) {
-                                  updateDeliveryMutation.mutate({
-                                    id: delivery.id,
-                                    data: { status: newStatus }
-                                  });
-                                }
-                              }}
-                              disabled={delivery.status === "completed"}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="draft">Brouillon</SelectItem>
-                                <SelectItem value="pending">En attente</SelectItem>
-                                <SelectItem value="ready">Prêt</SelectItem>
-                                <SelectItem value="completed">Livré</SelectItem>
-                                <SelectItem value="cancelled">Annulé</SelectItem>
-                              </SelectContent>
-                            </Select>
+                           
                             <Button
                               variant="ghost"
                               size="sm"
@@ -876,7 +1023,8 @@ export default function DeliveriesPage() {
                           try {
                             await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
                             toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
-                            queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
                             resetForm();
                           } catch (e: any) {
                             toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
@@ -926,14 +1074,11 @@ export default function DeliveriesPage() {
                         </TableRow>
                       ) : (
                         items.map((item) => {
-                          // Calculer les quantités déjà livrées et restantes
-                          const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
-                          const orderedQuantity = orderItem ? parseFloat(orderItem.quantity) : 0;
-
-                          // Calculer la quantité déjà livrée
-                          const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
-
-                          const remainingQuantity = orderedQuantity - deliveredQuantity;
+                          // Utiliser les données optimisées de l'API
+                          const orderItem = orderDetails?.items.find(oi => oi.articleId === item.articleId);
+                          const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
+                          const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
+                          const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
 
                           return (
                             <TableRow key={item.id}>
@@ -1023,61 +1168,7 @@ export default function DeliveriesPage() {
               {/* Form */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Basic Info */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Informations générales</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
 
-
-                    {/* Affichage des informations de la commande liée */}
-                    {currentDelivery.orderId && currentOrder && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Package className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-800">
-                            Commande liée: {currentOrder.code}
-                          </span>
-                        </div>
-                        <div className="text-xs text-blue-700 space-y-1">
-                          <p>Client: {getClientName(currentOrder.clientId)}</p>
-                          <p>Date de commande: {currentOrder.createdAt ? new Date(currentOrder.createdAt).toLocaleDateString('fr-FR') : 'N/A'}</p>
-                          <p>Total: {parseFloat(currentOrder.totalTTC?.toString() || "0").toFixed(2)} DA</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-sm font-medium">Date prévue</label>
-                      <Input
-                        type="date"
-                        value={currentDelivery.scheduledDate?.split('T')[0] || ""}
-                        onChange={(e) => setCurrentDelivery({
-                          ...currentDelivery,
-                          scheduledDate: e.target.value
-                        })}
-                        disabled={!isEditing}
-                        data-testid="input-scheduled-date"
-                      />
-                    </div>
-
-
-
-                    <div>
-                      <label className="text-sm font-medium">Notes</label>
-                      <Textarea
-                        value={currentDelivery.notes || ""}
-                        onChange={(e) => setCurrentDelivery({
-                          ...currentDelivery,
-                          notes: e.target.value
-                        })}
-                        placeholder="Notes sur la livraison..."
-                        disabled={!isEditing}
-                        data-testid="textarea-notes"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
 
               </div>
 
@@ -1115,7 +1206,7 @@ export default function DeliveriesPage() {
         onOpenChange={(open) => setAssignmentModal({ open, delivery: null })}
         delivery={assignmentModal.delivery}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
         }}
       />
 
@@ -1124,7 +1215,7 @@ export default function DeliveriesPage() {
         onOpenChange={(open) => setPackagesModal({ open, delivery: null })}
         delivery={packagesModal.delivery}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
         }}
       />
 
@@ -1133,7 +1224,7 @@ export default function DeliveriesPage() {
         onOpenChange={(open) => setTrackingModal({ open, delivery: null })}
         delivery={trackingModal.delivery}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
         }}
       />
 
@@ -1142,7 +1233,7 @@ export default function DeliveriesPage() {
         onOpenChange={(open) => setPaymentModal({ open, delivery: null })}
         delivery={paymentModal.delivery}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
         }}
       />
     </div>

@@ -4183,34 +4183,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //        ----------------------- DELIVERIES -----------------------
   app.get("/api/deliveries", async (req, res) => {
     try {
-      // On pourra ajouter des filtres (orderId, clientId, etc.) plus tard si besoin
+      const { orderId, clientId, status } = req.query;
+      
+      // Récupérer les livraisons avec filtres
       const deliveries = await storage.getInventoryOperationsByType('livraison', false);
-      // Pour chaque livraison, on récupère aussi les items
-      // Si getInventoryOperationsByType ne retourne pas les items, il faudra adapter
-      // Pour l'instant, on suppose que chaque livraison a un id et on va chercher les items
-      const deliveriesWithItems = await Promise.all(
-        deliveries.map(async (delivery) => {
+      
+      // Filtrer par orderId si fourni
+      let filteredDeliveries = deliveries;
+      if (orderId) {
+        filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
+      }
+      
+      // Récupérer toutes les données nécessaires en une seule fois
+      const deliveriesWithFullData = await Promise.all(
+        filteredDeliveries.map(async (delivery) => {
+          // Récupérer les items de la livraison
           const items = await storage.getInventoryOperationItems(delivery.id);
-          return { ...delivery, items };
+          
+          // Récupérer les données de la commande si elle existe
+          let order = null;
+          let client = null;
+          if (delivery.orderId) {
+            order = await storage.getOrder(delivery.orderId);
+            if (order && order.clientId) {
+              client = await storage.getClient(order.clientId);
+            }
+          }
+          
+          // Enrichir les items avec les données des articles
+          const enrichedItems = await Promise.all(
+            items.map(async (item) => {
+              const article = await storage.getArticle(item.articleId);
+              return {
+                ...item,
+                article: article ? {
+                  id: article.id,
+                  name: article.name,
+                  code: article.code,
+                  unit: article.unit,
+                  unitPrice: article.salePrice
+                } : null
+              };
+            })
+          );
+          
+          return {
+            ...delivery,
+            items: enrichedItems,
+            order: order ? {
+              id: order.id,
+              code: order.code,
+              totalTTC: order.totalTTC,
+              createdAt: order.createdAt,
+              deliveryDate: order.deliveryDate
+            } : null,
+            client: client ? {
+              id: client.id,
+              name: client.type === 'societe' ? client.companyName : `${client.firstName} ${client.lastName}`,
+              type: client.type
+            } : null
+          };
         })
       );
-      res.json(deliveriesWithItems);
+      
+      // Filtrer par clientId si fourni
+      let finalDeliveries = deliveriesWithFullData;
+      if (clientId) {
+        finalDeliveries = deliveriesWithFullData.filter(d => d.client?.id === parseInt(clientId as string));
+      }
+      
+      // Filtrer par status si fourni
+      if (status) {
+        finalDeliveries = finalDeliveries.filter(d => d.status === status);
+      }
+      
+      res.json(finalDeliveries);
     } catch (error) {
       console.error("Erreur lors de la récupération des livraisons:", error);
       res.status(500).json({ message: "Erreur lors de la récupération des livraisons" });
     }
   });
 
-  // API pour détails commande (tableau Articles)
+  // API optimisée pour la page deliveries - récupère toutes les données nécessaires
+  app.get("/api/deliveries/page-data", async (req, res) => {
+    try {
+      const { orderId } = req.query;
+      
+      // Récupérer toutes les livraisons avec leurs données complètes
+      const deliveries = await storage.getInventoryOperationsByType('livraison', false);
+      
+      // Filtrer par orderId si fourni
+      let filteredDeliveries = deliveries;
+      if (orderId) {
+        filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
+      }
+      
+      // Récupérer toutes les données nécessaires en parallèle
+      const [allClients, allOrders, allArticles] = await Promise.all([
+        storage.getAllClients(),
+        storage.getAllOrders(),
+        storage.getAllArticles()
+      ]);
+      
+      // Créer des maps pour un accès rapide
+      const clientsMap = new Map(allClients.map(c => [c.id, c]));
+      const ordersMap = new Map(allOrders.map(o => [o.id, o]));
+      const articlesMap = new Map(allArticles.map(a => [a.id, a]));
+      
+      // Enrichir les livraisons avec toutes les données
+      const enrichedDeliveries = await Promise.all(
+        filteredDeliveries.map(async (delivery) => {
+          // Récupérer les items de la livraison
+          const items = await storage.getInventoryOperationItems(delivery.id);
+          
+          // Enrichir les items avec les données des articles
+          const enrichedItems = items.map(item => {
+            const article = articlesMap.get(item.articleId);
+            return {
+              ...item,
+              article: article ? {
+                id: article.id,
+                name: article.name,
+                code: article.code,
+                unit: article.unit,
+                unitPrice: article.salePrice
+              } : null
+            };
+          });
+          
+          // Récupérer les données de la commande et du client
+          const order = delivery.orderId ? ordersMap.get(delivery.orderId) : null;
+          const client = order && order.clientId ? clientsMap.get(order.clientId) : null;
+          
+          return {
+            ...delivery,
+            items: enrichedItems,
+            order: order ? {
+              id: order.id,
+              code: order.code,
+              totalTTC: order.totalTTC,
+              createdAt: order.createdAt,
+              deliveryDate: order.deliveryDate
+            } : null,
+            client: client ? {
+              id: client.id,
+              name: client.type === 'societe' ? client.companyName : `${client.firstName} ${client.lastName}`,
+              type: client.type
+            } : null
+          };
+        })
+      );
+      
+      res.json({
+        deliveries: enrichedDeliveries,
+        clients: allClients.map(c => ({
+          id: c.id,
+          name: c.type === 'societe' ? c.companyName : `${c.firstName} ${c.lastName}`,
+          type: c.type
+        })),
+        orders: allOrders.map(o => ({
+          id: o.id,
+          code: o.code,
+          clientId: o.clientId,
+          totalTTC: o.totalTTC,
+          createdAt: o.createdAt
+        })),
+        articles: allArticles.map(a => ({
+          id: a.id,
+          name: a.name,
+          code: a.code,
+          unit: a.unit,
+          unitPrice: a.salePrice
+        }))
+      });
+    } catch (error) {
+      console.error("Erreur lors de la récupération des données de la page deliveries:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des données" });
+    }
+  });
+
+  // API pour détails commande (tableau Articles) - optimisée
   app.get("/api/orders/:id/delivery-details", async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const order = await storage.getOrder(orderId);
+      
+      // Récupérer toutes les données nécessaires en parallèle
+      const [order, items, deliveries] = await Promise.all([
+        storage.getOrder(orderId),
+        storage.getOrderItems(orderId),
+        storage.getInventoryOperationsByOrder(orderId)
+      ]);
+      
       if (!order) return res.status(404).json({ message: "Commande introuvable" });
+      
+      // Récupérer le client
       const client = order.clientId ? await storage.getClient(order.clientId) : null;
-      const items = await storage.getOrderItems(orderId);
-      // Récupérer toutes les livraisons (inventory_operations type livraison) liées à cette commande
-      const deliveries = await storage.getInventoryOperationsByOrder(orderId);
+      
+      // Récupérer tous les articles en une fois
+      const articleIds = items.map(item => item.articleId);
+      const articles = await Promise.all(
+        articleIds.map(id => storage.getArticle(id))
+      );
+      const articlesMap = new Map(articles.filter(a => a).map(a => [a!.id, a!]));
+      
       // Pour chaque item, calculer qté déjà livrée et qté restante
       const itemsWithDelivery = items.map(item => {
         // Somme des quantités livrées pour cet article dans toutes les livraisons
@@ -4223,14 +4398,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         });
         const quantityOrdered = parseFloat(item.quantity);
+        const article = articlesMap.get(item.articleId);
+        
         return {
           articleId: item.articleId,
-          article: item.articleId, // à enrichir si besoin
+          article: article ? {
+            id: article.id,
+            name: article.name,
+            code: article.code,
+            unit: article.unit,
+            unitPrice: article.salePrice
+          } : null,
           quantityOrdered,
           quantityDelivered: delivered,
           quantityRemaining: Math.max(0, quantityOrdered - delivered),
         };
       });
+      
       res.json({
         code: order.code,
         client: client ? client.type==='societe' ? { id: client.id, name: client.companyName } : { id: client.id, name: client.firstName + ' ' + client.lastName } : null,
