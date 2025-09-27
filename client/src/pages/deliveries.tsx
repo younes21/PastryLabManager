@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -71,7 +70,7 @@ export default function DeliveriesPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
   const [items, setItems] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("list");
+  const [showForm, setShowForm] = useState(false);
   const [splitModal, setSplitModal] = useState<{ open: boolean, articleId: number | null }>({ open: false, articleId: null });
   const [splits, setSplits] = useState<Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>>({});
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
@@ -151,41 +150,19 @@ export default function DeliveriesPage() {
   const orders = pageData?.orders || [];
   const articles = pageData?.articles || [];
 
-  // Query pour récupérer les détails de la commande avec les quantités livrées
-  const { data: orderDetails } = useQuery<{
-    code: string;
-    client: { id: number; name: string } | null;
-    orderDate: string;
-    total: string;
-    scheduledDate: string | null;
-    note: string | null;
-    items: Array<{
-      articleId: number;
-      article: { id: number; name: string; code: string; unit: string; unitPrice: string } | null;
-      quantityOrdered: number;
-      quantityDelivered: number;
-      quantityRemaining: number;
-    }>;
-  }>({
-    queryKey: ["/api/orders", orderId, "delivery-details"],
-    queryFn: async () => {
-      if (!orderId) return null;
-      const response = await fetch(`/api/orders/${orderId}/delivery-details`);
-      if (!response.ok) throw new Error("Failed to fetch order delivery details");
-      return response.json();
-    },
-    enabled: !!orderId,
-  });
+  // Récupérer les détails de commande depuis la liste orders
+  const currentOrder = orderId ? orders.find(o => o.id === orderId) : null;
+  const orderDetails = (currentOrder as any)?.deliveryDetails;
 
   // Extraire les données de la commande
-  const currentOrder = orderDetails ? {
-    id: orderId,
-    code: orderDetails.code,
-    clientId: orderDetails.client?.id || null,
-    totalTTC: orderDetails.total,
-    createdAt: orderDetails.orderDate,
-    deliveryDate: orderDetails.scheduledDate,
-    notes: orderDetails.note
+  const orderData = currentOrder ? {
+    id: currentOrder.id,
+    code: currentOrder.code,
+    clientId: currentOrder.clientId,
+    totalTTC: currentOrder.totalTTC,
+    createdAt: currentOrder.createdAt,
+    deliveryDate: currentOrder.deliveryDate,
+    notes: currentOrder.notes
   } : null;
 
   const orderItems = orderDetails?.items || [];
@@ -210,7 +187,6 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
       toast({
         title: "Livraison créée",
         description: "La livraison a été créée avec succès"
@@ -244,7 +220,6 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
       toast({
         title: "Livraison mise à jour",
         description: "La livraison a été modifiée avec succès"
@@ -266,7 +241,6 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
       toast({
         title: "Livraison supprimée",
         description: "La livraison a été supprimée avec succès"
@@ -289,19 +263,19 @@ export default function DeliveriesPage() {
     setItems([]);
     setIsEditing(false);
     setIsViewing(false);
-    setActiveTab("list");
+    setShowForm(false);
   };
 
   const startNewDelivery = () => {
-    if (orderId && currentOrder && orderDetails) {
+    if (orderId && orderData && orderDetails) {
       // Si on a un orderId, pré-remplir avec les données de la commande
       setCurrentDelivery({
         type: "delivery",
         status: "draft",
-        clientId: currentOrder.clientId,
+        clientId: orderData.clientId,
         orderId: orderId,
         scheduledDate: new Date().toISOString().split('T')[0],
-        notes: `Livraison pour la commande ${currentOrder.code}`,
+        notes: `Livraison pour la commande ${orderData.code}`,
         currency: "DZD",
         // Ne plus initialiser les totaux - ils seront calculés côté serveur
       });
@@ -312,7 +286,7 @@ export default function DeliveriesPage() {
         .map((item: any) => ({
           id: Date.now() + Math.random(), // Nouvel ID temporaire
           articleId: item.articleId,
-          article: item.article,
+          article: articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
           quantity: item.quantityRemaining, // Utiliser la quantité restante
           // Ne plus gérer unitPrice et totalPrice côté client
           notes: "",
@@ -333,7 +307,7 @@ export default function DeliveriesPage() {
     }
     setIsEditing(true);
     setIsViewing(false);
-    setActiveTab("form");
+    setShowForm(true);
   };
 
   const editDelivery = (delivery: InventoryOperation) => {
@@ -342,7 +316,7 @@ export default function DeliveriesPage() {
     loadDeliveryItems(delivery.id);
     setIsEditing(true);
     setIsViewing(false);
-    setActiveTab("form");
+    setShowForm(true);
   };
 
   const viewDelivery = (delivery: InventoryOperation) => {
@@ -350,7 +324,7 @@ export default function DeliveriesPage() {
     loadDeliveryItems(delivery.id);
     setIsEditing(false);
     setIsViewing(true);
-    setActiveTab("form");
+    setShowForm(true);
   };
 
   const loadDeliveryItems = async (deliveryId: number) => {
@@ -362,7 +336,7 @@ export default function DeliveriesPage() {
       setItems(deliveryItems.map((item: any) => ({
         id: item.id,
         articleId: item.articleId,
-        article: articles.find(a => a.id === item.articleId),
+        article: articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
         quantity: parseFloat(item.quantity),
         // Ne plus gérer unitPrice et totalPrice côté client
         notes: item.notes || "",
@@ -378,7 +352,7 @@ export default function DeliveriesPage() {
     setItems(items.map(item => {
       if (item.id === itemId) {
         // Vérifier les limites avant de mettre à jour
-        const orderItem = orderDetails?.items.find(oi => oi.articleId === item.articleId);
+        const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
         if (orderItem) {
           const remainingQuantity = orderItem.quantityRemaining;
           const orderedQuantity = orderItem.quantityOrdered;
@@ -444,7 +418,7 @@ export default function DeliveriesPage() {
 
     // Vérifier que les quantités ne dépassent pas les limites
     for (const item of items) {
-      const orderItem = orderDetails?.items.find(oi => oi.articleId === item.articleId);
+      const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
       if (orderItem) {
         const remainingQuantity = orderItem.quantityRemaining;
         const orderedQuantity = orderItem.quantityOrdered;
@@ -629,7 +603,7 @@ export default function DeliveriesPage() {
     <div className=" mx-auto p-6 pt-2 space-y-6">
       {/* livraisons d'une commande spécifique */}
       {orderId && (
-        <div className="flex items-center ">
+        <Card className="flex items-center justify-between p-2 shadow-none border-none">
 
           <Button
             className="bg-primary text-white hover:bg-primary-hover "
@@ -640,543 +614,521 @@ export default function DeliveriesPage() {
             Retour aux commandes
           </Button>
           {/* Affichage des informations de la commande liée */}
-          {orderDetails && (
-            <div className="p-3 flex gap-3 m-auto text-blue-800 text-xs bg-blue-50 border border-blue-200 rounded-lg">
+          {orderData && (
+            <div className="p-3 flex gap-3  text-blue-800 text-xs bg-blue-50 border border-blue-200 rounded-lg">
               <Package className="h-4 w-4 text-blue-600" />
-              <p className="font-medium">Commande: <b>{orderDetails.code}</b></p>
-              <p>Client: <b>{orderDetails.client?.name}</b></p>
-              <p>Date de commande: <b>{formatDate(orderDetails.orderDate)}</b></p>
-              <p>Date prévu: <b>{formatDate(orderDetails.scheduledDate)}</b></p>
-              <p>Total: <b>{parseFloat(orderDetails.total?.toString() || "0").toFixed(2)} DA</b></p>
+              <p className="font-medium">Commande: <b>{orderData.code}</b></p>
+              <p>Client: <b>{getClientName(orderData.clientId || 0)}</b></p>
+              <p>Date de commande: <b>{formatDate(orderData.createdAt)}</b></p>
+              <p>Date prévu: <b>{formatDate(orderData.deliveryDate)}</b></p>
+              <p>Total: <b>{parseFloat(orderData.totalTTC?.toString() || "0").toFixed(2)} DA</b></p>
 
             </div>
           )}
-        </div>
+        </Card>
       )}
+      {!showForm && (
+        <Card className="flex  items-center justify-between p-4">
+          <CardContent className="p-0 w-full">
+            <div className="flex flex-wrap items-center  gap-4">
+              {/* Filtres avancés */}
+              {!orderId && (
+                <>
 
-      <Card className="flex  items-center justify-between p-4">
-        <CardContent className="p-0 w-full">
-          <div className="flex flex-wrap items-center  gap-4">
-            {/* Filtres avancés */}
-            {!orderId && (
-              <>
+                  <Select value={orderIdFilter} onValueChange={setOrderIdFilter}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Filtrer par commande" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les commandes</SelectItem>
+                      {pageData?.orders.map(order => (
+                        <SelectItem key={order.id} value={String(order.id)}>
+                          {order.code} - {getClientName(order.clientId)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                <Select value={orderIdFilter} onValueChange={setOrderIdFilter}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Filtrer par commande" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toutes les commandes</SelectItem>
-                    {pageData?.orders.map(order => (
-                      <SelectItem key={order.id} value={String(order.id)}>
-                        {order.code} - {getClientName(order.clientId)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Select value={clientIdFilter} onValueChange={setClientIdFilter}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Filtrer par client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les clients</SelectItem>
+                      {clients.map(client => (
+                        <SelectItem key={client.id} value={String(client.id)}>
+                          {getClientName(client.id)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Filtrer par statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="draft">Brouillon</SelectItem>
+                  <SelectItem value="pending">En attente</SelectItem>
+                  <SelectItem value="ready">Prêt</SelectItem>
+                  <SelectItem value="completed">Livré</SelectItem>
+                  <SelectItem value="cancelled">Annulé</SelectItem>
+                </SelectContent>
+              </Select>
+              {/* Désactiver le bouton Nouvelle livraison */}
+              {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
+                <FileText className="h-4 w-4 mr-2" />
+                Nouvelle livraison
+              </Button>}
+              {/* Dates */}
+              <div className="flex  gap-3 items-end w-full">
 
-                <Select value={clientIdFilter} onValueChange={setClientIdFilter}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Filtrer par client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les clients</SelectItem>
-                    {clients.map(client => (
-                      <SelectItem key={client.id} value={String(client.id)}>
-                        {getClientName(client.id)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Filtrer par statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="draft">Brouillon</SelectItem>
-                <SelectItem value="pending">En attente</SelectItem>
-                <SelectItem value="ready">Prêt</SelectItem>
-                <SelectItem value="completed">Livré</SelectItem>
-                <SelectItem value="cancelled">Annulé</SelectItem>
-              </SelectContent>
-            </Select>
-            {/* Désactiver le bouton Nouvelle livraison */}
-            {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
-              <FileText className="h-4 w-4 mr-2" />
-              Nouvelle livraison
-            </Button>}
-            {/* Dates */}
-            <div className="flex  gap-3 items-end w-full">
-
-              <div className="flex flex-1 gap-2 col-span-3">
-                <div className="flex flex-col space-y-1 flex-1">
-                  <label className="text-xs text-gray-600">📅 Début</label>
-                  <Input
-                    type="date"
-                    value={filterDateFrom}
-                    onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
-                    data-testid="input-date-from"
-                    className="h-9 text-sm"
-                  />
+                <div className="flex flex-1 gap-2 col-span-3">
+                  <div className="flex flex-col space-y-1 flex-1">
+                    <label className="text-xs text-gray-600">📅 Début</label>
+                    <Input
+                      type="date"
+                      value={filterDateFrom}
+                      onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
+                      data-testid="input-date-from"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1 flex-1">
+                    <label className="text-xs text-gray-600">📅 Fin</label>
+                    <Input
+                      type="date"
+                      value={filterDateTo}
+                      onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
+                      data-testid="input-date-to"
+                      className="h-9 text-sm"
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-col space-y-1 flex-1">
-                  <label className="text-xs text-gray-600">📅 Fin</label>
-                  <Input
-                    type="date"
-                    value={filterDateTo}
-                    onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
-                    data-testid="input-date-to"
-                    className="h-9 text-sm"
-                  />
-                </div>
-              </div>
 
-              {/* Boutons rapides */}
-              <div className="flex  col-span-3 items-center justify-center gap-2">
-                {[
-                  { label: "Aujourd'hui", value: "today" },
-                  { label: "Hier", value: "yesterday" },
-                  { label: "Demain", value: "tomorrow" },
-                ].map(({ label, value }) => (
+                {/* Boutons rapides */}
+                <div className="flex  col-span-3 items-center justify-center gap-2">
+                  {[
+                    { label: "Aujourd'hui", value: "today" },
+                    { label: "Hier", value: "yesterday" },
+                    { label: "Demain", value: "tomorrow" },
+                  ].map(({ label, value }) => (
+                    <Button
+                      key={value}
+                      variant={filterDate === value ? "default" : "outline"}
+                      size="sm"
+                      className={`rounded-full ${filterDate === value ? "bg-blue-600 text-white" : ""
+                        }`}
+                      onClick={() => {
+                        const base = new Date();
+                        let d: Date;
+                        if (value === "yesterday") d = new Date(base.getTime() - 86400000);
+                        else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
+                        else d = base;
+                        const iso = d.toISOString().split("T")[0];
+                        setFilterDate(value);
+
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+
+                  {/* Bouton reset */}
                   <Button
-                    key={value}
-                    variant={filterDate === value ? "default" : "outline"}
+                    variant="outline"
                     size="sm"
-                    className={`rounded-full ${filterDate === value ? "bg-blue-600 text-white" : ""
-                      }`}
+                    className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
                     onClick={() => {
-                      const base = new Date();
-                      let d: Date;
-                      if (value === "yesterday") d = new Date(base.getTime() - 86400000);
-                      else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
-                      else d = base;
-                      const iso = d.toISOString().split("T")[0];
-                      setFilterDate(value);
-
+                      setFilterDate("all");
+                      setFilterDateFrom("");
+                      setFilterDateTo("");
                     }}
                   >
-                    {label}
+                    Réinitialiser
                   </Button>
-                ))}
+                </div>
+              </div>
+            </div>
 
-                {/* Bouton reset */}
+          </CardContent>
+        </Card>
+
+      )}
+
+
+      {/* Affichage conditionnel : Liste ou Formulaire */}
+      {!showForm ? (
+        // Affichage de la liste des livraisons
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Liste des livraisons ({filteredDeliveries.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  {!orderId && (<TableHead>Client</TableHead>)}
+                  {!orderId && (<TableHead>Commande</TableHead>)}
+
+                  <TableHead>Total TTC</TableHead>
+                  <TableHead>etat</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Date valdiation</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {deliveriesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={orderId ? 6 : 8} className="text-center py-8">
+                      Chargement des livraisons...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredDeliveries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      Aucune livraison trouvée
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredDeliveries.map((delivery) => (
+                    <TableRow key={delivery.id} data-testid={`row-delivery-${delivery.id}`}>
+                      <TableCell className="font-medium">{delivery.code}</TableCell>
+
+                      {!orderId && (
+                        <>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              {getClientName(delivery.clientId || 0)}
+                            </div>
+                          </TableCell>
+                          <TableCell>{getOrderCode(delivery.orderId)}</TableCell>
+                        </>
+                      )}
+
+                      <TableCell className="font-semibold">
+                        {parseFloat(delivery.totalTTC || "0").toFixed(2)} DA
+                      </TableCell>
+                      <TableCell>{getStatusBadge(delivery.isPartial)}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={delivery.status}
+                          onValueChange={(newStatus) => {
+                            if (newStatus !== delivery.status) {
+                              updateDeliveryMutation.mutate({
+                                id: delivery.id,
+                                data: { status: newStatus }
+                              });
+                            }
+                          }}
+                          disabled={delivery.status === "completed"}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft">Brouillon</SelectItem>
+                            <SelectItem value="pending">En attente</SelectItem>
+                            <SelectItem value="ready">Prêt</SelectItem>
+                            <SelectItem value="completed">Livré</SelectItem>
+                            <SelectItem value="cancelled">Annulé</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          {formatDate(delivery.validatedAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => viewDelivery(delivery)}
+                            data-testid={`button-view-delivery-${delivery.id}`}
+                            title="Voir les détails"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editDelivery(delivery)}
+                            disabled={delivery.status === "completed"}
+                            data-testid={`button-edit-delivery-${delivery.id}`}
+                            title="Modifier"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setAssignmentModal({ open: true, delivery })}
+                            title="Assigner un livreur"
+                          >
+                            <User className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPackagesModal({ open: true, delivery })}
+                            title="Gérer les colis"
+                          >
+                            <Package className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setTrackingModal({ open: true, delivery })}
+                            title="Suivi de livraison"
+                          >
+                            <Truck className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPaymentModal({ open: true, delivery })}
+                            title="Paiement à la livraison"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
+                                deleteDeliveryMutation.mutate(delivery.id);
+                              }
+                            }}
+                            disabled={delivery.status === "completed"}
+                            data-testid={`button-delete-delivery-${delivery.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCancelDelivery(delivery)}
+                            disabled={delivery.status === "completed" || delivery.status === "cancelled"}
+                            data-testid={`button-cancel-delivery-${delivery.id}`}
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      {delivery.status === 'cancelled' && (
+                        <CancellationDetails
+                          delivery={{
+                            ...delivery,
+                            cancellationReason: delivery.cancellationReason || undefined
+                          }}
+                          inventoryOperations={getRelatedOperations(delivery.id)}
+                        />
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        // Affichage du formulaire
+        (isEditing || isViewing) && currentDelivery && (
+          <div className="space-y-6">
+            {/* Header */}
+            <Card className="flex items-center justify-between p-2">
+              <div className="flex items-center gap-4">
                 <Button
                   variant="outline"
-                  size="sm"
-                  className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
-                  onClick={() => {
-                    setFilterDate("all");
-                    setFilterDateFrom("");
-                    setFilterDateTo("");
-                  }}
+                  className="w-52 bg-slate-100"
+                  onClick={() => setShowForm(false)}
+                  data-testid="button-back-to-list"
                 >
-                  Réinitialiser
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Retour à la liste
                 </Button>
+
               </div>
-            </div>
-          </div>
-
-        </CardContent>
-      </Card>
-
-
-
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="list">Liste des livraisons</TabsTrigger>
-          {(isEditing || isViewing) && (
-            <TabsTrigger value="form">
-              {isViewing ? "Détails" : isEditing && currentDelivery?.id ? "Modifier" : "Nouvelle"}
-            </TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="list">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Liste des livraisons ({filteredDeliveries.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Code</TableHead>
-                    {!orderId && (<TableHead>Client</TableHead>)}
-                    {!orderId && (<TableHead>Commande</TableHead>)}
-                   
-                    <TableHead>Total TTC</TableHead>
-                    <TableHead>etat</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Date valdiation</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {deliveriesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={orderId ? 6 : 8} className="text-center py-8">
-                        Chargement des livraisons...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredDeliveries.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        Aucune livraison trouvée
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredDeliveries.map((delivery) => (
-                      <TableRow key={delivery.id} data-testid={`row-delivery-${delivery.id}`}>
-                        <TableCell className="font-medium">{delivery.code}</TableCell>
-
-                        {!orderId && (
-                          <>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                {getClientName(delivery.clientId || 0)}
-                              </div>
-                            </TableCell>
-                            <TableCell>{getOrderCode(delivery.orderId)}</TableCell>
-                          </>
-                        )}
-                       
-                        <TableCell className="font-semibold">
-                          {parseFloat(delivery.totalTTC || "0").toFixed(2)} DA
-                        </TableCell>
-                        <TableCell>{getStatusBadge(delivery.isPartial)}</TableCell>
-                        <TableCell>
-                        <Select
-                              value={delivery.status}
-                              onValueChange={(newStatus) => {
-                                if (newStatus !== delivery.status) {
-                                  updateDeliveryMutation.mutate({
-                                    id: delivery.id,
-                                    data: { status: newStatus }
-                                  });
-                                }
-                              }}
-                              disabled={delivery.status === "completed"}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="draft">Brouillon</SelectItem>
-                                <SelectItem value="pending">En attente</SelectItem>
-                                <SelectItem value="ready">Prêt</SelectItem>
-                                <SelectItem value="completed">Livré</SelectItem>
-                                <SelectItem value="cancelled">Annulé</SelectItem>
-                              </SelectContent>
-                            </Select>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {formatDate(delivery.validatedAt)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => viewDelivery(delivery)}
-                              data-testid={`button-view-delivery-${delivery.id}`}
-                              title="Voir les détails"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => editDelivery(delivery)}
-                              disabled={delivery.status === "completed"}
-                              data-testid={`button-edit-delivery-${delivery.id}`}
-                              title="Modifier"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setAssignmentModal({ open: true, delivery })}
-                              title="Assigner un livreur"
-                            >
-                              <User className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPackagesModal({ open: true, delivery })}
-                              title="Gérer les colis"
-                            >
-                              <Package className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setTrackingModal({ open: true, delivery })}
-                              title="Suivi de livraison"
-                            >
-                              <Truck className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPaymentModal({ open: true, delivery })}
-                              title="Paiement à la livraison"
-                            >
-                              <CreditCard className="h-4 w-4" />
-                            </Button>
-                           
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
-                                  deleteDeliveryMutation.mutate(delivery.id);
-                                }
-                              }}
-                              disabled={delivery.status === "completed"}
-                              data-testid={`button-delete-delivery-${delivery.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCancelDelivery(delivery)}
-                              disabled={delivery.status === "completed" || delivery.status === "cancelled"}
-                              data-testid={`button-cancel-delivery-${delivery.id}`}
-                            >
-                              <X className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        {delivery.status === 'cancelled' && (
-                          <CancellationDetails
-                            delivery={{
-                              ...delivery,
-                              cancellationReason: delivery.cancellationReason || undefined
-                            }}
-                            inventoryOperations={getRelatedOperations(delivery.id)}
-                          />
-                        )}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="form">
-
-          {(isEditing || isViewing) && currentDelivery && (
-            <div className="space-y-6">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setActiveTab("list")}
-                    data-testid="button-back-to-list"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Retour à la liste
+              {isEditing && (
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={resetForm}>
+                    <X className="h-4 w-4 mr-2" />
+                    Annuler
                   </Button>
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      {isViewing ? "Détails" : currentDelivery.id ? "Modifier" : "Nouvelle"} livraison
-                    </h2>
-                    {currentDelivery.code && (
-                      <p className="text-muted-foreground">{currentDelivery.code}</p>
-                    )}
-                  </div>
-                </div>
-                {isEditing && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={resetForm}>
-                      <X className="h-4 w-4 mr-2" />
-                      Annuler
-                    </Button>
+                  <Button
+                    onClick={saveDelivery}
+                    disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {currentDelivery.id ? "Mettre à jour" : "Créer"}
+                  </Button>
+                  {currentDelivery.id && currentDelivery.status !== "completed" && (
                     <Button
-                      onClick={saveDelivery}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={async () => {
+                        try {
+                          await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
+                          toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
+                          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+                          resetForm();
+                        } catch (e: any) {
+                          toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
+                        }
+                      }}
                       disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
                     >
-                      <Save className="h-4 w-4 mr-2" />
-                      {currentDelivery.id ? "Mettre à jour" : "Créer"}
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Valider la livraison
                     </Button>
-                    {currentDelivery.id && currentDelivery.status !== "completed" && (
-                      <Button
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={async () => {
-                          try {
-                            await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
-                            toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
-                            queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
-                            queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId, "delivery-details"] });
-                            resetForm();
-                          } catch (e: any) {
-                            toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
-                          }
-                        }}
-                        disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Valider la livraison
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-              {/* Articles */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Articles à livrer ({items.length})</span>
-                    {currentDelivery.orderId && currentOrder && (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                        <Package className="h-3 w-3 mr-1" />
-                        Commande {currentOrder.code}
-                      </Badge>
-                    )}
+                  )}
+                </div>
+              )}
+            </Card>
+            {/* Articles */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Articles à livrer ({items.length})</span>
+                  {currentDelivery.orderId && orderData && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      <Package className="h-3 w-3 mr-1" />
+                      Commande {orderData.code}
+                    </Badge>
+                  )}
 
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead >Article</TableHead>
+                      <TableHead className="text-center text-red-900">Quantité commandée</TableHead>
+                      <TableHead className="text-center">Quantité déjà livrée</TableHead>
+                      <TableHead className="text-center">Quantité restante</TableHead>
+                      <TableHead className="bg-green-100 text-green-900 font-bold text-center">Quantité à livrer</TableHead>
+                      <TableHead className="text-center">Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.length === 0 ? (
                       <TableRow>
-                        <TableHead>Article</TableHead>
-                        <TableHead>Quantité commandée</TableHead>
-                        <TableHead>Quantité déjà livrée</TableHead>
-                        <TableHead>Quantité restante</TableHead>
-                        <TableHead>Quantité à livrer</TableHead>
-                        <TableHead>Notes</TableHead>
+                        <TableCell colSpan={isEditing ? 4 : 4} className="text-center py-8">
+                          Aucun article ajouté
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {items.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={isEditing ? 4 : 4} className="text-center py-8">
-                            Aucun article ajouté
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        items.map((item) => {
-                          // Utiliser les données optimisées de l'API
-                          const orderItem = orderDetails?.items.find(oi => oi.articleId === item.articleId);
-                          const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
-                          const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
-                          const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
+                    ) : (
+                      items.map((item) => {
+                        // Utiliser les données optimisées de l'API
+                        const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
+                        const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
+                        const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
+                        const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
 
-                          return (
-                            <TableRow key={item.id}>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium">{item.article?.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {item.article?.code} • {item.article?.unit}
-                                  </p>
+                        return (
+                          <TableRow key={item.id} className="text-lg">
+                            <TableCell className="p-2">
+                              <div>
+                                <div className="flex items-center gap-4 text-xs font-bold">
+                                  <img src={item.article?.photo} alt='vérifier photo' className="w-[4rem] h-[3rem] object-cover rounded-t-lg" />
+                                  {item.article ? item.article?.name : item.articleId}
                                 </div>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {orderedQuantity}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {deliveredQuantity}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {remainingQuantity}
-                              </TableCell>
-                              <TableCell>
-                                {isEditing ? (
-                                  <Input
-                                    type="number"
-                                    min="0.01"
-                                    max={remainingQuantity}
-                                    step="0.01"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const newQuantity = parseFloat(e.target.value) || 0;
-                                      if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
-                                        updateItemQuantity(item.id, newQuantity);
-                                      }
-                                    }}
-                                    className="w-20"
-                                  />
-                                ) : (
-                                  item.quantity
-                                )}
-                              </TableCell>
-                              {/* Prix unitaire et total supprimés - calculés côté serveur */}
-                              <TableCell>
-                                {isEditing ? (
-                                  <Input
-                                    value={item.notes}
-                                    onChange={(e) => setItems(items.map(i =>
-                                      i.id === item.id ? { ...i, notes: e.target.value } : i
-                                    ))}
-                                    placeholder="Notes..."
-                                    className="w-32"
-                                  />
-                                ) : (
-                                  item.notes || "-"
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
-                                  <>
-                                    <CheckCircle className="text-green-600 inline-block mr-1" />
-                                    <span className="sr-only">Répartition complète</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <AlertTriangle className="text-yellow-500 inline-block mr-1" />
-                                    <span className="sr-only">Répartition incomplète</span>
-                                  </>
-                                )}
-                                {/* Masquer le bouton "Répartir" si c'est un cas simple (livraison directe possible) */}
-                                {!splits[item.articleId] || splits[item.articleId].length === 0 ? (
-                                  <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
-                                    Répartir
-                                  </Button>
-                                ) : (
-                                  <span className="text-sm text-green-600 font-medium">
-                                    ✓ Répartition validée
-                                  </span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-              {/* Form */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Basic Info */}
 
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center p-2 text-red-900">
+                              {orderedQuantity + ' ' + item.article.unit}
+                            </TableCell>
+                            <TableCell className="text-center p-2">
+                              {deliveredQuantity + ' ' + item.article.unit}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {remainingQuantity + ' ' + item.article.unit}
+                            </TableCell>
+                            <TableCell className="bg-green-100">
+                              {isEditing ? (
+                                <Input
 
-              </div>
+                                  type="number"
+                                  min="0"
+                                  max={remainingQuantity}
+                                  step="1"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const newQuantity = parseFloat(e.target.value) || 0;
+                                    if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
+                                      updateItemQuantity(item.id, newQuantity);
+                                    }
+                                  }}
+                                  className="text-center"
+                                />
+                              ) : (
+                                item.quantity
+                              )}
+                            </TableCell>
+                            {/* Prix unitaire et total supprimés - calculés côté serveur */}
+                            <TableCell>
+                              {isEditing ? (
+                                <Input
+                                  value={item.notes}
+                                  onChange={(e) => setItems(items.map(i =>
+                                    i.id === item.id ? { ...i, notes: e.target.value } : i
+                                  ))}
+                                  placeholder="Notes..."
+                                  className="w-32"
+                                />
+                              ) : (
+                                item.notes || "-"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
+                                <>
+                                  <CheckCircle className="text-green-600 inline-block mr-1" />
+                                  <span className="sr-only">Répartition complète</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                  <span className="sr-only">Répartition incomplète</span>
+                                </>
+                              )}
+                              {/* Masquer le bouton "Répartir" si c'est un cas simple (livraison directe possible) */}
+                              {!splits[item.articleId] || splits[item.articleId].length === 0 ? (
+                                <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
+                                  Répartir
+                                </Button>
+                              ) : (
+                                <span className="text-sm text-green-600 font-medium">
+                                  ✓ Répartition validée
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            {/* Form */}
 
-
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </div>
+        )
+      )}
 
       {/* Modal de répartition amélioré */}
       <DeliverySplitModal

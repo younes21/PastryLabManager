@@ -4296,43 +4296,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Récupérer les items de la livraison
           const items = await storage.getInventoryOperationItems(delivery.id);
           
-          // Enrichir les items avec les données des articles
-          const enrichedItems = items.map(item => {
-            const article = articlesMap.get(item.articleId);
-            return {
-              ...item,
-              article: article ? {
-                id: article.id,
-                name: article.name,
-                code: article.code,
-                unit: article.unit,
-                unitPrice: article.salePrice
-              } : null
-            };
-          });
-          
-          // Récupérer les données de la commande et du client
-          const order = delivery.orderId ? ordersMap.get(delivery.orderId) : null;
-          const client = order && order.clientId ? clientsMap.get(order.clientId) : null;
+          // Garder les items simples sans articles imbriqués
+          const enrichedItems = items.map(item => ({
+            ...item,
+            // Pas d'article imbriqué - utiliser la liste articles séparée
+          }));
           
           return {
             ...delivery,
             items: enrichedItems,
-            order: order ? {
-              id: order.id,
-              code: order.code,
-              totalTTC: order.totalTTC,
-              createdAt: order.createdAt,
-              deliveryDate: order.deliveryDate
-            } : null,
-            client: client ? {
-              id: client.id,
-              name: client.type === 'societe' ? client.companyName : `${client.firstName} ${client.lastName}`,
-              type: client.type
-            } : null
+            // Pas de données imbriquées - utiliser les listes séparées
           };
         })
       );
+      
+      // Si orderId est spécifié, enrichir la commande correspondante avec les détails de livraison
+      if (orderId) {
+        const orderIdNum = parseInt(orderId as string);
+        const order = ordersMap.get(orderIdNum);
+        if (order) {
+          // Récupérer les items de la commande et les livraisons existantes
+          const [orderItems, existingDeliveries] = await Promise.all([
+            storage.getOrderItems(orderIdNum),
+            storage.getInventoryOperationsByOrder(orderIdNum)
+          ]);
+          
+          // Pour chaque item, calculer qté déjà livrée et qté restante
+          const itemsWithDelivery = orderItems.map(item => {
+            // Somme des quantités livrées pour cet article dans toutes les livraisons
+            let delivered = 0;
+            existingDeliveries.forEach(delivery => {
+              delivery.items.forEach(deliveryItem => {
+                if (deliveryItem.articleId === item.articleId) {
+                  delivered += parseFloat(deliveryItem.quantity);
+                }
+              });
+            });
+            const quantityOrdered = parseFloat(item.quantity);
+            
+            return {
+              articleId: item.articleId,
+              quantityOrdered,
+              quantityDelivered: delivered,
+              quantityRemaining: Math.max(0, quantityOrdered - delivered),
+            };
+          });
+          
+          // Enrichir la commande dans la map avec les détails de livraison
+          (ordersMap as any).set(orderIdNum, {
+            ...order,
+            deliveryDetails: {
+              items: itemsWithDelivery,
+            }
+          });
+        }
+      }
       
       res.json({
         deliveries: enrichedDeliveries,
@@ -4341,18 +4359,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: c.type === 'societe' ? c.companyName : `${c.firstName} ${c.lastName}`,
           type: c.type
         })),
-        orders: allOrders.map(o => ({
+        orders: Array.from(ordersMap.values()).map((o: any) => ({
           id: o.id,
           code: o.code,
           clientId: o.clientId,
           totalTTC: o.totalTTC,
-          createdAt: o.createdAt
+          createdAt: o.createdAt,
+          deliveryDate: o.deliveryDate,
+          notes: o.notes,
+          // Inclure les détails de livraison si disponibles
+          ...(o.deliveryDetails && { deliveryDetails: o.deliveryDetails })
         })),
         articles: allArticles.map(a => ({
           id: a.id,
           name: a.name,
           code: a.code,
           unit: a.unit,
+          photo:a.photo,
           unitPrice: a.salePrice
         }))
       });
