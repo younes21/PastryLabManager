@@ -3,8 +3,8 @@ import {
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
   taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
-  orders, orderItems, inventoryOperations, inventoryOperationItems, deliveries, deliveryPackages, deliveryItems,
-  deliveryStockReservations, invoices, invoiceItems, payments, accountingEntries, accountingEntryLines, stockReservations,
+  orders, orderItems, inventoryOperations, inventoryOperationItems, 
+  invoices, invoiceItems, stockReservations,
   lots,
 
   type User, type InsertUser,
@@ -19,18 +19,18 @@ import {
   type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation,
   type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
   type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
-  type Delivery, type InsertDelivery, type DeliveryPackage, type InsertDeliveryPackage, type DeliveryItem, type InsertDeliveryItem,
-  type DeliveryStockReservation, type InsertDeliveryStockReservation,
+  
+  
   type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
   type Payment, type InsertPayment,
-  type AccountingEntry, type InsertAccountingEntry, type AccountingEntryLine, type InsertAccountingEntryLine,
+  
   InventoryOperationWithItems,
   type StockReservation, type InsertStockReservation,
   stock,
   Stock
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, or, gte, lte, isNull, sql, gt } from "drizzle-orm";
+import { eq, desc, lt, and, sql, gt } from "drizzle-orm";
 import camelcaseKeys from 'camelcase-keys';
 
 export interface IStorage {
@@ -208,8 +208,6 @@ export interface IStorage {
   getInvoice(id: number): Promise<Invoice | undefined>;
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByOrder(orderId: number): Promise<Invoice[]>;
-  getInvoicesFromDeliveryOperation(operationId: number): Promise<Invoice[]>;
-  createInvoiceFromDelivery(operationId: number, invoiceData?: Partial<InsertInvoice>): Promise<Invoice>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   updateInvoiceStatus(id: number): Promise<Invoice | undefined>; // Auto-calcul du statut basé sur les paiements
@@ -227,7 +225,6 @@ export interface IStorage {
   getPayment(id: number): Promise<Payment | undefined>;
   getPaymentsByInvoice(invoiceId: number): Promise<Payment[]>;
   getPaymentsByClient(clientId: number): Promise<Payment[]>;
-  getPaymentsByDelivery(deliveryId: number): Promise<Payment[]>;
   getOutstandingPayments(): Promise<any[]>;
   getPaymentStatistics(): Promise<any>;
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -259,23 +256,8 @@ export interface IStorage {
   // Obtenir le rapport de traçabilité d'un article
   getArticleTraceabilityReport(articleId: number, startDate?: string, endDate?: string): Promise<any>;
 
-  // ============ RESERVATIONS DE LIVRAISON ============
-
-  // Créer des réservations de stock pour une livraison
-  createDeliveryStockReservations(deliveryId: number, orderItems: any[]): Promise<DeliveryStockReservation[]>;
-  // Libérer toutes les réservations d'une livraison
-  releaseDeliveryStockReservations(deliveryId: number): Promise<boolean>;
-  // Obtenir les réservations d'une livraison
-  getDeliveryStockReservations(deliveryId: number): Promise<DeliveryStockReservation[]>;
-  // Calculer le stock disponible pour un article (en tenant compte des réservations de livraison)
-  getArticleAvailableStockWithDeliveryReservations(articleId: number): Promise<number>;
-  // Valider une livraison et déduire le stock
-  validateDelivery(deliveryId: number, splits?: Array<{ articleId: number, lotId: number | null, fromStorageZoneId: number | null, quantity: number }>): Promise<Delivery>;
 
   // ============ GESTION DES ANNULATIONS ============
-
-  // 1. Annuler une livraison (avant validation) - retour au stock
-  cancelDeliveryBeforeValidation(deliveryId: number, reason: string): Promise<Delivery>;
 
   // 3. Créer une opération de rebut
   createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation>;
@@ -283,57 +265,25 @@ export interface IStorage {
   // 2. Créer une opération de retour au stock
   createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation>;
 
-  // 4. Annuler une livraison (après validation) - retour au stock ou rebut
-  cancelDeliveryAfterValidation(deliveryId: number, reason: string, isReturnToStock: boolean): Promise<Delivery>;
 
-  // ============ GESTION DES LIVREURS ============
 
-  // Assigner un livreur à une livraison
-  assignDeliveryPerson(deliveryId: number, deliveryPersonId: number): Promise<Delivery>;
-  // Réassigner une livraison à un autre livreur
-  reassignDelivery(deliveryId: number, newDeliveryPersonId: number): Promise<Delivery>;
-  // Obtenir les livraisons assignées à un livreur
-  getDeliveriesByDeliveryPerson(deliveryPersonId: number, status?: string): Promise<Delivery[]>;
-  // Obtenir les livreurs disponibles
-  getAvailableDeliveryPersons(): Promise<User[]>;
-  // Mettre à jour le statut de livraison par le livreur
-  updateDeliveryStatusByDeliveryPerson(deliveryId: number, status: string, notes?: string): Promise<Delivery>;
 
-  // ============ GESTION DES COLIS ET PACKAGING ============
 
-  // Créer un colis pour une livraison
-  createDeliveryPackage(deliveryId: number, packageData: { name: string, weight?: number, dimensions?: string, notes?: string }): Promise<DeliveryPackage>;
-  // Mettre à jour un colis
-  updateDeliveryPackage(packageId: number, packageData: Partial<InsertDeliveryPackage>): Promise<DeliveryPackage>;
-  // Obtenir les colis d'une livraison
-  getDeliveryPackages(deliveryId: number): Promise<DeliveryPackage[]>;
-  // Ajouter un numéro de suivi à une livraison
-  addTrackingNumber(deliveryId: number, trackingNumber: string): Promise<Delivery>;
-  // Mettre à jour le statut de suivi d'un colis
-  updatePackageTrackingStatus(packageId: number, status: string, location?: string): Promise<DeliveryPackage>;
-
-  // ============ PAIEMENT À LA LIVRAISON ============
-
-  // Créer un paiement à la livraison
-  createDeliveryPayment(deliveryId: number, paymentData: { amount: number, method: string, reference?: string, notes?: string }): Promise<Payment>;
-  // Obtenir les paiements d'une livraison
-  getDeliveryPayments(deliveryId: number): Promise<Payment[]>;
-  // Créer une facture automatique après livraison
-  createInvoiceAfterDelivery(deliveryId: number): Promise<Invoice>;
-
-  // ============ LIVRAISONS ============
-
-  // Deliveries
-  getAllDeliveries(): Promise<Delivery[]>;
-  getDelivery(id: number): Promise<Delivery | undefined>;
-  getDeliveriesByOrder(orderId: number): Promise<Delivery[]>;
-  createDelivery(insertDelivery: InsertDelivery): Promise<Delivery>;
-  createDeliveryWithItems(insertDelivery: InsertDelivery, orderItems: any[], splits?: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>): Promise<Delivery>;
-  updateDelivery(id: number, updateData: Partial<InsertDelivery>): Promise<Delivery | undefined>;
-  deleteDelivery(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
+  updateInvoiceStatus(id: number): Promise<Invoice | undefined> {
+    throw new Error("Method not implemented.");
+  }
+  getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
+    throw new Error("Method not implemented.");
+  }
+  createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
+    throw new Error("Method not implemented.");
+  }
+  createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
+    throw new Error("Method not implemented.");
+  }
   getInvoicesByOrder(orderId: number): Promise<Invoice[]> {
     throw new Error("Method not implemented.");
   }
@@ -370,42 +320,7 @@ export class DatabaseStorage implements IStorage {
   deletePayment(id: number): Promise<boolean> {
     throw new Error("Method not implemented.");
   }
-  createDeliveryStockReservations(deliveryId: number, orderItems: any[]): Promise<DeliveryStockReservation[]> {
-    throw new Error("Method not implemented.");
-  }
-  releaseDeliveryStockReservations(deliveryId: number): Promise<boolean> {
-    throw new Error("Method not implemented.");
-  }
-  getDeliveryStockReservations(deliveryId: number): Promise<DeliveryStockReservation[]> {
-    throw new Error("Method not implemented.");
-  }
-  getArticleAvailableStockWithDeliveryReservations(articleId: number): Promise<number> {
-    throw new Error("Method not implemented.");
-  }
-  validateDelivery(deliveryId: number, splits?: Array<{ articleId: number; lotId: number | null; fromStorageZoneId: number | null; quantity: number; }>): Promise<Delivery> {
-    throw new Error("Method not implemented.");
-  }
-  cancelDeliveryBeforeValidation(deliveryId: number, reason: string): Promise<Delivery> {
-    throw new Error("Method not implemented.");
-  }
-  createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
-    throw new Error("Method not implemented.");
-  }
-  createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
-    throw new Error("Method not implemented.");
-  }
-  cancelDeliveryAfterValidation(deliveryId: number, reason: string, isReturnToStock: boolean): Promise<Delivery> {
-    throw new Error("Method not implemented.");
-  }
-  reassignDelivery(deliveryId: number, newDeliveryPersonId: number): Promise<Delivery> {
-    throw new Error("Method not implemented.");
-  }
-  getDeliveryPayments(deliveryId: number): Promise<Payment[]> {
-    throw new Error("Method not implemented.");
-  }
-  createDelivery(insertDelivery: InsertDelivery): Promise<Delivery> {
-    throw new Error("Method not implemented.");
-  }
+
   getInventoryRowsByOperation(operationId: number): Promise<Stock[]> {
     throw new Error("Method not implemented.");
   }
@@ -2606,356 +2521,6 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  // ============ LIVRAISONS ============
-
-  async getAllDeliveries(): Promise<Delivery[]> {
-    return await db.select().from(deliveries).orderBy(desc(deliveries.createdAt));
-  }
-
-  async getDelivery(id: number): Promise<Delivery | undefined> {
-    const [delivery] = await db.select().from(deliveries).where(eq(deliveries.id, id));
-    return delivery || undefined;
-  }
-
-  async getDeliveriesByOrder(orderId: number): Promise<Delivery[]> {
-    return await db.select().from(deliveries)
-      .where(eq(deliveries.orderId, orderId))
-      .orderBy(desc(deliveries.createdAt));
-  }
-
-  async createDeliveryWithItems(
-    insertDelivery: InsertDelivery,
-    orderItems: any[],
-    splits?: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>
-  ): Promise<Delivery> {
-    return await db.transaction(async (tx) => {
-      // 1. Générer le code de livraison
-      const existingDeliveries = await tx.select().from(deliveries);
-      const nextNumber = existingDeliveries.length + 1;
-      const code = `LIV-${nextNumber.toString().padStart(6, '0')}`;
-
-      // 2. Créer l'opération d'inventaire de type "delivery"
-      const operationCode = `OP-LIV-${nextNumber.toString().padStart(6, '0')}`;
-      const [operation] = await tx.insert(inventoryOperations).values({
-        code: operationCode,
-        type: "delivery",
-        status: "pending",
-        notes: `Opération de livraison pour ${code}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).returning();
-
-      // 3. Créer la livraison avec référence à l'opération
-      const deliveryData = {
-        ...insertDelivery,
-        code,
-        operationId: operation.id,
-      };
-
-      const [delivery] = await tx.insert(deliveries).values(deliveryData).returning();
-
-      // 4. Créer les inventory_operation_items et delivery_items
-      for (const orderItem of orderItems) {
-        const articleId = orderItem.articleId;
-        const totalQuantity = parseFloat(orderItem.quantity);
-
-        // Vérifier s'il y a des répartitions pour cet article
-        const articleSplits = splits?.[articleId];
-
-        if (articleSplits && articleSplits.length > 0) {
-          // Créer un item par répartition
-          for (const split of articleSplits) {
-            // Créer inventory_operation_item
-            const [operationItem] = await tx.insert(inventoryOperationItems).values({
-              operationId: operation.id,
-              articleId: articleId,
-              quantity: split.quantity.toString(),
-              quantityBefore: "0.000", // Sera calculé lors de la validation
-              quantityAfter: "0.000", // Sera calculé lors de la validation
-              unitCost: orderItem.unitPrice || "0.000",
-              totalCost: (parseFloat(orderItem.unitPrice || "0") * split.quantity).toString(),
-              taxRate: orderItem.taxRate || "0.000",
-              taxAmount: "0.000", // Sera calculé
-              fromStorageZoneId: split.fromStorageZoneId,
-              lotId: split.lotId,
-              notes: `Répartition livraison ${code}`,
-            }).returning();
-
-            // Créer delivery_item correspondant
-            await tx.insert(deliveryItems).values({
-              deliveryId: delivery.id,
-              orderItemId: orderItem.id,
-              articleId: articleId,
-              quantity: split.quantity.toString(),
-              notes: `Répartition: Zone ${split.fromStorageZoneId}, Lot ${split.lotId || 'N/A'}`,
-            });
-          }
-        } else {
-          // Pas de répartition, créer un seul item
-          const [operationItem] = await tx.insert(inventoryOperationItems).values({
-            operationId: operation.id,
-            articleId: articleId,
-            quantity: totalQuantity.toString(),
-            quantityBefore: "0.000",
-            quantityAfter: "0.000",
-            unitCost: orderItem.unitPrice || "0.000",
-            totalCost: (parseFloat(orderItem.unitPrice || "0") * totalQuantity).toString(),
-            taxRate: orderItem.taxRate || "0.000",
-            taxAmount: "0.000",
-            fromStorageZoneId: null,
-            lotId: null,
-            notes: `Livraison ${code}`,
-          }).returning();
-
-          // Créer delivery_item correspondant
-          await tx.insert(deliveryItems).values({
-            deliveryId: delivery.id,
-            orderItemId: orderItem.id,
-            articleId: articleId,
-            quantity: totalQuantity.toString(),
-            notes: `Livraison ${code}`,
-          });
-        }
-      }
-
-      return delivery;
-    });
-  }
-
-  async updateDelivery(id: number, updateData: Partial<InsertDelivery>): Promise<Delivery | undefined> {
-    const [delivery] = await db.update(deliveries)
-      .set({ ...updateData, updatedAt: new Date().toISOString() })
-      .where(eq(deliveries.id, id))
-      .returning();
-    return delivery || undefined;
-  }
-
-  async deleteDelivery(id: number): Promise<boolean> {
-    const result = await db.delete(deliveries).where(eq(deliveries.id, id));
-    return (result.rowCount || 0) > 0;
-  }
-  async createInvoiceAfterDelivery(deliveryId: number): Promise<Invoice> {
-    const delivery = await this.getDelivery(deliveryId);
-    if (!delivery) {
-      throw new Error(`Livraison ${deliveryId} non trouvée`);
-    }
-
-    const order = await this.getOrder(delivery.orderId);
-    if (!order) {
-      throw new Error(`Commande ${delivery.orderId} non trouvée`);
-    }
-
-    // Créer la facture avec les items de la commande
-    const orderItems = await this.getOrderItems(order.id);
-
-    // Calculer les totaux
-    let subtotalHT = 0;
-    let totalTax = 0;
-
-    for (const item of orderItems) {
-      const itemTotal = parseFloat(item.quantity) * parseFloat(item.unitPrice);
-      subtotalHT += itemTotal;
-      // TODO: Ajouter le calcul des taxes si nécessaire
-    }
-
-    const totalTTC = subtotalHT + totalTax;
-
-    // Générer le code de facture
-    const existingInvoices = await this.getAllInvoices();
-    const nextNumber = existingInvoices.length + 1;
-    const invoiceCode = `FAC-${nextNumber.toString().padStart(6, '0')}`;
-
-    // Créer la facture
-    const [invoice] = await db.insert(invoices).values({
-      code: invoiceCode,
-      orderId: order.id,
-      clientId: order.clientId,
-      status: 'sent',
-      subtotalHT: subtotalHT.toString(),
-      totalTax: totalTax.toString(),
-      totalTTC: totalTTC.toString(),
-      amountPaid: '0.00',
-      createdBy: delivery.createdBy,
-    }).returning();
-
-    // Créer les items de facture
-    for (const item of orderItems) {
-      await db.insert(invoiceItems).values({
-        invoiceId: invoice.id,
-        articleId: item.articleId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: (parseFloat(item.quantity) * parseFloat(item.unitPrice)).toString(),
-      });
-    }
-
-    return invoice;
-  }
-  async createDeliveryPayment(deliveryId: number, paymentData: { amount: number, method: string, reference?: string, notes?: string }): Promise<Payment> {
-    // Trouver la facture liée à la livraison
-    const delivery = await this.getDelivery(deliveryId);
-    if (!delivery) {
-      throw new Error(`Livraison ${deliveryId} non trouvée`);
-    }
-
-    // Créer une facture si elle n'existe pas
-    let invoice = await this.getInvoiceByOrder(delivery.orderId);
-    if (!invoice) {
-      invoice = await this.createInvoiceAfterDelivery(deliveryId);
-    }
-
-    // Créer le paiement
-    const [payment] = await db.insert(payments).values({
-      invoiceId: invoice.id,
-      amount: paymentData.amount.toString(),
-      method: paymentData.method,
-      reference: paymentData.reference,
-      notes: paymentData.notes,
-    }).returning();
-
-    // Mettre à jour le montant payé de la facture
-    await this.updateInvoiceStatus(invoice.id);
-
-    return payment;
-  }
-  async getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
-    return await db.select().from(payments)
-      .where(eq(payments.invoiceId, invoiceId))
-      .orderBy(desc(payments.createdAt));
-  }
-
-  async updateInvoiceStatus(id: number): Promise<Invoice | undefined> {
-    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
-    if (!invoice) return undefined;
-
-    const payments = await this.getPaymentsByInvoice(id);
-    const totalPaid = payments.reduce((sum, payment) =>
-      sum + parseFloat(payment.amount), 0
-    );
-    const totalTTC = parseFloat(invoice.totalTTC);
-
-    let newStatus: string;
-    if (totalPaid === 0) {
-      newStatus = invoice.status === 'cancelled' ? 'cancelled' : 'draft';
-    } else if (totalPaid >= totalTTC) {
-      newStatus = 'paid';
-    } else {
-      newStatus = 'partial';
-    }
-
-    const [updatedInvoice] = await db.update(invoices)
-      .set({
-        status: newStatus,
-        amountPaid: totalPaid.toFixed(2),
-        paidAt: newStatus === 'paid' ? new Date().toISOString() : null,
-        updatedAt: new Date().toISOString()
-      })
-      .where(eq(invoices.id, id))
-      .returning();
-
-    return updatedInvoice || undefined;
-  }
-
-  async getPaymentsByDelivery(deliveryId: number): Promise<any[]> {
-    return await db.select({
-      id: payments.id,
-      invoiceId: payments.invoiceId,
-      date: payments.date,
-      amount: payments.amount,
-      method: payments.method,
-      reference: payments.reference,
-      notes: payments.notes,
-      createdAt: payments.createdAt,
-      createdBy: payments.createdBy,
-      // Informations de la facture
-      invoiceCode: invoices.code,
-      invoiceStatus: invoices.status,
-      invoiceTotalTTC: invoices.totalTTC,
-      invoiceAmountPaid: invoices.amountPaid,
-    })
-      .from(payments)
-      .leftJoin(invoices, eq(payments.invoiceId, invoices.id))
-      .leftJoin(orders, eq(invoices.orderId, orders.id))
-      .leftJoin(deliveries, eq(orders.id, deliveries.orderId))
-      .where(eq(deliveries.id, deliveryId))
-      .orderBy(desc(payments.createdAt));
-  }
-
-
-  // ============ GESTION DES COLIS ET PACKAGING ============
-
-  async createDeliveryPackage(deliveryId: number, packageData: { name: string, weight?: number, dimensions?: string, notes?: string }): Promise<DeliveryPackage> {
-    const [deliveryPackage] = await db.insert(deliveryPackages).values({
-      deliveryId,
-      name: packageData.name,
-      weight: packageData.weight?.toString(),
-      dimensions: packageData.dimensions,
-      notes: packageData.notes,
-    }).returning();
-
-    return deliveryPackage;
-  }
-
-  async updateDeliveryPackage(packageId: number, packageData: Partial<InsertDeliveryPackage>): Promise<DeliveryPackage> {
-    const [deliveryPackage] = await db.update(deliveryPackages)
-      .set(packageData)
-      .where(eq(deliveryPackages.id, packageId))
-      .returning();
-
-    if (!deliveryPackage) {
-      throw new Error(`Colis ${packageId} non trouvé`);
-    }
-
-    return deliveryPackage;
-  }
-
-  async getDeliveryPackages(deliveryId: number): Promise<DeliveryPackage[]> {
-    return await db.select().from(deliveryPackages)
-      .where(eq(deliveryPackages.deliveryId, deliveryId))
-      .orderBy(desc(deliveryPackages.createdAt));
-  }
-
-  async addTrackingNumber(deliveryId: number, trackingNumber: string): Promise<Delivery> {
-    const [delivery] = await db.select().from(deliveries)
-      .where(eq(deliveries.id, deliveryId));
-
-    if (!delivery) {
-      throw new Error(`Livraison ${deliveryId} non trouvée`);
-    }
-
-    // Ajouter le numéro de suivi à la liste existante
-    const existingNumbers = delivery.trackingNumbers ? JSON.parse(delivery.trackingNumbers) : [];
-    const updatedNumbers = [...existingNumbers, trackingNumber];
-
-    const [updatedDelivery] = await db.update(deliveries)
-      .set({
-        trackingNumbers: JSON.stringify(updatedNumbers),
-        updatedAt: new Date().toISOString()
-      })
-      .where(eq(deliveries.id, deliveryId))
-      .returning();
-
-    return updatedDelivery;
-  }
-
-  async updatePackageTrackingStatus(packageId: number, status: string, location?: string): Promise<DeliveryPackage> {
-    const updateData: any = { status };
-
-    if (location) {
-      updateData.location = location;
-    }
-
-    const [deliveryPackage] = await db.update(deliveryPackages)
-      .set(updateData)
-      .where(eq(deliveryPackages.id, packageId))
-      .returning();
-
-    if (!deliveryPackage) {
-      throw new Error(`Colis ${packageId} non trouvé`);
-    }
-
-    return deliveryPackage;
-  }
   // ============ FACTURATION ============
 
   async getAllInvoices(): Promise<Invoice[]> {
@@ -3363,67 +2928,7 @@ export class DatabaseStorage implements IStorage {
     return result.rows;
   }
 
-  // ============ GESTION DES LIVREURS ============
 
-  async getAvailableDeliveryPersons(): Promise<User[]> {
-    return await db.select().from(users)
-      .where(eq(users.role, 'livreur'))
-      .orderBy(users.username);
-  }
-
-  async assignDeliveryPerson(deliveryId: number, deliveryPersonId: number): Promise<Delivery> {
-    const [delivery] = await db.update(deliveries)
-      .set({
-        deliveryPersonId: deliveryPersonId,
-        updatedAt: new Date().toISOString()
-      })
-      .where(eq(deliveries.id, deliveryId))
-      .returning();
-
-    if (!delivery) {
-      throw new Error(`Livraison ${deliveryId} non trouvée`);
-    }
-
-    return delivery;
-  }
-
-  async getDeliveriesByDeliveryPerson(deliveryPersonId: number, status?: string): Promise<Delivery[]> {
-    const conditions = [eq(deliveries.deliveryPersonId, deliveryPersonId)];
-
-    if (status) {
-      conditions.push(eq(deliveries.status, status));
-    }
-
-    return await db.select().from(deliveries)
-      .where(and(...conditions))
-      .orderBy(desc(deliveries.createdAt));
-  }
-
-  async updateDeliveryStatusByDeliveryPerson(deliveryId: number, status: string, notes?: string): Promise<Delivery> {
-    const updateData: any = {
-      status: status,
-      updatedAt: new Date().toISOString()
-    };
-
-    if (status === 'delivered') {
-      updateData.deliveredAt = new Date().toISOString();
-    }
-
-    if (notes) {
-      updateData.deliveryNotes = notes;
-    }
-
-    const [delivery] = await db.update(deliveries)
-      .set(updateData)
-      .where(eq(deliveries.id, deliveryId))
-      .returning();
-
-    if (!delivery) {
-      throw new Error(`Livraison ${deliveryId} non trouvée`);
-    }
-
-    return delivery;
-  }
 
 }
 

@@ -630,7 +630,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
   // Références
   supplierId: integer("supplier_id").references(() => suppliers.id), // si réception
   clientId: integer("customer_id").references(() => clients.id), // si livraison
-  orderId: integer("order_id").references(() => orders.id), // lien avec commande
+  orderId: integer("order_id").references(() => orders.id), // lien avec commande pour les livraisons,fabrication
   parentOperationId: integer("parent_operation_id").references(
     (): AnyPgColumn => inventoryOperations.id,
   ),
@@ -698,6 +698,7 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
   serialNumber: text("serial_number"),
   expiryDate: timestamp("expiry_date", { mode: "string" }),
 
+  orderItemId: integer("order_item_id").references(() => orderItems.id), // pour les livraisons
   // Stockage
   fromStorageZoneId: integer("from_storage_zone_id").references(
     () => storageZones.id,
@@ -888,103 +889,103 @@ export type InsertStockReservation = z.infer<
 export type StockReservation = typeof stockReservations.$inferSelect;
 // ============ LIVRAISONS ============
 
-export const deliveries = pgTable("deliveries", {
-  id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // LIV-000001
-  orderId: integer("order_id")
-    .references(() => orders.id)
-    .notNull(),
-  operationId: integer("operation_id").references(() => inventoryOperations.id), // Opération de livraison liée
+// export const deliveries = pgTable("deliveries", {
+//   id: serial("id").primaryKey(),
+//   code: text("code").notNull().unique(), // LIV-000001
+//   orderId: integer("order_id")
+//     .references(() => orders.id)
+//     .notNull(),
+//   operationId: integer("operation_id").references(() => inventoryOperations.id), // Opération de livraison liée
 
-  // Livreur et dates
-  deliveryPersonId: integer("delivery_person_id").references(() => users.id),
-  scheduledDate: timestamp("scheduled_date", { mode: "string" }),
-  deliveredAt: timestamp("delivered_at", { mode: "string" }),
+//   // Livreur et dates
+//   deliveryPersonId: integer("delivery_person_id").references(() => users.id),
+//   scheduledDate: timestamp("scheduled_date", { mode: "string" }),
+//   deliveredAt: timestamp("delivered_at", { mode: "string" }),
 
-  // Statut et adresse
-  status: text("status").notNull().default("pending"), // pending, in_transit, delivered, cancelled
-  deliveryAddress: text("delivery_address"),
-  deliveryNotes: text("delivery_notes"),
+//   // Statut et adresse
+//   status: text("status").notNull().default("pending"), // pending, in_transit, delivered, cancelled
+//   deliveryAddress: text("delivery_address"),
+//   deliveryNotes: text("delivery_notes"),
 
-  // Validation et stock
-  isValidated: boolean("is_validated").default(false), // Nouveau champ pour gérer la validation
-  validatedAt: timestamp("validated_at", { mode: "string" }), // Date de validation
+//   // Validation et stock
+//   isValidated: boolean("is_validated").default(false), // Nouveau champ pour gérer la validation
+//   validatedAt: timestamp("validated_at", { mode: "string" }), // Date de validation
 
-  // Colis
-  packageCount: integer("package_count").default(1),
-  trackingNumbers: text("tracking_numbers"), // JSON array of tracking numbers
+//   // Colis
+//   packageCount: integer("package_count").default(1),
+//   trackingNumbers: text("tracking_numbers"), // JSON array of tracking numbers
 
-  // Audit
-  createdBy: integer("created_by").references(() => users.id),
-  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
-});
+//   // Audit
+//   createdBy: integer("created_by").references(() => users.id),
+//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+//   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+// });
 
-export const deliveryPackages = pgTable("delivery_packages", {
-  id: serial("id").primaryKey(),
-  deliveryId: integer("delivery_id")
-    .references(() => deliveries.id, { onDelete: "cascade" })
-    .notNull(),
-  packageNumber: text("package_number").notNull(), // COL-000001
-  weight: decimal("weight", { precision: 8, scale: 3 }),
-  dimensions: text("dimensions"), // LxWxH
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-});
+// export const deliveryPackages = pgTable("delivery_packages", {
+//   id: serial("id").primaryKey(),
+//   deliveryId: integer("delivery_id")
+//     .references(() => deliveries.id, { onDelete: "cascade" })
+//     .notNull(),
+//   packageNumber: text("package_number").notNull(), // COL-000001
+//   weight: decimal("weight", { precision: 8, scale: 3 }),
+//   dimensions: text("dimensions"), // LxWxH
+//   notes: text("notes"),
+//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+// });
 
-export const deliveryItems = pgTable("delivery_items", {
-  id: serial("id").primaryKey(),
-  deliveryId: integer("delivery_id")
-    .references(() => deliveries.id, { onDelete: "cascade" })
-    .notNull(),
-  packageId: integer("package_id").references(() => deliveryPackages.id),
-  orderItemId: integer("order_item_id")
-    .references(() => orderItems.id)
-    .notNull(),
-  articleId: integer("article_id")
-    .references(() => articles.id)
-    .notNull(),
-  quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-});
+// export const deliveryItems = pgTable("delivery_items", {
+//   id: serial("id").primaryKey(),
+//   deliveryId: integer("delivery_id")
+//     .references(() => deliveries.id, { onDelete: "cascade" })
+//     .notNull(),
+//   packageId: integer("package_id").references(() => deliveryPackages.id),
+//   orderItemId: integer("order_item_id")
+//     .references(() => orderItems.id)
+//     .notNull(),
+//   articleId: integer("article_id")
+//     .references(() => articles.id)
+//     .notNull(),
+//   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
+//   notes: text("notes"),
+//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+// });
 
-// Nouvelle table pour gérer les réservations de stock spécifiques aux livraisons
-export const deliveryStockReservations = pgTable("delivery_stock_reservations", {
-  id: serial("id").primaryKey(),
-  deliveryId: integer("delivery_id")
-    .references(() => deliveries.id, { onDelete: "cascade" })
-    .notNull(),
-  articleId: integer("article_id")
-    .references(() => articles.id)
-    .notNull(),
-  orderItemId: integer("order_item_id")
-    .references(() => orderItems.id)
-    .notNull(),
+// // Nouvelle table pour gérer les réservations de stock spécifiques aux livraisons
+// export const deliveryStockReservations = pgTable("delivery_stock_reservations", {
+//   id: serial("id").primaryKey(),
+//   deliveryId: integer("delivery_id")
+//     .references(() => deliveries.id, { onDelete: "cascade" })
+//     .notNull(),
+//   articleId: integer("article_id")
+//     .references(() => articles.id)
+//     .notNull(),
+//   orderItemId: integer("order_item_id")
+//     .references(() => orderItems.id)
+//     .notNull(),
 
-  // Quantités
-  reservedQuantity: decimal("reserved_quantity", {
-    precision: 10,
-    scale: 3,
-  }).notNull(),
-  deliveredQuantity: decimal("delivered_quantity", {
-    precision: 10,
-    scale: 3,
-  }).default("0.00"),
+//   // Quantités
+//   reservedQuantity: decimal("reserved_quantity", {
+//     precision: 10,
+//     scale: 3,
+//   }).notNull(),
+//   deliveredQuantity: decimal("delivered_quantity", {
+//     precision: 10,
+//     scale: 3,
+//   }).default("0.00"),
 
-  // Statut de la réservation
-  status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
+//   // Statut de la réservation
+//   status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
 
-  // Traçabilité
-  parentOperationId: integer("parent_operation_id").references(() => inventoryOperations.id), // Opération mère (livraison)
+//   // Traçabilité
+//   parentOperationId: integer("parent_operation_id").references(() => inventoryOperations.id), // Opération mère (livraison)
 
-  // Dates
-  reservedAt: timestamp("reserved_at", { mode: "string" }).defaultNow(),
-  expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
+//   // Dates
+//   reservedAt: timestamp("reserved_at", { mode: "string" }).defaultNow(),
+//   expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
 
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-});
+//   notes: text("notes"),
+//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+// });
 
 // ============ FACTURATION ============
 
@@ -1167,25 +1168,8 @@ export const updateInventoryOperationWithItemsSchema = z.object({
     .array(insertInventoryOperationItemSchema)
     .min(1, "Au moins un article est requis."),
 });
-export const insertDeliverySchema = createInsertSchema(deliveries).omit({
-  id: true,
-  code: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export const insertDeliveryPackageSchema = createInsertSchema(
-  deliveryPackages,
-).omit({ id: true, createdAt: true });
-export const insertDeliveryItemSchema = createInsertSchema(deliveryItems).omit({
-  id: true,
-  createdAt: true,
-});
 
-// Schéma pour les réservations de stock des livraisons
-export const insertDeliveryStockReservationSchema = createInsertSchema(deliveryStockReservations).omit({
-  id: true,
-  createdAt: true,
-});
+
 
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true,
@@ -1226,14 +1210,6 @@ export type InventoryOperationWithItems = InventoryOperation & {
 export type InsertInventoryOperationItem = z.infer<
   typeof insertInventoryOperationItemSchema
 >;
-export type Delivery = typeof deliveries.$inferSelect;
-export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
-export type DeliveryPackage = typeof deliveryPackages.$inferSelect;
-export type InsertDeliveryPackage = z.infer<typeof insertDeliveryPackageSchema>;
-export type DeliveryItem = typeof deliveryItems.$inferSelect;
-export type InsertDeliveryItem = z.infer<typeof insertDeliveryItemSchema>;
-export type DeliveryStockReservation = typeof deliveryStockReservations.$inferSelect;
-export type InsertDeliveryStockReservation = z.infer<typeof insertDeliveryStockReservationSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
@@ -1301,25 +1277,3 @@ export const paymentsRelations = relations(
   }),
 );
 
-// Relations pour les réservations de stock des livraisons
-export const deliveryStockReservationsRelations = relations(
-  deliveryStockReservations,
-  ({ one }) => ({
-    delivery: one(deliveries, {
-      fields: [deliveryStockReservations.deliveryId],
-      references: [deliveries.id],
-    }),
-    article: one(articles, {
-      fields: [deliveryStockReservations.articleId],
-      references: [articles.id],
-    }),
-    orderItem: one(orderItems, {
-      fields: [deliveryStockReservations.orderItemId],
-      references: [orderItems.id],
-    }),
-    parentOperation: one(inventoryOperations, {
-      fields: [deliveryStockReservations.parentOperationId],
-      references: [inventoryOperations.id],
-    }),
-  }),
-);

@@ -41,12 +41,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import type { 
-  InventoryOperation, 
-  InventoryOperationItem, 
-  Client, 
-  Order, 
-  Article 
+import type {
+  InventoryOperation,
+  InventoryOperationItem,
+  Client,
+  Order,
+  Article
 } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DeliverySplitModal } from "@/components/delivery-split-modal";
@@ -62,10 +62,10 @@ export default function DeliveriesPage() {
   usePageTitle("Livraisons");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Récupérer le paramètre orderId de l'URL
   const [orderId, setOrderId] = useState<number | null>(null);
-  
+
   // States
   const [currentDelivery, setCurrentDelivery] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -73,14 +73,14 @@ export default function DeliveriesPage() {
   const [items, setItems] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("list");
   const [splitModal, setSplitModal] = useState<{ open: boolean, articleId: number | null }>({ open: false, articleId: null });
-  const [splits, setSplits] = useState<Record<number, Array<{ lotId: number|null, fromStorageZoneId: number|null, quantity: number }>>>({});
+  const [splits, setSplits] = useState<Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>>>({});
   const [lots, setLots] = useState<any[]>([]); // à charger via API
   const [zones, setZones] = useState<any[]>([]); // à charger via API
   const [splitError, setSplitError] = useState<string>("");
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [inventoryOperations, setInventoryOperations] = useState<any[]>([]);
-  
+
   // Nouveaux modals
   const [assignmentModal, setAssignmentModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
   const [packagesModal, setPackagesModal] = useState<{ open: boolean, delivery: any }>({ open: false, delivery: null });
@@ -170,17 +170,17 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
-      toast({ 
+      toast({
         title: "Livraison créée",
         description: "La livraison a été créée avec succès"
       });
       resetForm();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Erreur lors de la création",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -191,17 +191,17 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
-      toast({ 
+      toast({
         title: "Livraison mise à jour",
         description: "La livraison a été modifiée avec succès"
       });
       resetForm();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Erreur lors de la modification",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -212,16 +212,16 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
-      toast({ 
+      toast({
         title: "Livraison supprimée",
         description: "La livraison a été supprimée avec succès"
       });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Erreur", 
+      toast({
+        title: "Erreur",
         description: error.message || "Erreur lors de la suppression",
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -250,7 +250,7 @@ export default function DeliveriesPage() {
         currency: "DZD",
         // Ne plus initialiser les totaux - ils seront calculés côté serveur
       });
-      
+
       // Pré-remplir avec les articles de la commande (exclure ceux avec quantité 0)
       setItems(orderItems
         .filter((item: any) => parseFloat(item.quantity) > 0)
@@ -303,7 +303,7 @@ export default function DeliveriesPage() {
       const response = await fetch(`/api/inventory-operations/${deliveryId}/items`);
       if (!response.ok) throw new Error("Failed to fetch delivery items");
       const deliveryItems = await response.json();
-      
+
       setItems(deliveryItems.map((item: any) => ({
         id: item.id,
         articleId: item.articleId,
@@ -328,12 +328,12 @@ export default function DeliveriesPage() {
           const orderedQuantity = parseFloat(orderItem.quantity);
           const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
           const remainingQuantity = orderedQuantity - deliveredQuantity;
-          
+
           // Ne pas dépasser la quantité restante ni la quantité commandée
           const finalQuantity = Math.min(quantity, remainingQuantity, orderedQuantity);
-          
-          return { 
-            ...item, 
+
+          return {
+            ...item,
             quantity: finalQuantity
             // Ne plus calculer totalPrice côté client
           };
@@ -395,7 +395,7 @@ export default function DeliveriesPage() {
         const orderedQuantity = parseFloat(orderItem.quantity);
         const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
         const remainingQuantity = orderedQuantity - deliveredQuantity;
-        
+
         if (item.quantity > remainingQuantity) {
           toast({
             title: "Quantité invalide",
@@ -404,7 +404,7 @@ export default function DeliveriesPage() {
           });
           return;
         }
-        
+
         if (item.quantity > orderedQuantity) {
           toast({
             title: "Quantité invalide",
@@ -460,10 +460,10 @@ export default function DeliveriesPage() {
     if (currentDelivery.id) {
       updateDeliveryMutation.mutate({ id: currentDelivery.id, data: deliveryData });
     } else {
-      createDeliveryMutation.mutate({ 
-        deliveryData, 
-        orderItems: orderItemsForAPI, 
-        splits: Object.keys(splits).length > 0 ? splits : undefined 
+      createDeliveryMutation.mutate({
+        deliveryData,
+        orderItems: orderItemsForAPI,
+        splits: Object.keys(splits).length > 0 ? splits : undefined
       });
     }
   };
@@ -483,14 +483,14 @@ export default function DeliveriesPage() {
   // Fonction pour calculer la quantité déjà livrée pour un article donné
   const getDeliveredQuantity = (articleId: number, orderId: number) => {
     if (!orderId) return 0;
-    
+
     // Filtrer les livraisons pour cette commande (exclure la livraison actuelle et les annulées)
-    const relevantDeliveries = deliveries.filter(d => 
-      d.orderId === orderId && 
-      d.id !== currentDelivery?.id && 
+    const relevantDeliveries = deliveries.filter(d =>
+      d.orderId === orderId &&
+      d.id !== currentDelivery?.id &&
       d.status !== 'cancelled'
     );
-    
+
     // Pour simplifier, on retourne 0 car on n'a pas accès aux items des livraisons
     // Dans une vraie implémentation, il faudrait récupérer les items de chaque livraison
     return 0;
@@ -504,10 +504,10 @@ export default function DeliveriesPage() {
       completed: { variant: "default" as const, label: "Livré" },
       cancelled: { variant: "destructive" as const, label: "Annulé" },
     };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || 
-                  { variant: "outline" as const, label: status };
-    
+
+    const config = statusConfig[status as keyof typeof statusConfig] ||
+      { variant: "outline" as const, label: status };
+
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
@@ -562,7 +562,7 @@ export default function DeliveriesPage() {
             )}
           </h1>
           <p className="text-muted-foreground">
-            {orderId 
+            {orderId
               ? `Livraisons liées à la commande #${orderId}`
               : "Gestion des livraisons clients"
             }
@@ -622,10 +622,10 @@ export default function DeliveriesPage() {
           <Input placeholder="Recherche..." className="w-64" disabled />
         </div>
         {/* Désactiver le bouton Nouvelle livraison */}
-       {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
+        {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
           <FileText className="h-4 w-4 mr-2" />
           Nouvelle livraison
-        </Button> } 
+        </Button>}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -746,52 +746,52 @@ export default function DeliveriesPage() {
                             >
                               <CreditCard className="h-4 w-4" />
                             </Button>
-                             <Select
-                               value={delivery.status}
-                               onValueChange={(newStatus) => {
-                                 if (newStatus !== delivery.status) {
-                                   updateDeliveryMutation.mutate({
-                                     id: delivery.id,
-                                     data: { status: newStatus }
-                                   });
-                                 }
-                               }}
-                               disabled={delivery.status === "completed"}
-                             >
-                               <SelectTrigger className="w-32">
-                                 <SelectValue />
-                               </SelectTrigger>
-                               <SelectContent>
-                                 <SelectItem value="draft">Brouillon</SelectItem>
-                                 <SelectItem value="pending">En attente</SelectItem>
-                                 <SelectItem value="ready">Prêt</SelectItem>
-                                 <SelectItem value="completed">Livré</SelectItem>
-                                 <SelectItem value="cancelled">Annulé</SelectItem>
-                               </SelectContent>
-                             </Select>
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => {
-                                 if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
-                                   deleteDeliveryMutation.mutate(delivery.id);
-                                 }
-                               }}
-                               disabled={delivery.status === "completed"}
-                               data-testid={`button-delete-delivery-${delivery.id}`}
-                             >
-                               <Trash2 className="h-4 w-4 text-red-500" />
-                             </Button>
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handleCancelDelivery(delivery)}
-                               disabled={delivery.status === "completed" || delivery.status === "cancelled"}
-                               data-testid={`button-cancel-delivery-${delivery.id}`}
-                             >
-                               <X className="h-4 w-4 text-red-500" />
-                             </Button>
-                           </div>
+                            <Select
+                              value={delivery.status}
+                              onValueChange={(newStatus) => {
+                                if (newStatus !== delivery.status) {
+                                  updateDeliveryMutation.mutate({
+                                    id: delivery.id,
+                                    data: { status: newStatus }
+                                  });
+                                }
+                              }}
+                              disabled={delivery.status === "completed"}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="draft">Brouillon</SelectItem>
+                                <SelectItem value="pending">En attente</SelectItem>
+                                <SelectItem value="ready">Prêt</SelectItem>
+                                <SelectItem value="completed">Livré</SelectItem>
+                                <SelectItem value="cancelled">Annulé</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
+                                  deleteDeliveryMutation.mutate(delivery.id);
+                                }
+                              }}
+                              disabled={delivery.status === "completed"}
+                              data-testid={`button-delete-delivery-${delivery.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCancelDelivery(delivery)}
+                              disabled={delivery.status === "completed" || delivery.status === "cancelled"}
+                              data-testid={`button-cancel-delivery-${delivery.id}`}
+                            >
+                              <X className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
                         </TableCell>
                         {delivery.status === 'cancelled' && (
                           <CancellationDetails
@@ -812,7 +812,7 @@ export default function DeliveriesPage() {
         </TabsContent>
 
         <TabsContent value="form">
-          
+
           {(isEditing || isViewing) && currentDelivery && (
             <div className="space-y-6">
               {/* Header */}
@@ -841,7 +841,7 @@ export default function DeliveriesPage() {
                       <X className="h-4 w-4 mr-2" />
                       Annuler
                     </Button>
-                    <Button 
+                    <Button
                       onClick={saveDelivery}
                       disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
                     >
@@ -870,8 +870,8 @@ export default function DeliveriesPage() {
                   </div>
                 )}
               </div>
-  {/* Articles */}
-  <Card>
+              {/* Articles */}
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>Articles à livrer ({items.length})</span>
@@ -886,16 +886,16 @@ export default function DeliveriesPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
-                                         <TableHeader>
-                       <TableRow>
-                         <TableHead>Article</TableHead>
-                         <TableHead>Quantité commandée</TableHead>
-                         <TableHead>Quantité déjà livrée</TableHead>
-                         <TableHead>Quantité restante</TableHead>
-                         <TableHead>Quantité à livrer</TableHead>
-                         <TableHead>Notes</TableHead>
-                       </TableRow>
-                     </TableHeader>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Article</TableHead>
+                        <TableHead>Quantité commandée</TableHead>
+                        <TableHead>Quantité déjà livrée</TableHead>
+                        <TableHead>Quantité restante</TableHead>
+                        <TableHead>Quantité à livrer</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <TableBody>
                       {items.length === 0 ? (
                         <TableRow>
@@ -904,96 +904,96 @@ export default function DeliveriesPage() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                                                 items.map((item) => {
-                           // Calculer les quantités déjà livrées et restantes
-                           const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
-                           const orderedQuantity = orderItem ? parseFloat(orderItem.quantity) : 0;
-                           
-                           // Calculer la quantité déjà livrée
-                           const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
-                           
-                           const remainingQuantity = orderedQuantity - deliveredQuantity;
-                           
-                           return (
-                             <TableRow key={item.id}>
-                               <TableCell>
-                                 <div>
-                                   <p className="font-medium">{item.article?.name}</p>
-                                   <p className="text-sm text-muted-foreground">
-                                     {item.article?.code} • {item.article?.unit}
-                                   </p>
-                                 </div>
-                               </TableCell>
-                               <TableCell className="text-center">
-                                 {orderedQuantity}
-                               </TableCell>
-                               <TableCell className="text-center">
-                                 {deliveredQuantity}
-                               </TableCell>
-                               <TableCell className="text-center">
-                                 {remainingQuantity}
-                               </TableCell>
-                               <TableCell>
-                                 {isEditing ? (
-                                   <Input
-                                     type="number"
-                                     min="0.01"
-                                     max={remainingQuantity}
-                                     step="0.01"
-                                     value={item.quantity}
-                                     onChange={(e) => {
-                                       const newQuantity = parseFloat(e.target.value) || 0;
-                                       if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
-                                         updateItemQuantity(item.id, newQuantity);
-                                       }
-                                     }}
-                                     className="w-20"
-                                   />
-                                 ) : (
-                                   item.quantity
-                                 )}
-                               </TableCell>
-                               {/* Prix unitaire et total supprimés - calculés côté serveur */}
-                               <TableCell>
-                                 {isEditing ? (
-                                   <Input
-                                     value={item.notes}
-                                     onChange={(e) => setItems(items.map(i => 
-                                       i.id === item.id ? { ...i, notes: e.target.value } : i
-                                     ))}
-                                     placeholder="Notes..."
-                                     className="w-32"
-                                   />
-                                 ) : (
-                                   item.notes || "-"
-                                 )}
-                               </TableCell>
-                                                               <TableCell>
-                                  {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
-                                    <>
-                                      <CheckCircle className="text-green-600 inline-block mr-1" />
-                                      <span className="sr-only">Répartition complète</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <AlertTriangle className="text-yellow-500 inline-block mr-1" />
-                                      <span className="sr-only">Répartition incomplète</span>
-                                    </>
-                                  )}
-                                  {/* Masquer le bouton "Répartir" si c'est un cas simple (livraison directe possible) */}
-                                  {!splits[item.articleId] || splits[item.articleId].length === 0 ? (
-                                    <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
-                                      Répartir
-                                    </Button>
-                                  ) : (
-                                    <span className="text-sm text-green-600 font-medium">
-                                      ✓ Répartition validée
-                                    </span>
-                                  )}
-                                </TableCell>
-                             </TableRow>
-                           );
-                         })
+                        items.map((item) => {
+                          // Calculer les quantités déjà livrées et restantes
+                          const orderItem = orderItems.find(oi => oi.articleId === item.articleId);
+                          const orderedQuantity = orderItem ? parseFloat(orderItem.quantity) : 0;
+
+                          // Calculer la quantité déjà livrée
+                          const deliveredQuantity = getDeliveredQuantity(item.articleId, orderId || 0);
+
+                          const remainingQuantity = orderedQuantity - deliveredQuantity;
+
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{item.article?.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {item.article?.code} • {item.article?.unit}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {orderedQuantity}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {deliveredQuantity}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {remainingQuantity}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    type="number"
+                                    min="0.01"
+                                    max={remainingQuantity}
+                                    step="0.01"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const newQuantity = parseFloat(e.target.value) || 0;
+                                      if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
+                                        updateItemQuantity(item.id, newQuantity);
+                                      }
+                                    }}
+                                    className="w-20"
+                                  />
+                                ) : (
+                                  item.quantity
+                                )}
+                              </TableCell>
+                              {/* Prix unitaire et total supprimés - calculés côté serveur */}
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    value={item.notes}
+                                    onChange={(e) => setItems(items.map(i =>
+                                      i.id === item.id ? { ...i, notes: e.target.value } : i
+                                    ))}
+                                    placeholder="Notes..."
+                                    className="w-32"
+                                  />
+                                ) : (
+                                  item.notes || "-"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
+                                  <>
+                                    <CheckCircle className="text-green-600 inline-block mr-1" />
+                                    <span className="sr-only">Répartition complète</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                    <span className="sr-only">Répartition incomplète</span>
+                                  </>
+                                )}
+                                {/* Masquer le bouton "Répartir" si c'est un cas simple (livraison directe possible) */}
+                                {!splits[item.articleId] || splits[item.articleId].length === 0 ? (
+                                  <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
+                                    Répartir
+                                  </Button>
+                                ) : (
+                                  <span className="text-sm text-green-600 font-medium">
+                                    ✓ Répartition validée
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
@@ -1007,7 +1007,7 @@ export default function DeliveriesPage() {
                     <CardTitle>Informations générales</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    
+
 
                     {/* Affichage des informations de la commande liée */}
                     {currentDelivery.orderId && currentOrder && (
@@ -1058,46 +1058,9 @@ export default function DeliveriesPage() {
                   </CardContent>
                 </Card>
 
-                {/* Totals */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Résumé financier</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Sous-total HT</span>
-                        <span>
-                          {currentDelivery.subtotalHT 
-                            ? parseFloat(currentDelivery.subtotalHT.toString()).toFixed(2) 
-                            : "0.00"} DA
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">TVA (19%)</span>
-                        <span>
-                          {currentDelivery.totalTax 
-                            ? parseFloat(currentDelivery.totalTax.toString()).toFixed(2) 
-                            : "0.00"} DA
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-lg font-bold border-t pt-2">
-                        <span>Total TTC</span>
-                        <span>
-                          {currentDelivery.totalTTC 
-                            ? parseFloat(currentDelivery.totalTTC.toString()).toFixed(2) 
-                            : "0.00"} DA
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Détails de paiement */}
-                <DeliveryPaymentDetails deliveryId={currentDelivery.id} />
               </div>
 
-            
+
             </div>
           )}
         </TabsContent>
@@ -1110,7 +1073,7 @@ export default function DeliveriesPage() {
         articleId={splitModal.articleId}
         articleName={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.articleName || "" : ""}
         requestedQuantity={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.quantity || 0 : 0}
-        onSplitValidated={(newSplits: Array<{ lotId: number|null, fromStorageZoneId: number|null, quantity: number }>) => {
+        onSplitValidated={(newSplits: Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>) => {
           if (splitModal.articleId) {
             setSplits(s => ({ ...s, [splitModal.articleId!]: newSplits }));
           }
