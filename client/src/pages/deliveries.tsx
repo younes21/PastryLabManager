@@ -247,9 +247,10 @@ export default function DeliveriesPage() {
       });
     },
     onError: (error: any) => {
+      console.error("Erreur suppression livraison:", error);
       toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la suppression",
+        title: "Erreur de suppression",
+        description: error.message || "Impossible de supprimer cette livraison",
         variant: "destructive"
       });
     },
@@ -281,7 +282,7 @@ export default function DeliveriesPage() {
       });
 
       // Pré-remplir avec les articles de la commande (exclure ceux avec quantité restante 0)
-      setItems(orderDetails.items
+      const newItems = orderDetails.items
         .filter((item: any) => item.quantityRemaining > 0)
         .map((item: any) => ({
           id: Date.now() + Math.random(), // Nouvel ID temporaire
@@ -290,7 +291,27 @@ export default function DeliveriesPage() {
           quantity: item.quantityRemaining, // Utiliser la quantité restante
           // Ne plus gérer unitPrice et totalPrice côté client
           notes: "",
-        })));
+        }));
+
+      setItems(newItems);
+
+      // Créer automatiquement les répartitions pour les cas simples
+      const newSplits: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>> = {};
+      
+      newItems.forEach((item: any) => {
+        const articleId = item.articleId;
+        const quantity = item.quantity;
+        
+        // Si pas de répartition nécessaire, créer automatiquement
+        if (!isSplitRequired(articleId, quantity)) {
+          const autoSplit = createAutoSplit(articleId, quantity);
+          if (autoSplit) {
+            newSplits[articleId] = autoSplit;
+          }
+        }
+      });
+
+      setSplits(newSplits);
     } else {
       // Formulaire vide normal
       setCurrentDelivery({
@@ -304,6 +325,7 @@ export default function DeliveriesPage() {
         // Ne plus initialiser les totaux - ils seront calculés côté serveur
       });
       setItems([]);
+      setSplits({});
     }
     setIsEditing(true);
     setIsViewing(false);
@@ -360,6 +382,26 @@ export default function DeliveriesPage() {
           // Ne pas dépasser la quantité restante ni la quantité commandée
           const finalQuantity = Math.min(quantity, remainingQuantity, orderedQuantity);
 
+          // Si la quantité change et est différente de la quantité déjà répartie, réinitialiser la répartition
+          const currentSplitSum = getSplitSum(item.articleId);
+          if (Math.abs(currentSplitSum - finalQuantity) > 0.001) {
+            // Supprimer l'ancienne répartition
+            const newSplits = { ...splits };
+            delete newSplits[item.articleId];
+            setSplits(newSplits);
+
+            // Si pas de répartition nécessaire, créer automatiquement
+            if (!isSplitRequired(item.articleId, finalQuantity)) {
+              const autoSplit = createAutoSplit(item.articleId, finalQuantity);
+              if (autoSplit) {
+                setSplits(prev => ({
+                  ...prev,
+                  [item.articleId]: autoSplit
+                }));
+              }
+            }
+          }
+
           return {
             ...item,
             quantity: finalQuantity
@@ -384,20 +426,7 @@ export default function DeliveriesPage() {
   // };
 
   const saveDelivery = async () => {
-    // Pour chaque article, la répartition doit exister et être correcte
-    for (const item of items) {
-      const split = splits[item.articleId];
-      const sum = getSplitSum(item.articleId);
-      if (!split || split.length === 0 || sum !== item.quantity || sum === 0) {
-        toast({
-          title: "Répartition incomplète",
-          description: `Veuillez répartir correctement la quantité pour l'article ${item.article?.name}`,
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-
+    // Vérifications de base
     if (!currentDelivery.clientId) {
       toast({
         title: "Client requis",
@@ -416,7 +445,7 @@ export default function DeliveriesPage() {
       return;
     }
 
-    // Vérifier que les quantités ne dépassent pas les limites
+    // Vérifier que les quantités ne dépassent pas les limites de commande
     for (const item of items) {
       const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
       if (orderItem) {
@@ -443,24 +472,97 @@ export default function DeliveriesPage() {
       }
     }
 
-    // Pour chaque article, si une répartition existe, utiliser les splits, sinon fallback sur item.quantity
-    const allItems = items.flatMap(item => {
-      if (splits[item.articleId] && splits[item.articleId].length > 0) {
-        return splits[item.articleId].map(split => ({
-          idArticle: item.articleId,
-          qteLivree: split.quantity.toString(),
-          idlot: split.lotId ?? null,
-          idzone: split.fromStorageZoneId ?? null,
-        }));
-      } else {
-        return [{
-          idArticle: item.articleId,
-          qteLivree: item.quantity.toString(),
-          idlot: null,
-          idzone: null,
-        }];
+    // Traiter chaque article selon les règles de répartition
+    const allItems: any[] = [];
+    
+    for (const item of items) {
+      const articleId = item.articleId;
+      const quantity = item.quantity;
+      const isPerishable = isArticlePerishable(articleId);
+      const zones = getArticleZones(articleId);
+      const lots = getArticleLots(articleId);
+
+      // Règle 1: Si quantité = 0, pas besoin de répartir
+      if (quantity === 0) {
+        continue;
       }
-    });
+
+      // Règle 2: Si périssable et pas de lot, erreur
+      if (isPerishable && lots.length === 0) {
+        toast({
+          title: "Article périssable sans lot",
+          description: `L'article ${item.article?.name} est périssable mais aucun lot n'est disponible. Impossible de sauvegarder.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Règle 3: Si une seule zone et un seul lot, créer automatiquement la répartition
+      if (zones.length === 1 && lots.length <= 1) {
+        const autoSplit = createAutoSplit(articleId, quantity);
+        if (autoSplit) {
+          allItems.push({
+            idArticle: articleId,
+            qteLivree: autoSplit[0].quantity.toString(),
+            idlot: autoSplit[0].lotId,
+            idzone: autoSplit[0].fromStorageZoneId,
+          });
+          continue;
+        }
+      }
+
+      // Règle 4: Si plus d'une zone ou plus d'un lot, répartition obligatoire
+      const split = splits[articleId];
+      if (!split || split.length === 0) {
+        toast({
+          title: "Répartition obligatoire",
+          description: `Veuillez répartir la quantité pour l'article ${item.article?.name} (plusieurs zones ou lots disponibles)`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Règle 5: Vérifier que la quantité répartie = quantité à livrer
+      const splitSum = getSplitSum(articleId);
+      if (Math.abs(splitSum - quantity) > 0.001) {
+        toast({
+          title: "Quantité répartie incorrecte",
+          description: `La quantité répartie (${splitSum}) doit être égale à la quantité à livrer (${quantity}) pour ${item.article?.name}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Règle 6: Vérifier les doublons de combinaisons
+      if (hasDuplicateCombinations(split)) {
+        toast({
+          title: "Combinaisons dupliquées",
+          description: `Vous ne pouvez pas utiliser la même combinaison zone/lot plusieurs fois pour ${item.article?.name}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Règle 7: Valider chaque split individuellement
+      for (const splitItem of split) {
+        const validation = validateSplit(articleId, splitItem);
+        if (!validation.valid) {
+          toast({
+            title: "Erreur de répartition",
+            description: `${item.article?.name}: ${validation.error}`,
+            variant: "destructive"
+          });
+          return;
+        }
+
+        allItems.push({
+          idArticle: articleId,
+          qteLivree: splitItem.quantity.toString(),
+          idlot: splitItem.lotId,
+          idzone: splitItem.fromStorageZoneId,
+        });
+      }
+    }
 
     const payload = {
       deliveryDate: currentDelivery.scheduledDate || null,
@@ -512,6 +614,119 @@ export default function DeliveriesPage() {
 
   // Fonction utilitaire pour calculer la somme répartie pour un article
   const getSplitSum = (articleId: number) => (splits[articleId] || []).reduce((sum, s) => sum + (s.quantity || 0), 0);
+
+  // Fonction pour obtenir les informations de stock d'un article depuis pageData
+  const getArticleStockInfo = (articleId: number) => {
+    const article = articles.find(a => a.id === articleId);
+    return (article as any)?.stockInfo || [];
+  };
+
+  // Fonction pour vérifier si un article est périssable
+  const isArticlePerishable = (articleId: number) => {
+    const article = articles.find(a => a.id === articleId);
+    return (article as any)?.isPerishable || false;
+  };
+
+  // Fonction pour obtenir les zones uniques d'un article
+  const getArticleZones = (articleId: number) => {
+    const stockInfo = getArticleStockInfo(articleId);
+    const zones = new Map();
+    stockInfo.forEach((stock: any) => {
+      const zoneId = stock.storageZoneId || stock.storageZone?.id;
+      if (zoneId && stock.storageZone) {
+        zones.set(zoneId, stock.storageZone);
+      }
+    });
+    return Array.from(zones.values());
+  };
+
+  // Fonction pour obtenir les lots uniques d'un article
+  const getArticleLots = (articleId: number) => {
+    const stockInfo = getArticleStockInfo(articleId);
+    const lots = new Map();
+    stockInfo.forEach((stock: any) => {
+      const lotId = stock.lotId || stock.lot?.id;
+      if (lotId && stock.lot) {
+        lots.set(lotId, stock.lot);
+      }
+    });
+    return Array.from(lots.values());
+  };
+
+  // Fonction pour vérifier si la répartition est nécessaire
+  const isSplitRequired = (articleId: number, quantity: number) => {
+    // Si quantité = 0, pas besoin de répartir
+    if (quantity === 0) return false;
+
+    const zones = getArticleZones(articleId);
+    const lots = getArticleLots(articleId);
+    const isPerishable = isArticlePerishable(articleId);
+
+    // Si périssable et pas de lot, répartition obligatoire
+    if (isPerishable && lots.length === 0) return true;
+
+    // Si plus d'une zone ou plus d'un lot, répartition obligatoire
+    if (zones.length > 1 || lots.length > 1) return true;
+
+    return false;
+  };
+
+  // Fonction pour créer une répartition automatique (cas simple)
+  const createAutoSplit = (articleId: number, quantity: number) => {
+    const stockInfo = getArticleStockInfo(articleId);
+    if (stockInfo.length === 0) return null;
+
+    // Prendre la première combinaison zone/lot disponible
+    const firstStock = stockInfo[0];
+    return [{
+      lotId: firstStock.lotId || firstStock.lot?.id || null,
+      fromStorageZoneId: firstStock.storageZoneId || firstStock.storageZone?.id || null,
+      quantity: Math.min(quantity, parseFloat(firstStock.quantity || "0"))
+    }];
+  };
+
+  // Fonction pour valider une répartition
+  const validateSplit = (articleId: number, split: any) => {
+    const stockInfo = getArticleStockInfo(articleId);
+    const isPerishable = isArticlePerishable(articleId);
+
+    // Vérifier si l'article est périssable et n'a pas de lot
+    if (isPerishable && !split.lotId) {
+      return { valid: false, error: "Un lot est obligatoire pour les articles périssables" };
+    }
+
+    // Vérifier la disponibilité en stock pour cette combinaison
+    const stockItem = stockInfo.find((s: any) => {
+      const zoneId = s.storageZoneId || s.storageZone?.id;
+      const lotId = s.lotId || s.lot?.id;
+      return zoneId === split.fromStorageZoneId && 
+             (lotId === split.lotId || (!lotId && !split.lotId));
+    });
+
+    if (!stockItem) {
+      return { valid: false, error: "Combinaison zone/lot non trouvée en stock" };
+    }
+
+    const availableQuantity = parseFloat(stockItem.quantity || "0");
+    if (split.quantity > availableQuantity) {
+      return { valid: false, error: `Quantité insuffisante en stock (disponible: ${availableQuantity})` };
+    }
+
+    return { valid: true };
+  };
+
+  // Fonction pour vérifier les doublons dans une répartition
+  const hasDuplicateCombinations = (splits: any[]) => {
+    const combinations = new Set();
+    for (const split of splits) {
+      const key = `${split.fromStorageZoneId}-${split.lotId}`;
+      if (combinations.has(key)) {
+        return true;
+      }
+      combinations.add(key);
+    }
+    return false;
+  };
 
   const handleCancelDelivery = (delivery: any) => {
     setSelectedDelivery(delivery);
@@ -907,12 +1122,26 @@ export default function DeliveriesPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              if (confirm("Êtes-vous sûr de vouloir supprimer cette livraison ?")) {
+                              const confirmMessage = delivery.status === "completed" 
+                                ? "Cette livraison est validée et ne peut pas être supprimée."
+                                : `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
+                              
+                              if (delivery.status === "completed") {
+                                toast({
+                                  title: "Suppression impossible",
+                                  description: "Les livraisons validées ne peuvent pas être supprimées",
+                                  variant: "destructive"
+                                });
+                                return;
+                              }
+                              
+                              if (confirm(confirmMessage)) {
                                 deleteDeliveryMutation.mutate(delivery.id);
                               }
                             }}
-                            disabled={delivery.status === "completed"}
+                            disabled={delivery.status === "completed" || deleteDeliveryMutation.isPending}
                             data-testid={`button-delete-delivery-${delivery.id}`}
+                            title={delivery.status === "completed" ? "Impossible de supprimer une livraison validée" : "Supprimer la livraison"}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -1057,7 +1286,7 @@ export default function DeliveriesPage() {
                             <TableCell className="text-center">
                               {remainingQuantity + ' ' + item.article.unit}
                             </TableCell>
-                            <TableCell className="bg-green-100">
+                            <TableCell className="bg-green-100 text-center">
                               {isEditing ? (
                                 <Input
 
@@ -1094,27 +1323,52 @@ export default function DeliveriesPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                              {getSplitSum(item.articleId) === item.quantity && splits[item.articleId]?.length > 0 ? (
-                                <>
-                                  <CheckCircle className="text-green-600 inline-block mr-1" />
-                                  <span className="sr-only">Répartition complète</span>
-                                </>
-                              ) : (
-                                <>
-                                  <AlertTriangle className="text-yellow-500 inline-block mr-1" />
-                                  <span className="sr-only">Répartition incomplète</span>
-                                </>
-                              )}
-                              {/* Masquer le bouton "Répartir" si c'est un cas simple (livraison directe possible) */}
-                              {!splits[item.articleId] || splits[item.articleId].length === 0 ? (
-                                <Button size="sm" variant="outline" onClick={() => setSplitModal({ open: true, articleId: item.articleId })}>
-                                  Répartir
-                                </Button>
-                              ) : (
-                                <span className="text-sm text-green-600 font-medium">
-                                  ✓ Répartition validée
-                                </span>
-                              )}
+                              {(() => {
+                                const articleId = item.articleId;
+                                const quantity = item.quantity;
+                                const splitSum = getSplitSum(articleId);
+                                const isRequired = isSplitRequired(articleId, quantity);
+                                const hasValidSplit = splits[articleId] && splits[articleId].length > 0 && Math.abs(splitSum - quantity) < 0.001;
+
+                                // Si quantité = 0, ne rien afficher
+                                if (quantity === 0) {
+                                  return <span className="text-gray-400">-</span>;
+                                }
+
+                                // Si répartition pas nécessaire (cas simple), afficher automatique
+                                if (!isRequired) {
+                                  return (
+                                    <span className="text-sm text-blue-600 font-medium">
+                                      ✓ Répartition automatique
+                                    </span>
+                                  );
+                                }
+
+                                // Si répartition nécessaire
+                                if (hasValidSplit) {
+                                  return (
+                                    <>
+                                      <CheckCircle className="text-green-600 inline-block mr-1" />
+                                      <span className="text-sm text-green-600 font-medium">
+                                        ✓ Répartition validée
+                                      </span>
+                                    </>
+                                  );
+                                } else {
+                                  return (
+                                    <>
+                                      <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={() => setSplitModal({ open: true, articleId: item.articleId })}
+                                      >
+                                        Répartir
+                                      </Button>
+                                    </>
+                                  );
+                                }
+                              })()}
                             </TableCell>
                           </TableRow>
                         );

@@ -4519,6 +4519,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Suppression d'une livraison
+  app.delete("/api/deliveries/:id", async (req, res) => {
+    try {
+      const operationId = parseInt(req.params.id);
+      
+      // Vérifier que l'opération existe et est bien une livraison
+      const operation = await storage.getInventoryOperation(operationId);
+      if (!operation) {
+        return res.status(404).json({ message: "Livraison non trouvée" });
+      }
+      
+      if (operation.type !== 'livraison') {
+        return res.status(400).json({ message: "Cette opération n'est pas une livraison" });
+      }
+
+      // Vérifier le statut - on ne peut pas supprimer une livraison validée
+      if (operation.status === 'completed') {
+        return res.status(400).json({ message: "Impossible de supprimer une livraison validée" });
+      }
+
+      // Supprimer l'opération d'inventaire (cela supprimera aussi les items associés)
+      const deleted = await storage.deleteInventoryOperation(operationId);
+      
+      if (deleted) {
+        res.json({ message: "Livraison supprimée avec succès" });
+      } else {
+        res.status(500).json({ message: "Erreur lors de la suppression de la livraison" });
+      }
+    } catch (error) {
+      console.error("Erreur suppression livraison:", error);
+      res.status(500).json({ message: "Erreur lors de la suppression de la livraison" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

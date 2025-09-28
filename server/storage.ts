@@ -542,7 +542,8 @@ export class DatabaseStorage implements IStorage {
                 'lotId', s.lot_id,
                 'quantity', s.quantity,
                 'storageZone', CASE 
-                  WHEN sz.id IS NOT NULL THEN json_build_object(   
+                  WHEN sz.id IS NOT NULL THEN json_build_object(
+                    'id', sz.id,
                     'designation', sz.designation,
                     'code', sz.code
                   )
@@ -550,6 +551,7 @@ export class DatabaseStorage implements IStorage {
                 END,
                 'lot', CASE 
                   WHEN l.id IS NOT NULL THEN json_build_object(
+                    'id', l.id,
                     'code', l.code,
                     'expirationDate', l.expiration_date
                   )
