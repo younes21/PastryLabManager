@@ -48,6 +48,7 @@ import type {
   Article
 } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeliverySplitModal } from "@/components/delivery-split-modal";
 import { CancellationDetails } from '@/components/delivery-cancellation-details';
 import { CancellationModal } from '@/pages/delivery-cancellations';
@@ -91,6 +92,9 @@ export default function DeliveriesPage() {
 
   // Ajout de l'état pour l'article dont le split est affiché
   const [expandedArticleId, setExpandedArticleId] = useState<number | null>(null);
+
+  // État pour gérer l'onglet actif dans la card Articles à livrer
+  const [activeTab, setActiveTab] = useState<string>("details");
 
 
   // Récupérer le paramètre orderId de l'URL au chargement de la page
@@ -300,11 +304,11 @@ export default function DeliveriesPage() {
 
       // Créer automatiquement les répartitions pour les cas simples
       const newSplits: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>> = {};
-      
+
       newItems.forEach((item: any) => {
         const articleId = item.articleId;
         const quantity = item.quantity;
-        
+
         // Si pas de répartition nécessaire, créer automatiquement
         if (!isSplitRequired(articleId, quantity)) {
           const autoSplit = createAutoSplit(articleId, quantity);
@@ -477,7 +481,7 @@ export default function DeliveriesPage() {
 
     // Traiter chaque article selon les règles de répartition
     const allItems: any[] = [];
-    
+
     for (const item of items) {
       const articleId = item.articleId;
       const quantity = item.quantity;
@@ -702,8 +706,8 @@ export default function DeliveriesPage() {
     const stockItem = stockInfo.find((s: any) => {
       const zoneId = s.storageZoneId || s.storageZone?.id;
       const lotId = s.lotId || s.lot?.id;
-      return zoneId === split.fromStorageZoneId && 
-             (lotId === split.lotId || (!lotId && !split.lotId));
+      return zoneId === split.fromStorageZoneId &&
+        (lotId === split.lotId || (!lotId && !split.lotId));
     });
 
     if (!stockItem) {
@@ -729,6 +733,104 @@ export default function DeliveriesPage() {
       combinations.add(key);
     }
     return false;
+  };
+
+  // Fonction pour générer les données du résumé des articles à livrer
+  const generateSummaryData = () => {
+    const summaryItems: Array<{
+      articleId: number;
+      article: Article;
+      totalQuantity: number;
+      zones: Array<{
+        zoneId: number;
+        zoneName: string;
+        lotId: number | null;
+        lotName: string;
+        quantity: number;
+        notes: string;
+      }>;
+    }> = [];
+
+    items.forEach((item) => {
+      if (item.quantity === 0) return;
+
+      const articleId = item.articleId;
+      const article = item.article;
+      const quantity = item.quantity;
+      const isRequired = isSplitRequired(articleId, quantity);
+      const articleSplits = splits[articleId] || [];
+
+      // Si répartition automatique
+      if (!isRequired) {
+        const autoSplit = createAutoSplit(articleId, quantity);
+        if (autoSplit && autoSplit.length > 0) {
+          const s = autoSplit[0];
+          const stockInfo = getArticleStockInfo(articleId);
+          const stockItem = stockInfo.find((stock: any) =>
+            stock.storageZoneId === s.fromStorageZoneId &&
+            stock.lotId === s.lotId
+          );
+
+          const zoneName = stockItem?.storageZone?.designation ||
+            `Zone ${s.fromStorageZoneId || '-'}`;
+          const lotName = stockItem?.lot?.code || 'vide';
+
+          summaryItems.push({
+            articleId,
+            article,
+            totalQuantity: quantity,
+            zones: [{
+              zoneId: s.fromStorageZoneId || 0,
+              zoneName,
+              lotId: s.lotId,
+              lotName,
+              quantity: s.quantity,
+              notes: item.notes || ""
+            }]
+          });
+        }
+      } else if (articleSplits.length > 0) {
+        // Si répartition manuelle
+        const zones: Array<{
+          zoneId: number;
+          zoneName: string;
+          lotId: number | null;
+          lotName: string;
+          quantity: number;
+          notes: string;
+        }> = [];
+
+        articleSplits.forEach((split) => {
+          const stockInfo = getArticleStockInfo(articleId);
+          const stockItem = stockInfo.find((stock: any) =>
+            stock.storageZoneId === split.fromStorageZoneId &&
+            stock.lotId === split.lotId
+          );
+
+          const zoneName = stockItem?.storageZone?.designation ||
+            `Zone ${split.fromStorageZoneId || '-'}`;
+          const lotName = stockItem?.lot?.code || 'vide';
+
+          zones.push({
+            zoneId: split.fromStorageZoneId || 0,
+            zoneName,
+            lotId: split.lotId,
+            lotName,
+            quantity: split.quantity,
+            notes: item.notes || ""
+          });
+        });
+
+        summaryItems.push({
+          articleId,
+          article,
+          totalQuantity: quantity,
+          zones
+        });
+      }
+    });
+
+    return summaryItems;
   };
 
   const handleCancelDelivery = (delivery: any) => {
@@ -1125,10 +1227,10 @@ export default function DeliveriesPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              const confirmMessage = delivery.status === "completed" 
+                              const confirmMessage = delivery.status === "completed"
                                 ? "Cette livraison est validée et ne peut pas être supprimée."
                                 : `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
-                              
+
                               if (delivery.status === "completed") {
                                 toast({
                                   title: "Suppression impossible",
@@ -1137,7 +1239,7 @@ export default function DeliveriesPage() {
                                 });
                                 return;
                               }
-                              
+
                               if (confirm(confirmMessage)) {
                                 deleteDeliveryMutation.mutate(delivery.id);
                               }
@@ -1239,386 +1341,434 @@ export default function DeliveriesPage() {
                       Commande {orderData.code}
                     </Badge>
                   )}
-
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead >Article</TableHead>
-                      <TableHead className="text-center text-red-900">Quantité commandée</TableHead>
-                      <TableHead className="text-center">Quantité déjà livrée</TableHead>
-                      <TableHead className="text-center">Quantité restante</TableHead>
-                      <TableHead className="bg-green-100 text-green-900 font-bold text-center">Quantité à livrer</TableHead>
-                      <TableHead className="text-center">Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={isEditing ? 4 : 4} className="text-center py-8">
-                          Aucun article ajouté
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      items.map((item) => {
-                        // Utiliser les données optimisées de l'API
-                        const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
-                        const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
-                        const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
-                        const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
-                        const articleSplits = splits[item.articleId] || [];
-                        const splitSum = getSplitSum(item.articleId);
-                        const isRequired = isSplitRequired(item.articleId, item.quantity);
-                        const hasValidSplit = articleSplits.length > 0 && Math.abs(splitSum - item.quantity) < 0.001;
-                        const isExpanded = expandedArticleId === item.articleId;
-                        return (
-                          <React.Fragment key={item.id}>
-                            <TableRow className="text-lg cursor-pointer hover:bg-slate-50 transition-all duration-200 ease-in-out group"
-                            
-                            >
-                              <TableCell className="p-2"   onClick={() => setExpandedArticleId(isExpanded ? null : item.articleId)}>
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center gap-4 text-xs font-bold flex-1">
-                                    <img src={item.article?.photo} alt='vérifier photo' className="w-[4rem] h-[3rem] object-cover rounded-lg shadow-sm" />
-                                    <span className="text-gray-900">{item.article ? item.article?.name : item.articleId}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                  
-                                    <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
-                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                      </svg>
-                                    </div>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-center p-2 text-red-900">
-                                {orderedQuantity + ' ' + item.article.unit}
-                              </TableCell>
-                              <TableCell className="text-center p-2">
-                                {deliveredQuantity + ' ' + item.article.unit}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {remainingQuantity + ' ' + item.article.unit}
-                              </TableCell>
-                              <TableCell className="bg-green-100 text-center">
-                                {isEditing ? (
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max={remainingQuantity}
-                                    step="1"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const newQuantity = parseFloat(e.target.value) || 0;
-                                      if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
-                                        updateItemQuantity(item.id, newQuantity);
-                                      }
-                                    }}
-                                    className="text-center"
-                                  />
-                                ) : (
-                                  item.quantity
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {isEditing ? (
-                                  <Input
-                                    value={item.notes}
-                                    onChange={(e) => setItems(items.map(i =>
-                                      i.id === item.id ? { ...i, notes: e.target.value } : i
-                                    ))}
-                                    placeholder="Notes..."
-                                    className="w-32"
-                                  />
-                                ) : (
-                                  item.notes || "-"
-                                )}
-                              </TableCell>
-                              <TableCell onClick={e => e.stopPropagation()}>
-                                {/* Empêche la propagation du clic pour ne pas toggle l'accordion */}
-                                {(() => {
-                                  const articleId = item.articleId;
-                                  const quantity = item.quantity;
-                                  const splitSum = getSplitSum(articleId);
-                                  const isRequired = isSplitRequired(articleId, quantity);
-                                  const hasValidSplit = splits[articleId] && splits[articleId].length > 0 && Math.abs(splitSum - quantity) < 0.001;
-                                  if (quantity === 0) {
-                                    return <span className="text-gray-400">-</span>;
-                                  }
-                                  if (!isRequired) {
-                                    return (
-                                      <span className="text-sm text-blue-600 font-medium">
-                                        ✓ Répartition automatique
-                                      </span>
-                                    );
-                                  }
-                                  if (hasValidSplit) {
-                                    return (
-                                      <>
-                                        <CheckCircle className="text-green-600 inline-block mr-1" />
-                                        <span className="text-sm text-green-600 font-medium">
-                                          ✓ Répartition validée
-                                        </span>
-                                      </>
-                                    );
-                                  } else {
-                                    return (
-                                      <>
-                                        <AlertTriangle className="text-yellow-500 inline-block mr-1" />
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline" 
-                                          onClick={() => setSplitModal({ open: true, articleId: item.articleId })}
-                                        >
-                                          Répartir
-                                        </Button>
-                                      </>
-                                    );
-                                  }
-                                })()}
-                              </TableCell>
-                            </TableRow>
-                            {/* Ligne de split affichée si expanded */}
-                            {isExpanded && (
-                              <TableRow className="bg-gradient-to-r from-slate-50 to-blue-50">
-                                <TableCell colSpan={7} className="p-0">
-                                  <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                                    {/* Livraisons partielles déjà effectuées */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                      <div className="flex items-center gap-2 mb-3">
-                                        <div className="p-1 bg-green-100 rounded-full">
-                                          <CheckCircle className="h-4 w-4 text-green-600" />
-                                        </div>
-                                        <h4 className="font-semibold text-gray-800">Livraisons déjà effectuées</h4>
-                                        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                                          {deliveries.flatMap(delivery => (delivery.items || []).map((it: any) => ({...it, delivery}))).filter(it => it.articleId === item.articleId).length} livraison(s)
-                                        </Badge>
-                                      </div>
-                                      <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                          <thead className="bg-gray-50">
-                                            <tr>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Zone de stockage</th>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Lot</th>
-                                              <th className="px-3 py-2 text-right font-medium text-gray-700">Quantité livrée</th>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Date de livraison</th>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Statut</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-200">
-                                            {(() => {
-                                              const deliveredItems = deliveries
-                                                .flatMap(delivery => (delivery.items || []).map((it: any) => ({...it, delivery})))
-                                                .filter(it => it.articleId === item.articleId);
-                                              
-                                              if (deliveredItems.length === 0) {
-                                                return (
-                                                  <tr>
-                                                    <td colSpan={5} className="px-3 py-4 text-center text-gray-500 italic">
-                                                      Aucune livraison effectuée pour cet article
-                                                    </td>
-                                                  </tr>
-                                                );
-                                              }
-                                              
-                                              return deliveredItems.map((it, idx) => {
-                                                // Récupérer les informations de zone et lot depuis les données d'articles
-                                                const article = articles.find(a => a.id === it.articleId);
-                                                const stockInfo = (article as any)?.stockInfo || [];
-                                                const stockItem = stockInfo.find((s: any) => 
-                                                  s.storageZoneId === it.fromStorageZoneId && 
-                                                  s.lotId === it.lotId
-                                                );
-                                                
-                                                const zoneName = it.fromStorageZone?.designation || 
-                                                              stockItem?.storageZone?.designation || 
-                                                              it.zoneName || 
-                                                              it.zoneDesignation || 
-                                                              it.storageZoneDesignation || 
-                                                              `Zone ${it.fromStorageZoneId || '-'}`;
-                                                
-                                                const lotName = it.lot?.code || 
-                                                             stockItem?.lot?.code || 
-                                                             it.lotName || 
-                                                             it.lotCode || 
-                                                             `Lot ${it.lotId || '-'}`;
-                                                
-                                                return (
-                                                  <tr key={idx} className="hover:bg-gray-50">
-                                                    <td className="px-3 py-2">
-                                                      <div className="flex items-center gap-2">
-                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                        <span className="font-medium text-gray-900">{zoneName}</span>
-                                                      </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                        {lotName}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right">
-                                                      <span className="font-bold text-green-700">
-                                                        {it.qteLivree || it.quantity || '-'} {item.article?.unit || ''}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                      <span className="text-gray-600">
-                                                        {it.delivery?.deliveryDate ? new Date(it.delivery.deliveryDate).toLocaleDateString('fr-FR') : '-'}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                      <Badge variant="default" className="bg-green-100 text-green-800">
-                                                        Livré
-                                                      </Badge>
-                                                    </td>
-                                                  </tr>
-                                                );
-                                              });
-                                            })()}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="details">Détails</TabsTrigger>
+                    <TabsTrigger value="summary">Résumé</TabsTrigger>
+                  </TabsList>
 
-                                    {/* Livraison à venir (prévisualisation) */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                                      <div className="flex items-center gap-2 mb-3">
-                                        <div className="p-1 bg-blue-100 rounded-full">
-                                          <Truck className="h-4 w-4 text-blue-600" />
-                                        </div>
-                                        <h4 className="font-semibold text-gray-800">Livraison à venir</h4>
-                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                                          {isRequired ? (articleSplits.length > 0 ? 'Répartition manuelle' : 'En attente') : 'Automatique'}
-                                        </Badge>
+                  <TabsContent value="details" className="mt-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead >Article</TableHead>
+                          <TableHead className="text-center text-red-900">Quantité commandée</TableHead>
+                          <TableHead className="text-center">Quantité déjà livrée</TableHead>
+                          <TableHead className="text-center">Quantité restante</TableHead>
+                          <TableHead className="bg-green-100 text-green-900 font-bold text-center">Quantité à livrer</TableHead>
+                          <TableHead className="text-center">Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={isEditing ? 4 : 4} className="text-center py-8">
+                              Aucun article ajouté
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          items.map((item) => {
+                            // Utiliser les données optimisées de l'API
+                            const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
+                            const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
+                            const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
+                            const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
+                            const articleSplits = splits[item.articleId] || [];
+                            const splitSum = getSplitSum(item.articleId);
+                            const isRequired = isSplitRequired(item.articleId, item.quantity);
+                            const hasValidSplit = articleSplits.length > 0 && Math.abs(splitSum - item.quantity) < 0.001;
+                            const isExpanded = expandedArticleId === item.articleId;
+                            return (
+                              <React.Fragment key={item.id}>
+                                <TableRow className="text-lg cursor-pointer hover:bg-slate-50 transition-all duration-200 ease-in-out group"
+
+                                >
+                                  <TableCell className="p-2" onClick={() => setExpandedArticleId(isExpanded ? null : item.articleId)}>
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex items-center gap-4 text-xs font-bold flex-1">
+                                        <img src={item.article?.photo} alt='vérifier photo' className="w-[4rem] h-[3rem] object-cover rounded-lg shadow-sm" />
+                                        <span className="text-gray-900">{item.article ? item.article?.name : item.articleId}</span>
                                       </div>
-                                      <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                          <thead className="bg-gray-50">
-                                            <tr>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Zone de stockage</th>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Lot</th>
-                                              <th className="px-3 py-2 text-right font-medium text-gray-700">Quantité à livrer</th>
-                                              <th className="px-3 py-2 text-left font-medium text-gray-700">Type de répartition</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-200">
-                                            {/* Si répartition automatique */}
-                                            {!isRequired && (() => {
-                                              const autoSplit = createAutoSplit(item.articleId, item.quantity);
-                                              if (autoSplit && autoSplit.length > 0) {
-                                                const s = autoSplit[0];
-                                                const article = articles.find(a => a.id === item.articleId);
-                                                const stockInfo = (article as any)?.stockInfo || [];
-                                                const stockItem = stockInfo.find((stock: any) => 
-                                                  stock.storageZoneId === s.fromStorageZoneId && 
-                                                  stock.lotId === s.lotId
-                                                );
-                                                
-                                                const zoneName = stockItem?.storageZone?.designation || 
-                                                              `Zone ${s.fromStorageZoneId || '-'}`;
-                                                const lotName = stockItem?.lot?.code || 
-                                                             `Lot ${s.lotId || '-'}`;
-                                                
-                                                return (
-                                                  <tr className="hover:bg-gray-50">
-                                                    <td className="px-3 py-2">
-                                                      <div className="flex items-center gap-2">
-                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                        <span className="font-medium text-gray-900">{zoneName}</span>
-                                                      </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                        {lotName}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right">
-                                                      <span className="font-bold text-blue-700">
-                                                        {s.quantity} {item.article?.unit || ''}
-                                                      </span>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                      <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                                        Automatique
-                                                      </Badge>
-                                                    </td>
-                                                  </tr>
-                                                );
-                                              }
-                                              return null;
-                                            })()}
-                                            
-                                            {/* Sinon, splits manuels */}
-                                            {isRequired && articleSplits.length > 0 && articleSplits.map((split, idx) => {
-                                              const article = articles.find(a => a.id === item.articleId);
-                                              const stockInfo = (article as any)?.stockInfo || [];
-                                              const stockItem = stockInfo.find((stock: any) => 
-                                                stock.storageZoneId === split.fromStorageZoneId && 
-                                                stock.lotId === split.lotId
-                                              );
-                                              
-                                              const zoneName = stockItem?.storageZone?.designation || 
-                                                            `Zone ${split.fromStorageZoneId || '-'}`;
-                                              const lotName = stockItem?.lot?.code || 
-                                                           `Lot ${split.lotId || '-'}`;
-                                              
-                                              return (
-                                                <tr key={idx} className="hover:bg-gray-50">
-                                                  <td className="px-3 py-2">
-                                                    <div className="flex items-center gap-2">
-                                                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                      <span className="font-medium text-gray-900">{zoneName}</span>
-                                                    </div>
-                                                  </td>
-                                                  <td className="px-3 py-2">
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                      {lotName}
-                                                    </span>
-                                                  </td>
-                                                  <td className="px-3 py-2 text-right">
-                                                    <span className="font-bold text-blue-700">
-                                                      {split.quantity} {item.article?.unit || ''}
-                                                    </span>
-                                                  </td>
-                                                  <td className="px-3 py-2">
-                                                    <Badge variant="outline" className="bg-blue-50 text-blue-800">
-                                                      <Edit3 className="h-3 w-3 mr-1" />
-                                                      Répartition manuelle
-                                                    </Badge>
-                                                  </td>
-                                                </tr>
-                                              );
-                                            })}
-                                            
-                                            {/* Si aucun split manuel sélectionné */}
-                                            {isRequired && articleSplits.length === 0 && (
-                                              <tr>
-                                                <td colSpan={4} className="px-3 py-4 text-center">
-                                                  <div className="flex items-center justify-center gap-2 text-gray-500">
-                                                    <AlertTriangle className="h-4 w-4" />
-                                                    <span className="italic">Aucune répartition sélectionnée</span>
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            )}
-                                          </tbody>
-                                        </table>
+                                      <div className="flex items-center gap-2">
+
+                                        <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                          </svg>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
+                                  </TableCell>
+                                  <TableCell className="text-center p-2 text-red-900">
+                                    {orderedQuantity + ' ' + item.article.unit}
+                                  </TableCell>
+                                  <TableCell className="text-center p-2">
+                                    {deliveredQuantity + ' ' + item.article.unit}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {remainingQuantity + ' ' + item.article.unit}
+                                  </TableCell>
+                                  <TableCell className="bg-green-100 text-center">
+                                    {isEditing ? (
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max={remainingQuantity}
+                                        step="1"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const newQuantity = parseFloat(e.target.value) || 0;
+                                          if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
+                                            updateItemQuantity(item.id, newQuantity);
+                                          }
+                                        }}
+                                        className="text-center"
+                                      />
+                                    ) : (
+                                      item.quantity
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {isEditing ? (
+                                      <Input
+                                        value={item.notes}
+                                        onChange={(e) => setItems(items.map(i =>
+                                          i.id === item.id ? { ...i, notes: e.target.value } : i
+                                        ))}
+                                        placeholder="Notes..."
+                                        className="w-32"
+                                      />
+                                    ) : (
+                                      item.notes || "-"
+                                    )}
+                                  </TableCell>
+                                  <TableCell onClick={e => e.stopPropagation()}>
+                                    {/* Empêche la propagation du clic pour ne pas toggle l'accordion */}
+                                    {(() => {
+                                      const articleId = item.articleId;
+                                      const quantity = item.quantity;
+                                      const splitSum = getSplitSum(articleId);
+                                      const isRequired = isSplitRequired(articleId, quantity);
+                                      const hasValidSplit = splits[articleId] && splits[articleId].length > 0 && Math.abs(splitSum - quantity) < 0.001;
+                                      if (quantity === 0) {
+                                        return <span className="text-gray-400">-</span>;
+                                      }
+                                      if (!isRequired) {
+                                        return (
+                                          <span className="text-sm text-blue-600 font-medium">
+                                            ✓ Répartition automatique
+                                          </span>
+                                        );
+                                      }
+                                      if (hasValidSplit) {
+                                        return (
+                                          <>
+                                            <CheckCircle className="text-green-600 inline-block mr-1" />
+                                            <span className="text-sm text-green-600 font-medium">
+                                              ✓ Répartition validée
+                                            </span>
+                                          </>
+                                        );
+                                      } else {
+                                        return (
+                                          <>
+                                            <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => setSplitModal({ open: true, articleId: item.articleId })}
+                                            >
+                                              Répartir
+                                            </Button>
+                                          </>
+                                        );
+                                      }
+                                    })()}
+                                  </TableCell>
+                                </TableRow>
+                                {/* Ligne de split affichée si expanded */}
+                                {isExpanded && (
+                                  <TableRow className="bg-gradient-to-r from-slate-50 to-blue-50">
+                                    <TableCell colSpan={7} className="p-0">
+                                      <div className="p-4 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                                          {/* En-tête du tableau */}
+                                          <div className="bg-gray-50 px-4 py-3 border-b">
+                                            <h4 className="font-semibold text-gray-800 text-sm">Détails des livraisons</h4>
+                                          </div>
+
+                                          {/* Tableau unifié */}
+                                          <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                              <thead className="bg-gray-100">
+                                                <tr>
+                                                  <th className="px-3 py-2 text-left font-medium text-gray-700">Zone de stockage</th>
+                                                  <th className="px-3 py-2 text-left font-medium text-gray-700">Lot</th>
+                                                  <th className="px-3 py-2 text-right font-medium text-gray-700">Quantité</th>
+                                                  <th className="px-3 py-2 text-left font-medium text-gray-700">Statut</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-gray-200">
+                                                {/* Livraisons à venir (en haut) */}
+                                                {(() => {
+                                                  const upcomingRows = [];
+
+                                                  // Si répartition automatique
+                                                  if (!isRequired) {
+                                                    const autoSplit = createAutoSplit(item.articleId, item.quantity);
+                                                    if (autoSplit && autoSplit.length > 0) {
+                                                      const s = autoSplit[0];
+                                                      const article = articles.find(a => a.id === item.articleId);
+                                                      const stockInfo = (article as any)?.stockInfo || [];
+                                                      const stockItem = stockInfo.find((stock: any) =>
+                                                        stock.storageZoneId === s.fromStorageZoneId &&
+                                                        stock.lotId === s.lotId
+                                                      );
+
+                                                      const zoneName = stockItem?.storageZone?.designation ||
+                                                        `Zone ${s.fromStorageZoneId || '-'}`;
+                                                        const lotName = stockItem?.lot?.code || 'vide';
+
+                                                      upcomingRows.push(
+                                                        <tr key="auto-split" className="bg-blue-50 hover:bg-blue-100">
+                                                          <td className="px-3 py-2">
+                                                            <div className="flex items-center gap-2">
+                                                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                              <span className="font-medium text-gray-900">{zoneName}</span>
+                                                            </div>
+                                                          </td>
+                                                          <td className="px-3 py-2">
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                              {lotName}
+                                                            </span>
+                                                          </td>
+                                                          <td className="px-3 py-2 text-right">
+                                                            <span className="font-bold text-blue-700">
+                                                              {s.quantity} {item.article?.unit || ''}
+                                                            </span>
+                                                          </td>
+                                                          <td className="px-3 py-2">
+                                                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                                              <Truck className="h-3 w-3 mr-1" />
+                                                              En cours
+                                                            </Badge>
+                                                          </td>
+                                                        </tr>
+                                                      );
+                                                    }
+                                                  }
+
+                                                  // Si répartition manuelle
+                                                  if (isRequired && articleSplits.length > 0) {
+                                                    articleSplits.forEach((split, idx) => {
+                                                      const article = articles.find(a => a.id === item.articleId);
+                                                      const stockInfo = (article as any)?.stockInfo || [];
+                                                      const stockItem = stockInfo.find((stock: any) =>
+                                                        stock.storageZoneId === split.fromStorageZoneId &&
+                                                        stock.lotId === split.lotId
+                                                      );
+
+                                                      const zoneName = stockItem?.storageZone?.designation ||
+                                                        `Zone ${split.fromStorageZoneId || '-'}`;
+                                                      const lotName = stockItem?.lot?.code || 'vide';
+
+                                                      upcomingRows.push(
+                                                        <tr key={`manual-split-${idx}`} className="bg-blue-50 hover:bg-blue-100">
+                                                          <td className="px-3 py-2">
+                                                            <div className="flex items-center gap-2">
+                                                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                              <span className="font-medium text-gray-900">{zoneName}</span>
+                                                            </div>
+                                                          </td>
+                                                          <td className="px-3 py-2">
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                              {lotName}
+                                                            </span>
+                                                          </td>
+                                                          <td className="px-3 py-2 text-right">
+                                                            <span className="font-bold text-blue-700">
+                                                              {split.quantity} {item.article?.unit || ''}
+                                                            </span>
+                                                          </td>
+                                                          <td className="px-3 py-2">
+                                                            <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                                              <Edit3 className="h-3 w-3 mr-1" />
+                                                              En cours
+                                                            </Badge>
+                                                          </td>
+                                                        </tr>
+                                                      );
+                                                    });
+                                                  }
+
+                                                  // Si aucun split sélectionné
+                                                  if (isRequired && articleSplits.length === 0) {
+                                                    upcomingRows.push(
+                                                      <tr className="bg-blue-50">
+                                                        <td colSpan={4} className="px-3 py-4 text-center">
+                                                          <div className="flex items-center justify-center gap-2 text-blue-600">
+                                                            <AlertTriangle className="h-4 w-4" />
+                                                            <span className="italic">Aucune répartition sélectionnée</span>
+                                                          </div>
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  }
+
+                                                  return upcomingRows;
+                                                })()}
+
+                                                {/* Livraisons effectuées (en bas) */}
+                                                {(() => {
+                                                  const deliveredItems = deliveries
+                                                    .flatMap(delivery => (delivery.items || []).map((it: any) => ({ ...it, delivery })))
+                                                    .filter(it => it.articleId === item.articleId);
+
+                                                  if (deliveredItems.length === 0) {
+                                                    return (
+                                                      <tr className="bg-green-50">
+                                                        <td colSpan={4} className="px-3 py-4 text-center text-green-600 italic">
+                                                          Aucune livraison effectuée pour cet article
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  }
+
+                                                  return deliveredItems.map((it, idx) => {
+                                                    const zoneName = it.fromStorageZone?.designation ||
+                                                      `Zone ${it.fromStorageZoneId || '-'}`;
+                                                    const lotName = it.lot?.code || `vide`;
+
+
+                                                    return (
+                                                      <tr key={`delivered-${idx}`} className="bg-green-50 hover:bg-green-100">
+                                                        <td className="px-3 py-2">
+                                                          <div className="flex items-center gap-2">
+                                                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                            <span className="font-medium text-gray-900">{zoneName}</span>
+                                                          </div>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                            {lotName}
+                                                          </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right">
+                                                          <span className="font-bold text-green-700">
+                                                            {it.qteLivree || it.quantity || '-'} {item.article?.unit || ''}
+                                                          </span>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                          <Badge variant="default" className="bg-green-100 text-green-800">
+                                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                                            {it.delivery?.status || 'Livré'}
+                                                          </Badge>
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  });
+                                                })()}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+
+                  <TabsContent value="summary" className="mt-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Article</TableHead>
+                          <TableHead className="text-center">Quantité à livrer</TableHead>
+                          <TableHead className="text-center">Zone</TableHead>
+                          <TableHead className="text-center">Lot</TableHead>
+                          <TableHead className="text-center">Quantité par zone</TableHead>
+                          <TableHead className="text-center">Note</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(() => {
+                          const summaryData = generateSummaryData();
+
+                          if (summaryData.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center py-8">
+                                  Aucun article à livrer
                                 </TableCell>
                               </TableRow>
-                            )}
-                          </React.Fragment>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                            );
+                          }
+
+                          return summaryData.map((summaryItem) => {
+                            const { articleId, article, totalQuantity, zones } = summaryItem;
+
+                            return zones.map((zone, zoneIndex) => (
+                              <TableRow key={`${articleId}-${zoneIndex}`}>
+                                {zoneIndex === 0 && (
+                                  <TableCell rowSpan={zones.length} className="p-2">
+                                    <div className="flex items-center gap-3">
+                                      <img
+                                        src={article?.photo || ''}
+                                        alt={article?.name || ''}
+                                        className="w-[4rem] h-[3rem] object-cover rounded-lg shadow-sm"
+                                      />
+                                      <div>
+                                        <div className="font-medium text-gray-900">{article?.name}</div>
+                                        <div className="text-sm text-gray-500">{article?.unit}</div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                )}
+                                {zoneIndex === 0 && (
+                                  <TableCell rowSpan={zones.length} className="text-center p-2">
+                                    <div className="font-bold text-green-700">
+                                      {totalQuantity} {article?.unit}
+                                    </div>
+                                  </TableCell>
+                                )}
+                                <TableCell className="text-center p-2">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <span className="font-medium text-gray-900">{zone.zoneName}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center p-2">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                    {zone.lotName}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center p-2">
+                                  <span className="font-bold text-blue-700">
+                                    {zone.quantity} {article?.unit}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center p-2">
+                                  <span className="text-sm text-gray-600">
+                                    {zone.notes || "-"}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ));
+                          }).flat();
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
             {/* Form */}

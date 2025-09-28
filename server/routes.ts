@@ -4333,15 +4333,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ORDER BY ioi.id
           `);
           
-          // Log pour vérifier les libellés
-          console.log(`🔍 Livraison ${delivery.id} - Items avec libellés:`, items.rows.map(item => ({
-            articleId: item.articleId,
-            quantity: item.quantity,
-            fromStorageZone: item.fromStorageZone,
-            lot: item.lot,
-            fromStorageZoneId: item.fromStorageZoneId,
-            lotId: item.lotId
-          })));
 
           return {
             ...delivery,
