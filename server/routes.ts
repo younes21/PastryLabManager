@@ -4293,19 +4293,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrichir les livraisons avec toutes les données
       const enrichedDeliveries = await Promise.all(
         filteredDeliveries.map(async (delivery) => {
-          // Récupérer les items de la livraison
-          const items = await storage.getInventoryOperationItems(delivery.id);
+          // Récupérer les items de la livraison avec les libellés des zones et lots
+          const items = await db.execute(sql`
+            SELECT 
+              ioi.id,
+              ioi.operation_id as "operationId",
+              ioi.article_id as "articleId",
+              ioi.quantity,
+              ioi.quantity_before as "quantityBefore",
+              ioi.quantity_after as "quantityAfter",
+              ioi.unit_cost as "unitCost",
+              ioi.from_storage_zone_id as "fromStorageZoneId",
+              ioi.to_storage_zone_id as "toStorageZoneId",
+              ioi.lot_id as "lotId",
+              ioi.notes,
+              ioi.created_at as "createdAt",
+              -- Zone de stockage source
+              CASE 
+                WHEN sz_from.id IS NOT NULL THEN json_build_object(
+                  'id', sz_from.id,
+                  'designation', sz_from.designation,
+                  'code', sz_from.code
+                )
+                ELSE NULL
+              END as "fromStorageZone",
+              -- Lot
+              CASE 
+                WHEN l.id IS NOT NULL THEN json_build_object(
+                  'id', l.id,
+                  'code', l.code,
+                  'expirationDate', l.expiration_date
+                )
+                ELSE NULL
+              END as "lot"
+            FROM inventory_operation_items ioi
+            LEFT JOIN storage_zones sz_from ON sz_from.id = ioi.from_storage_zone_id
+            LEFT JOIN lots l ON l.id = ioi.lot_id
+            WHERE ioi.operation_id = ${delivery.id}
+            ORDER BY ioi.id
+          `);
           
-          // Garder les items simples sans articles imbriqués
-          const enrichedItems = items.map(item => ({
-            ...item,
-            // Pas d'article imbriqué - utiliser la liste articles séparée
-          }));
-          
+          // Log pour vérifier les libellés
+          console.log(`🔍 Livraison ${delivery.id} - Items avec libellés:`, items.rows.map(item => ({
+            articleId: item.articleId,
+            quantity: item.quantity,
+            fromStorageZone: item.fromStorageZone,
+            lot: item.lot,
+            fromStorageZoneId: item.fromStorageZoneId,
+            lotId: item.lotId
+          })));
+
           return {
             ...delivery,
-            items: enrichedItems,
-            // Pas de données imbriquées - utiliser les listes séparées
+            items: items.rows,
           };
         })
       );
@@ -4352,7 +4392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      res.json({
+      const responseData = {
         deliveries: enrichedDeliveries,
         clients: allClients.map(c => ({
           id: c.id,
@@ -4380,80 +4420,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitPrice: a.salePrice,
           isPerishable :a.is_perishable 
         }))
+      };
+
+      // Log pour vérifier les données finales
+      console.log(`📊 API /api/deliveries/page-data - Données retournées:`, {
+        deliveriesCount: responseData.deliveries.length,
+        sampleDelivery: responseData.deliveries[0] ? {
+          id: responseData.deliveries[0].id,
+          itemsCount: responseData.deliveries[0].items?.length || 0,
+          sampleItem: responseData.deliveries[0].items?.[0] ? {
+            articleId: responseData.deliveries[0].items[0].articleId,
+            fromStorageZone: responseData.deliveries[0].items[0].fromStorageZone,
+            lot: responseData.deliveries[0].items[0].lot
+          } : null
+        } : null
       });
+
+      res.json(responseData);
     } catch (error) {
       console.error("Erreur lors de la récupération des données de la page deliveries:", error);
       res.status(500).json({ message: "Erreur lors de la récupération des données" });
     }
   });
 
-  // API pour détails commande (tableau Articles) - optimisée
-  app.get("/api/orders/:id/delivery-details", async (req, res) => {
-    try {
-      const orderId = parseInt(req.params.id);
-      
-      // Récupérer toutes les données nécessaires en parallèle
-      const [order, items, deliveries] = await Promise.all([
-        storage.getOrder(orderId),
-        storage.getOrderItems(orderId),
-        storage.getInventoryOperationsByOrder(orderId)
-      ]);
-      
-      if (!order) return res.status(404).json({ message: "Commande introuvable" });
-      
-      // Récupérer le client
-      const client = order.clientId ? await storage.getClient(order.clientId) : null;
-      
-      // Récupérer tous les articles en une fois
-      const articleIds = items.map(item => item.articleId);
-      const articles = await Promise.all(
-        articleIds.map(id => storage.getArticle(id))
-      );
-      const articlesMap = new Map(articles.filter(a => a).map(a => [a!.id, a!]));
-      
-      // Pour chaque item, calculer qté déjà livrée et qté restante
-      const itemsWithDelivery = items.map(item => {
-        // Somme des quantités livrées pour cet article dans toutes les livraisons
-        let delivered = 0;
-        deliveries.forEach(delivery => {
-          delivery.items.forEach(deliveryItem => {
-            if (deliveryItem.articleId === item.articleId) {
-              delivered += parseFloat(deliveryItem.quantity);
-            }
-          });
-        });
-        const quantityOrdered = parseFloat(item.quantity);
-        const article = articlesMap.get(item.articleId);
-        
-        return {
-          articleId: item.articleId,
-          article: article ? {
-            id: article.id,
-            name: article.name,
-            code: article.code,
-            unit: article.unit,
-            unitPrice: article.salePrice
-          } : null,
-          quantityOrdered,
-          quantityDelivered: delivered,
-          quantityRemaining: Math.max(0, quantityOrdered - delivered),
-        };
-      });
-      
-      res.json({
-        code: order.code,
-        client: client ? client.type==='societe' ? { id: client.id, name: client.companyName } : { id: client.id, name: client.firstName + ' ' + client.lastName } : null,
-        orderDate: order.createdAt,
-        total: order.totalTTC,
-        scheduledDate: order.deliveryDate,
-        note: order.notes,
-        items: itemsWithDelivery,
-      });
-    } catch (error) {
-      console.error("Erreur détails livraison:", error);
-      res.status(500).json({ message: "Erreur lors de la récupération des détails de la commande" });
-    }
-  });
 
   // Création d'une livraison
   app.post("/api/deliveries", async (req, res) => {
@@ -4474,7 +4463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Construction des items
       const opItems = items.map((it: any) => ({
         articleId: it.idArticle,
-        toStorageZoneId: it.idzone,
+        fromStorageZoneId: it.idzone,
         lotId: it.idlot,
         quantity: it.qteLivree,
       }));
