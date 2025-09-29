@@ -2792,7 +2792,7 @@ export class DatabaseStorage implements IStorage {
           eq(stockReservations.status, 'reserved')
         )
       )
-      .orderBy(desc(stockReservations.reservedAt));
+      .orderBy(desc(stockReservations.createdAt));
 
     return reservations;
   }
@@ -2807,7 +2807,7 @@ export class DatabaseStorage implements IStorage {
           eq(stockReservations.status, 'reserved')
         )
       )
-      .orderBy(desc(stockReservations.reservedAt));
+      .orderBy(desc(stockReservations.createdAt));
 
     return reservations;
   }

@@ -114,6 +114,38 @@ export function DeliverySplitModal({
     enabled: !!articleId && open,
   });
 
+  // Obtenir les lots distincts
+  const getDistinctLots = () => {
+    if (!availabilityData?.availability) return [];
+    const lots = new Map();
+    availabilityData.availability.forEach(item => {
+      if (item.lotId !== null && item.lotId !== undefined) {
+        lots.set(item.lotId, {
+          id: item.lotId,
+          code: item.lotCode,
+          expirationDate: item.lotExpirationDate
+        });
+      }
+    });
+    return Array.from(lots.values());
+  };
+
+  // Obtenir les zones distinctes
+  const getDistinctZones = () => {
+    if (!availabilityData?.availability) return [];
+    const zones = new Map();
+    availabilityData.availability.forEach(item => {
+      if (item.storageZoneId !== null && item.storageZoneId !== undefined) {
+        zones.set(item.storageZoneId, {
+          id: item.storageZoneId,
+          code: item.storageZoneCode,
+          designation: item.storageZoneDesignation
+        });
+      }
+    });
+    return Array.from(zones.values());
+  };
+
   // Initialiser les splits au chargement des données
   useEffect(() => {
     if (availabilityData && availabilityData.availability && availabilityData.availability.length > 0) {
@@ -128,13 +160,13 @@ export function DeliverySplitModal({
           }]);
         }
       } else {
-        // Cas complexe : initialiser avec des splits vides
-        setSplits([]);
+        // Cas complexe : initialiser avec un split vide pour permettre la sélection
+        setSplits([{ lotId: null, fromStorageZoneId: null, quantity: 0 }]);
       }
     }
   }, [availabilityData, requestedQuantity]);
 
-  // Valider les splits
+  // Valider les splits multiples
   const validateSplits = (): boolean => {
     const newErrors: string[] = [];
 
@@ -148,15 +180,40 @@ export function DeliverySplitModal({
     splits.forEach((split, index) => {
       if (availabilityData) {
         if (availabilityData.summary.requiresLotSelection && split.lotId === null) {
-          newErrors.push(`La sélection d'un lot est obligatoire pour l'article ${articleName}`);
+          newErrors.push(`La sélection d'un lot est obligatoire pour l'article ${articleName} (ligne ${index + 1})`);
         }
         if (availabilityData.summary.requiresZoneSelection && split.fromStorageZoneId === null) {
-          newErrors.push(`La sélection d'une zone de stockage est obligatoire pour l'article ${articleName}`);
+          newErrors.push(`La sélection d'une zone de stockage est obligatoire pour l'article ${articleName} (ligne ${index + 1})`);
         }
       }
 
       if (split.quantity <= 0) {
         newErrors.push(`La quantité doit être supérieure à 0 pour la ligne ${index + 1}`);
+      }
+
+      // Vérifier la disponibilité pour cette combinaison
+      if (split.lotId !== null && split.fromStorageZoneId !== null) {
+        const availability = availabilityData?.availability.find(item =>
+          item.lotId === split.lotId && item.storageZoneId === split.fromStorageZoneId
+        );
+
+        if (!availability) {
+          newErrors.push(`Cette combinaison lot/zone n'est pas disponible en stock (ligne ${index + 1})`);
+        } else if (split.quantity > availability.availableQuantity) {
+          newErrors.push(`Quantité insuffisante en stock pour cette combinaison (disponible: ${availability.availableQuantity}, ligne ${index + 1})`);
+        }
+      }
+    });
+
+    // Vérifier les doublons de combinaisons
+    const combinations = new Set();
+    splits.forEach((split, index) => {
+      if (split.lotId !== null && split.fromStorageZoneId !== null) {
+        const key = `${split.lotId}-${split.fromStorageZoneId}`;
+        if (combinations.has(key)) {
+          newErrors.push(`La combinaison lot/zone est utilisée plusieurs fois (ligne ${index + 1})`);
+        }
+        combinations.add(key);
       }
     });
 
@@ -191,7 +248,7 @@ export function DeliverySplitModal({
     }
   };
 
-  // Calculer la quantité totale répartie
+  // Calculer les quantités pour l'affichage
   const totalSplitQuantity = splits.reduce((sum, split) => sum + split.quantity, 0);
   const remainingQuantity = requestedQuantity - totalSplitQuantity;
 
@@ -223,19 +280,19 @@ export function DeliverySplitModal({
               {/* Indicateurs de contraintes */}
               <div className="flex flex-wrap gap-2">
                 {availabilityData.summary.requiresLotSelection && (
-                  <div className="p-1  w-full rounded-lg border flex items-center gap-2 text-red-800">
+                  <div className="p-1  w-full rounded-lg border flex items-center gap-2 text-orange-800">
                     <AlertTriangle className="h-4 w-4" />
                     <b>Lot obligatoire :</b> {availabilityData.article.isPerishable ? "Produit Périssable" : "existe Plusieurs lots"}
                   </div>
                 )}
                 {availabilityData.summary.requiresZoneSelection && (
-                  <div className="p-1  w-full rounded-lg border flex items-center gap-2 text-red-800">
+                  <div className="p-1  w-full rounded-lg border flex items-center gap-2 text-orange-800">
                     <MapPin className="h-4 w-4" />
                     <b>Zone obligatoire :</b> Plusieurs zones
                   </div>
                 )}
                 {availabilityData.summary.canDirectDelivery && (
-                  <div className="p-1  w-full rounded-lg border flex items-center gap-2 text-red-800">
+                  <div className="p-1  w-full rounded-lg border flex items-center gap-2 text-orange-800">
                     <CheckCircle className="h-3 w-3" />
                     <b>Livraison directe</b>
 
@@ -286,78 +343,92 @@ export function DeliverySplitModal({
                 </Table>
               </fieldset>
               <br />
-              {/* Formulaire de répartition */}
+              {/* Formulaire de répartition multiple */}
               <fieldset className="border border-gray-300 rounded-md p-4">
                 <legend className="px-2 text-green-900 text-lg font-bold">Sélectionner la répartition:</legend>
-                <div className="space-y-2 ">
+                <div className="space-y-4">
+                  {/* Bouton pour ajouter une ligne */}
                   <Button
                     type="button"
                     variant="outline"
                     onClick={addSplit}
-                    className="w-full h-10 text-md mt-1 bg-blue-300"
+                    className="w-full h-10 text-md bg-blue-50 hover:bg-accent-hover hover:text-white border-blue-300"
                   >
-                    <Plus className="w-4 h-4 mr-1 " /> Ajouter une ligne
+                    <Plus className="w-4 h-4 " />  Ajouter une ligne
                   </Button>
+
+                  {/* Lignes de répartition */}
                   {splits.map((split, index) => (
-                    <div key={index} className="grid grid-cols-11 gap-2 items-center   p-1 text-md">
+                    <div key={index} className="grid grid-cols-12 gap-3 items-end ">
+
                       <div className="col-span-4">
+                        <Label className="text-xs text-gray-600 mb-1 block">Lot:</Label>
                         <Select
                           value={split.lotId?.toString() || "none"}
                           onValueChange={(value) => updateSplit(index, "lotId", value === "none" ? null : parseInt(value))}
                         >
-                          <SelectTrigger className="h-8 text-md">
-                            <SelectValue placeholder="Lot" />
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Sélectionner un lot" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent >
                             <SelectItem value="none">Aucun lot</SelectItem>
-                            {availabilityData?.availability
-                              ?.filter((item) => item.lotId !== null && item.lotId !== undefined)
-                              .map(item => (
-                                <SelectItem key={item.lotId} value={item.lotId!.toString()}>
-                                  {item.lotCode || `Lot ${item.lotId}`}
-                                  {item.lotExpirationDate && ` (DLC: ${new Date(item.lotExpirationDate).toLocaleDateString()})`}
-                                </SelectItem>
-                              ))}
+                            {getDistinctLots().map(lot => (
+                              <SelectItem key={lot.id} value={lot.id.toString()}>
+                                <div className="flex items-center gap-2 ">
+                                  <Package className="w-3 h-3" />
+                                  <span>{lot.designation || lot.code || `Lot ${lot.id}`}</span>
+                                 
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
+
                       <div className="col-span-4">
+                        <Label className="text-xs text-gray-600 mb-1 block">Zone:</Label>
                         <Select
                           value={split.fromStorageZoneId?.toString() || "none"}
                           onValueChange={(value) => updateSplit(index, "fromStorageZoneId", value === "none" ? null : parseInt(value))}
                         >
-                          <SelectTrigger className="h-8 text-md">
-                            <SelectValue placeholder="Zone" />
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Sélectionner une zone" />
                           </SelectTrigger>
                           <SelectContent>
-                            {availabilityData?.availability
-                              ?.filter((item) => item.storageZoneId !== null && item.storageZoneId !== undefined)
-                              .map(item => (
-                                <SelectItem key={item.storageZoneId} value={item.storageZoneId!.toString()}>
-                                  {item.storageZoneDesignation}
-                                </SelectItem>
-                              ))}
+                            {getDistinctZones().map(zone => (
+                              <SelectItem key={zone.id} value={zone.id.toString()}>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3 h-3" />
+                                  <span>{zone.designation}</span>
+
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
+
                       <div className="col-span-2">
+                        <Label className="text-xs text-gray-600 mb-1 block">Quantité:</Label>
                         <Input
-                          id={`quantity-${index}`}
                           type="number"
                           min="0"
                           step="1"
                           value={split.quantity}
                           onChange={(e) => updateSplit(index, "quantity", parseFloat(e.target.value) || 0)}
-                          className="w-full h-8 text-lg font-bold px-2 text-center"
+                          className="h-9 text-sm font-bold text-center"
+                          placeholder="0"
                         />
                       </div>
-                      <div className="col-span-1 flex justify-center">
+
+                      <div className="col-span-1 flex ">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => removeSplit(index)}
                           className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
-                          title="Supprimer"
+                          title="Supprimer cette ligne"
+                          disabled={splits.length === 1}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -366,22 +437,23 @@ export function DeliverySplitModal({
                   ))}
 
                   {/* Résumé de la répartition */}
-                  <div className="flex items-center justify-between p-2 px-4 font-semibold bg-slate-100 rounded text-lg">
+                  <div className="flex items-center justify-between p-3 px-4 font-semibold bg-slate-100 rounded text-lg">
                     <div>
                       <span className="text-gray-600">Demandé:</span> <span className="font-bold">{requestedQuantity}</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">Réparti:</span> <span className={`font-bold ${Math.abs(totalSplitQuantity - requestedQuantity) < 0.001 ? "text-green-600" : "text-red-600"}`}>{totalSplitQuantity}</span>
+                      <span className="text-gray-600">Réparti:</span> <span className={`font-bold ${Math.abs(totalSplitQuantity - requestedQuantity) < 0.001 ? "text-green-600" : "text-orange-600"}`}>{totalSplitQuantity}</span>
                     </div>
                     <div>
                       <span className="text-gray-600">Reste:</span> <span className={`font-bold ${remainingQuantity === 0 ? "text-green-600" : "text-orange-600"}`}>{remainingQuantity}</span>
                     </div>
                   </div>
+
                   {/* Messages d'erreur */}
                   {errors.length > 0 && (
                     <div className="space-y-1">
                       {errors.map((error, index) => (
-                        <div key={index} className="p-2  border border-red-600 rounded-lg flex items-center gap-2 text-red-800 font-bold bg-red-50">
+                        <div key={index} className="p-2 border border-red-600 rounded-lg flex items-center gap-2 text-red-800 font-bold bg-red-50">
                           <AlertTriangle className="h-3 w-3" />
                           <AlertDescription>{error}</AlertDescription>
                         </div>

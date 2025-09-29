@@ -1475,12 +1475,13 @@ export default function DeliveriesPage() {
                                       } else {
                                         return (
                                           <>
-                                            <AlertTriangle className="text-yellow-500 inline-block mr-1" />
+                                          
                                             <Button
                                               size="sm"
                                               variant="outline"
                                               onClick={() => setSplitModal({ open: true, articleId: item.articleId })}
                                             >
+                                                <AlertTriangle className="text-yellow-500 inline-block mr-1" />
                                               Répartir
                                             </Button>
                                           </>

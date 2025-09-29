@@ -776,16 +776,21 @@ export const stockReservations = pgTable("stock_reservations", {
   // Références (peut être une commande OU une opération d'inventaire)
   orderId: integer("order_id").references(() => orders.id), // Optionnel pour les préparations
   orderItemId: integer("order_item_id"), // Référence à la ligne de commande
+
   inventoryOperationId: integer("inventory_operation_id").references(
     () => inventoryOperations.id,
     { onDelete: "cascade" },
   ), // Pour les préparations
+  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id), // Optionnel pour les préparations
+  lotId: integer("lot_id").references(() => lots.id), // Optionnel pour les préparations
+  storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Optionnel pour les préparations
 
-  // Quantités
+  // Quantités réservée
   reservedQuantity: decimal("reserved_quantity", {
     precision: 10,
     scale: 3,
   }).notNull(),
+  // quantité 
   deliveredQuantity: decimal("delivered_quantity", {
     precision: 10,
     scale: 3,
@@ -795,10 +800,9 @@ export const stockReservations = pgTable("stock_reservations", {
   status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
 
   // Type de réservation
-  reservationType: text("reservation_type").notNull().default("order"), // 'order', 'preparation'
+  reservationType: text("reservation_type").notNull().default("order"), // 'order', 'preparation', 'delivery'
 
   // Dates
-  reservedAt: timestamp("reserved_at", { mode: "string" }).defaultNow(),
   expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
 
   notes: text("notes"),
@@ -847,6 +851,18 @@ export const stockReservationsRelations = relations(
       fields: [stockReservations.orderId],
       references: [orders.id],
     }),
+    InventoryItem: one(inventoryOperationItems, {
+      fields: [stockReservations.inventoryOperationItemId],
+      references: [inventoryOperationItems.id],
+    }),
+    Lot: one(lots, {
+      fields: [stockReservations.lotId],
+      references: [lots.id],
+    }),
+    Zone: one(storageZones, {
+      fields: [stockReservations.storageZoneId],
+      references: [storageZones.id],
+    }),
     inventoryOperation: one(inventoryOperations, {
       fields: [stockReservations.inventoryOperationId],
       references: [inventoryOperations.id],
@@ -866,6 +882,9 @@ export const insertStockReservationSchema = createInsertSchema(
     // Validation : soit orderId soit inventoryOperationId doit être présent
     orderId: z.union([z.number(), z.null()]).optional(),
     inventoryOperationId: z.union([z.number(), z.null()]).optional(),
+    inventoryOperationItemId: z.union([z.number(), z.null()]).optional(),
+    lotId: z.union([z.number(), z.null()]).optional(),
+    storageZoneId: z.union([z.number(), z.null()]).optional(),
     reservationType: z.enum(["order", "preparation"]).default("order"),
   })
   .refine(
