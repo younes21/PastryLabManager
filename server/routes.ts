@@ -45,6 +45,7 @@ import {
   users,
   orderItems,
   insertStockReservationSchema,
+  stockReservations,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -3804,42 +3805,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { articleId } = req.params;
       const articleIdNum = parseInt(articleId);
-
       if (isNaN(articleIdNum)) {
         return res.status(400).json({ message: "Invalid article ID" });
       }
-
       // Récupérer l'article
       const article = await storage.getArticle(articleIdNum);
       if (!article) {
         return res.status(404).json({ message: "Article not found" });
       }
-
       // Récupérer les lots de l'article
-      const articleLots = await db
-        .select()
-        .from(lots)
-        .where(eq(lots.articleId, articleIdNum));
-
+      const articleLots = await db.select().from(lots).where(eq(lots.articleId, articleIdNum));
       // Récupérer les zones de stockage où l'article existe
-      const articleZones = await db
-        .select()
-        .from(storageZones)
-        .where(
-          sql`EXISTS (
-            SELECT 1 FROM ${stockTable} 
-            WHERE ${stockTable.articleId} = ${articleIdNum} 
-            AND ${stockTable.storageZoneId} = ${storageZones.id}
-            AND ${stockTable.quantity} > 0
-          )`
-        );
-
-      // Récupérer les réservations actives pour cet article
-      const reservations = await storage.getActiveArticleReservations(articleIdNum);
-
+      const articleZones = await db.select().from(storageZones)
+        .where(sql`EXISTS (
+          SELECT 1 FROM stock 
+          WHERE stock.article_id = ${articleIdNum} 
+          AND stock.storage_zone_id = storage_zones.id
+          AND stock.quantity > 0
+        )`);
+      // Récupérer toutes les réservations actives (order, preparation, delivery)
+      const reservations = await db.select().from(stockReservations)
+        .where(and(
+          eq(stockReservations.articleId, articleIdNum),
+          eq(stockReservations.status, 'reserved')
+        ));
       // Calculer la disponibilité par lot et zone
       const availability = [];
-
       for (const lot of articleLots) {
         for (const zone of articleZones) {
           // Récupérer le stock disponible pour ce lot et cette zone
@@ -3854,17 +3845,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 sql`${stockTable.quantity} > 0`
               )
             );
-
           if (stockQuery.length > 0) {
             const stockQuantity = parseFloat(stockQuery[0].quantity);
-
             // Calculer les réservations pour ce lot et cette zone
             const reservedQuantity = reservations
-              .filter(r => (r as any).lotId === lot.id && (r as any).fromStorageZoneId === zone.id)
+              .filter(r => r.lotId === lot.id && r.storageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
-
             const availableQuantity = stockQuantity - reservedQuantity;
-
             if (availableQuantity > 0) {
               availability.push({
                 lotId: lot.id,
@@ -3884,9 +3871,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-
       // Si l'article n'a pas de lots, vérifier la disponibilité générale
-      if (articleLots.length === 0 || availability.length==0) {
+      if (articleLots.length === 0 || availability.length == 0) {
         for (const zone of articleZones) {
           const stockQuery = await db
             .select({ quantity: stockTable.quantity })
@@ -3899,19 +3885,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 sql`${stockTable.quantity} > 0`
               )
             );
-
           if (stockQuery.length > 0) {
             const stockQuantity = parseFloat(stockQuery[0].quantity);
-
             // Calculer les réservations pour cette zone (sans lot)
-            // ATTENTION : StockReservation n'a pas de fromStorageZoneId
-            // On additionne toutes les réservations de l'article (approximation)
             const reservedQuantity = reservations
+              .filter(r => !r.lotId && r.storageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
-
             const availableQuantity = stockQuantity - reservedQuantity;
-
-            if (availableQuantity > 0) {
+            // if (availableQuantity > 0) {
               availability.push({
                 lotId: null,
                 lotCode: null,
@@ -3926,11 +3907,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requiresLotSelection: false,
                 requiresZoneSelection: articleZones.length > 1
               });
-            }
+            // }
           }
         }
       }
-
       res.json({
         article,
         availability,
@@ -3943,7 +3923,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canDirectDelivery: articleLots.length === 1 && articleZones.length === 1 && !article.isPerishable
         }
       });
-
     } catch (error) {
       console.error("Error fetching article availability:", error);
       res.status(500).json({ message: "Failed to fetch article availability" });
@@ -4530,6 +4509,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Erreur suppression livraison:", error);
       res.status(500).json({ message: "Erreur lors de la suppression de la livraison" });
+    }
+  });
+
+
+  // Supprimer/libérer toutes les réservations de stock pour une livraison
+  app.delete("/api/deliveries/:id/reservations", async (req, res) => {
+    try {
+      const deliveryOperationId = parseInt(req.params.id);
+      // Annule toutes les réservations actives de type 'delivery' pour cette opération
+      const result = await db.update(stockReservations)
+        .set({ status: 'cancelled' })
+        .where(and(
+          eq(stockReservations.inventoryOperationId, deliveryOperationId),
+          eq(stockReservations.reservationType, 'delivery'),
+          eq(stockReservations.status, 'reserved')
+        ));
+      res.json({ cancelledCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error("Erreur lors de la suppression des réservations de livraison:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la suppression des réservations de livraison" });
+    }
+  });
+
+  // Lister toutes les réservations de stock pour une livraison
+  app.get("/api/deliveries/:id/reservations", async (req, res) => {
+    try {
+      const deliveryOperationId = parseInt(req.params.id);
+      const reservations = await db.select().from(stockReservations)
+        .where(and(
+          eq(stockReservations.inventoryOperationId, deliveryOperationId),
+          eq(stockReservations.reservationType, 'delivery')
+        ));
+      res.json(reservations);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des réservations de livraison:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des réservations de livraison" });
+    }
+  });
+
+  // Valider une livraison (déduire le stock, mettre à jour les statuts)
+  app.post("/api/deliveries/:id/validate", async (req, res) => {
+    try {
+      const deliveryOperationId = parseInt(req.params.id);
+      const validatedOp = await storage.validateDelivery(deliveryOperationId);
+      res.json(validatedOp);
+    } catch (error) {
+      console.error("Erreur lors de la validation de la livraison:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Erreur lors de la validation de la livraison" });
     }
   });
 

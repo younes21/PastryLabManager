@@ -578,10 +578,31 @@ export default function DeliveriesPage() {
       items: allItems,
     };
 
-    if (currentDelivery.id) {
-      updateDeliveryMutation.mutate({ id: currentDelivery.id, data: payload });
-    } else {
-      createDeliveryMutation.mutate(payload);
+    try {
+      let deliveryId = currentDelivery.id;
+      let deliveryResponse;
+      if (deliveryId) {
+        deliveryResponse = await apiRequest(`/api/deliveries/${deliveryId}`, "PUT", payload);
+        // Pour un PUT, on suppose que l'id ne change pas
+      } else {
+        deliveryResponse = await apiRequest("/api/deliveries", "POST", payload);
+        const deliveryData = await deliveryResponse.json();
+        deliveryId = deliveryData.id;
+      }
+      if (!deliveryId) throw new Error("Impossible de récupérer l'ID de la livraison");
+
+      toast({
+        title: currentDelivery.id ? "Livraison mise à jour" : "Livraison créée",
+        description: "La livraison et les réservations de stock ont été enregistrées avec succès"
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      resetForm();
+    } catch (error: any) {
+      toast({
+        title: "Erreur lors de la sauvegarde",
+        description: error.message || "Erreur lors de la création ou de la réservation de stock",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1459,34 +1480,28 @@ export default function DeliveriesPage() {
                                       if (!isRequired) {
                                         return (
                                           <span className="text-sm text-blue-600 font-medium">
-                                            ✓ Répartition automatique
+                                            ✓ Répartition auto.
                                           </span>
                                         );
                                       }
-                                      if (hasValidSplit) {
-                                        return (
-                                          <>
-                                            <CheckCircle className="text-green-600 inline-block mr-1" />
-                                            <span className="text-sm text-green-600 font-medium">
-                                              ✓ Répartition validée
-                                            </span>
-                                          </>
-                                        );
-                                      } else {
-                                        return (
-                                          <>
-                                          
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => setSplitModal({ open: true, articleId: item.articleId })}
-                                            >
-                                                <AlertTriangle className="text-yellow-500 inline-block mr-1" />
-                                              Répartir
-                                            </Button>
-                                          </>
-                                        );
-                                      }
+
+                                      return (
+                                        <>
+
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setSplitModal({ open: true, articleId: item.articleId })}
+                                          >
+                                            {hasValidSplit ?
+                                              (<CheckCircle className="text-green-600 inline-block mr-1" />)
+                                              : (<AlertTriangle className="text-yellow-500 inline-block mr-1" />)
+                                            }
+                                            Répartir
+                                          </Button>
+                                        </>
+                                      );
+
                                     })()}
                                   </TableCell>
                                 </TableRow>
@@ -1531,7 +1546,7 @@ export default function DeliveriesPage() {
 
                                                       const zoneName = stockItem?.storageZone?.designation ||
                                                         `Zone ${s.fromStorageZoneId || '-'}`;
-                                                        const lotName = stockItem?.lot?.code || 'vide';
+                                                      const lotName = stockItem?.lot?.code || 'vide';
 
                                                       upcomingRows.push(
                                                         <tr key="auto-split" className="bg-blue-50 hover:bg-blue-100">
