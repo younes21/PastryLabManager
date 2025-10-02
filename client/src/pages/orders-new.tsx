@@ -725,7 +725,18 @@ function ProductsRecapServer({ filters }: { filters: { search: string; status: s
     }
   });
 
-  const rows = (data || []) as Array<{ articleId: number; name: string; photo?: string | null; unit?: string | null; ordered: number; toPick: number; toProduce: number }>;
+  const rows = (data || []) as Array<{ 
+    articleId: number; 
+    name: string; 
+    photo?: string | null; 
+    unit?: string | null; 
+    ordered: number; 
+    toDeliver: number; 
+    delivered: number; 
+    remaining: number; 
+    toPick: number; 
+    toProduce: number 
+  }>;
 
   return (
     <Card>
@@ -743,11 +754,14 @@ function ProductsRecapServer({ filters }: { filters: { search: string; status: s
           <ScrollArea className="h-[60vh]">
             <div className="w-full border rounded-lg overflow-hidden">
               {/* Header du tableau */}
-              <div className="grid grid-cols-5 bg-slate-100 text-sm font-semibold text-slate-700">
+              <div className="grid grid-cols-8 bg-slate-100 text-sm font-semibold text-slate-700">
                 <div className="p-3 col-span-2">Produit</div>
-                <div className="p-3 text-center">Qté commandée</div>
-                <div className="p-3 text-center">Qté à prélever</div>
-                <div className="p-3 text-center">Qté à produire</div>
+                <div className="p-3 text-center">Commandé</div>
+                <div className="p-3 text-center">Déjà livré</div>
+                <div className="p-3 text-center">À livrer</div>
+                <div className="p-3 text-center">Restant</div>
+                <div className="p-3 text-center">Planif. livraison</div>
+                <div className="p-3 text-center">À produire</div>
               </div>
 
               {/* Lignes produits */}
@@ -755,7 +769,7 @@ function ProductsRecapServer({ filters }: { filters: { search: string; status: s
                 {rows.map((row) => (
                   <div
                     key={row.articleId}
-                    className="grid grid-cols-5 items-center hover:bg-slate-50 transition-colors"
+                    className="grid grid-cols-8 items-center hover:bg-slate-50 transition-colors"
                   >
                     {/* Produit */}
                     <div className="flex items-center gap-3 p-3 col-span-2">
@@ -785,12 +799,27 @@ function ProductsRecapServer({ filters }: { filters: { search: string; status: s
                       </div>
                     </div>
                     <div className="p-3 text-center">
-                      <div className="text-lg font-semibold text-blue-700">
+                      <div className="text-lg font-semibold text-green-600">
+                        {row.delivered.toFixed(2)} {row.unit || ""}
+                      </div>
+                    </div>
+                    <div className="p-3 text-center">
+                      <div className="text-lg font-semibold text-purple-600">
+                        {row.toDeliver.toFixed(2)} {row.unit || ""}
+                      </div>
+                    </div>
+                    <div className="p-3 text-center">
+                      <div className="text-lg font-semibold text-gray-600">
+                        {row.remaining.toFixed(2)} {row.unit || ""}
+                      </div>
+                    </div>
+                    <div className="p-3 text-center">
+                      <div className="text-lg font-semibold text-blue-600">
                         {row.toPick.toFixed(2)} {row.unit || ""}
                       </div>
                     </div>
                     <div className="p-3 text-center">
-                      <div className="text-lg font-semibold text-amber-700">
+                      <div className="text-lg font-semibold text-orange-600">
                         {row.toProduce.toFixed(2)} {row.unit || ""}
                       </div>
                     </div>

@@ -2048,9 +2048,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         articleInfo[articleId] = { name: art?.name || `Article ${articleId}`, photo: art?.photo || null, unit: art?.saleUnit || art?.unit || null };
       }));
 
-      // 5) agrégation : on CONSUME le stock sur toutes les commandes (ordre priorité),
-      // mais on n'AGREGATE (ordered/toPick/toProduce) que si la commande est dans le filtre
-      const agg: Record<number, { articleId: number; ordered: number; toPick: number; toProduce: number }> = {};
+      // 5) Récupérer les livraisons pour toutes les commandes filtrées
+      const deliveryQuantities: Record<number, { toDeliver: number; delivered: number }> = {};
+      
+      for (const orderId of Array.from(filteredIds)) {
+        const deliveries = await storage.getInventoryOperationsByOrder(orderId);
+        
+        deliveries.forEach(delivery => {
+          delivery.items.forEach(deliveryItem => {
+            const articleId = deliveryItem.articleId;
+            const quantity = parseFloat(deliveryItem.quantity);
+            
+            if (!deliveryQuantities[articleId]) {
+              deliveryQuantities[articleId] = { toDeliver: 0, delivered: 0 };
+            }
+            
+            // Si la livraison est validée, c'est livré, sinon c'est programmé
+            if (delivery.isValidated) {
+              deliveryQuantities[articleId].delivered += quantity;
+            } else {
+              deliveryQuantities[articleId].toDeliver += quantity;
+            }
+          });
+        });
+      }
+
+      // 6) agrégation : on CONSUME le stock sur toutes les commandes (ordre priorité),
+      // mais on n'AGREGATE (ordered/toPick) que si la commande est dans le filtre
+      const agg: Record<number, { articleId: number; ordered: number; toPick: number; toDeliver: number; delivered: number; remaining: number; toProduce: number }> = {};
 
       for (const order of ordersWithItems) {
         const shouldAggregate = filteredIds.has(order.id);
@@ -2059,7 +2084,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const articleId = item.articleId as number;
           const qCommande = Number(item.quantity) || 0;
 
-          if (!agg[articleId]) agg[articleId] = { articleId, ordered: 0, toPick: 0, toProduce: 0 };
+          if (!agg[articleId]) {
+            agg[articleId] = { 
+              articleId, 
+              ordered: 0, 
+              toPick: 0, 
+              toDeliver: 0, 
+              delivered: 0, 
+              remaining: 0,
+              toProduce: 0
+            };
+          }
 
           // 1) si la commande est dans le filtre, on compte Ordered (TOUJOURS)
           if (shouldAggregate) {
@@ -2078,15 +2113,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockVirtuel[articleId] = qStock - qFromStock;
             remaining -= qFromStock;
           }
-
-          // 3) le reste est à produire => uniquement agrégé si commande filtrée
-          if (remaining > 0 && shouldAggregate) {
-            agg[articleId].toProduce += remaining;
-          }
         }
       }
 
-      // 6) construire la réponse (par défaut on renvoie uniquement les articles avec ordered>0)
+      // 7) Ajouter les quantités de livraison et calculer les quantités restantes et à produire
+      for (const articleId in agg) {
+        const deliveryQty = deliveryQuantities[parseInt(articleId)] || { toDeliver: 0, delivered: 0 };
+        agg[articleId].toDeliver = deliveryQty.toDeliver;
+        agg[articleId].delivered = deliveryQty.delivered;
+        agg[articleId].remaining = agg[articleId].ordered - deliveryQty.toDeliver - deliveryQty.delivered;
+        // toProduce = remaining - toPick (ce qui reste après avoir prélevé du stock)
+        agg[articleId].toProduce = Math.max(0, agg[articleId].remaining - agg[articleId].toPick);
+      }
+
+      // 8) construire la réponse (par défaut on renvoie uniquement les articles avec ordered>0)
       const result = Object.values(agg)
         .filter(r => r.ordered > 0)
         .map(r => ({
@@ -2095,6 +2135,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           photo: articleInfo[r.articleId]?.photo || null,
           unit: articleInfo[r.articleId]?.unit || null,
           ordered: r.ordered,
+          toDeliver: r.toDeliver,
+          delivered: r.delivered,
+          remaining: r.remaining,
           toPick: r.toPick,
           toProduce: r.toProduce
         }))
