@@ -6,7 +6,7 @@ const testData = {
   operation: {
     id: 1,
     code: 'PREP-001',
-    type: 'preparation',
+    type: 'fabrication',
     status: 'in_progress'
   },
   article: {

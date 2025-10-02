@@ -251,7 +251,7 @@ const PreparationPage = () => {
     setCurrentOperation({
       id: null,
       code: undefined,
-      type: 'preparation',
+      type: 'fabrication',
       status: 'draft',
       operatorId: null,
       storageZoneId: '',
@@ -699,7 +699,7 @@ const PreparationPage = () => {
       const status = currentOperation.scheduledDate ? 'programmed' : 'draft';
 
       const preparationHeader = {
-        type: currentOperation.type || 'preparation',
+        type: currentOperation.type || 'fabrication',
         status: status,
         operatorId: currentOperation.operatorId,
         storageZoneId: currentOperation.storageZoneId || null,

@@ -31,12 +31,12 @@ Ce système permet de réserver automatiquement les ingrédients nécessaires lo
 ```sql
 -- Nouveaux champs ajoutés
 inventory_operation_id INTEGER REFERENCES inventory_operations(id)
-reservation_type TEXT NOT NULL DEFAULT 'order' CHECK (reservation_type IN ('order', 'preparation'))
+reservation_type TEXT NOT NULL DEFAULT 'order' CHECK (reservation_type IN ('order', 'fabrication'))
 ```
 
 #### Contraintes
 - Soit `order_id` soit `inventory_operation_id` doit être présent (pas les deux)
-- `reservation_type` peut être 'order' ou 'preparation'
+- `reservation_type` peut être 'order' ou 'fabrication'
 
 ### API Endpoints
 

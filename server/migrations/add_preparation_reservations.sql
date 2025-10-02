@@ -4,7 +4,7 @@
 -- Ajouter les nouveaux champs à la table stock_reservations
 ALTER TABLE stock_reservations 
 ADD COLUMN IF NOT EXISTS inventory_operation_id INTEGER REFERENCES inventory_operations(id),
-ADD COLUMN IF NOT EXISTS reservation_type TEXT NOT NULL DEFAULT 'order' CHECK (reservation_type IN ('order', 'preparation'));
+ADD COLUMN IF NOT EXISTS reservation_type TEXT NOT NULL DEFAULT 'order' CHECK (reservation_type IN ('order', 'fabrication'));
 
 -- Créer un index pour améliorer les performances des requêtes sur les opérations d'inventaire
 CREATE INDEX IF NOT EXISTS idx_stock_reservations_inventory_operation 

@@ -16,7 +16,7 @@ const BASE_URL = 'http://localhost:5000/api';
 const TEST_EMAIL = 'test@example.com';
 const TEST_PASSWORD = 'testpassword';
 const TEST_OPERATION = {
-  type: 'preparation',
+  type: 'fabrication',
   status: 'programmed',
   scheduledDate: new Date().toISOString(),
   notes: 'Test de réservations automatiques'
@@ -209,7 +209,7 @@ async function testSimpleOperationCreation() {
 
   try {
     const simpleOperation = {
-      type: 'preparation',
+      type: 'fabrication',
       status: 'programmed',
       notes: 'Test simple'
     };
@@ -264,7 +264,7 @@ async function testOperationWithItems() {
   try {
     const operationWithItems = {
       operation: {
-        type: 'preparation',
+        type: 'fabrication',
         status: 'programmed',
         notes: 'Test avec items'
       },
@@ -318,7 +318,7 @@ async function testCascadeDelete() {
     // Créer une opération avec items pour générer des réservations
     const operationWithItems = {
       operation: {
-        type: 'preparation',
+        type: 'fabrication',
         status: 'programmed',
         notes: 'Test cascade delete'
       },

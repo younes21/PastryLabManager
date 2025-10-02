@@ -10,6 +10,7 @@ import {
   unique,
   doublePrecision,
   real,
+  check,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -777,37 +778,42 @@ export const stockReservations = pgTable("stock_reservations", {
   orderId: integer("order_id").references(() => orders.id), // Optionnel pour les préparations
   orderItemId: integer("order_item_id"), // Référence à la ligne de commande
 
-  inventoryOperationId: integer("inventory_operation_id").references(
-    () => inventoryOperations.id,
-    { onDelete: "cascade" },
-  ), // Pour les préparations
+  inventoryOperationId: integer("inventory_operation_id").references(() => inventoryOperations.id, { onDelete: "cascade" },), // Pour les préparations
   inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id), // Optionnel pour les préparations
   lotId: integer("lot_id").references(() => lots.id), // Optionnel pour les préparations
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Optionnel pour les préparations
 
-  // Quantités réservée
-  reservedQuantity: decimal("reserved_quantity", {
-    precision: 10,
-    scale: 3,
-  }).notNull(),
-  // quantité 
-  deliveredQuantity: decimal("delivered_quantity", {
-    precision: 10,
-    scale: 3,
-  }).default("0.00"),
+  status: text("status").notNull().default("reserved"), // 'reserved','completed','cancelled'
+  stateChangedAt: timestamp("expires_at", { mode: "string" }), // Expiration / completion de la réservation
+  
+  reservedQuantity: decimal("reserved_quantity", { precision: 10, scale: 3 }).notNull(),
+  reservationType: text("reservation_type").notNull(), // 'order','delivery','production','inventory'
+  reservationDirection: text("reservation_direction").notNull(),
 
-  // Statut
-  status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
-
-  // Type de réservation
-  reservationType: text("reservation_type").notNull().default("order"), // 'order', 'preparation', 'delivery'
-
-  // Dates
-  expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
 
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-});
+}, (table) => [
+
+  check("chk_reserved_quantity_positive", sql`${table.reservedQuantity} > 0`),// quantité > 0
+  check("chk_status_valid", sql`${table.status} IN ('reserved','completed','cancelled')`), // statuts valides
+  check("chk_reservation_type_valid", sql`${table.reservationType} IN ('order','delivery','production','inventory')`),  // types valides
+  // directions valides
+  check("chk_reservation_direction_valid", sql`${table.reservationDirection} IN ('in','out')`),
+  // cohérence type ↔ direction
+  check(
+    "chk_reservation_direction",
+    sql`
+      (
+        (${table.reservationType} = 'order'            AND ${table.reservationDirection} = 'out') OR
+        (${table.reservationType} = 'delivery'         AND ${table.reservationDirection} = 'out') OR
+        (${table.reservationType} = 'production'       AND ${table.reservationDirection} = 'out') OR
+        (${table.reservationType} = 'production'       AND ${table.reservationDirection} = 'in')  OR
+        (${table.reservationType} = 'inventory'        AND ${table.reservationDirection} = 'in')
+      )
+    `
+  ),
+]);
 
 // ============ RELATIONS ============
 
@@ -885,7 +891,7 @@ export const insertStockReservationSchema = createInsertSchema(
     inventoryOperationItemId: z.union([z.number(), z.null()]).optional(),
     lotId: z.union([z.number(), z.null()]).optional(),
     storageZoneId: z.union([z.number(), z.null()]).optional(),
-    reservationType: z.enum(["order", "preparation"]).default("order"),
+    reservationType: z.enum(['order', 'delivery', 'production', 'inventory']).default("order"),
   })
   .refine(
     (data) => {

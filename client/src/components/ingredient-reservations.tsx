@@ -103,13 +103,13 @@ export const IngredientReservations: React.FC<IngredientReservationsProps> = ({
   };
 
   useEffect(() => {
-    if (operationId && (operationType === 'preparation' || operationType === 'preparation_reliquat')) {
+    if (operationId && (operationType === 'fabrication' || operationType === 'fabrication_reliquat')) {
       fetchReservations();
     }
   }, [operationId, operationType]);
 
   // Ne pas afficher pour les opérations qui ne sont pas des préparations
-  if (operationType !== 'preparation' && operationType !== 'preparation_reliquat') {
+  if (operationType !== 'fabrication' && operationType !== 'fabrication_reliquat') {
     return null;
   }
 

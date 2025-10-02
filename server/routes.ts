@@ -1535,7 +1535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stockData: Record<number, number> = {};
       const articleNames: Record<number, string> = {};
       for (const articleId of Array.from(allArticleIds)) {
-        stockData[articleId] = await storage.getAvailableStock(articleId);
+        stockData[articleId] = (await storage.getArticleAvailableStock(articleId))?.totalDispo || 0;
         const article = await storage.getArticle(articleId);
         articleNames[articleId] = article?.name || `Article ${articleId}`;
       }
@@ -1684,7 +1684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const articleNames: Record<number, string> = {};
       const articleImages: Record<number, string> = {};
       for (const articleId of Array.from(allArticleIds)) {
-        stockData[articleId] = await storage.getAvailableStock(articleId);
+        stockData[articleId] = (await storage.getArticleAvailableStock(articleId))?.totalDispo || 0;
         const article = await storage.getArticle(articleId);
         articleNames[articleId] = article?.name || `Article ${articleId}`;
         articleImages[articleId] = article?.photo || '';
@@ -2008,7 +2008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // paralléliser les fetchs pour perf
       await Promise.all(Array.from(articleIds).map(async (articleId) => {
-        stockVirtuel[articleId] = await storage.getAvailableStock(articleId) || 0;
+        stockVirtuel[articleId] = (await storage.getArticleAvailableStock(articleId))?.totalDispo || 0;
         const art = await storage.getArticle(articleId);
         articleInfo[articleId] = { name: art?.name || `Article ${articleId}`, photo: art?.photo || null, unit: art?.saleUnit || art?.unit || null };
       }));
@@ -2394,7 +2394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Pour les préparations, calculer automatiquement les ingrédients à consommer
-        if (operationData.type === 'preparation' || operationData.type === 'preparation_reliquat') {
+        if (operationData.type === 'fabrication' || operationData.type === 'fabrication_reliquat') {
           const allItems = [...itemsData]; // Copie des items produits
 
           // Pour chaque produit à produire, calculer les ingrédients nécessaires
@@ -2505,7 +2505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operation.totalTTC = totalCost.toString();
         }
         // Pour les préparations, calculer automatiquement les ingrédients à consommer
-        if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+        if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
           var NewItems = items.filter((f: any) => f.quantity >= 0);
           const allItems = [...NewItems]; // Copie des items produits
 
@@ -2655,7 +2655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const items = await storage.getInventoryOperationItems(id);
 
       // For preparation operations, only handle waste if any
-      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
         console.log('🔍 Starting preparation - items already calculated during creation');
         // Les ingrédients sont déjà calculés lors de la création
         // Ici on ne fait que démarrer la préparation
@@ -2672,7 +2672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Failed to update operation" });
       }
       // Libérer les réservations d'ingrédients une fois que la préparation commence
-      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
         await storage.releaseAllReservationsForOperation(id);
       }
 
@@ -2723,7 +2723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
       // For preparation operations, update stock with actual quantities
-      if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
+      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
         const conformQty = parseFloat(conformQuantity || '0');
 
         // Handle waste if conform quantity is less than planned
@@ -3143,7 +3143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid article ID" });
       }
 
-      const availableStock = await storage.getAvailableStock(id);
+      const availableStock = (await storage.getArticleAvailableStock(id))?.totalDispo || 0;
       res.json({ availableStock });
     } catch (error) {
       console.error("Error fetching available stock:", error);
@@ -3255,7 +3255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Inventory operation not found" });
       }
 
-      if (operation.type !== 'preparation' && operation.type !== 'preparation_reliquat') {
+      if (operation.type !== 'fabrication' && operation.type !== 'fabrication_reliquat') {
         return res.status(400).json({ message: "Operation must be a preparation type" });
       }
 
@@ -3326,7 +3326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hasEnough = await storage.hasEnoughAvailableStock(id, parseFloat(requiredQuantity));
-      const availableStock = await storage.getAvailableStock(id);
+      const availableStock = (await storage.getArticleAvailableStock(id))?.totalDispo || 0;
 
       res.json({
         hasEnough,
@@ -4260,7 +4260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [allClients, allOrders, allArticles] = await Promise.all([
         storage.getAllClients(),
         storage.getAllOrders(),
-        storage.getAllArticlesWithStock()
+        storage.getAllAvailableArticlesStock(true)
       ]);
 
       // Créer des maps pour un accès rapide
@@ -4384,10 +4384,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unit: a.unit,
           photo: a.photo,
           stockInfo: a.stockInfo,
-          totalStock:a.totalStock,
-          totalDispo:a.totalDispo,
-          unitPrice: a.salePrice,
-          isPerishable: a.is_perishable
+          totalStock: a.totalStock,
+          totalDispo: a.totalDispo,
+          unitPrice: a.unitPrice,
+          isPerishable: a.isPerishable
         }))
       };
 

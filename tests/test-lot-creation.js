@@ -15,7 +15,7 @@ const testData = {
   operation: {
     id: 1,
     code: 'PREP-001',
-    type: 'preparation',
+    type: 'fabrication',
     status: 'in_progress',
     operatorId: 1,
     scheduledDate: '2024-01-15T08:00:00Z'
@@ -41,7 +41,7 @@ function simulateLotCreation() {
   console.log('\n🔄 Simulation de la création automatique de lot...\n');
 
   // 1. Vérifier que l'opération est de type Préparation
-  if (testData.operation.type !== 'preparation') {
+  if (testData.operation.type !== 'fabrication') {
     console.log('❌ L\'opération n\'est pas de type préparation');
     return;
   }
