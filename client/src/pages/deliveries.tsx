@@ -113,7 +113,7 @@ export default function DeliveriesPage() {
     deliveries: any[];
     clients: any[];
     orders: Order[];
-    articles: Article[];
+    articles: any[];
   }>({
     queryKey: ["/api/deliveries/page-data", { orderId }],
     queryFn: async () => {
@@ -295,7 +295,7 @@ export default function DeliveriesPage() {
           id: Date.now() + Math.random(), // Nouvel ID temporaire
           articleId: item.articleId,
           article: articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
-          quantity: item.quantityRemaining, // Utiliser la quantité restante
+          quantity: Math.min(item.quantityRemaining, articles.find(a => a.id === item.articleId)?.totalDispo || 0), // Utiliser la quantité restante
           // Ne plus gérer unitPrice et totalPrice côté client
           notes: "",
         }));
@@ -1379,6 +1379,8 @@ export default function DeliveriesPage() {
                           <TableHead className="text-center text-red-900">Quantité commandée</TableHead>
                           <TableHead className="text-center">Quantité déjà livrée</TableHead>
                           <TableHead className="text-center">Quantité restante</TableHead>
+                          <TableHead className="text-center">Stock total</TableHead>
+                          <TableHead className="text-center">Stock disponible</TableHead>
                           <TableHead className="bg-green-100 text-green-900 font-bold text-center">Quantité à livrer</TableHead>
                           <TableHead className="text-center">Notes</TableHead>
                         </TableRow>
@@ -1397,6 +1399,10 @@ export default function DeliveriesPage() {
                             const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
                             const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
                             const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
+                            const articleData = articles.find((a: any) => a.id === (item.article?.id ?? item.articleId));
+                            const totalStock = articleData?.totalStock ?? 0;
+                            const availableStock = articleData?.totalDispo ?? 0;
+                            const maxQte = Math.min(remainingQuantity, availableStock);
                             const articleSplits = splits[item.articleId] || [];
                             const splitSum = getSplitSum(item.articleId);
                             const isRequired = isSplitRequired(item.articleId, item.quantity);
@@ -1432,17 +1438,23 @@ export default function DeliveriesPage() {
                                   <TableCell className="text-center">
                                     {remainingQuantity + ' ' + item.article.unit}
                                   </TableCell>
+                                  <TableCell className="text-center">
+                                    {totalStock + ' ' + item.article.unit}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {availableStock + ' ' + item.article.unit}
+                                  </TableCell>
                                   <TableCell className="bg-green-100 text-center">
                                     {isEditing ? (
                                       <Input
                                         type="number"
                                         min="0"
-                                        max={remainingQuantity}
+                                        max={maxQte}
                                         step="1"
                                         value={item.quantity}
                                         onChange={(e) => {
                                           const newQuantity = parseFloat(e.target.value) || 0;
-                                          if (newQuantity <= remainingQuantity && newQuantity <= orderedQuantity) {
+                                          if (newQuantity <= maxQte && newQuantity <= orderedQuantity) {
                                             updateItemQuantity(item.id, newQuantity);
                                           }
                                         }}
@@ -1508,7 +1520,7 @@ export default function DeliveriesPage() {
                                 {/* Ligne de split affichée si expanded */}
                                 {isExpanded && (
                                   <TableRow className="bg-gradient-to-r from-slate-50 to-blue-50">
-                                    <TableCell colSpan={7} className="p-0">
+                                    <TableCell colSpan={12} className="p-0">
                                       <div className="p-4 animate-in slide-in-from-top-2 duration-300">
                                         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
                                           {/* En-tête du tableau */}
@@ -1521,10 +1533,10 @@ export default function DeliveriesPage() {
                                             <table className="w-full text-sm">
                                               <thead className="bg-gray-100">
                                                 <tr>
-                                                  <th className="px-3 py-2 text-left font-medium text-gray-700">Zone de stockage</th>
-                                                  <th className="px-3 py-2 text-left font-medium text-gray-700">Lot</th>
-                                                  <th className="px-3 py-2 text-right font-medium text-gray-700">Quantité</th>
-                                                  <th className="px-3 py-2 text-left font-medium text-gray-700">Statut</th>
+                                                  <th className="px-3 py-2 w-60 max-w-60 text-left font-medium text-gray-700">Zone de stockage</th>
+                                                  <th className="px-3 py-2 w-48 max-w-48  text-left font-medium text-gray-700">Lot</th>
+                                                  <th className="px-3 py-2 w-28 max-w-28  text-right font-medium text-gray-700">Quantité</th>
+                                                  <th className="px-3 py-2  text-left font-medium text-gray-700">Statut</th>
                                                 </tr>
                                               </thead>
                                               <tbody className="divide-y divide-gray-200">
@@ -1550,7 +1562,7 @@ export default function DeliveriesPage() {
 
                                                       upcomingRows.push(
                                                         <tr key="auto-split" className="bg-blue-50 hover:bg-blue-100">
-                                                          <td className="px-3 py-2">
+                                                          <td className="px-3 py-2   ">
                                                             <div className="flex items-center gap-2">
                                                               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                                                               <span className="font-medium text-gray-900">{zoneName}</span>
@@ -1800,6 +1812,7 @@ export default function DeliveriesPage() {
         articleId={splitModal.articleId}
         articleName={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.articleName || "" : ""}
         requestedQuantity={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.quantity || 0 : 0}
+        existingSplits={splitModal.articleId ? splits[splitModal.articleId] || [] : []}
         onSplitValidated={(newSplits: Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>) => {
           if (splitModal.articleId) {
             setSplits(s => ({ ...s, [splitModal.articleId!]: newSplits }));

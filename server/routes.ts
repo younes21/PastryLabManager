@@ -394,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deletePriceList(id);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Price list not found" });
       }
@@ -1516,7 +1516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/production-status-batch", async (req, res) => {
     try {
       // Récupérer toutes les commandes avec leurs articles
-      const orders = (await storage.getAllOrders())?.filter(f => f.status =='validated')
+      const orders = (await storage.getAllOrders())?.filter(f => f.status == 'validated')
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
         orders.map(async (order) => {
@@ -1658,7 +1658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const order = await storage.getOrder(id);
-      
+
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -1860,16 +1860,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsDetail = targetOrder.items.map(item => {
         const qCommande = parseFloat(item.quantity);
         const qStockInitial = stockData[item.articleId] || 0;
-        
+
         // Calculer la quantité ajustée : ce qui peut être satisfait pour cette commande
         // C'est la quantité qui sera réellement prélevée du stock pour cette commande
         let qAjuste = 0;
-        
+
         // Trouver l'ajustement correspondant à cet article dans la liste des ajustements
-        const ajustementArticle = ajustements.find(aj => 
+        const ajustementArticle = ajustements.find(aj =>
           aj.includes(articleNames[item.articleId]) && !aj.includes("Aucun ajustement possible")
         );
-        
+
         if (ajustementArticle) {
           // Extraire la quantité de l'ajustement (format: "Article -X" ou "Article -X (depuis opération Y)")
           const match = ajustementArticle.match(/-(\d+(?:\.\d+)?)/);
@@ -1877,11 +1877,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             qAjuste = parseFloat(match[1]);
           }
         }
-        
+
         const qRestantAProduire = qCommande - qAjuste;
-        
+
         let status: 'available' | 'partial' | 'missing' | 'in_production' = 'missing';
-        
+
         if (qAjuste === qCommande) {
           status = 'available';
         } else if (qAjuste > 0) {
@@ -1892,7 +1892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return {
           articleId: item.articleId,
-          articleImage:articleImages[item.articleId],
+          articleImage: articleImages[item.articleId],
           articleName: articleNames[item.articleId],
           quantity: qCommande,
           stockAvailable: qStockInitial, // Stock initial pour référence
@@ -1922,11 +1922,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/production-summary", async (req, res) => {
     try {
       const { search, status, type, clientId, date, dateFrom, dateTo } = req.query as Record<string, string | undefined>;
-  
+
       // 1) charger toutes les commandes confirmées
       let allOrders = await storage.getAllOrders();
       allOrders = allOrders.filter((o: any) => o.status === "validated");
-  
+
       // Helper: normaliser une date en "date only" (00:00:00 locale). Retourne null si invalide.
       const toDateOnly = (input?: string | Date | null): Date | null => {
         if (!input) return null;
@@ -1934,36 +1934,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isNaN(d.getTime())) return null;
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
       };
-  
+
       const today = toDateOnly(new Date())!;
       const yesterday = toDateOnly(new Date(Date.now() - 86400000))!;
       const tomorrow = toDateOnly(new Date(Date.now() + 86400000))!;
-  
+
       // Charger clients (map)
       const clientsList = await storage.getAllClients();
       const clientsMap: Record<number, any> = {};
       clientsList.forEach((c: any) => { clientsMap[c.id] = c; });
-  
+
       // Fonction de filtrage pour l'AFFICHAGE SEUL (ne modifie pas la consommation)
       const isInFilter = (o: any): boolean => {
         if (status && status !== "all" && o.status !== status) return false;
         if (type && type !== "all" && o.type !== type) return false;
         if (clientId && clientId !== "all" && o.clientId !== parseInt(clientId)) return false;
-  
+
         if (date && date !== "all") {
           const raw = o.deliveryDate || o.orderDate || o.createdAt;
           if (!raw) return false;
           const od = toDateOnly(raw);
           if (!od) return false;
-  
+
           if (date === "today" && od.getTime() !== today.getTime()) return false;
           if (date === "yesterday" && od.getTime() !== yesterday.getTime()) return false;
           if (date === "tomorrow" && od.getTime() !== tomorrow.getTime()) return false;
-  
+
           if (date === "range") {
             const from = toDateOnly(dateFrom);
             const to = toDateOnly(dateTo);
-          
+
             if (!from && !to) {
               // aucun filtre appliqué
             } else if (from && !to) {
@@ -1978,7 +1978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-  
+
         if (search && search.trim()) {
           const s = search.toLowerCase();
           const client = clientsMap[o.clientId];
@@ -1986,53 +1986,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const code = (o.code || "").toString().toLowerCase();
           if (!code.includes(s) && !clientName.toLowerCase().includes(s)) return false;
         }
-  
+
         return true;
       };
-  
+
       // 2) trier par priorité
       const allOrdersSorted = allOrders.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
       const filteredIds = new Set<number>(allOrdersSorted.filter(isInFilter).map((o: any) => o.id));
-  
+
       // 3) charger items pour TOUTES les commandes (consommation virtuelle se fait sur toutes)
       const ordersWithItems = await Promise.all(
         allOrdersSorted.map(async (o: any) => ({ ...o, items: await storage.getOrderItems(o.id) }))
       );
-  
+
       // 4) préparer stock initial (par article) et info article
       const articleIds = new Set<number>();
       ordersWithItems.forEach(o => o.items.forEach((it: any) => articleIds.add(it.articleId)));
-  
+
       const stockVirtuel: Record<number, number> = {};
       const articleInfo: Record<number, any> = {};
-  
+
       // paralléliser les fetchs pour perf
       await Promise.all(Array.from(articleIds).map(async (articleId) => {
         stockVirtuel[articleId] = await storage.getAvailableStock(articleId) || 0;
         const art = await storage.getArticle(articleId);
         articleInfo[articleId] = { name: art?.name || `Article ${articleId}`, photo: art?.photo || null, unit: art?.saleUnit || art?.unit || null };
       }));
-  
+
       // 5) agrégation : on CONSUME le stock sur toutes les commandes (ordre priorité),
       // mais on n'AGREGATE (ordered/toPick/toProduce) que si la commande est dans le filtre
       const agg: Record<number, { articleId: number; ordered: number; toPick: number; toProduce: number }> = {};
-  
+
       for (const order of ordersWithItems) {
         const shouldAggregate = filteredIds.has(order.id);
-  
+
         for (const item of order.items) {
           const articleId = item.articleId as number;
           const qCommande = Number(item.quantity) || 0;
-  
+
           if (!agg[articleId]) agg[articleId] = { articleId, ordered: 0, toPick: 0, toProduce: 0 };
-  
+
           // 1) si la commande est dans le filtre, on compte Ordered (TOUJOURS)
           if (shouldAggregate) {
             agg[articleId].ordered += qCommande;
           }
-  
+
           let remaining = qCommande;
-  
+
           // 2) prélever sur stock virtuel (toujours consommé)
           const qStock = stockVirtuel[articleId] || 0;
           if (qStock > 0) {
@@ -2043,14 +2043,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockVirtuel[articleId] = qStock - qFromStock;
             remaining -= qFromStock;
           }
-  
+
           // 3) le reste est à produire => uniquement agrégé si commande filtrée
           if (remaining > 0 && shouldAggregate) {
             agg[articleId].toProduce += remaining;
           }
         }
       }
-  
+
       // 6) construire la réponse (par défaut on renvoie uniquement les articles avec ordered>0)
       const result = Object.values(agg)
         .filter(r => r.ordered > 0)
@@ -2064,16 +2064,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           toProduce: r.toProduce
         }))
         .sort((a, b) => b.toProduce - a.toProduce);
-  
+
       res.json(result);
-  
+
     } catch (error) {
       console.error("Erreur production-summary:", error);
       res.status(500).json({ message: "Échec du calcul du récapitulatif" });
     }
   });
-  
-  
+
+
   // app.get("/api/orders/production-summary", async (req, res) => {
   //   try {
   //     const { search, status, type, clientId, date, dateFrom, dateTo } = req.query as Record<string, string | undefined>;
@@ -2511,19 +2511,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Pour chaque produit à produire, calculer les ingrédients nécessaires
           for (const productItem of NewItems) {
-          
+
             const result = await storage.calculateIngredientConsumptionItems(productItem);
             allItems.push(...result.items);
-             // Mettre à jour le coût du produit principal basé sur le coût total des ingrédients
-             const productQuantity = parseFloat(productItem.quantity || '0');
-             const calculatedUnitCost = productQuantity > 0 ? result.totalCost / productQuantity : 0;
- 
-             // Mettre à jour l'item produit avec le coût calculé
-             productItem.unitCost = calculatedUnitCost.toString();
-             productItem.totalCost = result.totalCost.toString();
-             productItem.quantityBefore = result.quantityBefore;
-             productItem.quantityAfter = result.quantityAfter;
- 
+            // Mettre à jour le coût du produit principal basé sur le coût total des ingrédients
+            const productQuantity = parseFloat(productItem.quantity || '0');
+            const calculatedUnitCost = productQuantity > 0 ? result.totalCost / productQuantity : 0;
+
+            // Mettre à jour l'item produit avec le coût calculé
+            productItem.unitCost = calculatedUnitCost.toString();
+            productItem.totalCost = result.totalCost.toString();
+            productItem.quantityBefore = result.quantityBefore;
+            productItem.quantityAfter = result.quantityAfter;
+
           }
 
           // Remplacer itemsData par allItems (produits + ingrédients)
@@ -2721,7 +2721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completedBy: req.body.completedBy || null
       };
 
-   
+
       // For preparation operations, update stock with actual quantities
       if (operation.type === 'preparation' || operation.type === 'preparation_reliquat') {
         const conformQty = parseFloat(conformQuantity || '0');
@@ -2749,7 +2749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // 2. Mettre à jour tous les items de l'opération principale avec la zone de production
           if (preparationZoneId) {
-           // await storage.updateAllItemsToStorageZone(id, preparationZoneId);
+            // await storage.updateAllItemsToStorageZone(id, preparationZoneId);
           }
 
           // 3. Créer l'opération de rebut avec parentOperationId
@@ -2772,7 +2772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 articleId: item.articleId,
                 quantity: wasteItemQuantity.toString(),
                 quantityBefore: item.quantityAfter || '0',
-                quantityAfter: (parseFloat(item.quantityAfter  || '0') + wasteItemQuantity).toString(),
+                quantityAfter: (parseFloat(item.quantityAfter || '0') + wasteItemQuantity).toString(),
                 unitCost: item.unitCost || '0',
                 totalCost: (parseFloat(item.unitCost || '0') * Math.abs(wasteItemQuantity)).toString(),
                 notes: `Rebut de préparation ${operation.code}`,
@@ -2814,8 +2814,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Inventory Operation Lots
   app.get("/api/inventory-operations/:operationId/lots", async (req, res) => {
     try {
-    // to be implemented
-     throw new Error("Not implemented");
+      // to be implemented
+      throw new Error("Not implemented");
     } catch (error) {
       console.error("Error fetching inventory operation lots:", error);
       res.status(500).json({ message: "Failed to fetch inventory operation lots" });
@@ -3852,22 +3852,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter(r => r.lotId === lot.id && r.storageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
             const availableQuantity = stockQuantity - reservedQuantity;
-            if (availableQuantity > 0) {
-              availability.push({
-                lotId: lot.id,
-                lotCode: lot.code,
-                lotExpirationDate: lot.expirationDate,
-                storageZoneId: zone.id,
-                storageZoneCode: zone.code,
-                storageZoneDesignation: zone.designation,
-                stockQuantity,
-                reservedQuantity,
-                availableQuantity,
-                isPerishable: article.isPerishable,
-                requiresLotSelection: article.isPerishable || articleLots.length > 1,
-                requiresZoneSelection: articleZones.length > 1
-              });
-            }
+
+            availability.push({
+              lotId: lot.id,
+              lotCode: lot.code,
+              lotExpirationDate: lot.expirationDate,
+              storageZoneId: zone.id,
+              storageZoneCode: zone.code,
+              storageZoneDesignation: zone.designation,
+              stockQuantity,
+              reservedQuantity,
+              availableQuantity,
+              isPerishable: article.isPerishable,
+              requiresLotSelection: article.isPerishable || articleLots.length > 1,
+              requiresZoneSelection: articleZones.length > 1
+            });
           }
         }
       }
@@ -3892,22 +3891,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter(r => !r.lotId && r.storageZoneId === zone.id)
               .reduce((sum, r) => sum + parseFloat(r.reservedQuantity), 0);
             const availableQuantity = stockQuantity - reservedQuantity;
-            // if (availableQuantity > 0) {
-              availability.push({
-                lotId: null,
-                lotCode: null,
-                lotExpirationDate: null,
-                storageZoneId: zone.id,
-                storageZoneCode: zone.code,
-                storageZoneDesignation: zone.designation,
-                stockQuantity,
-                reservedQuantity,
-                availableQuantity,
-                isPerishable: article.isPerishable,
-                requiresLotSelection: false,
-                requiresZoneSelection: articleZones.length > 1
-              });
-            // }
+
+            availability.push({
+              lotId: null,
+              lotCode: null,
+              lotExpirationDate: null,
+              storageZoneId: zone.id,
+              storageZoneCode: zone.code,
+              storageZoneDesignation: zone.designation,
+              stockQuantity,
+              reservedQuantity,
+              availableQuantity,
+              isPerishable: article.isPerishable,
+              requiresLotSelection: false,
+              requiresZoneSelection: articleZones.length > 1
+            });
+
           }
         }
       }
@@ -3976,7 +3975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { storageZoneId, articleId } = req.query;
       let lotsResult = [];
-      
+
       if (storageZoneId) {
         // 1. Lots dont l'article est en stock dans la zone
         lotsResult = await db.select().from(lots)
@@ -4017,7 +4016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .leftJoin(suppliers, eq(lots.supplierId, suppliers.id))
           .orderBy(lots.createdAt);
       }
-      
+
       res.json(lotsResult);
     } catch (error) {
       console.error("Error fetching lots:", error);
@@ -4142,8 +4141,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
 
       if (stockWithLot.length > 0) {
-        return res.status(400).json({ 
-          message: "Impossible de supprimer ce lot car il est associé à des stocks existants" 
+        return res.status(400).json({
+          message: "Impossible de supprimer ce lot car il est associé à des stocks existants"
         });
       }
 
@@ -4163,22 +4162,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliveries", async (req, res) => {
     try {
       const { orderId, clientId, status } = req.query;
-      
+
       // Récupérer les livraisons avec filtres
       const deliveries = await storage.getInventoryOperationsByType('livraison', false);
-      
+
       // Filtrer par orderId si fourni
       let filteredDeliveries = deliveries;
       if (orderId) {
         filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
       }
-      
+
       // Récupérer toutes les données nécessaires en une seule fois
       const deliveriesWithFullData = await Promise.all(
         filteredDeliveries.map(async (delivery) => {
           // Récupérer les items de la livraison
           const items = await storage.getInventoryOperationItems(delivery.id);
-          
+
           // Récupérer les données de la commande si elle existe
           let order = null;
           let client = null;
@@ -4188,7 +4187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               client = await storage.getClient(order.clientId);
             }
           }
-          
+
           // Enrichir les items avec les données des articles
           const enrichedItems = await Promise.all(
             items.map(async (item) => {
@@ -4205,7 +4204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               };
             })
           );
-          
+
           return {
             ...delivery,
             items: enrichedItems,
@@ -4224,18 +4223,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       // Filtrer par clientId si fourni
       let finalDeliveries = deliveriesWithFullData;
       if (clientId) {
         finalDeliveries = deliveriesWithFullData.filter(d => d.client?.id === parseInt(clientId as string));
       }
-      
+
       // Filtrer par status si fourni
       if (status) {
         finalDeliveries = finalDeliveries.filter(d => d.status === status);
       }
-      
+
       res.json(finalDeliveries);
     } catch (error) {
       console.error("Erreur lors de la récupération des livraisons:", error);
@@ -4247,28 +4246,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliveries/page-data", async (req, res) => {
     try {
       const { orderId } = req.query;
-      
+
       // Récupérer toutes les livraisons avec leurs données complètes
       const deliveries = await storage.getInventoryOperationsByType('livraison', false);
-      
+
       // Filtrer par orderId si fourni
       let filteredDeliveries = deliveries;
       if (orderId) {
         filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
       }
-      
+
       // Récupérer toutes les données nécessaires en parallèle
       const [allClients, allOrders, allArticles] = await Promise.all([
         storage.getAllClients(),
         storage.getAllOrders(),
         storage.getAllArticlesWithStock()
       ]);
-      
+
       // Créer des maps pour un accès rapide
-      const clientsMap = new Map(allClients.map(c => [c.id, c]));
       const ordersMap = new Map(allOrders.map(o => [o.id, o]));
-      const articlesMap = new Map(allArticles.map(a => [a.id, a]));
-      
+
       // Enrichir les livraisons avec toutes les données
       const enrichedDeliveries = await Promise.all(
         filteredDeliveries.map(async (delivery) => {
@@ -4311,7 +4308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             WHERE ioi.operation_id = ${delivery.id}
             ORDER BY ioi.id
           `);
-          
+
 
           return {
             ...delivery,
@@ -4319,7 +4316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       // Si orderId est spécifié, enrichir la commande correspondante avec les détails de livraison
       if (orderId) {
         const orderIdNum = parseInt(orderId as string);
@@ -4330,7 +4327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             storage.getOrderItems(orderIdNum),
             storage.getInventoryOperationsByOrder(orderIdNum)
           ]);
-          
+
           // Pour chaque item, calculer qté déjà livrée et qté restante
           const itemsWithDelivery = orderItems.map(item => {
             // Somme des quantités livrées pour cet article dans toutes les livraisons
@@ -4343,7 +4340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             });
             const quantityOrdered = parseFloat(item.quantity);
-            
+
             return {
               articleId: item.articleId,
               quantityOrdered,
@@ -4351,7 +4348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               quantityRemaining: Math.max(0, quantityOrdered - delivered),
             };
           });
-          
+
           // Enrichir la commande dans la map avec les détails de livraison
           (ordersMap as any).set(orderIdNum, {
             ...order,
@@ -4361,7 +4358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-      
+
       const responseData = {
         deliveries: enrichedDeliveries,
         clients: allClients.map(c => ({
@@ -4385,10 +4382,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: a.name,
           code: a.code,
           unit: a.unit,
-          photo:a.photo,
-          stockInfo:a.stockInfo,
+          photo: a.photo,
+          stockInfo: a.stockInfo,
+          totalStock:a.totalStock,
+          totalDispo:a.totalDispo,
           unitPrice: a.salePrice,
-          isPerishable :a.is_perishable 
+          isPerishable: a.is_perishable
         }))
       };
 
@@ -4482,13 +4481,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/deliveries/:id", async (req, res) => {
     try {
       const operationId = parseInt(req.params.id);
-      
+
       // Vérifier que l'opération existe et est bien une livraison
       const operation = await storage.getInventoryOperation(operationId);
       if (!operation) {
         return res.status(404).json({ message: "Livraison non trouvée" });
       }
-      
+
       if (operation.type !== 'livraison') {
         return res.status(400).json({ message: "Cette opération n'est pas une livraison" });
       }
@@ -4500,7 +4499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Supprimer l'opération d'inventaire (cela supprimera aussi les items associés)
       const deleted = await storage.deleteInventoryOperation(operationId);
-      
+
       if (deleted) {
         res.json({ message: "Livraison supprimée avec succès" });
       } else {

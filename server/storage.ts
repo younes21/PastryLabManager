@@ -534,14 +534,26 @@ export class DatabaseStorage implements IStorage {
   async getAllArticlesWithStock(): Promise<any[]> {
     try {
       const result = await db.execute(sql`
-        SELECT 
-          a.*,
+       SELECT 
+          a.id,
+          a.name,
+          a.code,
+          a.unit,
+          a.photo,
+          a.sale_price AS "unitPrice",
+          a.is_perishable AS "isPerishable",
+            -- total stock physique
+          COALESCE(SUM(s.quantity), 0)::float8  AS "totalStock",
+
+          -- total disponible = stock - réservé
+          COALESCE(SUM(s.quantity - COALESCE(sr.reserved_quantity, 0)), 0)::float8  AS "totalDispo",
           COALESCE(
             json_agg(
               json_build_object(
                 'id', s.id,
                 'storageZoneId', s.storage_zone_id,
                 'lotId', s.lot_id,
+
                 'quantity', s.quantity,
                 'storageZone', CASE 
                   WHEN sz.id IS NOT NULL THEN json_build_object(
@@ -558,23 +570,26 @@ export class DatabaseStorage implements IStorage {
                     'expirationDate', l.expiration_date
                   )
                   ELSE NULL
-                END
+                END,
+                'reservedQuantity', COALESCE(sr.reserved_quantity, 0),
+                'availableQuantity', s.quantity - COALESCE(sr.reserved_quantity, 0)
               )
             ) FILTER (WHERE s.id IS NOT NULL),
             '[]'
-          ) AS stockInfo
-        FROM articles a
-        LEFT JOIN stock s ON s.article_id = a.id
-        LEFT JOIN storage_zones sz ON sz.id = s.storage_zone_id
-        LEFT JOIN lots l ON l.id = s.lot_id
-        WHERE a.active = true
-        GROUP BY a.id, a.code, a.name, a.type, a.description, a.cost_per_unit, a.price, a.current_stock, a.storage_zone_id, a.min_stock, a.max_stock, a.active, a.created_at
-        ORDER BY a.name
+          ) AS "stockInfo"
+              FROM articles a
+              LEFT JOIN stock s ON s.article_id = a.id
+              LEFT JOIN storage_zones sz  ON sz.id = s.storage_zone_id
+              LEFT JOIN lots l  ON l.id = s.lot_id
+              LEFT JOIN stock_reservations sr  ON sr.article_id = a.id  AND sr.lot_id = s.lot_id AND sr.storage_zone_id = s.storage_zone_id AND sr.status ='reserved' -- réservations actives
+              WHERE a.active = true
+              GROUP BY a.id
+              ORDER BY a.name;
       `);
 
       return result.rows.map(row => ({
         ...row,
-        stockInfo: row.stockinfo || []
+        stockInfo: row.stockInfo || []
       }));
     } catch (error) {
       console.error('Error in getAllArticlesWithStock:', error);
@@ -3073,7 +3088,7 @@ export class DatabaseStorage implements IStorage {
       }));
 
 
-      const res= await tx.insert(inventoryOperationItems).values(itemsToInsert);
+      const res = await tx.insert(inventoryOperationItems).values(itemsToInsert);
       // 3. Si c'est une livraison, créer les réservations dans la même transaction
       if (insertOperation.type === 'livraison') {
         // Libérer d'abord les anciennes réservations (au cas où)

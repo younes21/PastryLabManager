@@ -87,6 +87,7 @@ interface DeliverySplitModalProps {
   articleId: number | null;
   articleName: string;
   requestedQuantity: number;
+  existingSplits?: SplitItem[];
   onSplitValidated: (splits: SplitItem[]) => void;
 }
 
@@ -96,6 +97,7 @@ export function DeliverySplitModal({
   articleId,
   articleName,
   requestedQuantity,
+  existingSplits,
   onSplitValidated
 }: DeliverySplitModalProps) {
   const { toast } = useToast();
@@ -112,6 +114,10 @@ export function DeliverySplitModal({
       return response.json();
     },
     enabled: !!articleId && open,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: false,
   });
 
   // Obtenir les lots distincts
@@ -149,7 +155,10 @@ export function DeliverySplitModal({
   // Initialiser les splits au chargement des données
   useEffect(() => {
     if (availabilityData && availabilityData.availability && availabilityData.availability.length > 0) {
-      if (availabilityData.summary.canDirectDelivery) {
+      // Si des splits existants sont fournis, les utiliser
+      if (existingSplits && existingSplits.length > 0) {
+        setSplits(existingSplits);
+      } else if (availabilityData.summary.canDirectDelivery) {
         // Cas simple : un seul lot et une seule zone, pas périssable
         const firstAvailability = availabilityData.availability[0];
         if (firstAvailability) {
@@ -164,7 +173,7 @@ export function DeliverySplitModal({
         setSplits([{ lotId: null, fromStorageZoneId: null, quantity: 0 }]);
       }
     }
-  }, [availabilityData, requestedQuantity]);
+  }, [availabilityData, requestedQuantity, existingSplits]);
 
   // Valider les splits multiples
   const validateSplits = (): boolean => {
