@@ -44,7 +44,10 @@ interface ProductionDetail {
     articleImage: string;
     articleId: number;
     articleName: string;
-    quantity: number;
+    quantity: number; // Quantité commandée originale
+    quantityToDeliver: number; // Quantité programmée à livrer
+    quantityDelivered: number; // Quantité livrée (validée)
+    quantityRemaining: number; // Quantité restante à produire = quantity - quantityToDeliver - quantityDelivered
     stockAvailable: number;
     quantityAdjusted: number; // Quantité qui peut être ajustée depuis le stock
     inProduction: number; // Maintenant représente la quantité restante à produire
@@ -173,11 +176,11 @@ export function ProductionSummaryDialog({
   const getProgressValue = (productionDetail: ProductionDetail | null) => {
     if (!productionDetail) return 0;
 
-    const totalCommanded = productionDetail.items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalRemaining = productionDetail.items.reduce((sum, item) => sum + item.quantityRemaining, 0);
     const totalAdjusted = productionDetail.items.reduce((sum, item) => sum + item.quantityAdjusted, 0);
 
-    if (totalCommanded === 0) return 0;
-    return Math.round((totalAdjusted / totalCommanded) * 100);
+    if (totalRemaining === 0) return 100; // Tout est livré ou programmé
+    return Math.round((totalAdjusted / totalRemaining) * 100);
   };
 
   return (
@@ -284,8 +287,11 @@ export function ProductionSummaryDialog({
                         <tr className="bg-slate-100 text-xs text-slate-600 uppercase">
                           <th className="px-3 py-2 text-left">Article</th>
                           <th className="px-3 py-2 text-center">Commandé</th>
-                          <th className="px-3 py-2 text-center">Restant</th>
-                          <th className="px-3 py-2 text-center">Prélevé</th>
+                          <th className="px-3 py-2 text-center">déja Livré</th>
+                          <th className="px-3 py-2 text-center">A livrer</th>
+                         
+                          <th className="px-3 py-2 text-center">Restant </th>
+                          <th className="px-3 py-2 text-center">Planif. livraison </th>
                           <th className="px-3 py-2 text-center">À produire</th>
                           <th className="px-3 py-2 text-center">Statut</th>
                         </tr>
@@ -310,14 +316,16 @@ export function ProductionSummaryDialog({
                                     {item.articleName}
                                   </div>
                                   <div className="text-md text-gray-700">
-                                    Stock: {item.stockAvailable}
+                                    Stock; {item.stockRemaining==item.stockAvailable? item.stockAvailable:<span className="text-red-800">{item.stockAvailable+' ('+item.stockRemaining+' disp.)'}</span> } 
                                   </div>
                                 </div>
                               </td>
 
                               {/* Quantités */}
-                              <td className="px-3 py-2 text-center text-lg  font-semibold">{item.quantity}</td>
-                              <td className="px-3 py-2 text-center text-lg text-gray-600">{item.stockRemaining}</td>
+                              <td className="px-3 py-2 text-center text-lg font-semibold">{item.quantity}</td>
+                              <td className="px-3 py-2 text-center text-lg text-green-600">{item.quantityDelivered}</td>
+                              <td className="px-3 py-2 text-center text-lg text-purple-600">{item.quantityToDeliver}</td>
+                              <td className="px-3 py-2 text-center text-lg text-gray-600">{item.quantityRemaining}</td>
                               <td className="px-3 py-2 text-center text-lg text-blue-600">{item.quantityAdjusted}</td>
                               <td className="px-3 py-2 text-center text-lg text-orange-600">{item.inProduction}</td>
 
