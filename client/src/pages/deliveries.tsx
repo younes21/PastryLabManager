@@ -19,6 +19,14 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1333,96 +1341,65 @@ export default function DeliveriesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => viewDelivery(delivery)}
-                            data-testid={`button-view-delivery-${delivery.id}`}
-                            title="Voir les détails"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => editDelivery(delivery)}
-                            disabled={delivery.status === "completed"}
-                            data-testid={`button-edit-delivery-${delivery.id}`}
-                            title="Modifier"
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setAssignmentModal({ open: true, delivery })}
-                            title="Assigner un livreur"
-                          >
-                            <User className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPackagesModal({ open: true, delivery })}
-                            title="Gérer les colis"
-                          >
-                            <Package className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setTrackingModal({ open: true, delivery })}
-                            title="Suivi de livraison"
-                          >
-                            <Truck className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPaymentModal({ open: true, delivery })}
-                            title="Paiement à la livraison"
-                          >
-                            <CreditCard className="h-4 w-4" />
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const confirmMessage = delivery.status === "completed"
-                                ? "Cette livraison est validée et ne peut pas être supprimée."
-                                : `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
-
-                              if (delivery.status === "completed") {
-                                toast({
-                                  title: "Suppression impossible",
-                                  description: "Les livraisons validées ne peuvent pas être supprimées",
-                                  variant: "destructive"
-                                });
-                                return;
-                              }
-
-                              if (confirm(confirmMessage)) {
-                                deleteDeliveryMutation.mutate(delivery.id);
-                              }
-                            }}
-                            disabled={delivery.status === "completed" || deleteDeliveryMutation.isPending}
-                            data-testid={`button-delete-delivery-${delivery.id}`}
-                            title={delivery.status === "completed" ? "Impossible de supprimer une livraison validée" : "Supprimer la livraison"}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCancelDelivery(delivery)}
-                            disabled={delivery.status === "completed" || delivery.status === "cancelled"}
-                            data-testid={`button-cancel-delivery-${delivery.id}`}
-                          >
-                            <X className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                              Actions
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[14rem]">
+                            <DropdownMenuLabel>Livraison {delivery.code}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => viewDelivery(delivery)} data-testid={`button-view-delivery-${delivery.id}`}>
+                              <Eye className="h-4 w-4" /> Voir les détails
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === "completed"} data-testid={`button-edit-delivery-${delivery.id}`}>
+                              <Edit3 className="h-4 w-4" /> Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setAssignmentModal({ open: true, delivery })}>
+                              <User className="h-4 w-4" /> Assigner un livreur
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPackagesModal({ open: true, delivery })}>
+                              <Package className="h-4 w-4" /> Gérer les colis
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTrackingModal({ open: true, delivery })}>
+                              <Truck className="h-4 w-4" /> Suivi de livraison
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPaymentModal({ open: true, delivery })}>
+                              <CreditCard className="h-4 w-4" /> Paiement à la livraison
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={delivery.status === "completed" || deleteDeliveryMutation.isPending}
+                              onClick={() => {
+                                const confirmMessage = delivery.status === "completed"
+                                  ? "Cette livraison est validée et ne peut pas être supprimée."
+                                  : `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
+                                if (delivery.status === "completed") {
+                                  toast({
+                                    title: "Suppression impossible",
+                                    description: "Les livraisons validées ne peuvent pas être supprimées",
+                                    variant: "destructive"
+                                  });
+                                  return;
+                                }
+                                if (confirm(confirmMessage)) {
+                                  deleteDeliveryMutation.mutate(delivery.id);
+                                }
+                              }}
+                              data-testid={`button-delete-delivery-${delivery.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={delivery.status === "completed" || delivery.status === "cancelled"}
+                              onClick={() => handleCancelDelivery(delivery)}
+                              data-testid={`button-cancel-delivery-${delivery.id}`}
+                            >
+                              <X className="h-4 w-4 text-red-500" /> Annuler
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                       {delivery.status === 'cancelled' && (
                         <CancellationDetails
