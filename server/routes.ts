@@ -7,7 +7,6 @@ import {
   insertUserSchema,
   insertMeasurementCategorySchema,
   insertMeasurementUnitSchema,
-  insertArticleCategorySchema,
   insertArticleSchema,
   insertPriceListSchema,
   insertPriceRuleSchema,
@@ -20,9 +19,6 @@ import {
   insertWorkStationSchema,
   insertSupplierSchema,
   insertClientSchema,
-  insertRecipeSchema,
-  insertRecipeIngredientSchema,
-  insertRecipeOperationSchema,
   insertOrderSchema,
   insertOrderItemSchema,
   insertInventoryOperationSchema,
@@ -34,7 +30,6 @@ import {
   insertPaymentSchema,
   insertOrderWithItemsSchema,
   updateOrderWithItemsSchema,
-  InventoryOperation,
   stock as stockTable,
   articles,
   storageZones,
@@ -48,6 +43,22 @@ import {
   stockReservations,
 } from "@shared/schema";
 import { z } from "zod";
+import {
+  UserRole,
+  ArticleCategoryType,
+  OrderStatus,
+  InventoryOperationType,
+  InventoryOperationStatus,
+  StockReservationStatus,
+  StockReservationType,
+  ArticlePrefix,
+  CLIENT_TYPE,
+  ProductionStatus,
+  ProductionItemStatus,
+  FILTER_ALL,
+  DateTypes,
+
+} from "@shared/constants";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -65,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // get user client id if exists
       let clientId = null;
-      if (user.role == "client") {
+      if (user.role == UserRole.CLIENT) {
         clientId = await storage.getClientIdByUserId(user.id);
       }
       res.json({ user: userWithoutPassword, clientId: clientId });
@@ -169,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lowStockArticles = await storage.getAllArticles();
       const lowStockCount = lowStockArticles.filter(
         (article) =>
-          article.type === "ingredient" &&
+          article.type === ArticleCategoryType.INGREDIENT &&
           article.managedInStock &&
           parseFloat(article.currentStock || "0") <
           parseFloat(article.minStock || "0"),
@@ -314,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/article-categories/:type?", async (req, res) => {
     try {
 
-      const categories = await storage.getAllArticleCategories(req.params.type as ("produit" | "ingredient" | "service" | undefined));
+      const categories = await storage.getAllArticleCategories(req.params.type as (ArticleCategoryType | undefined));
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch article categories" });
@@ -1027,24 +1038,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate automatic code based on type
       let code = "";
-      if (articleData.type === "product") {
+      if (articleData.type === ArticleCategoryType.PRODUCT) {
         const existingProducts = await storage.getAllArticles();
         const productCount = existingProducts.filter(
-          (a) => a.type === "product",
+          (a) => a.type === ArticleCategoryType.PRODUCT,
         ).length;
-        code = `PRD-${String(productCount + 1).padStart(6, "0")}`;
-      } else if (articleData.type === "ingredient") {
+        code = `${ArticlePrefix.PRODUCT}-${String(productCount + 1).padStart(6, "0")}`;
+      } else if (articleData.type === ArticleCategoryType.INGREDIENT) {
         const existingIngredients = await storage.getAllArticles();
         const ingredientCount = existingIngredients.filter(
-          (a) => a.type === "ingredient",
+          (a) => a.type === ArticleCategoryType.INGREDIENT,
         ).length;
-        code = `ING-${String(ingredientCount + 1).padStart(6, "0")}`;
-      } else if (articleData.type === "service") {
+        code = `${ArticlePrefix.INGREDIENT}-${String(ingredientCount + 1).padStart(6, "0")}`;
+      } else if (articleData.type === ArticleCategoryType.SERVICE) {
         const existingServices = await storage.getAllArticles();
         const serviceCount = existingServices.filter(
-          (a) => a.type === "service",
+          (a) => a.type === ArticleCategoryType.SERVICE,
         ).length;
-        code = `SRV-${String(serviceCount + 1).padStart(6, "0")}`;
+        code = `${ArticlePrefix.SERVICE}-${String(serviceCount + 1).padStart(6, "0")}`;
       }
 
       const articleWithCode = { ...articleData, code };
@@ -1516,7 +1527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/production-status-batch", async (req, res) => {
     try {
       // Récupérer toutes les commandes avec leurs articles
-      const orders = (await storage.getAllOrders())?.filter(f => f.status == 'validated')
+      const orders = (await storage.getAllOrders())?.filter(f => f.status == OrderStatus.VALIDATED)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
         orders.map(async (order) => {
@@ -1541,11 +1552,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Récupérer toutes les opérations de fabrication en cours
-      const operationsEnCours = await storage.getInventoryOperationsByType('fabrication');
+      const operationsEnCours = await storage.getInventoryOperationsByType(InventoryOperationType.FABRICATION);
       const operationsEnCoursData: Record<number, any[]> = {};
 
       operationsEnCours.forEach(op => {
-        if (op.status === 'en_cours' && op.items) {
+        if (op.status === ProductionStatus.EN_COURS && op.items) {
           op.items.forEach((item: any) => {
             if (!operationsEnCoursData[item.articleId]) {
               operationsEnCoursData[item.articleId] = [];
@@ -1599,10 +1610,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Déterminer l'état final et appliquer les ajustements virtuels
-        let etat = "non_prepare";
+        let etat = ProductionStatus.NON_PREPARE;
 
         if (enCours) {
-          etat = "en_cours";
+          etat = ProductionStatus.EN_COURS;
           for (const item of order.items) {
             const op = operationsVirtuelles[item.articleId];
             if (op && op.length > 0) {
@@ -1616,7 +1627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else if (toutDisponible) {
-          etat = "prepare";
+          etat = ProductionStatus.PREPARE;
           for (const item of order.items) {
             const qCommande = parseFloat(item.quantity);
             // Ajustement virtuel : diminuer le stock
@@ -1624,7 +1635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ajustements.push(`${articleNames[item.articleId]} -${qCommande}`);
           }
         } else if (auMoinsUnDisponible) {
-          etat = "partiellement_prepare";
+          etat = ProductionStatus.PARTIELLEMENT_PREPARE;
           for (const item of order.items) {
             const qCommande = parseFloat(item.quantity);
             const qDisponible = Math.min(qCommande, stockVirtuel[item.articleId] || 0);
@@ -1635,7 +1646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else {
-          etat = "non_prepare";
+          etat = ProductionStatus.NON_PREPARE;
           ajustements.push("Aucun ajustement possible");
         }
 
@@ -1664,7 +1675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Récupérer toutes les commandes avec leurs articles (même logique que production-status-batch)
-      const orders = (await storage.getAllOrders())?.filter(f => f.status === 'validated')
+      const orders = (await storage.getAllOrders())?.filter(f => f.status === OrderStatus.VALIDATED)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
         orders.map(async (order) => {
@@ -1691,11 +1702,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Récupérer toutes les opérations de fabrication en cours
-      const operationsEnCours = await storage.getInventoryOperationsByType('fabrication');
+      const operationsEnCours = await storage.getInventoryOperationsByType(InventoryOperationType.FABRICATION);
       const operationsEnCoursData: Record<number, any[]> = {};
 
       operationsEnCours.forEach(op => {
-        if (op.status === 'en_cours' && op.items) {
+        if (op.status === ProductionStatus.EN_COURS && op.items) {
           op.items.forEach((item: any) => {
             if (!operationsEnCoursData[item.articleId]) {
               operationsEnCoursData[item.articleId] = [];
@@ -1720,7 +1731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const targetOrderIndex = ordersWithItems.findIndex(o => o.id === id);
       const ajustements: string[] = [];
-      let etat = "non_prepare";
+      let etat = ProductionStatus.NON_PREPARE;
 
       // Traiter toutes les commandes jusqu'à la commande cible (exclus)
       for (let i = 0; i < targetOrderIndex; i++) {
@@ -1819,7 +1830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Déterminer l'état final
       if (enCours) {
-        etat = "en_cours";
+        etat = ProductionStatus.EN_COURS;
         for (const item of currentOrder.items) {
           const op = operationsVirtuelles[item.articleId];
           if (op && op.length > 0) {
@@ -1833,7 +1844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } else if (toutDisponible) {
-        etat = "prepare";
+        etat = ProductionStatus.PREPARE;
         for (const item of currentOrder.items) {
           const qCommande = parseFloat(item.quantity);
           // Ajustement virtuel : diminuer le stock
@@ -1841,7 +1852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ajustements.push(`${articleNames[item.articleId]} -${qCommande}`);
         }
       } else if (auMoinsUnDisponible) {
-        etat = "partiellement_prepare";
+        etat = ProductionStatus.PARTIELLEMENT_PREPARE;
         for (const item of currentOrder.items) {
           const qCommande = parseFloat(item.quantity);
           const qDisponible = Math.min(qCommande, stockVirtuel[item.articleId] || 0);
@@ -1852,25 +1863,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } else {
-        etat = "non_prepare";
+        etat = ProductionStatus.NON_PREPARE;
         ajustements.push("Aucun ajustement possible");
       }
 
       // Récupérer les livraisons pour cette commande
       const deliveries = await storage.getInventoryOperationsByOrder(id);
-      
+
       // Calculer les quantités de livraison par article
       const deliveryQuantities: Record<number, { toDeliver: number; delivered: number }> = {};
-      
+
       deliveries.forEach(delivery => {
         delivery.items.forEach(deliveryItem => {
           const articleId = deliveryItem.articleId;
           const quantity = parseFloat(deliveryItem.quantity);
-          
+
           if (!deliveryQuantities[articleId]) {
             deliveryQuantities[articleId] = { toDeliver: 0, delivered: 0 };
           }
-          
+
           // Si la livraison est validée, c'est livré, sinon c'est programmé
           if (delivery.isValidated) {
             deliveryQuantities[articleId].delivered += quantity;
@@ -1884,12 +1895,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsDetail = targetOrder.items.map(item => {
         const qCommande = parseFloat(item.quantity);
         const qStockInitial = stockData[item.articleId] || 0;
-        
+
         // Récupérer les quantités de livraison pour cet article
         const deliveryQty = deliveryQuantities[item.articleId] || { toDeliver: 0, delivered: 0 };
         const qToDeliver = deliveryQty.toDeliver;
         const qDelivered = deliveryQty.delivered;
-        
+
         // Calculer la quantité restante à produire = commandée - programmée - livrée
         const qRemaining = qCommande - qToDeliver - qDelivered;
 
@@ -1912,14 +1923,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const qRestantAProduire = qRemaining - qAjuste;
 
-        let status: 'available' | 'partial' | 'missing' | 'in_production' = 'missing';
+        let status: ProductionItemStatus.AVAILABLE | ProductionItemStatus.PARTIAL | ProductionItemStatus.IN_PRODUCTION | ProductionItemStatus.MISSING = ProductionItemStatus.MISSING;
 
         if (qAjuste === qRemaining) {
-          status = 'available';
+          status = ProductionItemStatus.AVAILABLE;
         } else if (qAjuste > 0) {
-          status = 'partial';
+          status = ProductionItemStatus.PARTIAL;
         } else if (operationsVirtuelles[item.articleId] && operationsVirtuelles[item.articleId].length > 0) {
-          status = 'in_production';
+          status = ProductionItemStatus.IN_PRODUCTION;
         }
 
         return {
@@ -1960,7 +1971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 1) charger toutes les commandes confirmées
       let allOrders = await storage.getAllOrders();
-      allOrders = allOrders.filter((o: any) => o.status === "validated");
+      allOrders = allOrders.filter((o: any) => o.status === OrderStatus.VALIDATED);
 
       // Helper: normaliser une date en "date only" (00:00:00 locale). Retourne null si invalide.
       const toDateOnly = (input?: string | Date | null): Date | null => {
@@ -1981,21 +1992,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fonction de filtrage pour l'AFFICHAGE SEUL (ne modifie pas la consommation)
       const isInFilter = (o: any): boolean => {
-        if (status && status !== "all" && o.status !== status) return false;
-        if (type && type !== "all" && o.type !== type) return false;
-        if (clientId && clientId !== "all" && o.clientId !== parseInt(clientId)) return false;
+        if (status && status !== FILTER_ALL && o.status !== status) return false;
+        if (type && type !== FILTER_ALL && o.type !== type) return false;
+        if (clientId && clientId !== FILTER_ALL && o.clientId !== parseInt(clientId)) return false;
 
-        if (date && date !== "all") {
+        if (date && date !== FILTER_ALL) {
           const raw = o.deliveryDate || o.orderDate || o.createdAt;
           if (!raw) return false;
           const od = toDateOnly(raw);
           if (!od) return false;
 
-          if (date === "today" && od.getTime() !== today.getTime()) return false;
-          if (date === "yesterday" && od.getTime() !== yesterday.getTime()) return false;
-          if (date === "tomorrow" && od.getTime() !== tomorrow.getTime()) return false;
+          if (date === DateTypes.TODAY && od.getTime() !== today.getTime()) return false;
+          if (date === DateTypes.YESTERDAY && od.getTime() !== yesterday.getTime()) return false;
+          if (date === DateTypes.TOMORROW && od.getTime() !== tomorrow.getTime()) return false;
 
-          if (date === "range") {
+          if (date === DateTypes.RANGE) {
             const from = toDateOnly(dateFrom);
             const to = toDateOnly(dateTo);
 
@@ -2017,7 +2028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (search && search.trim()) {
           const s = search.toLowerCase();
           const client = clientsMap[o.clientId];
-          const clientName = client ? (client.type !== "societe" ? `${client.firstName} ${client.lastName}` : client.companyName) : "";
+          const clientName = client ? (client.type !== CLIENT_TYPE ? `${client.firstName} ${client.lastName}` : client.companyName) : "";
           const code = (o.code || "").toString().toLowerCase();
           if (!code.includes(s) && !clientName.toLowerCase().includes(s)) return false;
         }
@@ -2050,19 +2061,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 5) Récupérer les livraisons pour toutes les commandes filtrées
       const deliveryQuantities: Record<number, { toDeliver: number; delivered: number }> = {};
-      
+
       for (const orderId of Array.from(filteredIds)) {
         const deliveries = await storage.getInventoryOperationsByOrder(orderId);
-        
+
         deliveries.forEach(delivery => {
           delivery.items.forEach(deliveryItem => {
             const articleId = deliveryItem.articleId;
             const quantity = parseFloat(deliveryItem.quantity);
-            
+
             if (!deliveryQuantities[articleId]) {
               deliveryQuantities[articleId] = { toDeliver: 0, delivered: 0 };
             }
-            
+
             // Si la livraison est validée, c'est livré, sinon c'est programmé
             if (delivery.isValidated) {
               deliveryQuantities[articleId].delivered += quantity;
@@ -2085,12 +2096,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const qCommande = Number(item.quantity) || 0;
 
           if (!agg[articleId]) {
-            agg[articleId] = { 
-              articleId, 
-              ordered: 0, 
-              toPick: 0, 
-              toDeliver: 0, 
-              delivered: 0, 
+            agg[articleId] = {
+              articleId,
+              ordered: 0,
+              toPick: 0,
+              toDeliver: 0,
+              delivered: 0,
               remaining: 0,
               toProduce: 0
             };
@@ -2246,7 +2257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
               )
             );
-          if (existing.length > 0 && existing.some(f => f.status !== 'cancelled')) {
+          if (existing.length > 0 && existing.some(f => f.status !== InventoryOperationStatus.CANCELLED)) {
             return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
           }
         }
@@ -2258,7 +2269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         });
         // Calcul automatique des totaux pour les livraisons
-        if (operationData.type === 'livraison') {
+        if (operationData.type === InventoryOperationType.LIVRAISON) {
           let subtotalHT = 0;
           let totalTax = 0;
           let totalTTC = 0;
@@ -2321,7 +2332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Pour les préparations, calculer automatiquement les ingrédients à consommer
-        if (operationData.type === 'fabrication' || operationData.type === 'fabrication_reliquat') {
+        if (operationData.type === InventoryOperationType.FABRICATION || operationData.type === InventoryOperationType.FABRICATION_RELIQUAT) {
           const allItems = [...itemsData]; // Copie des items produits
 
           // Pour chaque produit à produire, calculer les ingrédients nécessaires
@@ -2355,15 +2366,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback to the old method for backward compatibility
         const operationData = insertInventoryOperationSchema.parse(req.body);
         // Vérification inventaire initiale unique par zone
-        if (operationData.type === 'inventaire_initiale' && operationData.storageZoneId) {
+        if (operationData.type === InventoryOperationType.INVENTAIRE_INITIALE && operationData.storageZoneId) {
           const existing = await db.select().from(inventoryOperations)
             .where(
               and(
-                eq(inventoryOperations.type, 'inventaire_initiale'),
+                eq(inventoryOperations.type, InventoryOperationType.INVENTAIRE_INITIALE),
                 eq(inventoryOperations.storageZoneId, operationData.storageZoneId)
               )
             );
-          if (existing.length > 0 && existing.some(f => f.status !== 'cancelled')) {
+          if (existing.length > 0 && existing.some(f => f.status !== InventoryOperationStatus.CANCELLED)) {
             return res.status(400).json({ message: 'Un inventaire initial existe déjà pour cette zone.' });
           }
         }
@@ -2432,7 +2443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           operation.totalTTC = totalCost.toString();
         }
         // Pour les préparations, calculer automatiquement les ingrédients à consommer
-        if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
+        if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
           var NewItems = items.filter((f: any) => f.quantity >= 0);
           const allItems = [...NewItems]; // Copie des items produits
 
@@ -2500,7 +2511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // If only status is being updated and it's a completion/cancellation
-      if (status && !scheduledDate && ["completed", "cancelled"].includes(status)) {
+      if (status && !scheduledDate && [InventoryOperationStatus.COMPLETED, InventoryOperationStatus.CANCELLED].includes(status)) {
         const result = await storage.updateInventoryOperationStatus(id, status);
         if (result) {
           res.json(result);
@@ -2557,8 +2568,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, startedAt } = req.body;
 
       // Validate required fields
-      if (status !== 'in_progress') {
-        return res.status(400).json({ message: "Status must be 'in_progress'" });
+      if (status !== InventoryOperationStatus.IN_PROGRESS) {
+        return res.status(400).json({ message: "Status must be IN_PROGRESS" });
       }
 
       if (!startedAt) {
@@ -2571,18 +2582,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Inventory operation not found" });
       }
 
-      if (operation.status === 'completed' || operation.status === 'cancelled') {
+      if (operation.status === InventoryOperationStatus.COMPLETED || operation.status === InventoryOperationStatus.CANCELLED) {
         return res.status(400).json({ message: "Operation cannot be started" });
       }
 
-      if (operation.status === 'in_progress') {
+      if (operation.status === InventoryOperationStatus.IN_PROGRESS) {
         return res.status(400).json({ message: "Operation is already in progress" });
       }
       // Get operation items to consume ingredients
       const items = await storage.getInventoryOperationItems(id);
 
       // For preparation operations, only handle waste if any
-      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
+      if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
         console.log('🔍 Starting preparation - items already calculated during creation');
         // Les ingrédients sont déjà calculés lors de la création
         // Ici on ne fait que démarrer la préparation
@@ -2590,7 +2601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update operation status
       const updateData: Partial<InsertInventoryOperation> = {
-        status: 'in_progress',
+        status: InventoryOperationStatus.IN_PROGRESS,
         startedAt: startedAt
       };
 
@@ -2599,7 +2610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Failed to update operation" });
       }
       // Libérer les réservations d'ingrédients une fois que la préparation commence
-      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
+      if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
         await storage.releaseAllReservationsForOperation(id);
       }
 
@@ -2623,8 +2634,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, completedAt, conformQuantity, wasteReason, preparationZoneId, wasteZoneId } = req.body;
 
       // Validate required fields
-      if (status !== 'completed') {
-        return res.status(400).json({ message: "Status must be 'completed'" });
+      if (status !== InventoryOperationStatus.COMPLETED) {
+        return res.status(400).json({ message: "Status must be InventoryOperationStatus.COMPLETED" });
       }
 
       if (!completedAt) {
@@ -2637,20 +2648,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Inventory operation not found" });
       }
 
-      if (operation.status === 'completed') {
+      if (operation.status === InventoryOperationStatus.COMPLETED) {
         return res.status(400).json({ message: "Operation is already completed and cannot be modified" });
       }
 
       // Update operation status
       const updateData: Partial<InsertInventoryOperation> = {
-        status: 'completed',
+        status: InventoryOperationStatus.COMPLETED,
         completedAt: completedAt,
         completedBy: req.body.completedBy || null
       };
 
 
       // For preparation operations, update stock with actual quantities
-      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
+      if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
         const conformQty = parseFloat(conformQuantity || '0');
 
         // Handle waste if conform quantity is less than planned
@@ -2681,8 +2692,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // 3. Créer l'opération de rebut avec parentOperationId
           const wasteOperation = {
-            type: 'ajustement_rebut',
-            status: 'completed',
+            type: InventoryOperationType.AJUSTEMENT_REBUT,
+            status: InventoryOperationStatus.COMPLETED,
             operatorId: operation.operatorId,
             scheduledDate: new Date().toISOString(),
             notes: `Rebut de préparation ${operation.code}: ${wasteReason || 'Aucune raison spécifiée'}`,
@@ -2780,7 +2791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { supplier_id, status } = req.query;
       // On mappe vers inventory_operations type=reception
-      let ops = await storage.getInventoryOperationsByType('reception');
+      let ops = await storage.getInventoryOperationsByType(InventoryOperationType.RECEPTION);
       if (supplier_id) {
         ops = ops.filter(op => op.supplierId === parseInt(supplier_id as string));
       }
@@ -2798,7 +2809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const op = await storage.getInventoryOperation(id);
-      if (!op || op.type !== 'reception') {
+      if (!op || op.type !== InventoryOperationType.RECEPTION) {
         return res.status(404).json({ message: "Reception not found" });
       }
       const items = await storage.getInventoryOperationItems(id);
@@ -2816,8 +2827,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const body = req.body as any;
       // On accepte payload existant de la page, on transforme vers opération
       const op = await storage.createInventoryOperation({
-        type: 'reception',
-        status: body?.purchaseOrder?.status ?? 'completed',
+        type: InventoryOperationType.RECEPTION,
+        status: body?.purchaseOrder?.status ?? InventoryOperationStatus.COMPLETED,
         supplierId: body?.purchaseOrder?.supplierId,
         storageZoneId: body?.items?.[0]?.storageZoneId ?? null,
         notes: body?.purchaseOrder?.notes ?? null,
@@ -2868,7 +2879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     const { status } = req.body;
 
-    if (!["completed", "cancelled"].includes(status)) {
+    if (![InventoryOperationStatus.COMPLETED, InventoryOperationStatus.CANCELLED].includes(status)) {
       return res.status(400).json({ message: "Invalid status transition" });
     }
 
@@ -2896,12 +2907,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Vérifier que la réception existe et est de type reception
       const existingOp = await storage.getInventoryOperation(id);
-      if (!existingOp || existingOp.type !== 'reception') {
+      if (!existingOp || existingOp.type !== InventoryOperationType.RECEPTION) {
         return res.status(404).json({ message: "Reception not found" });
       }
 
       // Si l'opération était complétée, annuler d'abord les stocks existants
-      if (existingOp.status === 'completed') {
+      if (existingOp.status === InventoryOperationStatus.COMPLETED) {
         const existingItems = await storage.getInventoryOperationItems(id);
         for (const item of existingItems) {
 
@@ -2982,7 +2993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Si l'opération est maintenant complétée, ajouter les nouveaux stocks
-      if (updatedOp && updatedOp.status === 'completed') {
+      if (updatedOp && updatedOp.status === InventoryOperationStatus.COMPLETED) {
         for (const it of body.items ?? []) {
           const qty = Number(it.quantityOrdered) || 0;
           if (qty > 0) {
@@ -3182,7 +3193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Inventory operation not found" });
       }
 
-      if (operation.type !== 'fabrication' && operation.type !== 'fabrication_reliquat') {
+      if (operation.type !== InventoryOperationType.FABRICATION && operation.type !== InventoryOperationType.FABRICATION_RELIQUAT) {
         return res.status(400).json({ message: "Operation must be a preparation type" });
       }
 
@@ -3754,7 +3765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reservations = await db.select().from(stockReservations)
         .where(and(
           eq(stockReservations.articleId, articleIdNum),
-          eq(stockReservations.status, 'reserved')
+          eq(stockReservations.status, StockReservationStatus.RESERVED)
         ));
       // Calculer la disponibilité par lot et zone
       const availability = [];
@@ -4091,7 +4102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orderId, clientId, status } = req.query;
 
       // Récupérer les livraisons avec filtres
-      const deliveries = await storage.getInventoryOperationsByType('livraison', false);
+      const deliveries = await storage.getInventoryOperationsByType(InventoryOperationType.LIVRAISON, false);
 
       // Filtrer par orderId si fourni
       let filteredDeliveries = deliveries;
@@ -4144,7 +4155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } : null,
             client: client ? {
               id: client.id,
-              name: client.type === 'societe' ? client.companyName : `${client.firstName} ${client.lastName}`,
+              name: client.type === CLIENT_TYPE ? client.companyName : `${client.firstName} ${client.lastName}`,
               type: client.type
             } : null
           };
@@ -4175,7 +4186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { orderId } = req.query;
 
       // Récupérer toutes les livraisons avec leurs données complètes
-      const deliveries = await storage.getInventoryOperationsByType('livraison', false);
+      const deliveries = await storage.getInventoryOperationsByType(InventoryOperationType.LIVRAISON, false);
 
       // Filtrer par orderId si fourni
       let filteredDeliveries = deliveries;
@@ -4297,7 +4308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deliveries: enrichedDeliveries,
         clients: allClients.map(c => ({
           id: c.id,
-          name: c.type === 'societe' ? c.companyName : `${c.firstName} ${c.lastName}`,
+          name: c.type === CLIENT_TYPE ? c.companyName : `${c.firstName} ${c.lastName}`,
           type: c.type
         })),
         orders: Array.from(ordersMap.values()).map((o: any) => ({
@@ -4397,18 +4408,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/deliveries", async (req, res) => {
     try {
       // Validation input
-      const { deliveryDate, note, orderId,clientId, items } = req.body;
+      const { deliveryDate, note, orderId, clientId, items } = req.body;
       if (!orderId || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "orderId et items sont requis" });
       }
       // Construction de l'opération
       const operation = {
-        type: 'livraison',
+        type: InventoryOperationType.LIVRAISON,
         orderId,
         clientId,
         notes: note,
         deliveryDate,
-        status: 'draft',
+        status: InventoryOperationStatus.DRAFT,
       };
       // Construction des items
       const opItems = items.map((it: any) => ({
@@ -4436,11 +4447,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Construction de l'opération
       const operation = {
-        type: 'livraison',
+        type: InventoryOperationType.LIVRAISON,
         orderId,
         notes: note,
         deliveryDate,
-        status: 'draft',
+        status: InventoryOperationStatus.DRAFT,
       };
       // Construction des items (pour une livraison, la zone est la zone SOURCE)
       const opItems = items.map((it: any) => ({
@@ -4469,12 +4480,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Livraison non trouvée" });
       }
 
-      if (operation.type !== 'livraison') {
+      if (operation.type !== InventoryOperationType.LIVRAISON) {
         return res.status(400).json({ message: "Cette opération n'est pas une livraison" });
       }
 
       // Vérifier le statut - on ne peut pas supprimer une livraison validée
-      if (operation.status === 'completed') {
+      if (operation.status === InventoryOperationStatus.COMPLETED) {
         return res.status(400).json({ message: "Impossible de supprimer une livraison validée" });
       }
 
@@ -4497,13 +4508,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/deliveries/:id/reservations", async (req, res) => {
     try {
       const deliveryOperationId = parseInt(req.params.id);
-      // Annule toutes les réservations actives de type 'delivery' pour cette opération
+      // Annule toutes les réservations actives de type StockReservationType.DELIVERY pour cette opération
       const result = await db.update(stockReservations)
-        .set({ status: 'cancelled' })
+        .set({ status: StockReservationStatus.CANCELLED })
         .where(and(
           eq(stockReservations.inventoryOperationId, deliveryOperationId),
-          eq(stockReservations.reservationType, 'delivery'),
-          eq(stockReservations.status, 'reserved')
+          eq(stockReservations.reservationType, StockReservationType.DELIVERY),
+          eq(stockReservations.status, StockReservationStatus.RESERVED)
         ));
       res.json({ cancelledCount: result.rowCount || 0 });
     } catch (error) {
@@ -4519,7 +4530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reservations = await db.select().from(stockReservations)
         .where(and(
           eq(stockReservations.inventoryOperationId, deliveryOperationId),
-          eq(stockReservations.reservationType, 'delivery')
+          eq(stockReservations.reservationType, StockReservationType.DELIVERY)
         ));
       res.json(reservations);
     } catch (error) {

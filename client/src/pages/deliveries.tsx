@@ -65,6 +65,7 @@ import { DeliveryAssignmentModal } from "@/components/delivery-assignment-modal"
 import { DeliveryPackagesModal } from "@/components/delivery-packages-modal";
 import { DeliveryTrackingModal } from "@/components/delivery-tracking-modal";
 import { DeliveryPaymentModal } from "@/components/delivery-payment-modal";
+import { DateTypes, DEFAULT_CURRENCY_DZD, FILTER_ALL, InventoryOperationStatus, InventoryOperationType } from "@shared/constants";
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
@@ -265,8 +266,8 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
-      if(orderId)
-      orderDeliveryDetails[orderId] = null;
+      if (orderId)
+        orderDeliveryDetails[orderId] = null;
       toast({
         title: "Livraison mise à jour",
         description: "La livraison a été modifiée avec succès"
@@ -391,13 +392,13 @@ export default function DeliveriesPage() {
     // Pré-remplir l'entête
     setCurrentDelivery({
       id: fullDelivery.id,
-      type: fullDelivery.type || 'delivery',
-      status: fullDelivery.status || 'draft',
+      type: fullDelivery.type ||  InventoryOperationType.LIVRAISON,
+      status: fullDelivery.status || InventoryOperationStatus.DRAFT,
       clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
       orderId: fullDelivery.orderId || null,
       scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
       notes: fullDelivery.notes || '',
-      currency: 'DZD',
+      currency: DEFAULT_CURRENCY_DZD,
     });
 
     // Regrouper les items par article avec agrégation des quantités et splits multiples
@@ -459,13 +460,13 @@ export default function DeliveriesPage() {
 
     setCurrentDelivery({
       id: (fullDelivery as any).id,
-      type: (fullDelivery as any).type || 'delivery',
-      status: (fullDelivery as any).status || 'draft',
+      type: (fullDelivery as any).type || InventoryOperationType.LIVRAISON,
+      status: (fullDelivery as any).status || InventoryOperationStatus.DRAFT,
       clientId: (fullDelivery as any).clientId || (fullDelivery as any).order?.clientId || null,
       orderId: (fullDelivery as any).orderId || null,
       scheduledDate: (fullDelivery as any).deliveryDate || (fullDelivery as any).scheduledDate || new Date().toISOString().split('T')[0],
       notes: (fullDelivery as any).notes || '',
-      currency: 'DZD',
+      currency: DEFAULT_CURRENCY_DZD,
     });
 
     // Regrouper items par article pour l'affichage
@@ -731,7 +732,7 @@ export default function DeliveriesPage() {
       if (deliveryId) {
         deliveryResponse = await apiRequest(`/api/deliveries/${deliveryId}`, "PUT", payload);
 
-          orderDeliveryDetails[currentDelivery.orderId] = null;
+        orderDeliveryDetails[currentDelivery.orderId] = null;
         // Pour un PUT, on suppose que l'id ne change pas
       } else {
         deliveryResponse = await apiRequest("/api/deliveries", "POST", payload);
@@ -1017,7 +1018,7 @@ export default function DeliveriesPage() {
   };
 
   const getRelatedOperations = (deliveryId: number) => {
-    return inventoryOperations.filter(op => op.parentOperationId === deliveryId || (op.type === 'livraison' && op.orderId === deliveryId));
+    return inventoryOperations.filter(op => op.parentOperationId === deliveryId || (op.type === InventoryOperationType.LIVRAISON && op.orderId === deliveryId));
   };
   // Fonction pour vérifier si une date correspond au filtre
   const matchesDateFilter = (DeliveryDate: string | null) => {
@@ -1043,16 +1044,16 @@ export default function DeliveriesPage() {
     const normalizedTomorrow = normalizeDate(tomorrow);
 
     switch (filterDate) {
-      case "today":
+      case DateTypes.TODAY:
         return normalizedDeliveryDate.getTime() === normalizedToday.getTime();
 
-      case "yesterday":
+      case DateTypes.YESTERDAY:
         return normalizedDeliveryDate.getTime() === normalizedYesterday.getTime();
 
-      case "tomorrow":
+      case DateTypes.TOMORROW:
         return normalizedDeliveryDate.getTime() === normalizedTomorrow.getTime();
 
-      case "range": {
+      case DateTypes.RANGE: {
         // Si les deux vides → pas de filtre
         if (!filterDateFrom && !filterDateTo) return true;
 
@@ -1081,10 +1082,10 @@ export default function DeliveriesPage() {
   // const totals = calculateTotals();
 
   const filteredDeliveries = deliveries.filter((delivery) => {
-    const matchesOrder = orderIdFilter === 'all' || String(delivery.orderId ?? '') === orderIdFilter;
-    const matchesDate = !filterDate || filterDate === "all" || matchesDateFilter(delivery?.order?.deliveryDate);
-    const matchesClient = clientIdFilter === 'all' || String(delivery.clientId ?? '') === clientIdFilter;
-    const matchesStatus = statusFilter === 'all' || delivery.status === statusFilter;
+    const matchesOrder = orderIdFilter === FILTER_ALL || String(delivery.orderId ?? '') === orderIdFilter;
+    const matchesDate = !filterDate || filterDate === FILTER_ALL || matchesDateFilter(delivery?.order?.deliveryDate);
+    const matchesClient = clientIdFilter === FILTER_ALL || String(delivery.clientId ?? '') === clientIdFilter;
+    const matchesStatus = statusFilter === FILTER_ALL || delivery.status === statusFilter;
     // Ajoutez ici la logique de recherche si besoin
     return matchesOrder && matchesClient && matchesStatus && matchesDate;
   });
@@ -1161,11 +1162,11 @@ export default function DeliveriesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="draft">Brouillon</SelectItem>
-                  <SelectItem value="pending">En attente</SelectItem>
-                  <SelectItem value="ready">Prêt</SelectItem>
-                  <SelectItem value="completed">Livré</SelectItem>
-                  <SelectItem value="cancelled">Annulé</SelectItem>
+                  <SelectItem value={InventoryOperationStatus.DRAFT}>Brouillon</SelectItem>
+                  <SelectItem value={InventoryOperationStatus.PENDING}>En attente</SelectItem>
+                  <SelectItem value={InventoryOperationStatus.READY}>Prêt</SelectItem>
+                  <SelectItem value={InventoryOperationStatus.COMPLETED}>Livré</SelectItem>
+                  <SelectItem value={InventoryOperationStatus.CANCELLED}>Annulé</SelectItem>
                 </SelectContent>
               </Select>
               {/* Désactiver le bouton Nouvelle livraison */}
@@ -1182,7 +1183,7 @@ export default function DeliveriesPage() {
                     <Input
                       type="date"
                       value={filterDateFrom}
-                      onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate("range"); }}
+                      onChange={(e) => { setFilterDateFrom(e.target.value); setFilterDate(DateTypes.RANGE); }}
                       data-testid="input-date-from"
                       className="h-9 text-sm"
                     />
@@ -1192,7 +1193,7 @@ export default function DeliveriesPage() {
                     <Input
                       type="date"
                       value={filterDateTo}
-                      onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate("range"); }}
+                      onChange={(e) => { setFilterDateTo(e.target.value); setFilterDate(DateTypes.RANGE); }}
                       data-testid="input-date-to"
                       className="h-9 text-sm"
                     />
@@ -1202,9 +1203,9 @@ export default function DeliveriesPage() {
                 {/* Boutons rapides */}
                 <div className="flex  col-span-3 items-center justify-center gap-2">
                   {[
-                    { label: "Aujourd'hui", value: "today" },
-                    { label: "Hier", value: "yesterday" },
-                    { label: "Demain", value: "tomorrow" },
+                    { label: "Aujourd'hui", value: DateTypes.TODAY },
+                    { label: "Hier", value: DateTypes.YESTERDAY },
+                    { label: "Demain", value: DateTypes.TOMORROW },
                   ].map(({ label, value }) => (
                     <Button
                       key={value}
@@ -1215,8 +1216,8 @@ export default function DeliveriesPage() {
                       onClick={() => {
                         const base = new Date();
                         let d: Date;
-                        if (value === "yesterday") d = new Date(base.getTime() - 86400000);
-                        else if (value === "tomorrow") d = new Date(base.getTime() + 86400000);
+                        if (value === DateTypes.YESTERDAY) d = new Date(base.getTime() - 86400000);
+                        else if (value === DateTypes.TOMORROW) d = new Date(base.getTime() + 86400000);
                         else d = base;
                         const iso = d.toISOString().split("T")[0];
                         setFilterDate(value);
@@ -1233,7 +1234,7 @@ export default function DeliveriesPage() {
                     size="sm"
                     className="rounded-full border-orange-200 text-orange-600 hover:bg-orange-600"
                     onClick={() => {
-                      setFilterDate("all");
+                      setFilterDate(FILTER_ALL);
                       setFilterDateFrom("");
                       setFilterDateTo("");
                     }}
@@ -1320,7 +1321,7 @@ export default function DeliveriesPage() {
                               });
                             }
                           }}
-                          disabled={delivery.status === "completed"}
+                          disabled={delivery.status === InventoryOperationStatus.COMPLETED}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue />
@@ -1353,7 +1354,7 @@ export default function DeliveriesPage() {
                             <DropdownMenuItem onClick={() => viewDelivery(delivery)} data-testid={`button-view-delivery-${delivery.id}`}>
                               <Eye className="h-4 w-4" /> Voir les détails
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === "completed"} data-testid={`button-edit-delivery-${delivery.id}`}>
+                            <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
                               <Edit3 className="h-4 w-4" /> Modifier
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setAssignmentModal({ open: true, delivery })}>
@@ -1370,12 +1371,12 @@ export default function DeliveriesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              disabled={delivery.status === "completed" || deleteDeliveryMutation.isPending}
+                              disabled={delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
                               onClick={() => {
-                                const confirmMessage = delivery.status === "completed"
+                                const confirmMessage = delivery.status === InventoryOperationStatus.COMPLETED
                                   ? "Cette livraison est validée et ne peut pas être supprimée."
                                   : `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
-                                if (delivery.status === "completed") {
+                                if (delivery.status === InventoryOperationStatus.COMPLETED) {
                                   toast({
                                     title: "Suppression impossible",
                                     description: "Les livraisons validées ne peuvent pas être supprimées",
@@ -1392,7 +1393,7 @@ export default function DeliveriesPage() {
                               <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              disabled={delivery.status === "completed" || delivery.status === "cancelled"}
+                              disabled={delivery.status === InventoryOperationStatus.COMPLETED || delivery.status === InventoryOperationStatus.CANCELLED}
                               onClick={() => handleCancelDelivery(delivery)}
                               data-testid={`button-cancel-delivery-${delivery.id}`}
                             >
@@ -1401,7 +1402,7 @@ export default function DeliveriesPage() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
-                      {delivery.status === 'cancelled' && (
+                      {delivery.status === InventoryOperationStatus.CANCELLED && (
                         <CancellationDetails
                           delivery={{
                             ...delivery,
@@ -1448,7 +1449,7 @@ export default function DeliveriesPage() {
                     <Save className="h-4 w-4 mr-2" />
                     {currentDelivery.id ? "Mettre à jour" : "Créer"}
                   </Button>
-                  {currentDelivery.id && currentDelivery.status !== "completed" && (
+                  {currentDelivery.id && currentDelivery.status !== InventoryOperationStatus.COMPLETED && (
                     <Button
                       className="bg-green-600 hover:bg-green-700 text-white"
                       onClick={async () => {

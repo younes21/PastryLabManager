@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Eye, Edit, Trash2, User, Calendar, Package } from "lucide-react";
 import type { Order, Client, Article } from "@shared/schema";
 import { ProductionSummaryDialog } from "./production-summary-dialog";
+import { CLIENT_TYPE } from "@shared/constants";
 
 interface ProductionStatus {
   orderId: number;
@@ -64,7 +65,7 @@ export function OrderRow({
 
   const getClientName = (clientId: number) => {
     const client = clients.find((c) => c.id === clientId);
-    if (client?.type != 'societe') return client ? `${client.firstName} ${client.lastName}` : "Client inconnu";
+    if (client?.type != CLIENT_TYPE) return client ? `${client.firstName} ${client.lastName}` : "Client inconnu";
     else return client ? `${client.companyName}` : "Client inconnu";
   };
 

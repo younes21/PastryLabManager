@@ -7,14 +7,19 @@ import {
   decimal,
   timestamp,
   AnyPgColumn,
-  unique,
   doublePrecision,
-  real,
   check,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import {
+  DEFAULT_CURRENCY,
+  DEFAULT_CURRENCY_RATE,
+  AccountingAccountNature,
+  WorkStationStatus,
+  DEFAULT_MIN_QUANTITY,
+} from "./constants";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -23,7 +28,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  role: text("role").notNull(), // 'admin', 'preparateur', 'gerant', 'client', 'livreur'
+  role: text("role").notNull(), // UserRole enum values
   active: boolean("active").default(true),
 });
 
@@ -39,7 +44,7 @@ export const measurementUnits = pgTable("measurement_units", {
   categoryId: integer("category_id").references(() => measurementCategories.id),
   label: text("label").notNull(),
   abbreviation: text("abbreviation").notNull(),
-  type: text("type").notNull(), // 'reference', 'larger', 'smaller'
+  type: text("type").notNull(), // MeasurementUnitType enum values
   factor: doublePrecision("factor").notNull(), // Conversion factor to reference unit
   active: boolean("active").default(true),
 });
@@ -60,7 +65,7 @@ export const articleCategories = pgTable("article_categories", {
 export const priceLists = pgTable("price_lists", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
-  currency: text("currency").notNull().default("DA"),
+  currency: text("currency").notNull().default(DEFAULT_CURRENCY),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
@@ -71,16 +76,16 @@ export const priceRules = pgTable("price_rules", {
   priceListId: integer("price_list_id")
     .references(() => priceLists.id)
     .notNull(),
-  applyTo: text("apply_to").notNull(), // 'article' or 'category'
+  applyTo: text("apply_to").notNull(), // PriceRuleApplyTo enum values
   articleId: integer("article_id").references(() => articles.id), // null if applies to category
   categoryId: integer("category_id").references(() => articleCategories.id), // null if applies to article
-  priceType: text("price_type").notNull(), // 'fixed', 'discount', 'formula'
+  priceType: text("price_type").notNull(), // PriceRuleType enum values
   fixedPrice: decimal("fixed_price", { precision: 10, scale: 2 }),
   discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }),
   formulaExpression: text("formula_expression"), // Expression pour calculs avancés
   minQuantity: decimal("min_quantity", { precision: 10, scale: 3 })
     .notNull()
-    .default("1"),
+    .default(DEFAULT_MIN_QUANTITY),
   validFrom: timestamp("valid_from", { mode: "string" }),
   validTo: timestamp("valid_to", { mode: "string" }),
   active: boolean("active").notNull().default(true),
@@ -104,7 +109,7 @@ export const currencies = pgTable("currencies", {
   symbol: text("symbol").notNull(), // دج, DA, $
   rate: decimal("rate", { precision: 10, scale: 4 })
     .notNull()
-    .default("1.0000"), // Taux par rapport à la devise de base
+    .default(DEFAULT_CURRENCY_RATE), // Taux par rapport à la devise de base
   isBase: boolean("is_base").default(false), // Devise de base (DA)
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
@@ -114,7 +119,7 @@ export const deliveryMethods = pgTable("delivery_methods", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
   code: text("code").notNull().unique(), // LIV-000001
-  price: decimal("price", { precision: 10, scale: 2 }).default("0.00"),
+  price: decimal("price", { precision: 10, scale: 2 }).default('0.00'),
   description: text("description"),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
@@ -124,7 +129,7 @@ export const accountingJournals = pgTable("accounting_journals", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
   code: text("code").notNull().unique(), // JRN-000001
-  type: text("type").notNull(), // 'vente', 'achat', 'banque', 'caisse', 'ope_diverses'
+  type: text("type").notNull(), // AccountingJournalType enum values
   description: text("description"),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
@@ -134,8 +139,8 @@ export const accountingAccounts = pgTable("accounting_accounts", {
   id: serial("id").primaryKey(),
   number: text("number").notNull().unique(), // Numéro de compte (ex: 411000)
   designation: text("designation").notNull(),
-  type: text("type").notNull(), // 'actif', 'passif', 'charge', 'produit'
-  nature: text("nature").notNull().default("debit"), // 'debit', 'credit'
+  type: text("type").notNull(), // AccountingAccountType enum values
+  nature: text("nature").notNull().default(AccountingAccountNature.DEBIT), // 'debit', 'credit'
   parentId: integer("parent_id").references(
     (): AnyPgColumn => accountingAccounts.id,
   ), // Comptes hiérarchiques
@@ -150,7 +155,7 @@ export const storageZones = pgTable("storage_zones", {
   code: text("code").notNull().unique(), // ZON-000001
   description: text("description"),
   capacity: decimal("capacity", { precision: 10, scale: 2 }),
-  unit: text("unit"), // 'kg', 'l', 'm3', 'pieces'
+  unit: text("unit"), // StorageUnit enum values
   temperature: decimal("temperature", { precision: 5, scale: 2 }),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
@@ -160,7 +165,7 @@ export const workStations = pgTable("work_stations", {
   id: serial("id").primaryKey(),
   designation: text("designation").notNull(),
   code: text("code").notNull().unique(), // PST-000001
-  type: text("type").notNull(), // 'four', 'mixeur', 'refrigerateur', 'plan_travail', 'machine_specialist'
+  type: text("type").notNull(), // WorkStationType enum values
   brand: text("brand"), // Marque
   model: text("model"), // Modèle
   serialNumber: text("serial_number"), // Numéro de série
@@ -169,7 +174,7 @@ export const workStations = pgTable("work_stations", {
   description: text("description"),
   maintenanceDate: timestamp("maintenance_date", { mode: "string" }), // Dernière maintenance
   nextMaintenanceDate: timestamp("next_maintenance_date", { mode: "string" }), // Prochaine maintenance
-  status: text("status").notNull().default("operationnel"), // 'operationnel', 'en_panne', 'maintenance', 'hors_service'
+  status: text("status").notNull().default(WorkStationStatus.OPERATIONNEL), // 'operationnel', 'en_panne', 'maintenance', 'hors_service'
   active: boolean("active").default(true),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
@@ -177,7 +182,7 @@ export const workStations = pgTable("work_stations", {
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // FRN-000001
-  type: text("type").notNull(), // 'particulier', 'societe'
+  type: text("type").notNull(), // PersonType enum values
   companyType: text("company_type"), // 'eurl', 'sarl', 'spa', 'snc', etc.
   // Informations personnelles/société
   firstName: text("first_name"), // Pour particulier
@@ -206,7 +211,7 @@ export const suppliers = pgTable("suppliers", {
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // CLI-000001
-  type: text("type").notNull(), // 'particulier' ou 'societe'
+  type: text("type").notNull(), // PersonType enum values
   companyType: text("company_type"), // 'eurl', 'sarl', 'spa', 'snc', etc.
   // Informations personnelles/société
   firstName: text("first_name"), // Pour particulier

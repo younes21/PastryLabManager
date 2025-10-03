@@ -32,6 +32,26 @@ import {
 import { db } from "./db";
 import { eq, desc, lt, and, sql, gt } from "drizzle-orm";
 import camelcaseKeys from 'camelcase-keys';
+import {
+  ArticleCategoryType,
+  OrderType,
+  OrderStatus,
+  InventoryOperationType,
+  InventoryOperationStatus,
+  StockReservationStatus,
+  StockReservationType,
+  StockReservationDirection,
+  OrderPrefix,
+  PrefixInventoryOperationType,
+  DEFAULT_ARTICLE_UNIT,
+  ZONE_CODE_PREFIX,
+  JOURNAL_CODE_PREFIX,
+  TAX_CODE_PREFIX,
+  ArticlePrefix,
+  STATION_CODE_PREFIX,
+  SUPPLIER_CODE_PREFIX,
+  CLIENT_CODE_PREFIX,
+} from "@shared/constants";
 
 
 export interface IStorage {
@@ -68,7 +88,7 @@ export interface IStorage {
 
   // Article Categories
   getArticleCategory(id: number): Promise<ArticleCategory | undefined>;
-  getAllArticleCategories(type: "produit" | "ingredient" | "service" | undefined): Promise<ArticleCategory[]>;
+  getAllArticleCategories(type: ArticleCategoryType | undefined): Promise<ArticleCategory[]>;
   getActiveArticleCategories(): Promise<ArticleCategory[]>;
   createArticleCategory(category: InsertArticleCategory): Promise<ArticleCategory>;
   updateArticleCategory(id: number, category: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined>;
@@ -370,11 +390,11 @@ export class DatabaseStorage implements IStorage {
 
   // Ingredients (filtrage des articles par type="ingredient")
   async getAllIngredients(): Promise<Article[]> {
-    return await db.select().from(articles).where(eq(articles.type, "ingredient")).orderBy(articles.name);
+    return await db.select().from(articles).where(eq(articles.type, ArticleCategoryType.INGREDIENT as string)).orderBy(articles.name);
   }
 
   async getIngredient(id: number): Promise<Article | undefined> {
-    const [article] = await db.select().from(articles).where(and(eq(articles.id, id), eq(articles.type, "ingredient")));
+    const [article] = await db.select().from(articles).where(and(eq(articles.id, id), eq(articles.type, ArticleCategoryType.INGREDIENT as string)));
     return article || undefined;
   }
 
@@ -382,11 +402,11 @@ export class DatabaseStorage implements IStorage {
     // Générer un code automatique pour les ingrédients
     const existingIngredients = await this.getAllIngredients();
     const nextNumber = existingIngredients.length + 1;
-    const code = `ING-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${ArticlePrefix.INGREDIENT}-${nextNumber.toString().padStart(6, '0')}`;
 
     const articleData = {
       ...insertArticle,
-      type: "ingredient" as const,
+      type: ArticleCategoryType.INGREDIENT as string,
       code,
     };
 
@@ -412,7 +432,7 @@ export class DatabaseStorage implements IStorage {
   async getLowStockIngredients(): Promise<Article[]> {
     return await db.select().from(articles)
       .where(and(
-        eq(articles.type, "ingredient"),
+        eq(articles.type, ArticleCategoryType.INGREDIENT as string),
         eq(articles.active, true),
         lt(articles.currentStock, articles.minStock)
       ))
@@ -493,9 +513,9 @@ export class DatabaseStorage implements IStorage {
     return category || undefined;
   }
 
-  async getAllArticleCategories(type: "produit" | "ingredient" | "service" | undefined): Promise<ArticleCategory[]> {
+  async getAllArticleCategories(type: ArticleCategoryType | undefined): Promise<ArticleCategory[]> {
     if (type) {
-      return await db.select().from(articleCategories).where(eq(articleCategories.type, type));
+      return await db.select().from(articleCategories).where(eq(articleCategories.type, type as string));
     }
     return await db.select().from(articleCategories);
   }
@@ -532,7 +552,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(articles).orderBy(articles.name);
   }
 
-//************************* fonctions pour avoir stock (total stock, total stock dispo) d'un seul article ou plusieurs articles ou tous les articles, (total stock, dispo stock) ou detailed:(total stock/dispo par zone,lot)******* */
+  //************************* fonctions pour avoir stock (total stock, total stock dispo) d'un seul article ou plusieurs articles ou tous les articles, (total stock, dispo stock) ou detailed:(total stock/dispo par zone,lot)******* */
   async queryArticleStock<T extends boolean>(
     withDetails: T,
     articleIds?: number | number[]
@@ -554,11 +574,11 @@ export class DatabaseStorage implements IStorage {
     LEFT JOIN storage_zones sz ON sz.id=s.storage_zone_id
     LEFT JOIN lots l ON l.id=s.lot_id
     LEFT JOIN (SELECT article_id,lot_id,storage_zone_id,SUM(reserved_quantity) total_reserved 
-               FROM stock_reservations WHERE status='reserved' AND reservation_direction='in' 
+               FROM stock_reservations WHERE status=${StockReservationStatus.RESERVED} AND reservation_direction=${StockReservationDirection.IN} 
                GROUP BY article_id,lot_id,storage_zone_id) sr_in 
       ON sr_in.article_id=a.id AND sr_in.lot_id=s.lot_id AND sr_in.storage_zone_id=s.storage_zone_id
     LEFT JOIN (SELECT article_id,lot_id,storage_zone_id,SUM(reserved_quantity) total_reserved 
-               FROM stock_reservations WHERE status='reserved' AND reservation_direction='out' 
+               FROM stock_reservations WHERE status=${StockReservationStatus.RESERVED} AND reservation_direction=${StockReservationDirection.OUT} 
                GROUP BY article_id,lot_id,storage_zone_id) sr_out 
       ON sr_out.article_id=a.id AND sr_out.lot_id=s.lot_id AND sr_out.storage_zone_id=s.storage_zone_id
     WHERE a.active=true
@@ -587,7 +607,7 @@ export class DatabaseStorage implements IStorage {
     return rows[0] ?? null;
   }
 
-  // Une sélection d’articles
+  // Une sélection d'articles
   async getSelectedArticlesStock(articleIds: number[], withDetails = false): Promise<ArticleStockBase[] | ArticleStockDetail[]> {
     return this.queryArticleStock(withDetails, articleIds);
   }
@@ -697,7 +717,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingTaxes = await this.getAllTaxes();
     const nextNumber = existingTaxes.length + 1;
-    const code = `TVA-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${TAX_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
 
     const taxData = {
       ...insertTax,
@@ -780,7 +800,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingMethods = await this.getAllDeliveryMethods();
     const nextNumber = existingMethods.length + 1;
-    const code = `LIV-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${PrefixInventoryOperationType[InventoryOperationType.LIVRAISON]}-${nextNumber.toString().padStart(6, '0')}`;
 
     const methodData = {
       ...insertDeliveryMethod,
@@ -818,7 +838,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingJournals = await this.getAllAccountingJournals();
     const nextNumber = existingJournals.length + 1;
-    const code = `JRN-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${JOURNAL_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
 
     const journalData = {
       ...insertJournal,
@@ -884,7 +904,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingZones = await this.getAllStorageZones();
     const nextNumber = existingZones.length + 1;
-    const code = `ZON-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${ZONE_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
 
     const zoneData = {
       ...insertZone,
@@ -922,7 +942,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingStations = await this.getAllWorkStations();
     const nextNumber = existingStations.length + 1;
-    const code = `PST-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${STATION_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
 
     const stationData = {
       ...insertWorkStation,
@@ -1096,7 +1116,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingSuppliers = await this.getAllSuppliers();
     const nextNumber = existingSuppliers.length + 1;
-    const code = `FRN-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${SUPPLIER_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
 
     const supplierData = {
       ...insertSupplier,
@@ -1139,7 +1159,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingClients = await this.getAllClients();
     const nextNumber = existingClients.length + 1;
-    const code = `CLI-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${CLIENT_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
 
     const clientData = {
       ...insertClient,
@@ -1197,7 +1217,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(orders)
       .leftJoin(clients, eq(orders.clientId, clients.id))
-      .where(eq(orders.status, 'confirmed'))
+      .where(eq(orders.status, OrderStatus.CONFIRMED))
       .orderBy(desc(orders.orderDate));
 
     // Get items for these orders with article info
@@ -1220,7 +1240,7 @@ export class DatabaseStorage implements IStorage {
           .leftJoin(articles, eq(orderItems.articleId, articles.id))
           .where(and(
             eq(orderItems.orderId, order.id),
-            eq(articles.type, 'product') // Only products
+            eq(articles.type, ArticleCategoryType.PRODUCT) // Only products
           ));
 
         // Filter items that still need preparation
@@ -1261,7 +1281,7 @@ export class DatabaseStorage implements IStorage {
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     // Generate automatic code
-    const prefix = insertOrder.type === 'quote' ? 'DEV' : 'CMD';
+    const prefix = insertOrder.type === OrderType.QUOTE ? OrderPrefix.DEV : OrderPrefix.CMD;
     const existingOrders = await this.getAllOrders();
     const nextNumber = existingOrders.length + 1;
     const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
@@ -1281,7 +1301,7 @@ export class DatabaseStorage implements IStorage {
     insertOrder.totalTTC = (parseFloat(insertOrder.subtotalHT) + parseFloat(insertOrder.totalTax)).toString();
 
     return await db.transaction(async (tx) => {
-      const prefix = insertOrder.type === "quote" ? "DEV" : "CMD";
+      const prefix = insertOrder.type === OrderType.QUOTE ? OrderPrefix.DEV : OrderPrefix.CMD;
       const existingOrders = await tx.select().from(orders);
       const nextNumber = existingOrders.length + 1;
       const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
@@ -1346,7 +1366,7 @@ export class DatabaseStorage implements IStorage {
     const foundOrders = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
     if (foundOrders[0]?.status != updateData.status) {
       updateData.statusDate = new Date().toISOString();
-      if (updateData.status == 'validated') {
+      if (updateData.status == OrderStatus.VALIDATED) {
         updateData.validatedAt = new Date().toISOString();
         // updateData.validatedBy = ...userId...when implementing user token...;
       }
@@ -1400,8 +1420,8 @@ export class DatabaseStorage implements IStorage {
 
   async getInventoryOperationsByType(type: string, includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
     const condition =
-      type === 'fabrication' && includeReliquat
-        ? sql`io.type IN ('fabrication', 'fabrication_reliquat')`
+      type === InventoryOperationType.FABRICATION && includeReliquat
+        ? sql`io.type IN (${InventoryOperationType.FABRICATION},${InventoryOperationType.FABRICATION_RELIQUAT} )`
         : sql`io.type = ${type}`;
 
     const result = await db.execute(sql`
@@ -1425,8 +1445,8 @@ export class DatabaseStorage implements IStorage {
   async getInventoryOperationsByTypes(types: string[], includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
     // Construire la condition pour plusieurs types
     const typeConditions = types.map(type => {
-      if (type === 'fabrication' && includeReliquat) {
-        return sql`io.type IN ('fabrication', 'fabrication_reliquat')`;
+      if (type === InventoryOperationType.FABRICATION && includeReliquat) {
+        return sql`io.type IN (${InventoryOperationType.FABRICATION},${InventoryOperationType.FABRICATION_RELIQUAT} )`;
       }
       return sql`io.type = ${type}`;
     });
@@ -1497,7 +1517,7 @@ export class DatabaseStorage implements IStorage {
         LEFT JOIN articles a
           ON a.id = iot.article_id
         WHERE io.operator_id = ${operatorId}
-          AND io.type IN ('fabrication', 'fabrication_reliquat')
+          AND io.type IN (${InventoryOperationType.FABRICATION},${InventoryOperationType.FABRICATION_RELIQUAT} )
         GROUP BY io.id, io.code, io.type, io.status, io.operator_id, io.scheduled_date, io.started_at, io.completed_at, io.notes, io.created_at, io.updated_at
         ORDER BY io.created_at DESC
       `);
@@ -1552,7 +1572,7 @@ export class DatabaseStorage implements IStorage {
         LEFT JOIN articles a
           ON a.id = iot.article_id
         WHERE io.order_id = ${orderId}
-          AND io.type = 'livraison'
+          AND io.type = ${InventoryOperationType.LIVRAISON}
         GROUP BY io.id, io.code, io.type, io.status, io.operator_id, io.scheduled_date, io.started_at, io.completed_at, io.notes, io.created_at, io.updated_at
         ORDER BY io.created_at DESC
       `);
@@ -1565,19 +1585,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation> {
-    // Generate automatic code based on type
-    const prefixes: Record<string, string> = {
-      'reception': 'REC',
-      'fabrication': 'PREP',
-      'fabrication_reliquat': 'PREL',
-      'ajustement': 'AJU',
-      'ajustement_rebut': 'REB',
-      'inventaire_initiale': 'INV',
-      'interne': 'INT',
-      'livraison': 'LIV'
-    };
 
-    const prefix = prefixes[insertOperation.type] || 'OP';
+
+    const prefix = PrefixInventoryOperationType[insertOperation.type];
     const existingOps = await this.getInventoryOperationsByType(insertOperation.type);
     const nextNumber = existingOps.length + 1;
     const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
@@ -1641,7 +1651,7 @@ export class DatabaseStorage implements IStorage {
       if (op.status === status) return op; // rien à faire
 
       // ---- Passage en completed ----
-      if (status === "completed" && op.status !== "completed") {
+      if (status === InventoryOperationStatus.COMPLETED && op.status !== InventoryOperationStatus.COMPLETED) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
           if (qty < 0) throw new Error(`Invalid qty for article ${item.articleId}`);
@@ -1658,7 +1668,7 @@ export class DatabaseStorage implements IStorage {
           // Entrée de stock (toStorageZoneId) - avec calcul PMP
           if (item.toStorageZoneId) {
             // Calculer le nouveau PMP pour les opérations d'achat et d'inventaire initial
-            if ((op.type === 'reception' || op.type === 'inventaire_initiale') && item.unitCost && parseFloat(item.unitCost) > 0) {
+            if ((op.type === InventoryOperationType.RECEPTION || op.type === 'inventaire_initiale') && item.unitCost && parseFloat(item.unitCost) > 0) {
               const newPMP = await this.calculateWeightedAveragePrice(
                 tx,
                 item.articleId,
@@ -1682,7 +1692,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // ---- Passage en cancelled ----
-      if (status === "cancelled" && op.status === "completed") {
+      if (status === InventoryOperationStatus.CANCELLED  && op.status === InventoryOperationStatus.COMPLETED ) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
           if (qty <= 0) continue;
@@ -1747,10 +1757,10 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Si scheduledDate est définie et que l'opération devient "programmed"
-        if (updateData.scheduledDate && operation.status === 'programmed') {
+        if (updateData.scheduledDate && operation.status === InventoryOperationStatus.PROGRAMMED) {
           // Libérer d'abord les anciennes réservations si elles existent
           await tx.update(stockReservations)
-            .set({ status: 'cancelled' })
+            .set({ status: InventoryOperationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, id));
 
           // Créer de nouvelles réservations pour les ingrédients
@@ -1790,8 +1800,8 @@ export class DatabaseStorage implements IStorage {
                   articleId: ingredientArticle.id,
                   inventoryOperationId: id,
                   reservedQuantity: requiredQuantity.toString(),
-                  reservationType: 'production' as const,
-                  reservationDirection: 'out',
+                  reservationType: StockReservationType.PRODUCTION as const,
+                  reservationDirection: StockReservationDirection.OUT,
                   stateChangedAt: new Date().toISOString(),
                   createdAt: new Date().toISOString(),
                   notes: `Réservation pour préparation ${id} - Produit: ${article.name}`,
@@ -1801,9 +1811,9 @@ export class DatabaseStorage implements IStorage {
           }
         }
         // Si l'opération n'est plus "programmed", libérer les réservations
-        else if (updateData.status && updateData.status !== 'programmed' && currentOperation.status === 'programmed') {
+        else if (updateData.status && updateData.status !== InventoryOperationStatus.PROGRAMMED && currentOperation.status === InventoryOperationStatus.PROGRAMMED) {
           await tx.update(stockReservations)
-            .set({ status: 'cancelled' })
+            .set({ status: InventoryOperationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, id));
         }
 
@@ -1879,7 +1889,7 @@ export class DatabaseStorage implements IStorage {
       const subIngredientQuantity = parseFloat(ingredient.quantity || '0');
       const adjustedQuantity = subIngredientQuantity * subProductQuantity;
 
-      if (article.type === 'product') {
+      if (article.type === ArticleCategoryType.PRODUCT) {
         // Si c'est un sous-sous-produit, calculer récursivement son coût
         const subRecipe = await this.getRecipeByArticleId(article.id);
         if (subRecipe) {
@@ -1890,7 +1900,7 @@ export class DatabaseStorage implements IStorage {
       } else {
         // Pour un ingrédient normal, convertir le coût selon les unités
         const subArticleCost = parseFloat(article.costPerUnit || '0');
-        const convertedCost = this.convertCost(subArticleCost, article.unit || 'kg', ingredient.unit || 'kg');
+        const convertedCost = this.convertCost(subArticleCost, article.unit || DEFAULT_ARTICLE_UNIT, ingredient.unit || DEFAULT_ARTICLE_UNIT);
         const ingredientCost = convertedCost * adjustedQuantity;
         totalCost += ingredientCost;
       }
@@ -1907,7 +1917,7 @@ export class DatabaseStorage implements IStorage {
       const article = await this.getArticle(ingredient.articleId);
       if (!article) continue;
 
-      if (article.type === 'product') {
+      if (article.type === ArticleCategoryType.PRODUCT) {
         // Pour un sous-produit, calculer le coût basé sur ses ingrédients (récursivement)
         const subRecipe = await this.getRecipeByArticleId(article.id);
         if (subRecipe) {
@@ -1919,7 +1929,7 @@ export class DatabaseStorage implements IStorage {
       } else {
         // Pour un ingrédient normal, convertir le coût selon l'unité de la recette
         const originalCost = parseFloat(article.costPerUnit || '0');
-        const unitCost = this.convertCost(originalCost, article.unit || 'kg', ingredient.unit || 'kg');
+        const unitCost = this.convertCost(originalCost, article.unit || DEFAULT_ARTICLE_UNIT, ingredient.unit || DEFAULT_ARTICLE_UNIT);
         const ingredientCost = unitCost * parseFloat(ingredient.quantity || '0');
         totalCost += ingredientCost;
       }
@@ -1968,7 +1978,7 @@ export class DatabaseStorage implements IStorage {
 
         // Calculer le coût unitaire récursivement
         let unitCost = 0;
-        if (ingredientArticle.type === 'product') {
+        if (ingredientArticle.type === ArticleCategoryType.PRODUCT) {
           // Pour un sous-produit, calculer le coût basé sur ses ingrédients (récursivement)
           const subRecipe = await this.getRecipeByArticleId(ingredientArticle.id);
           if (subRecipe) {
@@ -1980,7 +1990,7 @@ export class DatabaseStorage implements IStorage {
         } else {
           // Pour un ingrédient normal, convertir le coût selon l'unité de la recette
           const originalCost = parseFloat(ingredientArticle.costPerUnit || '0');
-          unitCost = this.convertCost(originalCost, ingredientArticle.unit || 'kg', ingredient.unit || 'kg');
+          unitCost = this.convertCost(originalCost, ingredientArticle.unit || DEFAULT_ARTICLE_UNIT, ingredient.unit || DEFAULT_ARTICLE_UNIT);
         }
 
         console.log(`🔍 Processing ingredient: ${ingredientArticle.name}, required: ${requiredQuantity}, unitCost: ${unitCost}`);
@@ -2325,14 +2335,14 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Gérer les réservations automatiquement
-      if (operation.type === 'livraison') {
+      if (operation.type === InventoryOperationType.LIVRAISON) {
         // Rafraîchir les réservations de livraison pour refléter les nouveaux splits/quantités
         await tx.update(stockReservations)
-          .set({ status: 'cancelled' })
+          .set({ status: InventoryOperationStatus.CANCELLED })
           .where(and(
             eq(stockReservations.inventoryOperationId, operationId),
-            eq(stockReservations.reservationType, 'delivery'),
-            eq(stockReservations.status, 'reserved')
+            eq(stockReservations.reservationType, StockReservationType.DELIVERY),
+            eq(stockReservations.status, StockReservationStatus.RESERVED)
           ));
 
         if (updatedItems.length > 0) {
@@ -2344,7 +2354,7 @@ export class DatabaseStorage implements IStorage {
               .from(stockReservations)
               .where(and(
                 eq(stockReservations.articleId, (item as any).articleId || (item as any).idArticle),
-                eq(stockReservations.status, 'reserved')
+                eq(stockReservations.status, StockReservationStatus.RESERVED)
               ));
             const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
             const availableStock = totalStock - totalReserved;
@@ -2360,21 +2370,21 @@ export class DatabaseStorage implements IStorage {
               lotId: (item as any).lotId || (item as any).idlot || null,
               storageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
               reservedQuantity: requestedQuantity.toString(),
-              status: 'reserved',
-              reservationDirection: 'out',
+              status: StockReservationStatus.RESERVED,
+              reservationDirection: StockReservationDirection.OUT,
               stateChangedAt: new Date().toISOString(),
               createdAt: new Date().toISOString(),
-              reservationType: 'delivery',
+              reservationType: StockReservationType.DELIVERY,
               notes: `Réservation après mise à jour livraison ${operationId}`,
             });
           }
         }
-      } else if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
+      } else if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
         // Si le statut devient "programmed", créer les réservations
-        if (operation.status === 'programmed' && currentOperation.status !== 'programmed') {
+        if (operation.status === InventoryOperationStatus.PROGRAMMED && currentOperation.status !== InventoryOperationStatus.PROGRAMMED) {
           // Libérer d'abord les anciennes réservations si elles existent
           await tx.update(stockReservations)
-            .set({ status: 'cancelled' })
+            .set({ status: StockReservationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, operationId));
 
           // Créer de nouvelles réservations pour les nouveaux items
@@ -2412,10 +2422,10 @@ export class DatabaseStorage implements IStorage {
                 // Créer la réservation directement dans la transaction
                 await tx.insert(stockReservations).values({
                   articleId: ingredientArticle.id,
-                  reservationDirection: 'out' as const,
+                  reservationDirection: StockReservationDirection.OUT as const,
                   inventoryOperationId: operationId,
                   reservedQuantity: requiredQuantity.toString(),
-                  reservationType: 'fabrication' as const,
+                  reservationType: InventoryOperationType.FABRICATION as const,
                   notes: `Réservation pour préparation ${operationId} - Produit: ${article.name}`,
                 });
               }
@@ -2423,10 +2433,10 @@ export class DatabaseStorage implements IStorage {
           }
         }
         // Si le statut reste "programmed" mais que les items changent, rafraîchir les réservations
-        else if (operation.status === 'programmed' && currentOperation.status === 'programmed') {
+        else if (operation.status === InventoryOperationStatus.PROGRAMMED && currentOperation.status === InventoryOperationStatus.PROGRAMMED) {
           // Libérer d'abord les anciennes réservations
           await tx.update(stockReservations)
-            .set({ status: 'cancelled' })
+            .set({ status: StockReservationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, operationId));
 
           // Créer de nouvelles réservations basées sur les nouveaux items
@@ -2464,10 +2474,10 @@ export class DatabaseStorage implements IStorage {
                 // Créer la réservation directement dans la transaction
                 await tx.insert(stockReservations).values({
                   articleId: ingredientArticle.id,
-                  reservationDirection: 'out' as const,
+                  reservationDirection: StockReservationDirection.OUT as const,
                   inventoryOperationId: operationId,
                   reservedQuantity: requiredQuantity.toString(),
-                  reservationType: 'production' as const,
+                  reservationType: StockReservationType.PRODUCTION as const,
                   notes: `Réservation pour préparation ${operationId} - Produit: ${article.name}`,
                 });
               }
@@ -2475,20 +2485,20 @@ export class DatabaseStorage implements IStorage {
           }
         }
         // Si le statut n'est plus "programmed", libérer les réservations
-        else if (operation.status !== 'programmed' && currentOperation.status === 'programmed') {
+        else if (operation.status !== InventoryOperationStatus.PROGRAMMED && currentOperation.status === InventoryOperationStatus.PROGRAMMED) {
           await tx.update(stockReservations)
-            .set({ status: 'cancelled' })
+            .set({ status: StockReservationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, operationId));
         }
       }
       // Gérer les réservations pour les livraisons
-      else if (operation.type === 'livraison') {
-        // Libérer d'abord les anciennes réservations de type 'delivery'
+      else if (operation.type === InventoryOperationType.LIVRAISON) {
+        // Libérer d'abord les anciennes réservations de type StockReservationType.DELIVERY
         await tx.update(stockReservations)
-          .set({ status: 'cancelled' })
+          .set({ status: StockReservationStatus.CANCELLED })
           .where(and(
             eq(stockReservations.inventoryOperationId, operationId),
-            eq(stockReservations.reservationType, 'delivery')
+            eq(stockReservations.reservationType, StockReservationType.DELIVERY)
           ));
 
         // Créer de nouvelles réservations pour les items de livraison
@@ -2501,9 +2511,9 @@ export class DatabaseStorage implements IStorage {
               storageZoneId: item.toStorageZoneId || null,
               orderItemId: item.orderItemId || null,
               reservedQuantity: item.quantity || '0',
-              reservationType: 'delivery' as const,
-              reservationDirection: 'out' as const,
-              status: 'reserved' as const,
+              reservationType: StockReservationType.DELIVERY as const,
+              reservationDirection: StockReservationDirection.OUT as const,
+              status: StockReservationStatus.RESERVED as const,
               notes: `Réservation pour livraison ${operationId}`,
               createdAt: new Date().toISOString()
             });
@@ -2526,7 +2536,7 @@ export class DatabaseStorage implements IStorage {
       if (!op) return false;
 
       // Si l'opération est complétée et de type reception, annuler les stocks
-      if (op.status === 'completed' && op.type === 'reception') {
+      if (op.status === InventoryOperationStatus.COMPLETED && op.type === InventoryOperationType.RECEPTION) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
 
@@ -2548,7 +2558,7 @@ export class DatabaseStorage implements IStorage {
 
       // Libérer d'abord toutes les réservations liées à cette opération
       await tx.update(stockReservations)
-        .set({ status: 'cancelled' })
+        .set({ status: StockReservationStatus.CANCELLED })
         .where(eq(stockReservations.inventoryOperationId, id));
 
       // Supprimer l'opération
@@ -2671,7 +2681,7 @@ export class DatabaseStorage implements IStorage {
   // ============ ACHATS VIA INVENTORY (aucune table purchase_*) ============
   // Générateur de code pour réceptions
   async generateReceptionCode(): Promise<string> {
-    const existingOps = await this.getInventoryOperationsByType('reception');
+    const existingOps = await this.getInventoryOperationsByType(InventoryOperationType.RECEPTION);
     const nextNumber = existingOps.length + 1;
     return `REC-${nextNumber.toString().padStart(6, '0')}`;
   }
@@ -2702,7 +2712,7 @@ export class DatabaseStorage implements IStorage {
   // Libérer une réservation de stock
   async releaseStockReservation(reservationId: number): Promise<StockReservation> {
     const [updatedReservation] = await db.update(stockReservations)
-      .set({ status: 'cancelled' })
+      .set({ status: StockReservationStatus.CANCELLED })
       .where(eq(stockReservations.id, reservationId))
       .returning();
 
@@ -2747,8 +2757,8 @@ export class DatabaseStorage implements IStorage {
           articleId: ingredientArticle.id,
           inventoryOperationId: operationId,
           reservedQuantity: requiredQuantity.toString(),
-          reservationType: 'production' as const,
-          reservationDirection: 'out' as const,
+          reservationType: StockReservationType.PRODUCTION as const,
+          reservationDirection: StockReservationDirection.OUT as const,
           notes: `Réservation pour préparation ${operationId} - Produit: ${article.name}`,
         };
 
@@ -2763,7 +2773,7 @@ export class DatabaseStorage implements IStorage {
   // Libérer toutes les réservations d'une opération d'inventaire
   async releaseAllReservationsForOperation(operationId: number): Promise<boolean> {
     const result = await db.update(stockReservations)
-      .set({ status: 'cancelled' })
+      .set({ status: StockReservationStatus.CANCELLED })
       .where(eq(stockReservations.inventoryOperationId, operationId));
 
     return (result.rowCount || 0) > 0;
@@ -2798,7 +2808,7 @@ export class DatabaseStorage implements IStorage {
           and(
             sql`${stockReservations.articleId} = ANY(${articleIds})`,
             sql`${stockReservations.inventoryOperationId} != ${operationId}`,
-            eq(stockReservations.status, 'reserved')
+            eq(stockReservations.status, StockReservationStatus.RESERVED)
           )
         );
 
@@ -2815,7 +2825,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(stockReservations.articleId, articleId),
-          eq(stockReservations.status, 'reserved')
+          eq(stockReservations.status, StockReservationStatus.RESERVED)
         )
       )
       .orderBy(desc(stockReservations.createdAt));
@@ -2842,7 +2852,7 @@ export class DatabaseStorage implements IStorage {
   // Vérifier si un article a suffisamment de stock disponible pour une quantité donnée
   async hasEnoughAvailableStock(articleId: number, requiredQuantity: number): Promise<boolean> {
     const availableStock = await this.getArticleAvailableStock(articleId);
-     const availableArticle = availableStock?.totalDispo || 0;
+    const availableArticle = availableStock?.totalDispo || 0;
     return availableArticle >= requiredQuantity;
   }
 
@@ -2995,7 +3005,7 @@ export class DatabaseStorage implements IStorage {
       // 1. Récupérer l'opération et vérifier sa validité
       const [operation] = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.id, deliveryOperationId));
       if (!operation) throw new Error(`Opération ${deliveryOperationId} non trouvée`);
-      if (operation.type !== 'livraison') throw new Error(`L'opération ${deliveryOperationId} n'est pas une livraison`);
+      if (operation.type !== InventoryOperationType.LIVRAISON) throw new Error(`L'opération ${deliveryOperationId} n'est pas une livraison`);
       if (operation.isValidated) throw new Error(`Livraison ${deliveryOperationId} déjà validée`);
 
       // 2. Récupérer les items de l'opération pour vérification
@@ -3003,12 +3013,12 @@ export class DatabaseStorage implements IStorage {
         .where(eq(inventoryOperationItems.operationId, deliveryOperationId));
       if (operationItems.length === 0) throw new Error(`Aucun item trouvé pour l'opération ${deliveryOperationId}`);
 
-      // 3. Récupérer les réservations de type 'delivery' pour cette opération
+      // 3. Récupérer les réservations de type StockReservationType.DELIVERY pour cette opération
       const reservations = await tx.select().from(stockReservations)
         .where(and(
           eq(stockReservations.inventoryOperationId, deliveryOperationId),
-          eq(stockReservations.reservationType, 'delivery'),
-          eq(stockReservations.status, 'reserved')
+          eq(stockReservations.reservationType, StockReservationType.DELIVERY),
+          eq(stockReservations.status, StockReservationStatus.RESERVED)
         ));
       if (reservations.length === 0) throw new Error(`Aucune réservation de stock trouvée pour cette livraison`);
 
@@ -3043,21 +3053,21 @@ export class DatabaseStorage implements IStorage {
             res.lotId ? eq(stock.lotId, res.lotId) : sql`1=1`
           ))
           .limit(1);
-        
+
         if (!stockRow[0]) {
           throw new Error(`Stock introuvable pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'})`);
         }
-        
+
         const available = parseFloat(stockRow[0].quantity);
         const reserved = parseFloat(res.reservedQuantity);
-        
+
         if (available < reserved) {
           throw new Error(`Stock insuffisant pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'}). Disponible: ${available}, Requis: ${reserved}`);
         }
 
         // Déduire le stock
         await tx.update(stock)
-          .set({ 
+          .set({
             quantity: (available - reserved).toString(),
             updatedAt: new Date().toISOString()
           })
@@ -3065,8 +3075,8 @@ export class DatabaseStorage implements IStorage {
 
         // Mettre à jour la réservation avec tous les champs nécessaires
         await tx.update(stockReservations)
-          .set({ 
-            status: 'completed',
+          .set({
+            status: StockReservationStatus.COMPLETED,
             stateChangedAt: new Date().toISOString(),
             notes: `Livraison validée le ${new Date().toISOString()}`
           })
@@ -3075,10 +3085,10 @@ export class DatabaseStorage implements IStorage {
 
       // 6. Mettre à jour l'opération comme validée
       const [updatedOp] = await tx.update(inventoryOperations)
-        .set({ 
-          isValidated: true, 
-          validatedAt: new Date().toISOString(), 
-          status: 'completed',
+        .set({
+          isValidated: true,
+          validatedAt: new Date().toISOString(),
+          status: InventoryOperationStatus.COMPLETED,
           completedAt: new Date().toISOString()
         })
         .where(eq(inventoryOperations.id, deliveryOperationId))
@@ -3090,18 +3100,8 @@ export class DatabaseStorage implements IStorage {
 
   async createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: any[]): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
-      const prefixes: Record<string, string> = {
-        'reception': 'REC',
-        'fabrication': 'PREP',
-        'preparation_reliquat': 'PREL',
-        'ajustement': 'AJU',
-        'ajustement_rebut': 'REB',
-        'inventaire_initiale': 'INV',
-        'interne': 'INT',
-        'livraison': 'LIV'
-      };
 
-      const prefix = prefixes[insertOperation.type] || 'OP';
+      const prefix = PrefixInventoryOperationType[insertOperation.type];
       const existingOps = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.type, insertOperation.type));
       const nextNumber = existingOps.length + 1;
       const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
@@ -3125,14 +3125,14 @@ export class DatabaseStorage implements IStorage {
 
       const res = await tx.insert(inventoryOperationItems).values(itemsToInsert);
       // 3. Si c'est une livraison, créer les réservations dans la même transaction
-      if (insertOperation.type === 'livraison') {
+      if (insertOperation.type === InventoryOperationType.LIVRAISON) {
         // Libérer d'abord les anciennes réservations (au cas où)
         await tx.update(stockReservations)
-          .set({ status: 'cancelled' })
+          .set({ status: StockReservationStatus.CANCELLED })
           .where(and(
             eq(stockReservations.inventoryOperationId, operation.id),
-            eq(stockReservations.reservationType, 'delivery'),
-            eq(stockReservations.status, 'reserved')
+            eq(stockReservations.reservationType, StockReservationType.DELIVERY),
+            eq(stockReservations.status, StockReservationStatus.RESERVED)
           ));
         // Créer les réservations
         const reservationItems = itemsToInsert.map(i => ({
@@ -3154,7 +3154,7 @@ export class DatabaseStorage implements IStorage {
             .where(
               and(
                 eq(stockReservations.articleId, item.articleId),
-                eq(stockReservations.status, 'reserved')
+                eq(stockReservations.status, StockReservationStatus.RESERVED)
               )
             );
           const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
@@ -3171,16 +3171,16 @@ export class DatabaseStorage implements IStorage {
             lotId: item.lotId || null,
             storageZoneId: item.storageZoneId || null,
             reservedQuantity: requestedQuantity.toString(),
-            status: 'reserved',
-            reservationDirection: 'out',
+            status: StockReservationStatus.RESERVED,
+            reservationDirection: StockReservationDirection.OUT,
             stateChangedAt: new Date().toISOString(),
             createdAt: new Date().toISOString(),
-            reservationType: 'delivery',
+            reservationType: StockReservationType.DELIVERY,
             notes: `Réservation pour livraison (opération ${operation.id})`,
           });
         }
-      } else if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
-        if (operation.status === 'programmed' && itemsToInsert.length > 0) {
+      } else if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
+        if (operation.status === InventoryOperationStatus.PROGRAMMED && itemsToInsert.length > 0) {
           for (const item of itemsToInsert) {
             const article = await this.getArticle(item.articleId);
             if (!article) continue;
@@ -3209,8 +3209,8 @@ export class DatabaseStorage implements IStorage {
                 articleId: ingredientArticle.id,
                 inventoryOperationId: operation.id,
                 reservedQuantity: requiredQuantity.toString(),
-                reservationType: 'production' as const,
-                reservationDirection: 'out',
+                reservationType: StockReservationType.PRODUCTION as const,
+                reservationDirection: StockReservationDirection.OUT,
                 stateChangedAt: new Date().toISOString(),
                 createdAt: new Date().toISOString(),
                 notes: `Réservation pour préparation ${operation.id} - Produit: ${article.name}`,
@@ -3258,3 +3258,5 @@ export interface ArticleStockDetail extends ArticleStockBase {
     } | null;
   }[];
 }
+
+
