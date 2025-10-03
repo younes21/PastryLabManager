@@ -2312,14 +2312,64 @@ export class DatabaseStorage implements IStorage {
       // Insert new items
       if (updatedItems.length > 0) {
         const itemsToInsert = updatedItems.map(item => ({
-          ...item,
+          articleId: (item as any).articleId || (item as any).idArticle,
+          quantity: (item as any).quantity || (item as any).qteLivree,
+          lotId: (item as any).lotId || (item as any).idlot || null,
+          fromStorageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
+          toStorageZoneId: (item as any).toStorageZoneId || null,
+          orderItemId: (item as any).orderItemId || (item as any).idOrderItem || null,
+          notes: (item as any).notes || null,
           operationId: operationId
         }));
         await tx.insert(inventoryOperationItems).values(itemsToInsert);
       }
 
       // Gérer les réservations automatiquement
-      if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
+      if (operation.type === 'livraison') {
+        // Rafraîchir les réservations de livraison pour refléter les nouveaux splits/quantités
+        await tx.update(stockReservations)
+          .set({ status: 'cancelled' })
+          .where(and(
+            eq(stockReservations.inventoryOperationId, operationId),
+            eq(stockReservations.reservationType, 'delivery'),
+            eq(stockReservations.status, 'reserved')
+          ));
+
+        if (updatedItems.length > 0) {
+          for (const item of updatedItems) {
+            const article = await this.getArticle((item as any).articleId || (item as any).idArticle);
+            if (!article) continue;
+            const totalStock = parseFloat(article.currentStock || '0');
+            const activeReservations = await tx.select({ reservedQuantity: stockReservations.reservedQuantity })
+              .from(stockReservations)
+              .where(and(
+                eq(stockReservations.articleId, (item as any).articleId || (item as any).idArticle),
+                eq(stockReservations.status, 'reserved')
+              ));
+            const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
+            const availableStock = totalStock - totalReserved;
+            const requestedQuantity = parseFloat(((item as any).quantity || (item as any).qteLivree) as string);
+            if (availableStock < requestedQuantity) {
+              throw new Error(`Stock insuffisant pour l'article ${(item as any).articleId || (item as any).idArticle}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
+            }
+
+            await tx.insert(stockReservations).values({
+              articleId: (item as any).articleId || (item as any).idArticle,
+              inventoryOperationId: operationId,
+              orderItemId: (item as any).orderItemId || (item as any).idOrderItem || null,
+              lotId: (item as any).lotId || (item as any).idlot || null,
+              storageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
+              reservedQuantity: requestedQuantity.toString(),
+              status: 'reserved',
+              reservationDirection: 'out',
+              stateChangedAt: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              reservationType: 'delivery',
+              notes: `Réservation après mise à jour livraison ${operationId}`,
+            });
+          }
+        }
+      } else if (operation.type === 'fabrication' || operation.type === 'fabrication_reliquat') {
         // Si le statut devient "programmed", créer les réservations
         if (operation.status === 'programmed' && currentOperation.status !== 'programmed') {
           // Libérer d'abord les anciennes réservations si elles existent
@@ -2941,22 +2991,49 @@ export class DatabaseStorage implements IStorage {
    * @returns {Promise<InventoryOperation>}
    */
   async validateDelivery(deliveryOperationId: number): Promise<InventoryOperation> {
-    throw new Error("Méthode doit etre vérifiée car elle est erronée");
     return await db.transaction(async (tx) => {
-      // 1. Récupérer l'opération
+      // 1. Récupérer l'opération et vérifier sa validité
       const [operation] = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.id, deliveryOperationId));
       if (!operation) throw new Error(`Opération ${deliveryOperationId} non trouvée`);
       if (operation.type !== 'livraison') throw new Error(`L'opération ${deliveryOperationId} n'est pas une livraison`);
       if (operation.isValidated) throw new Error(`Livraison ${deliveryOperationId} déjà validée`);
-      // 2. Récupérer les réservations de type 'delivery' pour cette opération
+
+      // 2. Récupérer les items de l'opération pour vérification
+      const operationItems = await tx.select().from(inventoryOperationItems)
+        .where(eq(inventoryOperationItems.operationId, deliveryOperationId));
+      if (operationItems.length === 0) throw new Error(`Aucun item trouvé pour l'opération ${deliveryOperationId}`);
+
+      // 3. Récupérer les réservations de type 'delivery' pour cette opération
       const reservations = await tx.select().from(stockReservations)
         .where(and(
           eq(stockReservations.inventoryOperationId, deliveryOperationId),
           eq(stockReservations.reservationType, 'delivery'),
           eq(stockReservations.status, 'reserved')
         ));
-      if (reservations.length === 0) throw new Error(`Aucune réservation de stock trouvée pour cette livraison.`);
-      // 3. Vérifier le stock et déduire pour chaque réservation
+      if (reservations.length === 0) throw new Error(`Aucune réservation de stock trouvée pour cette livraison`);
+
+      // 4. Vérifier la cohérence entre les items et les réservations
+      const itemsByArticle = new Map<number, number>();
+      operationItems.forEach(item => {
+        const current = itemsByArticle.get(item.articleId) || 0;
+        itemsByArticle.set(item.articleId, current + parseFloat(item.quantity));
+      });
+
+      const reservationsByArticle = new Map<number, number>();
+      reservations.forEach(res => {
+        const current = reservationsByArticle.get(res.articleId) || 0;
+        reservationsByArticle.set(res.articleId, current + parseFloat(res.reservedQuantity));
+      });
+
+      // Vérifier que chaque article a une réservation correspondante
+      for (const [articleId, itemQuantity] of itemsByArticle) {
+        const reservedQuantity = reservationsByArticle.get(articleId) || 0;
+        if (Math.abs(itemQuantity - reservedQuantity) > 0.001) {
+          throw new Error(`Incohérence pour l'article ${articleId}: items=${itemQuantity}, réservations=${reservedQuantity}`);
+        }
+      }
+
+      // 5. Vérifier le stock et déduire pour chaque réservation
       for (const res of reservations) {
         // Récupérer le stock courant (par article, lot, zone)
         const stockRow = await tx.select().from(stock)
@@ -2966,24 +3043,47 @@ export class DatabaseStorage implements IStorage {
             res.lotId ? eq(stock.lotId, res.lotId) : sql`1=1`
           ))
           .limit(1);
-        if (!stockRow[0]) throw new Error(`Stock introuvable pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'})`);
+        
+        if (!stockRow[0]) {
+          throw new Error(`Stock introuvable pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'})`);
+        }
+        
         const available = parseFloat(stockRow[0].quantity);
         const reserved = parseFloat(res.reservedQuantity);
-        if (available < reserved) throw new Error(`Stock insuffisant pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'}). Disponible: ${available}, Requis: ${reserved}`);
+        
+        if (available < reserved) {
+          throw new Error(`Stock insuffisant pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'}). Disponible: ${available}, Requis: ${reserved}`);
+        }
+
         // Déduire le stock
         await tx.update(stock)
-          .set({ quantity: (available - reserved).toString() })
+          .set({ 
+            quantity: (available - reserved).toString(),
+            updatedAt: new Date().toISOString()
+          })
           .where(eq(stock.id, stockRow[0].id));
-        // Mettre à jour la réservation
+
+        // Mettre à jour la réservation avec tous les champs nécessaires
         await tx.update(stockReservations)
-          .set({ status: 'delivered', deliveredQuantity: reserved.toString() })
+          .set({ 
+            status: 'completed',
+            stateChangedAt: new Date().toISOString(),
+            notes: `Livraison validée le ${new Date().toISOString()}`
+          })
           .where(eq(stockReservations.id, res.id));
       }
-      // 4. Mettre à jour l'opération comme validée
+
+      // 6. Mettre à jour l'opération comme validée
       const [updatedOp] = await tx.update(inventoryOperations)
-        .set({ isValidated: true, validatedAt: new Date().toISOString(), status: 'completed' })
+        .set({ 
+          isValidated: true, 
+          validatedAt: new Date().toISOString(), 
+          status: 'completed',
+          completedAt: new Date().toISOString()
+        })
         .where(eq(inventoryOperations.id, deliveryOperationId))
         .returning();
+
       return updatedOp;
     });
   }

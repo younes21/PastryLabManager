@@ -65,6 +65,8 @@ export default function DeliveriesPage() {
 
   // Récupérer le paramètre orderId de l'URL
   const [orderId, setOrderId] = useState<number | null>(null);
+  const [fromOrder, setfromOrder] = useState<boolean>(false);
+  const [urlIsParsed, seturlIsParsed] = useState<boolean>(false);
 
   // States
   const [currentDelivery, setCurrentDelivery] = useState<any>(null);
@@ -90,6 +92,7 @@ export default function DeliveriesPage() {
   const [clientIdFilter, setClientIdFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  const [orderDeliveryDetails, setOrderDeliveryDetails] = useState<Record<number, any>>({});
   // Ajout de l'état pour l'article dont le split est affiché
   const [expandedArticleId, setExpandedArticleId] = useState<number | null>(null);
 
@@ -103,9 +106,37 @@ export default function DeliveriesPage() {
     const orderIdParam = urlParams.get('orderId');
     if (orderIdParam) {
       setOrderId(parseInt(orderIdParam));
-    }
+      setfromOrder(true);
+
+    } else { setOrderId(null); }
+    seturlIsParsed(true);
   }, []);
 
+  // Charger automatiquement les détails de commande si on a un orderId dans l'URL
+  useEffect(() => {
+    if (urlIsParsed && orderId) {
+      ensureOrderDeliveryDetails(orderId);
+    }
+  }, [urlIsParsed, orderId]);
+
+  // Détails de livraison côté client pour le mode "toutes livraisons" lors de l'édition/consultation
+
+
+  // Fonction utilitaire pour charger les détails de livraison d'une commande sans altérer la liste
+  const ensureOrderDeliveryDetails = async (orderIdToLoad: number | null) => {
+    if (!orderIdToLoad) return null;
+    if (orderDeliveryDetails[orderIdToLoad]) return orderDeliveryDetails[orderIdToLoad];
+    try {
+      const resp = await fetch(`/api/orders/${orderIdToLoad}/delivery-details`);
+      if (!resp.ok) throw new Error('Failed to fetch order delivery details');
+      const data = await resp.json();
+      setOrderDeliveryDetails(prev => ({ ...prev, [orderIdToLoad]: data }));
+      return data;
+    } catch (e) {
+      console.error('Erreur chargement détails de livraison commande:', e);
+      return null;
+    }
+  };
 
 
   // Query optimisée - récupère toutes les données nécessaires en un seul appel
@@ -115,12 +146,9 @@ export default function DeliveriesPage() {
     orders: Order[];
     articles: any[];
   }>({
-    queryKey: ["/api/deliveries/page-data", { orderId }],
+    queryKey: ["/api/deliveries/page-data"],
     queryFn: async () => {
       let url = "/api/deliveries/page-data";
-      if (orderId) {
-        url += `?orderId=${orderId}`;
-      }
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch deliveries page data");
       const data = await response.json();
@@ -148,8 +176,10 @@ export default function DeliveriesPage() {
         articles: data.articles
       };
     },
-    enabled: true,
+
+    staleTime: 2 * 60 * 1000,
   });
+
 
   // Extraire les données de la réponse
   const deliveries = pageData?.deliveries || [];
@@ -159,7 +189,7 @@ export default function DeliveriesPage() {
 
   // Récupérer les détails de commande depuis la liste orders
   const currentOrder = orderId ? orders.find(o => o.id === orderId) : null;
-  const orderDetails = (currentOrder as any)?.deliveryDetails;
+
 
   // Extraire les données de la commande
   const orderData = currentOrder ? {
@@ -172,7 +202,7 @@ export default function DeliveriesPage() {
     notes: currentOrder.notes
   } : null;
 
-  const orderItems = orderDetails?.items || [];
+  // order delivery details are fetched via ensureOrderDeliveryDetails
 
   // Mutations
   // Adaptation de la mutation création
@@ -227,6 +257,8 @@ export default function DeliveriesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      if(orderId)
+      orderDeliveryDetails[orderId] = null;
       toast({
         title: "Livraison mise à jour",
         description: "La livraison a été modifiée avec succès"
@@ -274,8 +306,10 @@ export default function DeliveriesPage() {
     setShowForm(false);
   };
 
-  const startNewDelivery = () => {
-    if (orderId && orderData && orderDetails) {
+  const startNewDelivery = async () => {
+    if (orderId && orderData) {
+      await ensureOrderDeliveryDetails(orderId);
+      if (!orderDeliveryDetails || !orderDeliveryDetails[orderId]) return;
       // Si on a un orderId, pré-remplir avec les données de la commande
       setCurrentDelivery({
         type: "delivery",
@@ -289,7 +323,7 @@ export default function DeliveriesPage() {
       });
 
       // Pré-remplir avec les articles de la commande (exclure ceux avec quantité restante 0)
-      const newItems = orderDetails.items
+      const newItems = orderDeliveryDetails[orderId].items
         .filter((item: any) => item.quantityRemaining > 0)
         .map((item: any) => ({
           id: Date.now() + Math.random(), // Nouvel ID temporaire
@@ -339,85 +373,189 @@ export default function DeliveriesPage() {
     setShowForm(true);
   };
 
-  const editDelivery = (delivery: InventoryOperation) => {
-    setCurrentDelivery(delivery);
-    // Charger les items de la livraison
-    loadDeliveryItems(delivery.id);
+  const editDelivery = async (delivery: InventoryOperation) => {
+    // Forcer l'ordre courant pour charger les détails de commande associés
+    setOrderId((delivery as any).orderId || orderId || null);
+    await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
+    // Récupérer la livraison enrichie depuis page-data
+    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
+
+    // Pré-remplir l'entête
+    setCurrentDelivery({
+      id: fullDelivery.id,
+      type: fullDelivery.type || 'delivery',
+      status: fullDelivery.status || 'draft',
+      clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
+      orderId: fullDelivery.orderId || null,
+      scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
+      notes: fullDelivery.notes || '',
+      currency: 'DZD',
+    });
+
+    // Regrouper les items par article avec agrégation des quantités et splits multiples
+    const groupedByArticle: Record<number, {
+      articleId: number;
+      article: any;
+      totalQuantity: number;
+      splits: Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>;
+      notes: string;
+    }> = {};
+
+    for (const item of (fullDelivery.items || [])) {
+      const articleId = item.articleId;
+      if (!groupedByArticle[articleId]) {
+        groupedByArticle[articleId] = {
+          articleId,
+          article: (articles || []).find(a => a.id === articleId),
+          totalQuantity: 0,
+          splits: [],
+          notes: '',
+        };
+      }
+      groupedByArticle[articleId].totalQuantity += parseFloat(item.quantity);
+      groupedByArticle[articleId].splits.push({
+        lotId: item.lotId || item.lot?.id || null,
+        fromStorageZoneId: item.fromStorageZoneId || item.fromStorageZone?.id || null,
+        quantity: parseFloat(item.quantity),
+      });
+    }
+
+    // Mettre à jour items (une ligne par article) et splits
+    const normalizedItems = Object.values(groupedByArticle).map((g: any) => ({
+      id: `${fullDelivery.id}-${g.articleId}`,
+      articleId: g.articleId,
+      article: g.article,
+      quantity: g.totalQuantity,
+      notes: g.notes,
+    }));
+    setItems(normalizedItems);
+
+    const newSplits: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>> = {};
+    for (const g of Object.values(groupedByArticle) as any[]) {
+      newSplits[g.articleId] = g.splits;
+    }
+    setSplits(newSplits);
+
+    // Mode toutes livraisons: charger deliveryDetails de la commande au besoin (fusion côté client)
+
     setIsEditing(true);
     setIsViewing(false);
     setShowForm(true);
   };
 
-  const viewDelivery = (delivery: InventoryOperation) => {
-    setCurrentDelivery(delivery);
-    loadDeliveryItems(delivery.id);
+  const viewDelivery = async (delivery: InventoryOperation) => {
+    // Pré-remplissage identique à edit mais en mode lecture
+    setOrderId((delivery as any).orderId || orderId || null);
+    await ensureOrderDeliveryDetails(orderId);
+    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
+
+    setCurrentDelivery({
+      id: (fullDelivery as any).id,
+      type: (fullDelivery as any).type || 'delivery',
+      status: (fullDelivery as any).status || 'draft',
+      clientId: (fullDelivery as any).clientId || (fullDelivery as any).order?.clientId || null,
+      orderId: (fullDelivery as any).orderId || null,
+      scheduledDate: (fullDelivery as any).deliveryDate || (fullDelivery as any).scheduledDate || new Date().toISOString().split('T')[0],
+      notes: (fullDelivery as any).notes || '',
+      currency: 'DZD',
+    });
+
+    // Regrouper items par article pour l'affichage
+    const groupedByArticle: Record<number, {
+      articleId: number;
+      article: any;
+      totalQuantity: number;
+      splits: Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>;
+      notes: string;
+    }> = {};
+
+    for (const item of ((fullDelivery as any).items || [])) {
+      const articleId = item.articleId;
+      if (!groupedByArticle[articleId]) {
+        groupedByArticle[articleId] = {
+          articleId,
+          article: (articles || []).find(a => a.id === articleId),
+          totalQuantity: 0,
+          splits: [],
+          notes: '',
+        };
+      }
+      groupedByArticle[articleId].totalQuantity += parseFloat(item.quantity);
+      groupedByArticle[articleId].splits.push({
+        lotId: item.lotId || item.lot?.id || null,
+        fromStorageZoneId: item.fromStorageZoneId || item.fromStorageZone?.id || null,
+        quantity: parseFloat(item.quantity),
+      });
+    }
+
+    const normalizedItems = Object.values(groupedByArticle).map((g: any) => ({
+      id: `${(fullDelivery as any).id}-${g.articleId}`,
+      articleId: g.articleId,
+      article: g.article,
+      quantity: g.totalQuantity,
+      notes: g.notes,
+    }));
+    setItems(normalizedItems);
+
+    const newSplits: Record<number, Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>> = {};
+    for (const g of Object.values(groupedByArticle) as any[]) {
+      newSplits[g.articleId] = g.splits;
+    }
+    setSplits(newSplits);
+
+    if (!fromOrder && ((delivery as any).orderId || orderId)) {
+      await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
+    }
+
     setIsEditing(false);
     setIsViewing(true);
     setShowForm(true);
   };
 
-  const loadDeliveryItems = async (deliveryId: number) => {
-    try {
-      const response = await fetch(`/api/inventory-operations/${deliveryId}/items`);
-      if (!response.ok) throw new Error("Failed to fetch delivery items");
-      const deliveryItems = await response.json();
-
-      setItems(deliveryItems.map((item: any) => ({
-        id: item.id,
-        articleId: item.articleId,
-        article: articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
-        quantity: parseFloat(item.quantity),
-        // Ne plus gérer unitPrice et totalPrice côté client
-        notes: item.notes || "",
-      })));
-    } catch (error) {
-      console.error("Erreur lors du chargement des articles:", error);
-    }
-  };
-
 
 
   const updateItemQuantity = (itemId: number | string, quantity: number) => {
-    setItems(items.map(item => {
-      if (item.id === itemId) {
-        // Vérifier les limites avant de mettre à jour
-        const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
-        if (orderItem) {
-          const remainingQuantity = orderItem.quantityRemaining;
-          const orderedQuantity = orderItem.quantityOrdered;
+    if (orderId)
+      setItems(items.map(item => {
+        if (item.id === itemId) {
+          // Vérifier les limites avant de mettre à jour
+          const orderItem = orderDeliveryDetails[orderId]?.items.find((oi: any) => oi.articleId === item.articleId);
+          if (orderItem) {
+            const remainingQuantity = orderItem.quantityRemaining;
+            const orderedQuantity = orderItem.quantityOrdered;
 
-          // Ne pas dépasser la quantité restante ni la quantité commandée
-          const finalQuantity = Math.min(quantity, remainingQuantity, orderedQuantity);
+            // Ne pas dépasser la quantité restante ni la quantité commandée
+            const finalQuantity = Math.min(quantity, remainingQuantity, orderedQuantity);
 
-          // Si la quantité change et est différente de la quantité déjà répartie, réinitialiser la répartition
-          const currentSplitSum = getSplitSum(item.articleId);
-          if (Math.abs(currentSplitSum - finalQuantity) > 0.001) {
-            // Supprimer l'ancienne répartition
-            const newSplits = { ...splits };
-            delete newSplits[item.articleId];
-            setSplits(newSplits);
+            // Si la quantité change et est différente de la quantité déjà répartie, réinitialiser la répartition
+            const currentSplitSum = getSplitSum(item.articleId);
+            if (Math.abs(currentSplitSum - finalQuantity) > 0.001) {
+              // Supprimer l'ancienne répartition
+              const newSplits = { ...splits };
+              delete newSplits[item.articleId];
+              setSplits(newSplits);
 
-            // Si pas de répartition nécessaire, créer automatiquement
-            if (!isSplitRequired(item.articleId, finalQuantity)) {
-              const autoSplit = createAutoSplit(item.articleId, finalQuantity);
-              if (autoSplit) {
-                setSplits(prev => ({
-                  ...prev,
-                  [item.articleId]: autoSplit
-                }));
+              // Si pas de répartition nécessaire, créer automatiquement
+              if (!isSplitRequired(item.articleId, finalQuantity)) {
+                const autoSplit = createAutoSplit(item.articleId, finalQuantity);
+                if (autoSplit) {
+                  setSplits(prev => ({
+                    ...prev,
+                    [item.articleId]: autoSplit
+                  }));
+                }
               }
             }
-          }
 
-          return {
-            ...item,
-            quantity: finalQuantity
-            // Ne plus calculer totalPrice côté client
-          };
+            return {
+              ...item,
+              quantity: finalQuantity
+              // Ne plus calculer totalPrice côté client
+            };
+          }
         }
-      }
-      return item;
-    }));
+        return item;
+      }));
   };
 
 
@@ -451,10 +589,10 @@ export default function DeliveriesPage() {
       });
       return;
     }
-
+    if (!orderId) return;
     // Vérifier que les quantités ne dépassent pas les limites de commande
     for (const item of items) {
-      const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
+      const orderItem = orderDeliveryDetails[orderId]?.items.find((oi: any) => oi.articleId === item.articleId);
       if (orderItem) {
         const remainingQuantity = orderItem.quantityRemaining;
         const orderedQuantity = orderItem.quantityOrdered;
@@ -575,6 +713,7 @@ export default function DeliveriesPage() {
       deliveryDate: currentDelivery.scheduledDate || null,
       note: currentDelivery.notes || null,
       orderId: currentDelivery.orderId,
+      clientId: currentDelivery.clientId,
       items: allItems,
     };
 
@@ -583,6 +722,8 @@ export default function DeliveriesPage() {
       let deliveryResponse;
       if (deliveryId) {
         deliveryResponse = await apiRequest(`/api/deliveries/${deliveryId}`, "PUT", payload);
+
+          orderDeliveryDetails[currentDelivery.orderId] = null;
         // Pour un PUT, on suppose que l'id ne change pas
       } else {
         deliveryResponse = await apiRequest("/api/deliveries", "POST", payload);
@@ -943,22 +1084,23 @@ export default function DeliveriesPage() {
   return (
     <div className=" mx-auto p-6 pt-2 space-y-6">
       {/* livraisons d'une commande spécifique */}
-      {orderId && (
+      {orderId && showForm && (
         <Card className="flex items-center justify-between p-2 shadow-none border-none">
-
-          <Button
-            className="bg-primary text-white hover:bg-primary-hover "
-            variant="outline"
-            onClick={() => window.location.href = '/orders'}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour aux commandes
-          </Button>
+          {fromOrder && (
+            <Button
+              className="bg-primary text-white hover:bg-primary-hover "
+              variant="outline"
+              onClick={() => window.location.href = '/orders'}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour aux commandes
+            </Button>
+          )}
           {/* Affichage des informations de la commande liée */}
           {orderData && (
-            <div className="p-3 flex gap-3  text-blue-800 text-xs bg-blue-50 border border-blue-200 rounded-lg">
-              <Package className="h-4 w-4 text-blue-600" />
-              <p className="font-medium">Commande: <b>{orderData.code}</b></p>
+            <div className={`p-3 flex gap-3  text-blue-800 text-xs bg-blue-50 border border-blue-200 rounded-lg ${!fromOrder ? "w-full justify-around !text-base " : "w-auto"}`}>
+              <span className="flex items-center gap-1"><Package className="h-4 w-4 text-blue-600" />
+                <p className="font-medium">Commande: <b>{orderData.code}</b></p></span>
               <p>Client: <b>{getClientName(orderData.clientId || 0)}</b></p>
               <p>Date de commande: <b>{formatDate(orderData.createdAt)}</b></p>
               <p>Date prévu: <b>{formatDate(orderData.deliveryDate)}</b></p>
@@ -1019,7 +1161,7 @@ export default function DeliveriesPage() {
                 </SelectContent>
               </Select>
               {/* Désactiver le bouton Nouvelle livraison */}
-              {orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
+              {fromOrder && orderId && <Button onClick={startNewDelivery} data-testid="button-new-delivery">
                 <FileText className="h-4 w-4 mr-2" />
                 Nouvelle livraison
               </Button>}
@@ -1394,8 +1536,9 @@ export default function DeliveriesPage() {
                           </TableRow>
                         ) : (
                           items.map((item) => {
+                            if (!orderId) return;
                             // Utiliser les données optimisées de l'API
-                            const orderItem = orderDetails?.items.find((oi: any) => oi.articleId === item.articleId);
+                            const orderItem = orderDeliveryDetails[orderId]?.items.find((oi: any) => oi.articleId === item.articleId);
                             const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
                             const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
                             const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
@@ -1807,6 +1950,7 @@ export default function DeliveriesPage() {
 
       {/* Modal de répartition amélioré */}
       <DeliverySplitModal
+        isViewing={isViewing}
         open={splitModal.open}
         onOpenChange={(open: boolean) => setSplitModal({ open, articleId: splitModal.articleId })}
         articleId={splitModal.articleId}
@@ -1814,7 +1958,7 @@ export default function DeliveriesPage() {
         requestedQuantity={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.quantity || 0 : 0}
         existingSplits={splitModal.articleId ? splits[splitModal.articleId] || [] : []}
         onSplitValidated={(newSplits: Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>) => {
-          if (splitModal.articleId) {
+          if (splitModal.articleId && !isViewing) {
             setSplits(s => ({ ...s, [splitModal.articleId!]: newSplits }));
           }
         }}

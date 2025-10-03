@@ -82,6 +82,7 @@ interface SplitItem {
 }
 
 interface DeliverySplitModalProps {
+  isViewing:boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   articleId: number | null;
@@ -92,6 +93,7 @@ interface DeliverySplitModalProps {
 }
 
 export function DeliverySplitModal({
+  isViewing,
   open,
   onOpenChange,
   articleId,
@@ -360,6 +362,7 @@ export function DeliverySplitModal({
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={isViewing}
                     onClick={addSplit}
                     className="w-full h-10 text-md bg-blue-50 hover:bg-accent-hover hover:text-white border-blue-300"
                   >
@@ -437,7 +440,7 @@ export function DeliverySplitModal({
                           onClick={() => removeSplit(index)}
                           className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
                           title="Supprimer cette ligne"
-                          disabled={splits.length === 1}
+                          disabled={splits.length === 1|| isViewing}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -481,7 +484,7 @@ export function DeliverySplitModal({
             <Button variant="outline" onClick={() => onOpenChange(false)} className="h-9 px-4 text-lg">Annuler</Button>
             <Button
               onClick={handleValidate}
-              disabled={!availabilityData || splits.length === 0 || Math.abs(totalSplitQuantity - requestedQuantity) > 0.001}
+              disabled={isViewing ||!availabilityData || splits.length === 0 || Math.abs(totalSplitQuantity - requestedQuantity) > 0.001}
               className="h-9 px-4 text-lg"
             >
               Valider

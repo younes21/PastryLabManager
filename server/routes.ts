@@ -4183,15 +4183,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
       }
 
-      // Récupérer toutes les données nécessaires en parallèle
-      const [allClients, allOrders, allArticles] = await Promise.all([
+      // Récupérer toutes les données nécessaires (optimisé pour éviter de charger toutes les commandes si orderId est fourni)
+      const [allClients, allArticles] = await Promise.all([
         storage.getAllClients(),
-        storage.getAllOrders(),
         storage.getAllAvailableArticlesStock(true)
       ]);
 
+      let allOrders: any[] = [];
+      if (orderId) {
+        const singleOrder = await storage.getOrder(parseInt(orderId as string));
+        allOrders = singleOrder ? [singleOrder] : [];
+      } else {
+        allOrders = await storage.getAllOrders();
+      }
+
       // Créer des maps pour un accès rapide
-      const ordersMap = new Map(allOrders.map(o => [o.id, o]));
+      const ordersMap = new Map(allOrders.map((o: any) => [o.id, o]));
 
       // Enrichir les livraisons avec toutes les données
       const enrichedDeliveries = await Promise.all(
@@ -4310,7 +4317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: a.code,
           unit: a.unit,
           photo: a.photo,
-          stockInfo: a.stockInfo,
+          stockInfo: (a as any).stockInfo,
           totalStock: a.totalStock,
           totalDispo: a.totalDispo,
           unitPrice: a.unitPrice,
@@ -4339,12 +4346,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Détails de livraison pour une commande spécifique (utilisé pour enrichir côté client sans recharger toute la page)
+  app.get("/api/orders/:id/delivery-details", async (req, res) => {
+    try {
+      const orderIdNum = parseInt(req.params.id);
+      if (Number.isNaN(orderIdNum)) {
+        return res.status(400).json({ message: "orderId invalide" });
+      }
+
+      const order = await storage.getOrder(orderIdNum);
+      if (!order) {
+        return res.status(404).json({ message: "Commande non trouvée" });
+      }
+
+      const [orderItems, existingDeliveries] = await Promise.all([
+        storage.getOrderItems(orderIdNum),
+        storage.getInventoryOperationsByOrder(orderIdNum)
+      ]);
+
+      const itemsWithDelivery = orderItems.map((item: any) => {
+        let delivered = 0;
+        existingDeliveries.forEach((delivery: any) => {
+          (delivery.items || []).forEach((deliveryItem: any) => {
+            if (deliveryItem.articleId === item.articleId) {
+              delivered += parseFloat(deliveryItem.quantity);
+            }
+          });
+        });
+        const quantityOrdered = parseFloat(item.quantity);
+        return {
+          articleId: item.articleId,
+          quantityOrdered,
+          quantityDelivered: delivered,
+          quantityRemaining: Math.max(0, quantityOrdered - delivered),
+        };
+      });
+
+      return res.json({
+        orderId: orderIdNum,
+        items: itemsWithDelivery,
+      });
+    } catch (error) {
+      console.error("Erreur /api/orders/:id/delivery-details:", error);
+      return res.status(500).json({ message: "Erreur lors de la récupération des détails de livraison de la commande" });
+    }
+  });
+
 
   // Création d'une livraison
   app.post("/api/deliveries", async (req, res) => {
     try {
       // Validation input
-      const { deliveryDate, note, orderId, items } = req.body;
+      const { deliveryDate, note, orderId,clientId, items } = req.body;
       if (!orderId || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "orderId et items sont requis" });
       }
@@ -4352,6 +4405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const operation = {
         type: 'livraison',
         orderId,
+        clientId,
         notes: note,
         deliveryDate,
         status: 'draft',
@@ -4388,10 +4442,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deliveryDate,
         status: 'draft',
       };
-      // Construction des items
+      // Construction des items (pour une livraison, la zone est la zone SOURCE)
       const opItems = items.map((it: any) => ({
         articleId: it.idArticle,
-        toStorageZoneId: it.idzone,
+        fromStorageZoneId: it.idzone,
         lotId: it.idlot,
         quantity: it.qteLivree,
       }));

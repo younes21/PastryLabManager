@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Truck } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,7 @@ export function OrderRow({
   productionStatusLoading
 }: OrderRowProps) {
   const [isProductionDialogOpen, setIsProductionDialogOpen] = useState(false);
-  
+
   const {
     attributes,
     listeners,
@@ -108,9 +108,9 @@ export function OrderRow({
 
   return (
     <>
-      <TableRow 
-        ref={setNodeRef} 
-        style={style} 
+      <TableRow
+        ref={setNodeRef}
+        style={style}
         data-testid={`row-order-${order.id}`}
         className={isDragging ? "opacity-50" : ""}
       >
@@ -148,7 +148,7 @@ export function OrderRow({
             onValueChange={(value) => onStatusChange(order, value)}
           >
             <SelectTrigger className="w-auto">
-              <Badge variant="outline"  className={`text-xs px-2 py-1 ${orderStatusColors[order.status as keyof typeof orderStatusLabels]} `
+              <Badge variant="outline" className={`text-xs px-2 py-1 ${orderStatusColors[order.status as keyof typeof orderStatusLabels]} `
               }>
                 {orderStatusLabels[order.status as keyof typeof orderStatusLabels]}
               </Badge>
@@ -169,18 +169,18 @@ export function OrderRow({
               <span className="text-sm text-muted-foreground">Chargement...</span>
             </div>
           ) : productionStatus ? (
-            <div 
+            <div
               className="flex flex-col gap-1 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
               onClick={() => setIsProductionDialogOpen(true)}
               title="Cliquer pour voir le détail de la préparation"
             >
-              <Badge 
+              <Badge
                 className={`${getProductionStatusColor(productionStatus.etat)} border`}
                 variant="outline"
               >
                 {getProductionStatusLabel(productionStatus.etat)}
               </Badge>
-             
+
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>
@@ -188,6 +188,16 @@ export function OrderRow({
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid={`button-view-order-${order.id}`}
+              onClick={() => {
+                window.location.href = `/deliveries?orderId=${order.id}`;
+              }}
+            >
+              <Truck className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -218,7 +228,7 @@ export function OrderRow({
           </div>
         </TableCell>
       </TableRow>
-      
+
       <ProductionSummaryDialog
         order={order}
         isOpen={isProductionDialogOpen}

@@ -630,7 +630,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
   statusDate: timestamp("status_date", { mode: "string" }), // date etat
   // Références
   supplierId: integer("supplier_id").references(() => suppliers.id), // si réception
-  clientId: integer("customer_id").references(() => clients.id), // si livraison
+  clientId: integer("client_id").references(() => clients.id), // si livraison
   orderId: integer("order_id").references(() => orders.id), // lien avec commande pour les livraisons,fabrication
   parentOperationId: integer("parent_operation_id").references(
     (): AnyPgColumn => inventoryOperations.id,
