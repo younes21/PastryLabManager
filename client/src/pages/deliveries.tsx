@@ -1093,7 +1093,7 @@ export default function DeliveriesPage() {
   return (
     <div className=" mx-auto p-6 pt-2 space-y-6">
       {/* livraisons d'une commande spécifique */}
-      {orderId && showForm && (
+      {orderId &&  (
         <Card className="flex items-center justify-between p-2 shadow-none border-none">
           {fromOrder && (
             <Button

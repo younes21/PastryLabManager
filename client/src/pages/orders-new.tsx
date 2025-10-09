@@ -756,11 +756,11 @@ function ProductsRecapServer({ filters }: { filters: { search: string; status: s
               {/* Header du tableau */}
               <div className="grid grid-cols-8 bg-slate-100 text-sm font-semibold text-slate-700">
                 <div className="p-3 col-span-2">Produit</div>
-                <div className="p-3 text-center">Commandé</div>
-                <div className="p-3 text-center">Déjà livré</div>
+                <div className="p-3 text-center">Commandées</div>
+                <div className="p-3 text-center">Déjà livrées</div>
                 <div className="p-3 text-center">À livrer</div>
-                <div className="p-3 text-center">Restant</div>
-                <div className="p-3 text-center">Planif. livraison</div>
+                <div className="p-3 text-center">Commandes restantes</div>
+                <div className="p-3 text-center">Que tu peut planifier</div>
                 <div className="p-3 text-center">À produire</div>
               </div>
 

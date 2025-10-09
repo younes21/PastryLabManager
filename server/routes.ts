@@ -1674,7 +1674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Order not found" });
       }
 
-      // Récupérer toutes les commandes avec leurs articles (même logique que production-status-batch)
+      // Récupérer toutes les commandes avec leurs articles
       const orders = (await storage.getAllOrders())?.filter(f => f.status === OrderStatus.VALIDATED)
         .sort((a, b) => (a.order || 0) - (b.order || 0));
       const ordersWithItems = await Promise.all(
@@ -1690,7 +1690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         order.items.forEach((item: any) => allArticleIds.add(item.articleId));
       });
 
-      // Récupérer le stock disponible et les noms des articles pour tous les articles en une fois
+      // Récupérer le stock disponible et les noms des articles
       const stockData: Record<number, number> = {};
       const articleNames: Record<number, string> = {};
       const articleImages: Record<number, string> = {};
@@ -1719,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Copie virtuelle pour les ajustements (même logique que production-status-batch)
+      // Copie virtuelle pour les ajustements
       const stockVirtuel = { ...stockData };
       const operationsVirtuelles = JSON.parse(JSON.stringify(operationsEnCoursData));
 
@@ -1736,7 +1736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Traiter toutes les commandes jusqu'à la commande cible (exclus)
       for (let i = 0; i < targetOrderIndex; i++) {
         const currentOrder = ordersWithItems[i];
-        // Traiter les commandes précédentes pour ajuster le stock virtuel
+
         let toutDisponible = true;
         let auMoinsUnDisponible = false;
 
@@ -1835,7 +1835,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const op = operationsVirtuelles[item.articleId];
           if (op && op.length > 0) {
             const qOp = Math.min(parseFloat(item.quantity), op[0].quantity);
-            // Ajustement virtuel : diminuer la quantité dans l'opération
             op[0].quantity -= qOp;
             if (op[0].quantity <= 0) {
               operationsVirtuelles[item.articleId] = op.slice(1);
@@ -1847,7 +1846,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         etat = ProductionStatus.PREPARE;
         for (const item of currentOrder.items) {
           const qCommande = parseFloat(item.quantity);
-          // Ajustement virtuel : diminuer le stock
           stockVirtuel[item.articleId] -= qCommande;
           ajustements.push(`${articleNames[item.articleId]} -${qCommande}`);
         }
@@ -1857,7 +1855,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const qCommande = parseFloat(item.quantity);
           const qDisponible = Math.min(qCommande, stockVirtuel[item.articleId] || 0);
           if (qDisponible > 0) {
-            // Ajustement virtuel : diminuer le stock
             stockVirtuel[item.articleId] -= qDisponible;
             ajustements.push(`${articleNames[item.articleId]} -${qDisponible}`);
           }
@@ -1882,7 +1879,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             deliveryQuantities[articleId] = { toDeliver: 0, delivered: 0 };
           }
 
-          // Si la livraison est validée, c'est livré, sinon c'est programmé
           if (delivery.isValidated) {
             deliveryQuantities[articleId].delivered += quantity;
           } else {
@@ -1891,7 +1887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
 
-      // Créer les détails des articles avec les bonnes quantités
+      // CORRECTION PRINCIPALE : Créer les détails des articles avec les bonnes quantités
       const itemsDetail = targetOrder.items.map(item => {
         const qCommande = parseFloat(item.quantity);
         const qStockInitial = stockData[item.articleId] || 0;
@@ -1901,31 +1897,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const qToDeliver = deliveryQty.toDeliver;
         const qDelivered = deliveryQty.delivered;
 
-        // Calculer la quantité restante à produire = commandée - programmée - livrée
+        // Quantité restante à produire = commandée - programmée - livrée
         const qRemaining = qCommande - qToDeliver - qDelivered;
 
-        // Calculer la quantité ajustée : ce qui peut être satisfait pour cette commande
-        // C'est la quantité qui sera réellement prélevée du stock pour cette commande
-        let qAjuste = 0;
+        // CORRECTION : Calculer ce qui peut être planifié MAINTENANT
+        // C'est le minimum entre le stock disponible AVANT cette commande et la quantité restante
+        const stockDisponiblePourCetteCommande = stockAvantCommande[item.articleId] || 0;
+        const qAjuste = Math.min(stockDisponiblePourCetteCommande, qRemaining);
 
-        // Trouver l'ajustement correspondant à cet article dans la liste des ajustements
-        const ajustementArticle = ajustements.find(aj =>
-          aj.includes(articleNames[item.articleId]) && !aj.includes("Aucun ajustement possible")
-        );
-
-        if (ajustementArticle) {
-          // Extraire la quantité de l'ajustement (format: "Article -X" ou "Article -X (depuis opération Y)")
-          const match = ajustementArticle.match(/-(\d+(?:\.\d+)?)/);
-          if (match) {
-            qAjuste = parseFloat(match[1]);
-          }
-        }
-
-        const qRestantAProduire = qRemaining - qAjuste;
+        // CORRECTION : À produire = ce qui reste après avoir utilisé le stock disponible
+        const qRestantAProduire = Math.max(0, qRemaining - qAjuste);
 
         let status: ProductionItemStatus.AVAILABLE | ProductionItemStatus.PARTIAL | ProductionItemStatus.IN_PRODUCTION | ProductionItemStatus.MISSING = ProductionItemStatus.MISSING;
 
-        if (qAjuste === qRemaining) {
+        if (qAjuste === qRemaining ) {
           status = ProductionItemStatus.AVAILABLE;
         } else if (qAjuste > 0) {
           status = ProductionItemStatus.PARTIAL;
@@ -1942,8 +1927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantityDelivered: qDelivered, // Quantité livrée (validée)
           quantityRemaining: qRemaining, // Quantité restante à produire
           stockAvailable: qStockInitial, // Stock initial pour référence
-          quantityAdjusted: qAjuste,
-          inProduction: qRestantAProduire,
+          quantityAdjusted: qAjuste, // CORRIGÉ : Ce qu'on peut planifier maintenant
+          inProduction: qRestantAProduire, // CORRIGÉ : Ce qui reste à produire
           stockRemaining: stockAvantCommande[item.articleId] || 0, // Stock restant AVANT cette commande
           status
         };

@@ -185,7 +185,7 @@ export function ProductionSummaryDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] p-0">
+      <DialogContent className="2xl:max-w-[80vw] max-w-[95vw] max-h-[97vh] p-0">
         <DialogHeader className="text-2xl font-bold text-orange-700 flex items-center gap-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <div className="p-1.5 bg-blue-100 rounded-lg">
@@ -277,7 +277,7 @@ export function ProductionSummaryDialog({
                   <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
                     <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                       <Package className="h-4 w-4 text-slate-600" />
-                      Détail des articles ({productionDetail.items.length})
+                      Détail des produits ({productionDetail.items.length})
                     </h3>
                   </div>
 
@@ -285,13 +285,13 @@ export function ProductionSummaryDialog({
                     <table className="w-full text-sm border-collapse">
                       <thead>
                         <tr className="bg-slate-100 text-xs text-slate-600 uppercase">
-                          <th className="px-3 py-2 text-left">Article</th>
-                          <th className="px-3 py-2 text-center">Commandé</th>
-                          <th className="px-3 py-2 text-center">déja Livré</th>
-                          <th className="px-3 py-2 text-center">A livrer</th>
+                          <th className="px-3 py-2 text-left">Produit</th>
+                          <th className="px-3 py-2 text-center">Commandées</th>
+                          <th className="px-3 py-2 text-center">déja Livrées</th>
+                          <th className="px-3 py-2 text-center">À livrer</th>
                          
-                          <th className="px-3 py-2 text-center">Restant </th>
-                          <th className="px-3 py-2 text-center">Planif. livraison </th>
+                          <th className="px-3 py-2 text-center">Commandes restantes </th>
+                          <th className="px-3 py-2 text-center">Que tu peut planifier </th>
                           <th className="px-3 py-2 text-center">À produire</th>
                           <th className="px-3 py-2 text-center">Statut</th>
                         </tr>
