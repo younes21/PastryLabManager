@@ -107,26 +107,40 @@ export default function DeliveriesPage() {
 
   // État pour gérer l'onglet actif dans la card Articles à livrer
   const [activeTab, setActiveTab] = useState<string>("details");
+  const [orderData, setOrderData] = useState<any>(null);
+
+  // Utilisation avec useState et useEffect pour gérer l'état
+  const [pageData, setPageData] = useState<{
+    deliveries: any[];
+    clients: any[];
+    orders: Order[];
+    articles: any[];
+  } | null>(null);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(true);
 
 
   // Récupérer le paramètre orderId de l'URL au chargement de la page
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const orderIdParam = urlParams.get('orderId');
+    const _orderId = orderIdParam ? parseInt(orderIdParam) : null;
     if (orderIdParam) {
-      setOrderId(parseInt(orderIdParam));
+      setOrderId(_orderId);
       setfromOrder(true);
+    } else {
+      setOrderId(null);
+    }
 
-    } else { setOrderId(null); }
+    fetchPageData(_orderId);
     seturlIsParsed(true);
-  }, []);
+  }, [location.search]);
 
   // Charger automatiquement les détails de commande si on a un orderId dans l'URL
   useEffect(() => {
-    if (urlIsParsed && orderId) {
+    if (!fromOrder && orderId) {
       ensureOrderDeliveryDetails(orderId);
     }
-  }, [urlIsParsed, orderId]);
+  }, [fromOrder, orderId]);
 
   // Détails de livraison côté client pour le mode "toutes livraisons" lors de l'édition/consultation
 
@@ -147,17 +161,10 @@ export default function DeliveriesPage() {
     }
   };
 
-
-  // Query optimisée - récupère toutes les données nécessaires en un seul appel
-  const { data: pageData, isLoading: deliveriesLoading } = useQuery<{
-    deliveries: any[];
-    clients: any[];
-    orders: Order[];
-    articles: any[];
-  }>({
-    queryKey: ["/api/deliveries/page-data"],
-    queryFn: async () => {
-      let url = "/api/deliveries/page-data";
+  const fetchPageData = async (myOrderId: number | null) => {
+    try {
+      setDeliveriesLoading(true);
+      let url = `/api/deliveries/page-data${myOrderId ? '?orderId=' + myOrderId : ''}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch deliveries page data");
       const data = await response.json();
@@ -178,38 +185,53 @@ export default function DeliveriesPage() {
 
       setInventoryOperations(adaptedDeliveries);
 
-      return {
+      setPageData({
         deliveries: adaptedDeliveries,
         clients: data.clients,
         orders: data.orders,
         articles: data.articles
-      };
-    },
+      });
 
-    staleTime: 2 * 60 * 1000,
-  });
+      // Récupérer les détails de commande depuis la liste orders
 
 
-  // Extraire les données de la réponse
-  const deliveries = pageData?.deliveries || [];
-  const clients = pageData?.clients || [];
-  const orders = pageData?.orders || [];
-  const articles = pageData?.articles || [];
+    } catch (error) {
+      console.error("Error fetching deliveries page data:", error);
+      throw error;
+    } finally {
+      setDeliveriesLoading(false);
+    }
+  };
 
-  // Récupérer les détails de commande depuis la liste orders
-  const currentOrder = orderId ? orders.find(o => o.id === orderId) : null;
 
+  const selectCurrentDelivery = (delivery: InventoryOperation) => {
+    setOrderId(delivery.orderId || orderId || null);
 
-  // Extraire les données de la commande
-  const orderData = currentOrder ? {
-    id: currentOrder.id,
-    code: currentOrder.code,
-    clientId: currentOrder.clientId,
-    totalTTC: currentOrder.totalTTC,
-    createdAt: currentOrder.createdAt,
-    deliveryDate: currentOrder.deliveryDate,
-    notes: currentOrder.notes
-  } : null;
+    const currentOrder = pageData?.orders.find(o => o.id === delivery.orderId);
+    setOrderData(currentOrder ? {
+      id: currentOrder.id,
+      code: currentOrder.code,
+      clientId: currentOrder.clientId,
+      totalTTC: currentOrder.totalTTC,
+      createdAt: currentOrder.createdAt,
+      deliveryDate: currentOrder.deliveryDate,
+      notes: currentOrder.notes
+    } : null);
+
+    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
+
+    setCurrentDelivery({
+      id: fullDelivery.id,
+      code:fullDelivery.code,
+      type: fullDelivery.type || InventoryOperationType.LIVRAISON,
+      status: fullDelivery.status || InventoryOperationStatus.DRAFT,
+      clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
+      orderId: fullDelivery.orderId || null,
+      scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
+      notes: fullDelivery.notes || '',
+      currency: DEFAULT_CURRENCY_DZD,
+    });
+  }
 
   // order delivery details are fetched via ensureOrderDeliveryDetails
 
@@ -232,7 +254,7 @@ export default function DeliveriesPage() {
       return await apiRequest("/api/deliveries", "POST", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      fetchPageData(orderId);
       toast({
         title: "Livraison créée",
         description: "La livraison a été créée avec succès"
@@ -265,7 +287,7 @@ export default function DeliveriesPage() {
       return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      fetchPageData(orderId);
       if (orderId)
         orderDeliveryDetails[orderId] = null;
       toast({
@@ -288,7 +310,7 @@ export default function DeliveriesPage() {
       return await apiRequest(`/api/deliveries/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      fetchPageData(orderId);
       toast({
         title: "Livraison supprimée",
         description: "La livraison a été supprimée avec succès"
@@ -317,8 +339,8 @@ export default function DeliveriesPage() {
 
   const startNewDelivery = async () => {
     if (orderId && orderData) {
-      await ensureOrderDeliveryDetails(orderId);
-      if (!orderDeliveryDetails || !orderDeliveryDetails[orderId]) return;
+      const data = await ensureOrderDeliveryDetails(orderId);
+      if (!data) return;
       // Si on a un orderId, pré-remplir avec les données de la commande
       setCurrentDelivery({
         type: "delivery",
@@ -332,13 +354,13 @@ export default function DeliveriesPage() {
       });
 
       // Pré-remplir avec les articles de la commande (exclure ceux avec quantité restante 0)
-      const newItems = orderDeliveryDetails[orderId].items
+      const newItems = data.items
         .filter((item: any) => item.quantityRemaining > 0)
         .map((item: any) => ({
           id: Date.now() + Math.random(), // Nouvel ID temporaire
           articleId: item.articleId,
-          article: articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
-          quantity: Math.min(item.quantityRemaining, articles.find(a => a.id === item.articleId)?.totalDispo || 0), // Utiliser la quantité restante
+          article: pageData?.articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
+          quantity: Math.min(item.quantityRemaining, pageData?.articles.find(a => a.id === item.articleId)?.totalDispo || 0), // Utiliser la quantité restante
           // Ne plus gérer unitPrice et totalPrice côté client
           notes: "",
         }));
@@ -381,25 +403,31 @@ export default function DeliveriesPage() {
     setIsViewing(false);
     setShowForm(true);
   };
+  // const selectDelivery = (delivery: InventoryOperation) => {
+  //   setOrderId((delivery as any).orderId || orderId || null);
+  //   const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
+  //   // Pré-remplir l'entête
+  //   setCurrentDelivery({
+  //     id: fullDelivery.id,
+  //     type: fullDelivery.type || InventoryOperationType.LIVRAISON,
+  //     status: fullDelivery.status || InventoryOperationStatus.DRAFT,
+  //     clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
+  //     orderId: fullDelivery.orderId || null,
+  //     scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
+  //     notes: fullDelivery.notes || '',
+  //     currency: DEFAULT_CURRENCY_DZD,
+  //   });
+  // }
   const editDelivery = async (delivery: InventoryOperation) => {
-    // Forcer l'ordre courant pour charger les détails de commande associés
-    setOrderId((delivery as any).orderId || orderId || null);
+
     await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
-    // Récupérer la livraison enrichie depuis page-data
+
+    selectCurrentDelivery(delivery);
+
     const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
-    // Pré-remplir l'entête
-    setCurrentDelivery({
-      id: fullDelivery.id,
-      type: fullDelivery.type ||  InventoryOperationType.LIVRAISON,
-      status: fullDelivery.status || InventoryOperationStatus.DRAFT,
-      clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
-      orderId: fullDelivery.orderId || null,
-      scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
-      notes: fullDelivery.notes || '',
-      currency: DEFAULT_CURRENCY_DZD,
-    });
+
 
     // Regrouper les items par article avec agrégation des quantités et splits multiples
     const groupedByArticle: Record<number, {
@@ -415,7 +443,7 @@ export default function DeliveriesPage() {
       if (!groupedByArticle[articleId]) {
         groupedByArticle[articleId] = {
           articleId,
-          article: (articles || []).find(a => a.id === articleId),
+          article: (pageData?.articles || []).find(a => a.id === articleId),
           totalQuantity: 0,
           splits: [],
           notes: '',
@@ -454,20 +482,11 @@ export default function DeliveriesPage() {
 
   const viewDelivery = async (delivery: InventoryOperation) => {
     // Pré-remplissage identique à edit mais en mode lecture
-    setOrderId((delivery as any).orderId || orderId || null);
-    await ensureOrderDeliveryDetails(orderId);
-    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
-    setCurrentDelivery({
-      id: (fullDelivery as any).id,
-      type: (fullDelivery as any).type || InventoryOperationType.LIVRAISON,
-      status: (fullDelivery as any).status || InventoryOperationStatus.DRAFT,
-      clientId: (fullDelivery as any).clientId || (fullDelivery as any).order?.clientId || null,
-      orderId: (fullDelivery as any).orderId || null,
-      scheduledDate: (fullDelivery as any).deliveryDate || (fullDelivery as any).scheduledDate || new Date().toISOString().split('T')[0],
-      notes: (fullDelivery as any).notes || '',
-      currency: DEFAULT_CURRENCY_DZD,
-    });
+    await ensureOrderDeliveryDetails(orderId);
+
+    selectCurrentDelivery(delivery);
+    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
     // Regrouper items par article pour l'affichage
     const groupedByArticle: Record<number, {
@@ -483,7 +502,7 @@ export default function DeliveriesPage() {
       if (!groupedByArticle[articleId]) {
         groupedByArticle[articleId] = {
           articleId,
-          article: (articles || []).find(a => a.id === articleId),
+          article: (pageData?.articles || []).find(a => a.id === articleId),
           totalQuantity: 0,
           splits: [],
           notes: '',
@@ -512,9 +531,9 @@ export default function DeliveriesPage() {
     }
     setSplits(newSplits);
 
-    if (!fromOrder && ((delivery as any).orderId || orderId)) {
-      await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
-    }
+    // if (!fromOrder && ((delivery as any).orderId || orderId)) {
+    //   await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
+    // }
 
     setIsEditing(false);
     setIsViewing(true);
@@ -795,13 +814,13 @@ export default function DeliveriesPage() {
 
   // Fonction pour obtenir les informations de stock d'un article depuis pageData
   const getArticleStockInfo = (articleId: number) => {
-    const article = articles.find(a => a.id === articleId);
+    const article = pageData?.articles.find(a => a.id === articleId);
     return (article as any)?.stockInfo || [];
   };
 
   // Fonction pour vérifier si un article est périssable
   const isArticlePerishable = (articleId: number) => {
-    const article = articles.find(a => a.id === articleId);
+    const article = pageData?.articles.find(a => a.id === articleId);
     return (article as any)?.isPerishable || false;
   };
 
@@ -1081,7 +1100,7 @@ export default function DeliveriesPage() {
   // Les totaux sont maintenant calculés côté serveur
   // const totals = calculateTotals();
 
-  const filteredDeliveries = deliveries.filter((delivery) => {
+  const filteredDeliveries = pageData?.deliveries.filter((delivery) => {
     const matchesOrder = orderIdFilter === FILTER_ALL || String(delivery.orderId ?? '') === orderIdFilter;
     const matchesDate = !filterDate || filterDate === FILTER_ALL || matchesDateFilter(delivery?.order?.deliveryDate);
     const matchesClient = clientIdFilter === FILTER_ALL || String(delivery.clientId ?? '') === clientIdFilter;
@@ -1093,7 +1112,7 @@ export default function DeliveriesPage() {
   return (
     <div className=" mx-auto p-6 pt-2 space-y-6">
       {/* livraisons d'une commande spécifique */}
-      {orderId &&  (
+      {orderId && (
         <Card className="flex items-center justify-between p-2 shadow-none border-none">
           {fromOrder && (
             <Button
@@ -1147,7 +1166,7 @@ export default function DeliveriesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tous les clients</SelectItem>
-                      {clients.map(client => (
+                      {pageData?.clients.map(client => (
                         <SelectItem key={client.id} value={String(client.id)}>
                           {getClientName(client.id)}
                         </SelectItem>
@@ -1258,7 +1277,7 @@ export default function DeliveriesPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Liste des livraisons ({filteredDeliveries.length})
+              Liste des livraisons ({filteredDeliveries?.length ?? 0})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -1283,16 +1302,16 @@ export default function DeliveriesPage() {
                       Chargement des livraisons...
                     </TableCell>
                   </TableRow>
-                ) : filteredDeliveries.length === 0 ? (
+                ) : filteredDeliveries?.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       Aucune livraison trouvée
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredDeliveries.map((delivery) => (
+                  filteredDeliveries?.map((delivery) => (
                     <TableRow key={delivery.id} data-testid={`row-delivery-${delivery.id}`}>
-                      <TableCell className="font-medium">{delivery.code}</TableCell>
+                      <TableCell className={`font-medium cursor-pointer ${currentDelivery?.id == delivery.id ? 'border-l-8 border-l-orange-500' : ''}`} onClick={() => selectCurrentDelivery(delivery)}>{delivery.code}</TableCell>
 
                       {!orderId && (
                         <>
@@ -1438,10 +1457,10 @@ export default function DeliveriesPage() {
               </div>
               {isEditing && (
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={resetForm}>
+                  {/* <Button variant="outline" onClick={resetForm}>
                     <X className="h-4 w-4 mr-2" />
                     Annuler
-                  </Button>
+                  </Button> */}
                   <Button
                     onClick={saveDelivery}
                     disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
@@ -1479,7 +1498,7 @@ export default function DeliveriesPage() {
                   {currentDelivery.orderId && orderData && (
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                       <Package className="h-3 w-3 mr-1" />
-                      Commande {orderData.code}
+                      Livraison {currentDelivery.code}
                     </Badge>
                   )}
                 </CardTitle>
@@ -1508,8 +1527,8 @@ export default function DeliveriesPage() {
                       <TableBody>
                         {items.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={isEditing ? 4 : 4} className="text-center py-8">
-                              Aucun article ajouté
+                            <TableCell colSpan={8} className="text-center py-8">
+                              <span className="text-lg font-bold text-red-900 uppercase"> Aucun produit à livrer</span>
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -1520,7 +1539,7 @@ export default function DeliveriesPage() {
                             const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
                             const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
                             const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
-                            const articleData = articles.find((a: any) => a.id === (item.article?.id ?? item.articleId));
+                            const articleData = pageData?.articles.find((a: any) => a.id === (item.article?.id ?? item.articleId));
                             const totalStock = articleData?.totalStock ?? 0;
                             const availableStock = articleData?.totalDispo ?? 0;
                             const maxQte = Math.min(remainingQuantity, availableStock);
@@ -1670,7 +1689,7 @@ export default function DeliveriesPage() {
                                                     const autoSplit = createAutoSplit(item.articleId, item.quantity);
                                                     if (autoSplit && autoSplit.length > 0) {
                                                       const s = autoSplit[0];
-                                                      const article = articles.find(a => a.id === item.articleId);
+                                                      const article = pageData?.articles.find(a => a.id === item.articleId);
                                                       const stockInfo = (article as any)?.stockInfo || [];
                                                       const stockItem = stockInfo.find((stock: any) =>
                                                         stock.storageZoneId === s.fromStorageZoneId &&
@@ -1713,7 +1732,7 @@ export default function DeliveriesPage() {
                                                   // Si répartition manuelle
                                                   if (isRequired && articleSplits.length > 0) {
                                                     articleSplits.forEach((split, idx) => {
-                                                      const article = articles.find(a => a.id === item.articleId);
+                                                      const article = pageData?.articles.find(a => a.id === item.articleId);
                                                       const stockInfo = (article as any)?.stockInfo || [];
                                                       const stockItem = stockInfo.find((stock: any) =>
                                                         stock.storageZoneId === split.fromStorageZoneId &&
@@ -1772,11 +1791,11 @@ export default function DeliveriesPage() {
 
                                                 {/* Livraisons effectuées (en bas) */}
                                                 {(() => {
-                                                  const deliveredItems = deliveries
+                                                  const deliveredItems = pageData?.deliveries
                                                     .flatMap(delivery => (delivery.items || []).map((it: any) => ({ ...it, delivery })))
                                                     .filter(it => it.articleId === item.articleId);
 
-                                                  if (deliveredItems.length === 0) {
+                                                  if (deliveredItems?.length === 0) {
                                                     return (
                                                       <tr className="bg-green-50">
                                                         <td colSpan={4} className="px-3 py-4 text-center text-green-600 italic">
@@ -1786,7 +1805,7 @@ export default function DeliveriesPage() {
                                                     );
                                                   }
 
-                                                  return deliveredItems.map((it, idx) => {
+                                                  return deliveredItems?.map((it, idx) => {
                                                     const zoneName = it.fromStorageZone?.designation ||
                                                       `Zone ${it.fromStorageZoneId || '-'}`;
                                                     const lotName = it.lot?.code || `vide`;
@@ -1856,7 +1875,7 @@ export default function DeliveriesPage() {
                             return (
                               <TableRow>
                                 <TableCell colSpan={6} className="text-center py-8">
-                                  Aucun article à livrer
+                                  <span className="text-lg font-bold text-red-900 uppercase"> Aucun produit à livrer</span>
                                 </TableCell>
                               </TableRow>
                             );

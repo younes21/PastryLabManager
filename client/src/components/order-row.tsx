@@ -194,7 +194,7 @@ export function OrderRow({
               size="sm"
               data-testid={`button-view-order-${order.id}`}
               onClick={() => {
-                window.location.href = `/deliveries?orderId=${order.id}`;
+                window.location.href = `/delivery-order?orderId=${order.id}`;
               }}
             >
               <Truck className="h-4 w-4" />

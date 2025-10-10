@@ -202,6 +202,7 @@ function ProtectedRouter() {
       <Route path="/invoices/:id" component={InvoiceDetailPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/deliveries" component={DeliveriesPage} />
+      <Route path="/delivery-order" component={DeliveriesPage} />
       <Route path="/payment-dashboard" component={PaymentDashboard} />
       <Route path="/payment-reports" component={PaymentReports} />
       <Route path="/client-payment-history/:clientId" component={ClientPaymentHistory} />
