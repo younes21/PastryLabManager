@@ -103,7 +103,7 @@ export default function DeliveriesPage() {
   const [clientIdFilter, setClientIdFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const [orderDeliveryDetails, setOrderDeliveryDetails] = useState<Record<number, any>>({});
+  const [orderDeliveryDetails, setOrderDeliveryDetails] = useState<Record<string, any>>({});
   // Ajout de l'état pour l'article dont le split est affiché
   const [expandedArticleId, setExpandedArticleId] = useState<number | null>(null);
 
@@ -154,14 +154,23 @@ export default function DeliveriesPage() {
 
 
   // Fonction utilitaire pour charger les détails de livraison d'une commande sans altérer la liste
-  const ensureOrderDeliveryDetails = async (orderIdToLoad: number | null) => {
+  const ensureOrderDeliveryDetails = async (orderIdToLoad: number | null, excludeDeliveryId?: number) => {
     if (!orderIdToLoad) return null;
-    if (orderDeliveryDetails[orderIdToLoad]) return orderDeliveryDetails[orderIdToLoad];
+
+    // Créer une clé unique pour le cache qui inclut l'exclusion
+    const cacheKey = `${orderIdToLoad}-${excludeDeliveryId || 'none'}`;
+    if (orderDeliveryDetails[cacheKey]) return orderDeliveryDetails[cacheKey];
+
     try {
-      const resp = await fetch(`/api/orders/${orderIdToLoad}/delivery-details`);
+      let url = `/api/orders/${orderIdToLoad}/delivery-details`;
+      if (excludeDeliveryId) {
+        url += `?excludeDeliveryId=${excludeDeliveryId}`;
+      }
+
+      const resp = await fetch(url);
       if (!resp.ok) throw new Error('Failed to fetch order delivery details');
       const data = await resp.json();
-      setOrderDeliveryDetails(prev => ({ ...prev, [orderIdToLoad]: data }));
+      setOrderDeliveryDetails(prev => ({ ...prev, [cacheKey]: data }));
       return data;
     } catch (e) {
       console.error('Erreur chargement détails de livraison commande:', e);
@@ -169,10 +178,13 @@ export default function DeliveriesPage() {
     }
   };
 
-  const fetchPageData = async (myOrderId: number | null) => {
+  const fetchPageData = async (myOrderId: number | null, excludeDeliveryId?: number) => {
     try {
       setDeliveriesLoading(true);
       let url = `/api/deliveries/page-data${myOrderId ? '?orderId=' + myOrderId : ''}`;
+      if (excludeDeliveryId) {
+        url += `${myOrderId ? '&' : '?'}excludeDeliveryId=${excludeDeliveryId}`;
+      }
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch deliveries page data");
       const data = await response.json();
@@ -368,7 +380,10 @@ export default function DeliveriesPage() {
 
   const editDelivery = async (delivery: InventoryOperation) => {
 
-    await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
+    await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number, delivery.id);
+
+    // Recharger les données de la page avec exclusion de cette livraison pour le stock
+    await fetchPageData(((delivery as any).orderId || orderId) as number, delivery.id);
 
     selectCurrentOrderAndDelivery(delivery.orderId, delivery.id);
 
@@ -430,7 +445,9 @@ export default function DeliveriesPage() {
   const viewDelivery = async (delivery: InventoryOperation) => {
     // Pré-remplissage identique à edit mais en mode lecture
 
-    await ensureOrderDeliveryDetails(orderId);
+    await ensureOrderDeliveryDetails(delivery.orderId,delivery.id);
+    // Recharger les données de la page avec exclusion de cette livraison pour le stock
+    await fetchPageData(((delivery as any).orderId || orderId) as number, delivery.id);
 
     selectCurrentOrderAndDelivery(delivery.orderId, delivery.id);
     const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
@@ -490,11 +507,15 @@ export default function DeliveriesPage() {
 
 
   const updateItemQuantity = (itemId: number | string, quantity: number) => {
-    if (orderId)
+    if (orderId) {
+      // Pour une nouvelle livraison (currentDelivery?.id est undefined), utiliser la clé sans exclusion
+      // Pour une livraison existante, utiliser la clé avec exclusion
+      const cacheKey = currentDelivery?.id ? `${orderId}-${currentDelivery.id}` : `${orderId}-none`;
+
       setItems(items.map(item => {
         if (item.id === itemId) {
           // Vérifier les limites avant de mettre à jour
-          const orderItem = orderDeliveryDetails[orderId]?.items.find((oi: any) => oi.articleId === item.articleId);
+          const orderItem = orderDeliveryDetails[cacheKey]?.items.find((oi: any) => oi.articleId === item.articleId);
           if (orderItem) {
             const remainingQuantity = orderItem.quantityRemaining;
             const orderedQuantity = orderItem.quantityOrdered;
@@ -531,6 +552,7 @@ export default function DeliveriesPage() {
         }
         return item;
       }));
+    }
   };
 
 
@@ -567,28 +589,34 @@ export default function DeliveriesPage() {
     }
     if (!orderId) return;
     // Vérifier que les quantités ne dépassent pas les limites de commande
-    for (const item of items) {
-      const orderItem = orderDeliveryDetails[orderId]?.items.find((oi: any) => oi.articleId === item.articleId);
-      if (orderItem) {
-        const remainingQuantity = orderItem.quantityRemaining;
-        const orderedQuantity = orderItem.quantityOrdered;
+    if (orderId) {
+      // Pour une nouvelle livraison (currentDelivery?.id est undefined), utiliser la clé sans exclusion
+      // Pour une livraison existante, utiliser la clé avec exclusion
+      const cacheKey = currentDelivery?.id ? `${orderId}-${currentDelivery.id}` : `${orderId}-none`;
 
-        if (item.quantity > remainingQuantity) {
-          toast({
-            title: "Quantité invalide",
-            description: `La quantité pour ${item.article?.name} dépasse la quantité restante (${remainingQuantity})`,
-            variant: "destructive"
-          });
-          return;
-        }
+      for (const item of items) {
+        const orderItem = orderDeliveryDetails[cacheKey]?.items.find((oi: any) => oi.articleId === item.articleId);
+        if (orderItem) {
+          const remainingQuantity = orderItem.quantityRemaining;
+          const orderedQuantity = orderItem.quantityOrdered;
 
-        if (item.quantity > orderedQuantity) {
-          toast({
-            title: "Quantité invalide",
-            description: `La quantité pour ${item.article?.name} dépasse la quantité commandée (${orderedQuantity})`,
-            variant: "destructive"
-          });
-          return;
+          if (item.quantity > remainingQuantity) {
+            toast({
+              title: "Quantité invalide",
+              description: `La quantité pour ${item.article?.name} dépasse la quantité restante (${remainingQuantity})`,
+              variant: "destructive"
+            });
+            return;
+          }
+
+          if (item.quantity > orderedQuantity) {
+            toast({
+              title: "Quantité invalide",
+              description: `La quantité pour ${item.article?.name} dépasse la quantité commandée (${orderedQuantity})`,
+              variant: "destructive"
+            });
+            return;
+          }
         }
       }
     }
@@ -699,7 +727,8 @@ export default function DeliveriesPage() {
       if (deliveryId) {
         deliveryResponse = await apiRequest(`/api/deliveries/${deliveryId}`, "PUT", payload);
 
-        orderDeliveryDetails[currentDelivery.orderId] = null;
+        const cacheKey = `${currentDelivery.orderId}-none`;
+        orderDeliveryDetails[cacheKey] = null;
         // Pour un PUT, on suppose que l'id ne change pas
       } else {
         deliveryResponse = await apiRequest("/api/deliveries", "POST", payload);
@@ -1485,8 +1514,9 @@ export default function DeliveriesPage() {
                         ) : (
                           items.map((item) => {
                             if (!orderId) return;
-                            // Utiliser les données optimisées de l'API
-                            const orderItem = orderDeliveryDetails[orderId]?.items.find((oi: any) => oi.articleId === item.articleId);
+                            // Utiliser les données optimisées de l'API avec la bonne clé de cache
+                            const cacheKey = currentDelivery?.id ? `${orderId}-${currentDelivery.id}` : `${orderId}-none`;
+                            const orderItem = orderDeliveryDetails[cacheKey]?.items.find((oi: any) => oi.articleId === item.articleId);
                             const orderedQuantity = orderItem ? orderItem.quantityOrdered : 0;
                             const deliveredQuantity = orderItem ? orderItem.quantityDelivered : 0;
                             const remainingQuantity = orderItem ? orderItem.quantityRemaining : 0;
@@ -1494,6 +1524,7 @@ export default function DeliveriesPage() {
                             const totalStock = articleData?.totalStock ?? 0;
                             const availableStock = articleData?.totalDispo ?? 0;
                             const maxQte = Math.min(remainingQuantity, availableStock);
+
                             const articleSplits = splits[item.articleId] || [];
                             const splitSum = getSplitSum(item.articleId);
                             const isRequired = isSplitRequired(item.articleId, item.quantity);
@@ -1624,6 +1655,7 @@ export default function DeliveriesPage() {
                                             <table className="w-full text-sm">
                                               <thead className="bg-gray-100">
                                                 <tr>
+                                                  <th className="px-3 py-2 w-60 max-w-60 text-left font-medium text-gray-700">Livraison</th>
                                                   <th className="px-3 py-2 w-60 max-w-60 text-left font-medium text-gray-700">Zone de stockage</th>
                                                   <th className="px-3 py-2 w-48 max-w-48  text-left font-medium text-gray-700">Lot</th>
                                                   <th className="px-3 py-2 w-28 max-w-28  text-right font-medium text-gray-700">Quantité</th>
@@ -1653,6 +1685,7 @@ export default function DeliveriesPage() {
 
                                                       upcomingRows.push(
                                                         <tr key="auto-split" className="bg-blue-50 hover:bg-blue-100">
+                                                         <td className="px-3 font-bold text-blue-900">Livraison courante</td>
                                                           <td className="px-3 py-2   ">
                                                             <div className="flex items-center gap-2">
                                                               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -1696,6 +1729,7 @@ export default function DeliveriesPage() {
 
                                                       upcomingRows.push(
                                                         <tr key={`manual-split-${idx}`} className="bg-blue-50 hover:bg-blue-100">
+                                                          <td className="px-3 font-bold text-blue-900">Livraison courante</td>
                                                           <td className="px-3 py-2">
                                                             <div className="flex items-center gap-2">
                                                               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -1742,7 +1776,7 @@ export default function DeliveriesPage() {
 
                                                 {/* Livraisons effectuées (en bas) */}
                                                 {(() => {
-                                                  const deliveredItems = pageData?.deliveries
+                                                  const deliveredItems = pageData?.deliveries.filter(f=>f.id!=currentDelivery?.id)
                                                     .flatMap(delivery => (delivery.items || []).map((it: any) => ({ ...it, delivery })))
                                                     .filter(it => it.articleId === item.articleId);
 
@@ -1764,6 +1798,7 @@ export default function DeliveriesPage() {
 
                                                     return (
                                                       <tr key={`delivered-${idx}`} className="bg-green-50 hover:bg-green-100">
+                                                        <td className="px-3 font-bold text-blue-900">{it.delivery?.code}</td>
                                                         <td className="px-3 py-2">
                                                           <div className="flex items-center gap-2">
                                                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -1905,6 +1940,7 @@ export default function DeliveriesPage() {
         articleName={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.articleName || "" : ""}
         requestedQuantity={splitModal.articleId ? items.find(i => i.articleId === splitModal.articleId)?.quantity || 0 : 0}
         existingSplits={splitModal.articleId ? splits[splitModal.articleId] || [] : []}
+        excludeDeliveryId={currentDelivery?.id}
         onSplitValidated={(newSplits: Array<{ lotId: number | null, fromStorageZoneId: number | null, quantity: number }>) => {
           if (splitModal.articleId && !isViewing) {
             setSplits(s => ({ ...s, [splitModal.articleId!]: newSplits }));

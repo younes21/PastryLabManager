@@ -90,6 +90,7 @@ interface DeliverySplitModalProps {
   requestedQuantity: number;
   existingSplits?: SplitItem[];
   onSplitValidated: (splits: SplitItem[]) => void;
+  excludeDeliveryId?: number;
 }
 
 export function DeliverySplitModal({
@@ -100,7 +101,8 @@ export function DeliverySplitModal({
   articleName,
   requestedQuantity,
   existingSplits,
-  onSplitValidated
+  onSplitValidated,
+  excludeDeliveryId
 }: DeliverySplitModalProps) {
   const { toast } = useToast();
   const [splits, setSplits] = useState<SplitItem[]>([]);
@@ -108,10 +110,14 @@ export function DeliverySplitModal({
 
   // Récupérer les informations de disponibilité de l'article
   const { data: availabilityData, isLoading } = useQuery<ArticleAvailabilityResponse>({
-    queryKey: ["article-availability", articleId],
+    queryKey: ["article-availability", articleId, excludeDeliveryId],
     queryFn: async () => {
       if (!articleId) throw new Error("No article ID");
-      const response = await fetch(`/api/articles/${articleId}/availability`);
+      let url = `/api/articles/${articleId}/availability`;
+      if (excludeDeliveryId) {
+        url += `?excludeDeliveryId=${excludeDeliveryId}`;
+      }
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch availability");
       return response.json();
     },

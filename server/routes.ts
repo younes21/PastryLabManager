@@ -3727,7 +3727,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/articles/:articleId/availability", async (req, res) => {
     try {
       const { articleId } = req.params;
+      const { excludeDeliveryId } = req.query;
       const articleIdNum = parseInt(articleId);
+      const excludeDeliveryIdNum = excludeDeliveryId ? parseInt(excludeDeliveryId as string) : undefined;
+      
       if (isNaN(articleIdNum)) {
         return res.status(400).json({ message: "Invalid article ID" });
       }
@@ -3747,11 +3750,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND stock.quantity > 0
         )`);
       // Récupérer toutes les réservations actives (order, preparation, delivery)
+      const whereConditions = [
+        eq(stockReservations.articleId, articleIdNum),
+        eq(stockReservations.status, StockReservationStatus.RESERVED)
+      ];
+      
+      // Exclure les réservations de la livraison spécifiée si fournie
+      if (excludeDeliveryIdNum) {
+        whereConditions.push(sql`${stockReservations.inventoryOperationId} != ${excludeDeliveryIdNum}`);
+      }
+      
       const reservations = await db.select().from(stockReservations)
-        .where(and(
-          eq(stockReservations.articleId, articleIdNum),
-          eq(stockReservations.status, StockReservationStatus.RESERVED)
-        ));
+        .where(and(...whereConditions));
       // Calculer la disponibilité par lot et zone
       const availability = [];
       for (const lot of articleLots) {
@@ -4168,7 +4178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API optimisée pour la page deliveries - récupère toutes les données nécessaires
   app.get("/api/deliveries/page-data", async (req, res) => {
     try {
-      const { orderId } = req.query;
+      const { orderId, excludeDeliveryId } = req.query;
 
       // Récupérer toutes les livraisons avec leurs données complètes
       const deliveries = await storage.getInventoryOperationsByType(InventoryOperationType.LIVRAISON, false);
@@ -4190,9 +4200,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Récupérer toutes les données nécessaires en parallèle
+      const excludeDeliveryIdNum = excludeDeliveryId ? parseInt(excludeDeliveryId as string) : undefined;
       const [allClients, allArticles, allOrders] = await Promise.all([
         storage.getAllClients(),
-        storage.getAllAvailableArticlesStock(true),
+        storage.getAllAvailableArticlesStock(true, excludeDeliveryIdNum),
         orderId ? 
           (async () => {
             const singleOrder = await storage.getOrder(parseInt(orderId as string));
@@ -4399,6 +4410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/:id/delivery-details", async (req, res) => {
     try {
       const orderIdNum = parseInt(req.params.id);
+      const excludeDeliveryId = req.query.excludeDeliveryId ? parseInt(req.query.excludeDeliveryId as string) : null;
+      
       if (Number.isNaN(orderIdNum)) {
         return res.status(400).json({ message: "orderId invalide" });
       }
@@ -4416,6 +4429,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsWithDelivery = orderItems.map((item: any) => {
         let delivered = 0;
         existingDeliveries.forEach((delivery: any) => {
+          // Exclure la livraison spécifiée si elle est en cours de modification
+          if (excludeDeliveryId && delivery.id === excludeDeliveryId) {
+            return;
+          }
+          
           (delivery.items || []).forEach((deliveryItem: any) => {
             if (deliveryItem.articleId === item.articleId) {
               delivered += parseFloat(deliveryItem.quantity);
