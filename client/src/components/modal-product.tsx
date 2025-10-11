@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Delete, LayoutGrid, RotateCcw, Package, Utensils } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Article } from "@shared/schema";
+import { ArticleCategoryType } from "@shared/constants";
 
 // --- Types ---
 
@@ -145,8 +146,8 @@ export default function ProductSelectorCompact({
                                                 : ""
                                                 }`}
                                         >
-                                            <div className={`absolute top-1 left-1 flex text-xs font-bold shadow-md  rounded-xl  p-1  justify-center items-center ${product.type == 'product' ? 'bg-orange-400 ' : 'bg-green-300'} `}>
-                                                <span>{product.type == 'product' ? 'PROD' : 'ING'}</span>
+                                            <div className={`absolute top-1 left-1 flex text-xs font-bold shadow-md  rounded-xl  p-1  justify-center items-center ${product.type == ArticleCategoryType.PRODUCT ? 'bg-orange-400 ' : 'bg-green-300'} `}>
+                                                <span>{product.type == ArticleCategoryType.PRODUCT ? 'PROD' : 'ING'}</span>
                                             </div>
                                             <img
                                                 src={product.photo}

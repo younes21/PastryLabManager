@@ -17,6 +17,7 @@ import {
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/lib/auth';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { ArticleCategoryType } from '@shared/constants';
 
 interface StockItem {
   id: number;
@@ -25,7 +26,7 @@ interface StockItem {
     id: number;
     code: string;
     name: string;
-    type: 'product' | 'ingredient' | 'service';
+    type: ArticleCategoryType;
     unit: string;
     costPerUnit: string;
     currentStock: string;
@@ -152,7 +153,7 @@ export default function Stock() {
   const filteredStockItems = stockItems.filter(item => {
     const matchesSearch = item.article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.article.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = activeTab === "ingredients" ? item.article.type === 'ingredient' : item.article.type === 'product';
+    const matchesType = activeTab === "ingredients" ? item.article.type === ArticleCategoryType.INGREDIENT  : item.article.type === ArticleCategoryType.PRODUCT;
     const matchesZone = !filterZone || item.storageZoneId === parseInt(filterZone);
 
     return matchesSearch && matchesType && matchesZone;
@@ -160,7 +161,7 @@ export default function Stock() {
 
   // Grouper les articles par articleId (pour ingredients)
   const groupedIngredients = Object.values(filteredStockItems
-    .filter(item => item.article.type === 'ingredient')
+    .filter(item => item.article.type === ArticleCategoryType.INGREDIENT )
     .reduce((acc, item) => {
       if (!acc[item.articleId]) acc[item.articleId] = { article: item.article, items: [] };
       acc[item.articleId].items.push(item);
@@ -169,7 +170,7 @@ export default function Stock() {
 
   // Grouper les produits par articleId (pour produits)
   const groupedProducts = Object.values(filteredStockItems
-    .filter(item => item.article.type === 'product')
+    .filter(item => item.article.type === ArticleCategoryType.PRODUCT)
     .reduce((acc, item) => {
       if (!acc[item.articleId]) acc[item.articleId] = { article: item.article, items: [] };
       acc[item.articleId].items.push(item);
@@ -297,11 +298,11 @@ export default function Stock() {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="ingredients" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
-            Ingrédients ({filteredStockItems.filter(item => item.article.type === 'ingredient').length})
+            Ingrédients ({filteredStockItems.filter(item => item.article.type === ArticleCategoryType.INGREDIENT ).length})
           </TabsTrigger>
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
-            Produits ({filteredStockItems.filter(item => item.article.type === 'product').length})
+            Produits ({filteredStockItems.filter(item => item.article.type === ArticleCategoryType.PRODUCT).length})
           </TabsTrigger>
         </TabsList>
 

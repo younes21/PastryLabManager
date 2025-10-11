@@ -16,6 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { PriceRuleForm } from "@/components/price-rule-form";
 import { Layout } from "@/components/layout";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { ArticleCategoryType } from "@shared/constants";
 
 export default function PriceListsPage() {
   const { toast } = useToast();
@@ -117,7 +118,7 @@ export default function PriceListsPage() {
 
     const data: InsertPriceList = {
       designation: formData.get("designation") as string,
-      description: formData.get("description") as string,
+   //   description: formData.get("description") as string,
       active: formData.get("active") === "on",
     };
 
@@ -223,7 +224,7 @@ export default function PriceListsPage() {
                     <div className="flex items-center space-x-2">
                       <CardTitle className="text-lg">{priceList.designation}</CardTitle>
                       <div className="flex items-center space-x-1">
-                        {priceList.description}
+                        {priceList.designation}
 
                       </div>
                     </div>
@@ -304,7 +305,7 @@ export default function PriceListsPage() {
                         <div className="flex justify-between items-start">
                           <div>
                             <CardTitle className="text-lg">
-                              {rule.applyTo === 'product' ? 'Produit' : 'Catégorie'}
+                              {rule.applyTo === ArticleCategoryType.PRODUCT ? 'Produit' : 'Catégorie'}
                             </CardTitle>
                             <p className="text-sm text-gray-600">
                               Type: {rule.priceType}

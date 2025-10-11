@@ -691,13 +691,12 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
 
   // Prix
   unitCost: decimal("unit_cost", { precision: 12, scale: 2 }).default("0.00"), // coût d’achat
-  unitPriceSale: decimal("unit_price_sale", {
-    precision: 12,
-    scale: 2,
-  }).default("0.00"), // prix de vente (si vente)
   totalCost: decimal("total_cost", { precision: 12, scale: 2 }).default("0.00"),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0.00"),
-  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).default("0.00"),
+  taxAmountCost: decimal("tax_amount_cost", { precision: 12, scale: 2 }).default("0.00"),
+  unitPriceSale: decimal("unit_price_sale", { precision: 12, scale: 3 }).default("0.000"), // prix de vente (si vente)
+  totalPriceSale: decimal("total_price_sale", { precision: 12, scale: 3, }).default("0.000"), // prix de vente (si vente)
+  taxAmountSale: decimal("tax_amount_sale", { precision: 12, scale: 3, }).default("0.000"), // prix de vente (si vente)
 
   // Traçabilité
   lotId: integer("lot_id").references(() => lots.id),
@@ -784,13 +783,13 @@ export const stockReservations = pgTable("stock_reservations", {
   orderItemId: integer("order_item_id"), // Référence à la ligne de commande
 
   inventoryOperationId: integer("inventory_operation_id").references(() => inventoryOperations.id, { onDelete: "cascade" },), // Pour les préparations
-  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id), // Optionnel pour les préparations
+  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id,{ onDelete: "cascade" }), // Optionnel pour les préparations
   lotId: integer("lot_id").references(() => lots.id), // Optionnel pour les préparations
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Optionnel pour les préparations
 
   status: text("status").notNull().default("reserved"), // 'reserved','completed','cancelled'
-  stateChangedAt: timestamp("expires_at", { mode: "string" }), // Expiration / completion de la réservation
-  
+  stateChangedAt: timestamp("state_changed_at", { mode: "string" }), // Expiration / completion de la réservation
+
   reservedQuantity: decimal("reserved_quantity", { precision: 10, scale: 3 }).notNull(),
   reservationType: text("reservation_type").notNull(), // 'order','delivery','production','inventory'
   reservationDirection: text("reservation_direction").notNull(),

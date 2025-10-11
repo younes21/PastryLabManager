@@ -380,8 +380,8 @@ export default function DeliveriesPage() {
 
   const editDelivery = async (delivery: InventoryOperation) => {
 
-    await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number, delivery.id);
-
+    const data = await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number, delivery.id);
+    if (!data) return;
     // Recharger les données de la page avec exclusion de cette livraison pour le stock
     await fetchPageData(((delivery as any).orderId || orderId) as number, delivery.id);
 
@@ -418,9 +418,19 @@ export default function DeliveriesPage() {
         quantity: parseFloat(item.quantity),
       });
     }
+    var articleIds = Object.keys(groupedByArticle);
+
+    const notCreated = data.items.filter((item: any) => item.quantityRemaining > 0 && !articleIds.includes(item.articleId?.toString()))
+      .map((item: any) => ({
+        articleId: item.articleId,
+        article: pageData?.articles.find(a => a.id === item.articleId), // Récupérer depuis la liste articles
+        totalQuantity: 0, // Utiliser la quantité restante
+        // Ne plus gérer unitPrice et totalPrice côté client
+        notes: "",
+      }));;
 
     // Mettre à jour items (une ligne par article) et splits
-    const normalizedItems = Object.values(groupedByArticle).map((g: any) => ({
+    const normalizedItems = [...Object.values(groupedByArticle), ...notCreated].map((g: any) => ({
       id: `${fullDelivery.id}-${g.articleId}`,
       articleId: g.articleId,
       article: g.article,
@@ -445,7 +455,7 @@ export default function DeliveriesPage() {
   const viewDelivery = async (delivery: InventoryOperation) => {
     // Pré-remplissage identique à edit mais en mode lecture
 
-    await ensureOrderDeliveryDetails(delivery.orderId,delivery.id);
+    await ensureOrderDeliveryDetails(delivery.orderId, delivery.id);
     // Recharger les données de la page avec exclusion de cette livraison pour le stock
     await fetchPageData(((delivery as any).orderId || orderId) as number, delivery.id);
 
@@ -568,7 +578,6 @@ export default function DeliveriesPage() {
   // };
   const [isSaving, setIsSaving] = useState(false);
   const saveDelivery = async () => {
-    setIsSaving(true);
     // Vérifications de base
     if (!currentDelivery.clientId) {
       toast({
@@ -650,11 +659,16 @@ export default function DeliveriesPage() {
       if (zones.length === 1 && lots.length <= 1) {
         const autoSplit = createAutoSplit(articleId, quantity);
         if (autoSplit) {
+          // Récupérer l'orderItemId depuis les données de commande
+          const cacheKey = currentDelivery?.id ? `${orderId}-${currentDelivery.id}` : `${orderId}-none`;
+          const orderItem = orderDeliveryDetails[cacheKey]?.items.find((oi: any) => oi.articleId === articleId);
+
           allItems.push({
             idArticle: articleId,
             qteLivree: autoSplit[0].quantity.toString(),
             idlot: autoSplit[0].lotId,
             idzone: autoSplit[0].fromStorageZoneId,
+            idOrderItem: orderItem?.id || null,
           });
           continue;
         }
@@ -704,11 +718,16 @@ export default function DeliveriesPage() {
           return;
         }
 
+        // Récupérer l'orderItemId depuis les données de commande
+        const cacheKey = currentDelivery?.id ? `${orderId}-${currentDelivery.id}` : `${orderId}-none`;
+        const orderItem = orderDeliveryDetails[cacheKey]?.items.find((oi: any) => oi.articleId === articleId);
+
         allItems.push({
           idArticle: articleId,
           qteLivree: splitItem.quantity.toString(),
           idlot: splitItem.lotId,
           idzone: splitItem.fromStorageZoneId,
+          idOrderItem: orderItem?.id || null,
         });
       }
     }
@@ -722,6 +741,7 @@ export default function DeliveriesPage() {
     };
 
     try {
+      setIsSaving(true);
       let deliveryId = currentDelivery.id;
       let deliveryResponse;
       if (deliveryId) {
@@ -1011,9 +1031,9 @@ export default function DeliveriesPage() {
     if (!isOk) return;
 
     try {
-      await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
+      await apiRequest(`/api/deliveries/${delivery.id}/validate`, "POST");
       toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      fetchPageData(delivery.orderId, delivery.id);
       resetForm();
     } catch (e: any) {
       toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
@@ -1021,6 +1041,7 @@ export default function DeliveriesPage() {
   };
 
   const handleCancelDelivery = (delivery: any) => {
+    if(delivery.status !== InventoryOperationStatus.COMPLETED ) return;
     setSelectedDelivery(delivery);
     setIsCancelModalOpen(true);
   };
@@ -1324,7 +1345,7 @@ export default function DeliveriesPage() {
                       )}
 
                       <TableCell className="font-semibold">
-                        {parseFloat(delivery.totalTTC || "0").toFixed(2)} DA
+                        {parseFloat(delivery.totalTtc || "0").toFixed(2)} DA
                       </TableCell>
                       <TableCell>{<Badge className={delivery.isPartial ? 'bg-teal-200 text-black' : 'bg-sky-500'} >{delivery.isPartial ? 'Partielle' : 'complète'}</Badge>}</TableCell>
                       <TableCell>
@@ -1393,7 +1414,7 @@ export default function DeliveriesPage() {
                               <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              disabled={delivery.status === InventoryOperationStatus.COMPLETED || delivery.status === InventoryOperationStatus.CANCELLED}
+                              disabled={delivery.status !== InventoryOperationStatus.COMPLETED }
                               onClick={() => handleCancelDelivery(delivery)}
                               data-testid={`button-cancel-delivery-${delivery.id}`}
                             >
@@ -1685,7 +1706,7 @@ export default function DeliveriesPage() {
 
                                                       upcomingRows.push(
                                                         <tr key="auto-split" className="bg-blue-50 hover:bg-blue-100">
-                                                         <td className="px-3 font-bold text-blue-900">Livraison courante</td>
+                                                          <td className="px-3 font-bold text-blue-900">Livraison courante</td>
                                                           <td className="px-3 py-2   ">
                                                             <div className="flex items-center gap-2">
                                                               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -1776,14 +1797,14 @@ export default function DeliveriesPage() {
 
                                                 {/* Livraisons effectuées (en bas) */}
                                                 {(() => {
-                                                  const deliveredItems = pageData?.deliveries.filter(f=>f.id!=currentDelivery?.id)
+                                                  const deliveredItems = pageData?.deliveries.filter(f => f.id != currentDelivery?.id)
                                                     .flatMap(delivery => (delivery.items || []).map((it: any) => ({ ...it, delivery })))
                                                     .filter(it => it.articleId === item.articleId);
 
                                                   if (deliveredItems?.length === 0) {
                                                     return (
                                                       <tr className="bg-green-50">
-                                                        <td colSpan={4} className="px-3 py-4 text-center text-green-600 italic">
+                                                        <td colSpan={5} className="px-3 py-4 text-center text-green-600 italic">
                                                           Aucune livraison effectuée pour cet article
                                                         </td>
                                                       </tr>

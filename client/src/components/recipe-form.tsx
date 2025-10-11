@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Recipe, InsertRecipe, Article, RecipeIngredient, RecipeOperation, WorkStation, MeasurementUnit } from "@shared/schema";
 import ProductSelectorCompact from "./modal-product";
+import { ArticleCategoryType } from "@shared/constants";
 
 const recipeSchema = z.object({
   designation: z.string().min(1, "La désignation est requise"),
@@ -640,8 +641,8 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                             <SelectContent>
                               {(allArticles as Article[])
                                 .filter((art: Article) => {
-                                  if (art.type === 'ingredient') return true;
-                                  if (art.type === 'product') {
+                                  if (art.type === ArticleCategoryType.INGREDIENT) return true;
+                                  if (art.type === ArticleCategoryType.PRODUCT) {
                                     // On cherche une recette pour ce produit qui est une sous-recette
                                     return existingRecipes.some((rec: any) => rec.articleId === art.id && rec.isSubRecipe);
                                   }
@@ -650,8 +651,8 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                                 .map((article: Article) => (
                                   <SelectItem key={article.id} value={article.id.toString()}>
                                     <div className="flex items-center gap-2">
-                                      <Badge variant={article.type === 'ingredient' ? 'default' : 'secondary'}>
-                                        {article.type === 'ingredient' ? 'ING' : 'PROD'}
+                                      <Badge variant={article.type === ArticleCategoryType.INGREDIENT ? 'default' : 'secondary'}>
+                                        {article.type === ArticleCategoryType.INGREDIENT ? 'ING' : 'PROD'}
                                       </Badge>
                                       {article.name}
                                     </div>
@@ -720,8 +721,8 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                         <div key={index} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <Badge variant={ingredient.article?.type === 'ingredient' ? 'default' : 'secondary'}>
-                                {ingredient.article?.type === 'ingredient' ? 'ING' : 'PROD'}
+                              <Badge variant={ingredient.article?.type === ArticleCategoryType.INGREDIENT ? 'default' : 'secondary'}>
+                                {ingredient.article?.type === ArticleCategoryType.INGREDIENT ? 'ING' : 'PROD'}
                               </Badge>
                               <span className="font-medium">{ingredient.article?.name}</span>
                               <span className="text-gray-600">

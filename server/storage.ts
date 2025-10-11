@@ -515,7 +515,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAllArticleCategories(type: ArticleCategoryType | undefined): Promise<ArticleCategory[]> {
     if (type) {
-      return await db.select().from(articleCategories).where(eq(articleCategories.type, type as string));
+      return await db.select().from(articleCategories).where(eq(articleCategories.type, type as any));
     }
     return await db.select().from(articleCategories);
   }
@@ -525,13 +525,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createArticleCategory(insertCategory: InsertArticleCategory): Promise<ArticleCategory> {
-    const [category] = await db.insert(articleCategories).values(insertCategory).returning();
+    const [category] = await db.insert(articleCategories).values(insertCategory as any).returning();
     return category;
   }
 
   async updateArticleCategory(id: number, updateData: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined> {
     const [category] = await db.update(articleCategories)
-      .set(updateData)
+      .set(updateData as any)
       .where(eq(articleCategories.id, id))
       .returning();
     return category || undefined;
@@ -1391,6 +1391,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Order Items
+  async getOrderItem(id: number): Promise<OrderItem | undefined> {
+    const [orderItem] = await db.select()
+      .from(orderItems)
+      .where(eq(orderItems.id, id));
+    return orderItem;
+  }
+
   async getOrderItems(orderId: number): Promise<OrderItem[]> {
     return await db.select().from(orderItems)
       .where(eq(orderItems.orderId, orderId))
@@ -2080,7 +2087,7 @@ export class DatabaseStorage implements IStorage {
         const stockLocation = await db.query.stock.findFirst({
           where: and(
             eq(stock.articleId, ingredientArticle.id),
-            gt(stock.quantity, 0)
+            gt(stock.quantity, "0")
           ),
           orderBy: [desc(stock.updatedAt)]
         });
@@ -2326,10 +2333,20 @@ export class DatabaseStorage implements IStorage {
         .where(eq(inventoryOperationItems.operationId, operationId));
 
       // Insert new items
+      let insertedItems: any[] = [];
       if (updatedItems.length > 0) {
         const itemsToInsert = updatedItems.map(item => ({
           articleId: (item as any).articleId || (item as any).idArticle,
           quantity: (item as any).quantity || (item as any).qteLivree,
+          quantityBefore: (item as any).quantityBefore || null,
+          quantityAfter: (item as any).quantityAfter || null,
+          unitCost: (item as any).unitCost || "0.00",
+          totalCost: (item as any).totalCost || "0.00",
+          unitPriceSale: (item as any).unitPriceSale || "0.00",
+          totalPriceSale: (item as any).totalPriceSale || "0.00",
+          taxAmountSale: (item as any).taxAmountSale || "0.00",
+          taxRate: (item as any).taxRate || "0.00",
+          taxAmountCost: (item as any).taxAmountCost || "0.00",
           lotId: (item as any).lotId || (item as any).idlot || null,
           fromStorageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
           toStorageZoneId: (item as any).toStorageZoneId || null,
@@ -2337,7 +2354,7 @@ export class DatabaseStorage implements IStorage {
           notes: (item as any).notes || null,
           operationId: operationId
         }));
-        await tx.insert(inventoryOperationItems).values(itemsToInsert);
+        insertedItems = await tx.insert(inventoryOperationItems).values(itemsToInsert).returning();
       }
 
       // Gérer les réservations automatiquement
@@ -2352,7 +2369,9 @@ export class DatabaseStorage implements IStorage {
           ));
 
         if (updatedItems.length > 0) {
-          for (const item of updatedItems) {
+          for (let i = 0; i < updatedItems.length; i++) {
+            const item = updatedItems[i];
+            const insertedItem = insertedItems[i];
             const articleId = (item as any).articleId || (item as any).idArticle;
             const article = await this.getArticle(articleId);
             if (!article) continue;
@@ -2380,6 +2399,8 @@ export class DatabaseStorage implements IStorage {
             await tx.insert(stockReservations).values({
               articleId: articleId,
               inventoryOperationId: operationId,
+              inventoryOperationItemId: insertedItem.id, // Correction principale
+              orderId: operation.orderId || null,
               orderItemId: (item as any).orderItemId || (item as any).idOrderItem || null,
               lotId: (item as any).lotId || (item as any).idlot || null,
               storageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
@@ -2588,7 +2609,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(inventoryOperationItems.id);
   }
 
-  async createInventoryOperationItem(insertItem: InsertInventoryOperationItem): Promise<InventoryOperationItem> {
+  async createInventoryOperationItem(insertItem: InsertInventoryOperationItem & { operationId: number }): Promise<InventoryOperationItem> {
     const [item] = await db.insert(inventoryOperationItems).values(insertItem).returning();
     return item;
   }
@@ -3127,6 +3148,15 @@ export class DatabaseStorage implements IStorage {
       const itemsToInsert = items.map((it) => ({
         articleId: it.articleId || it.idArticle,
         quantity: it.quantity || it.qteLivree,
+        quantityBefore: it.quantityBefore || null,
+        quantityAfter: it.quantityAfter || null,
+        unitCost: it.unitCost || "0.00",
+        totalCost: it.totalCost || "0.00",
+        unitPriceSale: it.unitPriceSale || "0.00",
+        totalPriceSale: it.totalPriceSale || "0.00",
+        taxAmountSale: it.taxAmountSale || "0.00",
+        taxRate: it.taxRate || "0.00",
+        taxAmountCost: it.taxAmountCost || "0.00",
         lotId: it.lotId || it.idlot || null,
         fromStorageZoneId: it.fromStorageZoneId || it.idzone || null,
         toStorageZoneId: it.toStorageZoneId || null,

@@ -4,6 +4,7 @@ import { Layout } from '@/components/layout';
 import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { ArticleCategoryType } from '@shared/constants';
 
 const ReceptionAchatInterface = () => {
   const [operations, setOperations] = useState<any[]>([]);
@@ -41,7 +42,7 @@ const ReceptionAchatInterface = () => {
         // Normaliser types numériques pour éviter 0
         const norm = (v: any) => (v === null || v === undefined ? '0' : v.toString());
         const ing = (articlesData || [])
-          .filter((a: any) => a.type === 'ingredient')
+          .filter((a: any) => a.type === ArticleCategoryType.INGREDIENT )
           .map((a: any) => ({
             ...a,
             costPerUnit: norm(a.costPerUnit),
@@ -285,7 +286,7 @@ const ReceptionAchatInterface = () => {
       };
 
       let res;
-      let data;
+      let data:any;
 
       // Détecter si c'est une modification (ID existe) ou création
       if (currentOperation.id> 0 && typeof currentOperation.id === 'number') {
@@ -345,7 +346,7 @@ const ReceptionAchatInterface = () => {
       try {
         const artRes = await apiRequest('/api/articles', 'GET');
         const articlesData = await artRes.json();
-        setArticles((articlesData || []).filter((a: any) => a.type === 'ingredient'));
+        setArticles((articlesData || []).filter((a: any) => a.type === ArticleCategoryType.INGREDIENT ));
       } catch {}
     } catch (e) {
       console.error('Failed to save purchase order', e);
@@ -371,7 +372,7 @@ const ReceptionAchatInterface = () => {
       try {
         const artRes = await apiRequest('/api/articles', 'GET');
         const articlesData = await artRes.json();
-        setArticles((articlesData || []).filter((a: any) => a.type === 'ingredient'));
+        setArticles((articlesData || []).filter((a: any) => a.type === ArticleCategoryType.INGREDIENT ));
       } catch {}
       alert('Réception complétée');
     } catch (e) {

@@ -25,9 +25,11 @@ import {
   User,
   DollarSign,
   Activity,
-  Zap
+  Zap,
+  TruckIcon
 } from "lucide-react";
 import type { Order, Client } from "@shared/schema";
+import { ProductionItemStatus } from "@shared/constants";
 
 interface ProductionSummaryDialogProps {
   order: Order | null;
@@ -52,7 +54,7 @@ interface ProductionDetail {
     quantityAdjusted: number; // Quantité qui peut être ajustée depuis le stock
     inProduction: number; // Maintenant représente la quantité restante à produire
     stockRemaining: number; // Stock restant après tous les ajustements
-    status: 'available' | 'partial' | 'missing' | 'in_production';
+    status:  ProductionItemStatus;
   }>;
 }
 
@@ -142,6 +144,8 @@ export function ProductionSummaryDialog({
         return <AlertCircle className="h-4 w-4 text-yellow-600" />;
       case 'in_production':
         return <Clock className="h-4 w-4 text-blue-600" />;
+      case 'delivered':
+        return <TruckIcon className="h-4 w-4 text-violet-600" />;
       case 'missing':
       default:
         return <XCircle className="h-4 w-4 text-red-600" />;
@@ -156,6 +160,8 @@ export function ProductionSummaryDialog({
         return "Partiellement disponible";
       case 'in_production':
         return "En production";
+      case 'delivered':
+        return "Livraison totale";
       case 'missing':
       default:
         return "Non disponible";
@@ -335,9 +341,10 @@ export function ProductionSummaryDialog({
                                   {getItemStatusIcon(item.status)}
                                   <Badge
                                     variant="outline"
-                                    className={`text-xs px-2 py-0.5 ${item.status === 'available' ? 'bg-green-50 text-green-700 border-green-200' :
+                                    className={`text-sm px-2 py-0.5 ${item.status === 'available' ? 'bg-green-50 text-green-700 border-green-200' :
                                       item.status === 'partial' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
                                         item.status === 'in_production' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                         item.status === 'delivered' ? 'bg-violet-200 text-violet-900 border-violet-500':
                                           'bg-red-50 text-red-700 border-red-200'
                                       }`}
                                   >

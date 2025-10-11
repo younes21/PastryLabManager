@@ -5,6 +5,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { ArticleCategoryType } from '@shared/constants';
 
 
 const PreparateurPreparationsPage = () => {
@@ -106,7 +107,7 @@ const PreparateurPreparationsPage = () => {
         
         // Filter to products only (with recipes)
         const products = (articlesData || [])
-          .filter((a: any) => a.type === 'product')
+          .filter((a: any) => a.type === ArticleCategoryType.PRODUCT)
           .map((a: any) => ({
             ...a,
             currentStock: a.currentStock?.toString() || '0',
@@ -180,7 +181,7 @@ const PreparateurPreparationsPage = () => {
       const enrichedIngredients = await Promise.all(
         scaledIngredients.map(async (ingredient: any) => {
           const article = articles.find(a => a.id === ingredient.articleId);
-          if (article?.type === 'product') {
+          if (article?.type === ArticleCategoryType.PRODUCT) {
             // Chercher la recette du sous-produit
             const subRecipe = recipes.find(r => r.articleId === article.id);
             if (subRecipe) {
@@ -745,7 +746,7 @@ const PreparateurPreparationsPage = () => {
       // Multiplier la quantité du sous-ingrédient par la quantité du sous-produit dans la recette
       const adjustedQuantity = subIngredientQuantity * subProductQuantity;
       
-      if (subArticle?.type === 'product') {
+      if (subArticle?.type === ArticleCategoryType.PRODUCT) {
         // Si c'est un sous-sous-produit, calculer récursivement son coût
         const subSubRecipe = recipes.find(r => r.articleId === subArticle.id);
         if (subSubRecipe && Array.isArray(subSubRecipe.ingredients)) {
@@ -772,7 +773,7 @@ const PreparateurPreparationsPage = () => {
     return ingredientsList.reduce((totalCost, ingredient) => {
       const article = articles.find(a => a.id === ingredient.articleId);
       
-      if (article?.type === 'product') {
+      if (article?.type === ArticleCategoryType.PRODUCT) {
         // Pour un sous-produit, calculer le coût basé sur ses ingrédients (récursivement)
         const subRecipe = recipes.find(r => r.articleId === article.id);
         if (subRecipe && Array.isArray(subRecipe.ingredients)) {
@@ -824,7 +825,7 @@ const PreparateurPreparationsPage = () => {
       // Chercher la recette du sous-produit si c'est un produit
       let subRecipe = null;
       let subIngredients: any[] = [];
-      if (article?.type === 'product') {
+      if (article?.type === ArticleCategoryType.PRODUCT) {
         subRecipe = recipes.find(r => r.articleId === article.id);
         if (subRecipe && Array.isArray(subRecipe.ingredients)) {
           subIngredients = subRecipe.ingredients || [];
@@ -835,7 +836,7 @@ const PreparateurPreparationsPage = () => {
       let displayCost = 0;
       let unitCost = 0;
       
-      if (article?.type === 'product' && subRecipe && subIngredients.length > 0) {
+      if (article?.type === ArticleCategoryType.PRODUCT && subRecipe && subIngredients.length > 0) {
         // Pour un sous-produit, calculer le coût basé sur ses ingrédients
         const subProductQuantity = parseFloat(ingredient.quantity || '0');
         unitCost = calculateSubProductCost(subIngredients, subProductQuantity);
@@ -847,13 +848,13 @@ const PreparateurPreparationsPage = () => {
         displayCost = unitCost * parseFloat(ingredient.quantity || '0');
       }
       
-      const hasSubIngredients = article?.type === 'product' && subRecipe && subIngredients.length > 0;
+      const hasSubIngredients = article?.type === ArticleCategoryType.PRODUCT && subRecipe && subIngredients.length > 0;
       const isExpanded = expandedSet.has(ingredient.id);
       
       return [
         <tr key={ingredient.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
           <td className="px-3 py-2 text-xs text-gray-600">
-            {article?.type === 'ingredient' ? 'Ingrédient' : 'Produit'}
+            {article?.type === ArticleCategoryType.INGREDIENT ? 'Ingrédient' : 'Produit'}
           </td>
           <td className="px-3 py-2 text-xs font-medium text-gray-800" style={{paddingLeft: `${level * 24}px`}}>
             <div className="flex items-center">

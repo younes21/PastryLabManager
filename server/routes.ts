@@ -1908,9 +1908,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // CORRECTION : À produire = ce qui reste après avoir utilisé le stock disponible
         const qRestantAProduire = Math.max(0, qRemaining - qAjuste);
 
-        let status: ProductionItemStatus.AVAILABLE | ProductionItemStatus.PARTIAL | ProductionItemStatus.IN_PRODUCTION | ProductionItemStatus.MISSING = ProductionItemStatus.MISSING;
-
-        if (qAjuste === qRemaining ) {
+        let status: ProductionItemStatus = ProductionItemStatus.MISSING;
+        if (qCommande == qDelivered) { status = ProductionItemStatus.DELIVERED; }
+        else if (qAjuste === qRemaining) {
           status = ProductionItemStatus.AVAILABLE;
         } else if (qAjuste > 0) {
           status = ProductionItemStatus.PARTIAL;
@@ -3730,7 +3730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { excludeDeliveryId } = req.query;
       const articleIdNum = parseInt(articleId);
       const excludeDeliveryIdNum = excludeDeliveryId ? parseInt(excludeDeliveryId as string) : undefined;
-      
+
       if (isNaN(articleIdNum)) {
         return res.status(400).json({ message: "Invalid article ID" });
       }
@@ -3754,12 +3754,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(stockReservations.articleId, articleIdNum),
         eq(stockReservations.status, StockReservationStatus.RESERVED)
       ];
-      
+
       // Exclure les réservations de la livraison spécifiée si fournie
       if (excludeDeliveryIdNum) {
         whereConditions.push(sql`${stockReservations.inventoryOperationId} != ${excludeDeliveryIdNum}`);
       }
-      
+
       const reservations = await db.select().from(stockReservations)
         .where(and(...whereConditions));
       // Calculer la disponibilité par lot et zone
@@ -4189,26 +4189,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
       }
 
-      // Si aucune livraison trouvée, retourner une réponse vide
-      if (filteredDeliveries.length === 0) {
-        return res.json({
-          deliveries: [],
-          clients: [],
-          orders: [],
-          articles: []
-        });
-      }
 
       // Récupérer toutes les données nécessaires en parallèle
       const excludeDeliveryIdNum = excludeDeliveryId ? parseInt(excludeDeliveryId as string) : undefined;
       const [allClients, allArticles, allOrders] = await Promise.all([
         storage.getAllClients(),
         storage.getAllAvailableArticlesStock(true, excludeDeliveryIdNum),
-        orderId ? 
+        orderId ?
           (async () => {
             const singleOrder = await storage.getOrder(parseInt(orderId as string));
             return singleOrder ? [singleOrder] : [];
-          })() : 
+          })() :
           storage.getAllOrders()
       ]);
 
@@ -4255,7 +4246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM inventory_operation_items ioi
         LEFT JOIN storage_zones sz_from ON sz_from.id = ioi.from_storage_zone_id
         LEFT JOIN lots l ON l.id = ioi.lot_id
-        WHERE ioi.operation_id = ANY(${ sql.raw(`ARRAY[${deliveryIds.join(",")}]::int[]`)})
+        WHERE ioi.operation_id = ANY(${sql.raw(`ARRAY[${deliveryIds.join(",")}]::int[]`)})
         ORDER BY ioi.operation_id, ioi.id
       `);
 
@@ -4271,7 +4262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             oi.unit_price as "unitPrice",
             oi.total_price as "totalPrice"
           FROM order_items oi
-          WHERE oi.order_id = ANY(${ sql.raw(`ARRAY[${orderIds.join(",")}]::int[]`)})
+          WHERE oi.order_id = ANY(${sql.raw(`ARRAY[${orderIds.join(",")}]::int[]`)})
           ORDER BY oi.order_id, oi.id
         `);
         allOrderItems = orderItemsResult.rows;
@@ -4307,10 +4298,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (delivery.orderId) {
           const orderItems = itemsByOrder.get(delivery.orderId) || [];
-          
+
           // Calculer le total commandé (somme des quantités de tous les articles de la commande)
           totalOrdred = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-          
+
           // Calculer le total livré pour cette livraison spécifique
           totalDelivred = items.reduce((sum, item) => sum + parseFloat(String(item.quantity)), 0);
         }
@@ -4323,7 +4314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           items,
           totalOrdred: totalOrdred,
           totalDelivred: totalDelivred,
-          isPartial:livraisonPartielle,
+          isPartial: livraisonPartielle,
         };
       });
 
@@ -4411,7 +4402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderIdNum = parseInt(req.params.id);
       const excludeDeliveryId = req.query.excludeDeliveryId ? parseInt(req.query.excludeDeliveryId as string) : null;
-      
+
       if (Number.isNaN(orderIdNum)) {
         return res.status(400).json({ message: "orderId invalide" });
       }
@@ -4433,7 +4424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (excludeDeliveryId && delivery.id === excludeDeliveryId) {
             return;
           }
-          
+
           (delivery.items || []).forEach((deliveryItem: any) => {
             if (deliveryItem.articleId === item.articleId) {
               delivered += parseFloat(deliveryItem.quantity);
@@ -4442,6 +4433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         const quantityOrdered = parseFloat(item.quantity);
         return {
+          id: item.id,
           articleId: item.articleId,
           quantityOrdered,
           quantityDelivered: delivered,
@@ -4464,26 +4456,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/deliveries", async (req, res) => {
     try {
       // Validation input
-      const { deliveryDate, note, orderId, clientId, items } = req.body;
+      const { deliveryDate, scheduledDate, note, orderId, clientId, items } = req.body;
       if (!orderId || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "orderId et items sont requis" });
       }
-      // Construction de l'opération
+
+      // Récupérer les données de la commande
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Commande non trouvée" });
+      }
+      // Construction des items avec calculs automatiques
+      const opItems = await Promise.all(items.map(async (it: any) => {
+        const article = await storage.getArticle(it.idArticle);
+        const orderItem = it.idOrderItem ? await storage.getOrderItem(it.idOrderItem) : null;
+
+        // Calculer les quantités avant et après
+        const currentStock = parseFloat(article?.currentStock || '0');
+        const quantityToDeliver = parseFloat(it.qteLivree);
+        const quantityAfter = currentStock - quantityToDeliver;
+
+        // Calculer les coûts
+        const unitCost = parseFloat(article?.costPerUnit || '0');
+        const totalCost = unitCost * quantityToDeliver;
+        const unitPriceSale = parseFloat(orderItem?.unitPrice?.toString() || "0.00");
+        const totalPriceSale = unitPriceSale * quantityToDeliver;
+        const taxRate = parseFloat(orderItem?.taxRate || "0.00") == 0
+          ? 0 : parseFloat(orderItem?.taxRate || "0.00") / 100;
+
+        return {
+          articleId: it.idArticle,
+          fromStorageZoneId: it.idzone,
+          lotId: it.idlot,
+          quantity: it.qteLivree,
+          quantityBefore: currentStock.toString(),
+          quantityAfter: quantityAfter.toString(),
+          unitCost: unitCost.toString(),
+          totalCost: totalCost.toString(),
+          taxAmountCost: (totalCost * taxRate).toString(),
+          orderItemId: it.idOrderItem || orderItem?.id || null,
+          taxRate: orderItem?.taxRate?.toString() || "0.00", // Taxe de l'article
+          // Ajouter les prix de vente pour le calcul des montants
+          unitPriceSale: unitPriceSale.toString(),
+          totalPriceSale: totalPriceSale.toString(),
+          taxAmountSale: (totalPriceSale * taxRate).toString(),
+
+        };
+      }));
+
+      // Calculer les montants totaux basés sur les articles réellement livrés
+      let subtotalHT = 0;
+      let totalTax = 0;
+      let totalTTC = 0;
+
+      for (const item of opItems) {
+        const quantity = parseFloat(item.quantity);
+        const unitPrice = parseFloat(item.unitPriceSale || '0');
+        const taxRate = parseFloat(item.taxRate || '0');
+
+        const itemSubtotal = quantity * unitPrice;
+        const itemTax = itemSubtotal * (taxRate / 100);
+        const itemTotal = itemSubtotal + itemTax;
+
+        subtotalHT += itemSubtotal;
+        totalTax += itemTax;
+        totalTTC += itemTotal;
+      }
+
+      // Construction de l'opération avec scheduled_date et montants calculés
       const operation = {
         type: InventoryOperationType.LIVRAISON,
         orderId,
         clientId,
         notes: note,
         deliveryDate,
+        scheduledDate: scheduledDate || deliveryDate, // Utiliser scheduledDate si fourni, sinon deliveryDate
         status: InventoryOperationStatus.DRAFT,
+        subtotalHT: subtotalHT.toFixed(2),
+        totalTax: totalTax.toFixed(2),
+        totalTTC: totalTTC.toFixed(2),
       };
-      // Construction des items
-      const opItems = items.map((it: any) => ({
-        articleId: it.idArticle,
-        fromStorageZoneId: it.idzone,
-        lotId: it.idlot,
-        quantity: it.qteLivree,
-      }));
+
       // Création transactionnelle
       const created = await storage.createInventoryOperationWithItems(operation, opItems);
       res.status(201).json(created);
@@ -4497,25 +4550,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/deliveries/:id", async (req, res) => {
     try {
       const operationId = parseInt(req.params.id);
-      const { deliveryDate, note, orderId, items } = req.body;
+      const { deliveryDate, scheduledDate, note, orderId, items } = req.body;
       if (!orderId || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "orderId et items sont requis" });
       }
-      // Construction de l'opération
+
+      // Récupérer les données de la commande
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Commande non trouvée" });
+      }
+
+      // Construction des items avec calculs automatiques
+      const opItems = await Promise.all(items.map(async (it: any) => {
+        const article = await storage.getArticle(it.idArticle);
+        const orderItem = it.idOrderItem ? await storage.getOrderItem(it.idOrderItem) : null;
+
+        // Calculer les quantités avant et après
+        const currentStock = parseFloat(article?.currentStock || '0');
+        const quantityToDeliver = parseFloat(it.qteLivree);
+        const quantityAfter = currentStock - quantityToDeliver;
+
+        // Calculer les coûts
+        const unitCost = parseFloat(article?.costPerUnit || '0');
+        const totalCost = unitCost * quantityToDeliver;
+        const unitPriceSale = parseFloat(orderItem?.unitPrice?.toString() || "0.00");
+        const totalPriceSale = unitPriceSale * quantityToDeliver;
+        const taxRate = parseFloat(orderItem?.taxRate || "0.00") == 0
+          ? 0 : parseFloat(orderItem?.taxRate || "0.00") / 100;
+
+        return {
+          articleId: it.idArticle,
+          fromStorageZoneId: it.idzone,
+          lotId: it.idlot,
+          quantity: it.qteLivree,
+          quantityBefore: currentStock.toString(),
+          quantityAfter: quantityAfter.toString(),
+          unitCost: unitCost.toString(),
+          totalCost: totalCost.toString(),
+          taxAmountCost: (totalCost * taxRate).toString(),
+          orderItemId: it.idOrderItem || orderItem?.id || null,
+          taxRate: orderItem?.taxRate?.toString() || "0.00", // Taxe de l'article
+          // Ajouter les prix de vente pour le calcul des montants
+          unitPriceSale: unitPriceSale.toString(),
+          totalPriceSale: totalPriceSale.toString(),
+          taxAmountSale: (totalPriceSale * taxRate).toString(),
+
+        };
+      }));
+
+      // Calculer les montants totaux basés sur les articles réellement livrés
+      let subtotalHT = 0;
+      let totalTax = 0;
+      let totalTTC = 0;
+
+      for (const item of opItems) {
+        const quantity = parseFloat(item.quantity);
+        const unitPrice = parseFloat(item.unitPriceSale || '0');
+        const taxRate = parseFloat(item.taxRate || '0');
+
+        const itemSubtotal = quantity * unitPrice;
+        const itemTax = itemSubtotal * (taxRate / 100);
+        const itemTotal = itemSubtotal + itemTax;
+
+        subtotalHT += itemSubtotal;
+        totalTax += itemTax;
+        totalTTC += itemTotal;
+      }
+
+      // Construction de l'opération avec scheduled_date et montants calculés
       const operation = {
         type: InventoryOperationType.LIVRAISON,
         orderId,
         notes: note,
         deliveryDate,
+        scheduledDate: scheduledDate || deliveryDate, // Utiliser scheduledDate si fourni, sinon deliveryDate
         status: InventoryOperationStatus.DRAFT,
+        subtotalHT: subtotalHT.toFixed(2),
+        totalTax: totalTax.toFixed(2),
+        totalTTC: totalTTC.toFixed(2),
       };
-      // Construction des items (pour une livraison, la zone est la zone SOURCE)
-      const opItems = items.map((it: any) => ({
-        articleId: it.idArticle,
-        fromStorageZoneId: it.idzone,
-        lotId: it.idlot,
-        quantity: it.qteLivree,
-      }));
+
       // Update transactionnel
       const updated = await storage.updateInventoryOperationWithItems(operationId, operation, opItems);
       res.json(updated);

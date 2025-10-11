@@ -18,7 +18,7 @@ export enum MeasurementUnitType {
 
 // Catégories d'articles
 export enum ArticleCategoryType {
-  PRODUCT = "product",
+  PRODUCT = "produit",
   INGREDIENT = "ingredient",
   SERVICE = "service", 
 }
@@ -212,6 +212,7 @@ export enum ProductionItemStatus {
   PARTIAL = "partial",
   IN_PRODUCTION = "in_production",
   MISSING = "missing",
+  DELIVERED = "delivered",
 }
 export enum ProductionStatus {
   NON_PREPARE = "non_prepare",
