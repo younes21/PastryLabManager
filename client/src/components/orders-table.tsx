@@ -51,24 +51,53 @@ export function OrdersTable({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
+  const recalculateOrderValues = (
+    filteredOrders: Order[],
+    draggedOrder: Order,
+    targetOrder: Order
+  ): Order[] => {
+    if (filteredOrders.length === 0) return filteredOrders;
+  
+    const oldIndex = filteredOrders.findIndex(o => o.id === draggedOrder.id);
+    const newIndex = filteredOrders.findIndex(o => o.id === targetOrder.id);
+  
+    if (oldIndex === -1 || newIndex === -1) return filteredOrders;
+  
+    // 1️⃣ Déplacer localement dans la liste filtrée
+    const newFiltered = arrayMove([...filteredOrders], oldIndex, newIndex);
+  
+    // 2️⃣ Conserver la continuité des valeurs `order` d’origine
+    const sortedOrderValues = filteredOrders
+      .map(o => o.order)
+      .sort((a, b) => (a ?? 0) - (b ?? 0));
+  
+    // 3️⃣ Appliquer les ordres triés dans le nouvel ordre visuel
+    const updated = newFiltered.map((order, i) => ({
+      ...order,
+      order: sortedOrderValues[i],
+    }));
+  
+    return updated;
+  };
   // Utiliser le nouveau hook de calcul du statut de production
   const { data: productionStatuses = [], isLoading: productionStatusLoading } = useProductionStatusCalculation(orders);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      const oldIndex = orders.findIndex((order) => order.id === active.id);
-      const newIndex = orders.findIndex((order) => order.id === over.id);
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrders = arrayMove(orders, oldIndex, newIndex);
-        
-        // Mettre à jour l'ordre dans la base de données
-        onReorder(newOrders);
-      }
-    }
+    if (!over || active.id === over.id) return;
+  
+    const draggedOrder = orders.find(o => o.id === active.id);
+    const targetOrder = orders.find(o => o.id === over.id);
+  
+    if (!draggedOrder || !targetOrder) return;
+  
+    console.log('filtered before orders:', orders.map(o => ({ id:o.id, order:o.order })));
+    const updatedFiltered = recalculateOrderValues(orders, draggedOrder, targetOrder);
+    console.log('filtered after orders:', updatedFiltered.map(o => ({ id:o.id, order:o.order })));
+    
+  
+    // Envoie les éléments mis à jour à ton backend ou parent
+    onReorder(updatedFiltered);
   };
 
   return (

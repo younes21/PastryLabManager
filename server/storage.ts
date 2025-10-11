@@ -1305,10 +1305,14 @@ export class DatabaseStorage implements IStorage {
       const existingOrders = await tx.select().from(orders);
       const nextNumber = existingOrders.length + 1;
       const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
-
+      // 2. Calculer la nouvelle position (dernière position + 1)
+      const lastPosition = existingOrders.length > 0
+        ? Math.max(...existingOrders.map(order => order.order ?? 0))
+        : 0;
+      const newPosition = lastPosition + 1;
       const [order] = await tx
         .insert(orders)
-        .values({ ...insertOrder, code })
+        .values({ ...insertOrder, code, order: newPosition })
         .returning();
 
       const orderItemsToInsert = items.map((item) => ({
@@ -1692,7 +1696,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // ---- Passage en cancelled ----
-      if (status === InventoryOperationStatus.CANCELLED  && op.status === InventoryOperationStatus.COMPLETED ) {
+      if (status === InventoryOperationStatus.CANCELLED && op.status === InventoryOperationStatus.COMPLETED) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
           if (qty <= 0) continue;

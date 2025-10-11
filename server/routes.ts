@@ -4179,84 +4179,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredDeliveries = deliveries.filter(d => d.orderId === parseInt(orderId as string));
       }
 
-      // Récupérer toutes les données nécessaires (optimisé pour éviter de charger toutes les commandes si orderId est fourni)
-      const [allClients, allArticles] = await Promise.all([
-        storage.getAllClients(),
-        storage.getAllAvailableArticlesStock(true)
-      ]);
-
-      let allOrders: any[] = [];
-      if (orderId) {
-        const singleOrder = await storage.getOrder(parseInt(orderId as string));
-        allOrders = singleOrder ? [singleOrder] : [];
-      } else {
-        allOrders = await storage.getAllOrders();
+      // Si aucune livraison trouvée, retourner une réponse vide
+      if (filteredDeliveries.length === 0) {
+        return res.json({
+          deliveries: [],
+          clients: [],
+          orders: [],
+          articles: []
+        });
       }
+
+      // Récupérer toutes les données nécessaires en parallèle
+      const [allClients, allArticles, allOrders] = await Promise.all([
+        storage.getAllClients(),
+        storage.getAllAvailableArticlesStock(true),
+        orderId ? 
+          (async () => {
+            const singleOrder = await storage.getOrder(parseInt(orderId as string));
+            return singleOrder ? [singleOrder] : [];
+          })() : 
+          storage.getAllOrders()
+      ]);
 
       // Créer des maps pour un accès rapide
       const ordersMap = new Map(allOrders.map((o: any) => [o.id, o]));
 
+      // Récupérer tous les IDs de livraisons et commandes pour les requêtes optimisées
+      const deliveryIds = filteredDeliveries.map(d => d.id);
+      const orderIds = [...new Set(filteredDeliveries.map(d => d.orderId).filter(Boolean))];
+
+      // Récupérer tous les items de livraisons en une seule requête
+      const allDeliveryItems = await db.execute(sql`
+        SELECT 
+          ioi.id,
+          ioi.operation_id as "operationId",
+          ioi.article_id as "articleId",
+          ioi.quantity,
+          ioi.quantity_before as "quantityBefore",
+          ioi.quantity_after as "quantityAfter",
+          ioi.unit_cost as "unitCost",
+          ioi.from_storage_zone_id as "fromStorageZoneId",
+          ioi.to_storage_zone_id as "toStorageZoneId",
+          ioi.lot_id as "lotId",
+          ioi.notes,
+          ioi.created_at as "createdAt",
+          -- Zone de stockage source
+          CASE 
+            WHEN sz_from.id IS NOT NULL THEN json_build_object(
+              'id', sz_from.id,
+              'designation', sz_from.designation,
+              'code', sz_from.code
+            )
+            ELSE NULL
+          END as "fromStorageZone",
+          -- Lot
+          CASE 
+            WHEN l.id IS NOT NULL THEN json_build_object(
+              'id', l.id,
+              'code', l.code,
+              'expirationDate', l.expiration_date
+            )
+            ELSE NULL
+          END as "lot"
+        FROM inventory_operation_items ioi
+        LEFT JOIN storage_zones sz_from ON sz_from.id = ioi.from_storage_zone_id
+        LEFT JOIN lots l ON l.id = ioi.lot_id
+        WHERE ioi.operation_id = ANY(${ sql.raw(`ARRAY[${deliveryIds.join(",")}]::int[]`)})
+        ORDER BY ioi.operation_id, ioi.id
+      `);
+
+      // Récupérer tous les items de commandes en une seule requête si nécessaire
+      let allOrderItems: any[] = [];
+      if (orderIds.length > 0) {
+        const orderItemsResult = await db.execute(sql`
+          SELECT 
+            oi.id,
+            oi.order_id as "orderId",
+            oi.article_id as "articleId",
+            oi.quantity,
+            oi.unit_price as "unitPrice",
+            oi.total_price as "totalPrice"
+          FROM order_items oi
+          WHERE oi.order_id = ANY(${ sql.raw(`ARRAY[${orderIds.join(",")}]::int[]`)})
+          ORDER BY oi.order_id, oi.id
+        `);
+        allOrderItems = orderItemsResult.rows;
+      }
+
+      // Grouper les items par livraison et commande
+      const itemsByDelivery = new Map<number, any[]>();
+      const itemsByOrder = new Map<number, any[]>();
+
+      allDeliveryItems.rows.forEach((item: any) => {
+        const deliveryId = item.operationId;
+        if (!itemsByDelivery.has(deliveryId)) {
+          itemsByDelivery.set(deliveryId, []);
+        }
+        itemsByDelivery.get(deliveryId)!.push(item);
+      });
+
+      allOrderItems.forEach((item: any) => {
+        const orderId = item.orderId;
+        if (!itemsByOrder.has(orderId)) {
+          itemsByOrder.set(orderId, []);
+        }
+        itemsByOrder.get(orderId)!.push(item);
+      });
+
       // Enrichir les livraisons avec toutes les données
-      const enrichedDeliveries = await Promise.all(
-        filteredDeliveries.map(async (delivery) => {
-          // Récupérer les items de la livraison avec les libellés des zones et lots
-          const items = await db.execute(sql`
-            SELECT 
-              ioi.id,
-              ioi.operation_id as "operationId",
-              ioi.article_id as "articleId",
-              ioi.quantity,
-              ioi.quantity_before as "quantityBefore",
-              ioi.quantity_after as "quantityAfter",
-              ioi.unit_cost as "unitCost",
-              ioi.from_storage_zone_id as "fromStorageZoneId",
-              ioi.to_storage_zone_id as "toStorageZoneId",
-              ioi.lot_id as "lotId",
-              ioi.notes,
-              ioi.created_at as "createdAt",
-              -- Zone de stockage source
-              CASE 
-                WHEN sz_from.id IS NOT NULL THEN json_build_object(
-                  'id', sz_from.id,
-                  'designation', sz_from.designation,
-                  'code', sz_from.code
-                )
-                ELSE NULL
-              END as "fromStorageZone",
-              -- Lot
-              CASE 
-                WHEN l.id IS NOT NULL THEN json_build_object(
-                  'id', l.id,
-                  'code', l.code,
-                  'expirationDate', l.expiration_date
-                )
-                ELSE NULL
-              END as "lot"
-            FROM inventory_operation_items ioi
-            LEFT JOIN storage_zones sz_from ON sz_from.id = ioi.from_storage_zone_id
-            LEFT JOIN lots l ON l.id = ioi.lot_id
-            WHERE ioi.operation_id = ${delivery.id}
-            ORDER BY ioi.id
-          `);
+      const enrichedDeliveries = filteredDeliveries.map((delivery) => {
+        const items = itemsByDelivery.get(delivery.id) || [];
 
+        // Calculer les totaux pour cette livraison
+        let totalOrdred = 0;
+        let totalDelivred = 0;
 
-          return {
-            ...delivery,
-            items: items.rows,
-          };
-        })
-      );
+        if (delivery.orderId) {
+          const orderItems = itemsByOrder.get(delivery.orderId) || [];
+          
+          // Calculer le total commandé (somme des quantités de tous les articles de la commande)
+          totalOrdred = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+          
+          // Calculer le total livré pour cette livraison spécifique
+          totalDelivred = items.reduce((sum, item) => sum + parseFloat(String(item.quantity)), 0);
+        }
+
+        // Déterminer si c'est une livraison partielle
+        const livraisonPartielle = totalOrdred > totalDelivred;
+
+        return {
+          ...delivery,
+          items,
+          totalOrdred: totalOrdred,
+          totalDelivred: totalDelivred,
+          isPartial:livraisonPartielle,
+        };
+      });
 
       // Si orderId est spécifié, enrichir la commande correspondante avec les détails de livraison
       if (orderId) {
         const orderIdNum = parseInt(orderId as string);
         const order = ordersMap.get(orderIdNum);
         if (order) {
-          // Récupérer les items de la commande et les livraisons existantes
-          const [orderItems, existingDeliveries] = await Promise.all([
-            storage.getOrderItems(orderIdNum),
-            storage.getInventoryOperationsByOrder(orderIdNum)
-          ]);
+          // Récupérer les livraisons existantes pour cette commande
+          const existingDeliveries = await storage.getInventoryOperationsByOrder(orderIdNum);
+          const orderItems = itemsByOrder.get(orderIdNum) || [];
 
           // Pour chaque item, calculer qté déjà livrée et qté restante
           const itemsWithDelivery = orderItems.map(item => {
@@ -4320,20 +4387,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isPerishable: a.isPerishable
         }))
       };
-
-      // Log pour vérifier les données finales
-      console.log(`📊 API /api/deliveries/page-data - Données retournées:`, {
-        deliveriesCount: responseData.deliveries.length,
-        sampleDelivery: responseData.deliveries[0] ? {
-          id: responseData.deliveries[0].id,
-          itemsCount: responseData.deliveries[0].items?.length || 0,
-          sampleItem: responseData.deliveries[0].items?.[0] ? {
-            articleId: responseData.deliveries[0].items[0].articleId,
-            fromStorageZone: responseData.deliveries[0].items[0].fromStorageZone,
-            lot: responseData.deliveries[0].items[0].lot
-          } : null
-        } : null
-      });
 
       res.json(responseData);
     } catch (error) {

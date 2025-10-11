@@ -135,9 +135,10 @@ export default function OrdersPage() {
 
   const reorderMutation = useMutation({
     mutationFn: async (orders: Order[]) => {
-      const updates = orders.map((order, index) => ({
+      console.log('orders:', orders.map(o => ({ id:o.id, order:o.order })));
+      const updates = orders.map((order) => ({
         id: order.id,
-        order: index
+        order: order.order ?? 0
       }));
       return await apiRequest("/api/orders/reorder", "PUT", { updates });
     },

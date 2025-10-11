@@ -66,12 +66,14 @@ import { DeliveryPackagesModal } from "@/components/delivery-packages-modal";
 import { DeliveryTrackingModal } from "@/components/delivery-tracking-modal";
 import { DeliveryPaymentModal } from "@/components/delivery-payment-modal";
 import { DateTypes, DEFAULT_CURRENCY_DZD, FILTER_ALL, InventoryOperationStatus, InventoryOperationType } from "@shared/constants";
+import { Progress } from "@/components/ui/progress";
+import { Alert } from "@/components/ui/alert";
+import { confirmGlobal, useGlobalConfirm } from "@/contexts/confimContext";
 
 export default function DeliveriesPage() {
   usePageTitle("Livraisons");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
   // Récupérer le paramètre orderId de l'URL
   const [orderId, setOrderId] = useState<number | null>(null);
   const [fromOrder, setfromOrder] = useState<boolean>(false);
@@ -131,9 +133,15 @@ export default function DeliveriesPage() {
       setOrderId(null);
     }
 
-    fetchPageData(_orderId);
+    fetchPageData(_orderId).then(f => selectCurrentOrderAndDelivery(_orderId));
     seturlIsParsed(true);
   }, [location.search]);
+
+  useEffect(() => {
+    if (pageData && orderId) {
+      selectCurrentOrderAndDelivery(orderId);
+    }
+  }, [orderId, pageData]);
 
   // Charger automatiquement les détails de commande si on a un orderId dans l'URL
   useEffect(() => {
@@ -204,10 +212,11 @@ export default function DeliveriesPage() {
   };
 
 
-  const selectCurrentDelivery = (delivery: InventoryOperation) => {
-    setOrderId(delivery.orderId || orderId || null);
-
-    const currentOrder = pageData?.orders.find(o => o.id === delivery.orderId);
+  const selectCurrentOrderAndDelivery = (myOrderId: number | null, deliveryId: number | null = null) => {
+    if (!myOrderId) return;
+    // --------------set order---------
+    setOrderId(myOrderId || myOrderId || null);
+    const currentOrder = pageData?.orders.find(o => o.id === myOrderId);
     setOrderData(currentOrder ? {
       id: currentOrder.id,
       code: currentOrder.code,
@@ -218,11 +227,13 @@ export default function DeliveriesPage() {
       notes: currentOrder.notes
     } : null);
 
-    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
+    // --------------set delivery---------
+    if (!deliveryId) return;
+    const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === deliveryId);
 
     setCurrentDelivery({
       id: fullDelivery.id,
-      code:fullDelivery.code,
+      code: fullDelivery.code,
       type: fullDelivery.type || InventoryOperationType.LIVRAISON,
       status: fullDelivery.status || InventoryOperationStatus.DRAFT,
       clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
@@ -233,77 +244,28 @@ export default function DeliveriesPage() {
     });
   }
 
-  // order delivery details are fetched via ensureOrderDeliveryDetails
-
-  // Mutations
-  // Adaptation de la mutation création
-  const createDeliveryMutation = useMutation({
-    mutationFn: async (data: any) => {
-      // Adapter le payload pour l'API backend
-      const payload = {
-        deliveryDate: data.deliveryDate,
-        note: data.note,
-        orderId: data.orderId,
-        items: data.items.map((item: any) => ({
-          idArticle: item.idArticle,
-          idzone: item.idzone,
-          idlot: item.idlot,
-          qteLivree: item.qteLivree,
-        })),
-      };
-      return await apiRequest("/api/deliveries", "POST", payload);
-    },
-    onSuccess: () => {
-      fetchPageData(orderId);
-      toast({
-        title: "Livraison créée",
-        description: "La livraison a été créée avec succès"
-      });
-      resetForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la création",
-        variant: "destructive"
-      });
-    },
-  });
-
-  // Adaptation de la mutation modification
-  const updateDeliveryMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const payload = {
-        deliveryDate: data.deliveryDate,
-        note: data.note,
-        orderId: data.orderId,
-        items: data.items.map((item: any) => ({
-          idArticle: item.idArticle,
-          idzone: item.idzone,
-          idlot: item.idlot,
-          qteLivree: item.qteLivree,
-        })),
-      };
-      return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
-    },
-    onSuccess: () => {
-      fetchPageData(orderId);
-      if (orderId)
-        orderDeliveryDetails[orderId] = null;
-      toast({
-        title: "Livraison mise à jour",
-        description: "La livraison a été modifiée avec succès"
-      });
-      resetForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erreur",
-        description: error.message || "Erreur lors de la modification",
-        variant: "destructive"
-      });
-    },
-  });
+  // const updateDeliveryStateMutation = useMutation({
+  //   mutationFn: async ({ id, data }: { id: number; data: any }) => {
+  //     const payload = {
+  //       status: data.status,
+  //     };
+  //     return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
+  //   },
+  //   onSuccess: () => {
+  //     toast({
+  //       title: "Status mis à jour",
+  //       description: "Status mis à jour avec succès"
+  //     });
+  //     resetForm();
+  //   },
+  //   onError: (error: any) => {
+  //     toast({
+  //       title: "Erreur",
+  //       description: error.message || "Erreur lors de la mise à jour du status",
+  //       variant: "destructive"
+  //     });
+  //   },
+  // });
 
   const deleteDeliveryMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -403,27 +365,12 @@ export default function DeliveriesPage() {
     setIsViewing(false);
     setShowForm(true);
   };
-  // const selectDelivery = (delivery: InventoryOperation) => {
-  //   setOrderId((delivery as any).orderId || orderId || null);
-  //   const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
-  //   // Pré-remplir l'entête
-  //   setCurrentDelivery({
-  //     id: fullDelivery.id,
-  //     type: fullDelivery.type || InventoryOperationType.LIVRAISON,
-  //     status: fullDelivery.status || InventoryOperationStatus.DRAFT,
-  //     clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
-  //     orderId: fullDelivery.orderId || null,
-  //     scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
-  //     notes: fullDelivery.notes || '',
-  //     currency: DEFAULT_CURRENCY_DZD,
-  //   });
-  // }
   const editDelivery = async (delivery: InventoryOperation) => {
 
     await ensureOrderDeliveryDetails(((delivery as any).orderId || orderId) as number);
 
-    selectCurrentDelivery(delivery);
+    selectCurrentOrderAndDelivery(delivery.orderId, delivery.id);
 
     const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
@@ -485,7 +432,7 @@ export default function DeliveriesPage() {
 
     await ensureOrderDeliveryDetails(orderId);
 
-    selectCurrentDelivery(delivery);
+    selectCurrentOrderAndDelivery(delivery.orderId, delivery.id);
     const fullDelivery = (pageData?.deliveries || []).find((d: any) => d.id === (delivery as any).id) || (delivery as any);
 
     // Regrouper items par article pour l'affichage
@@ -597,8 +544,9 @@ export default function DeliveriesPage() {
   //   const totalTTC = subtotalHT + totalTax;
   //   return { subtotalHT, totalTax, totalTTC };
   // };
-
+  const [isSaving, setIsSaving] = useState(false);
   const saveDelivery = async () => {
+    setIsSaving(true);
     // Vérifications de base
     if (!currentDelivery.clientId) {
       toast({
@@ -758,15 +706,19 @@ export default function DeliveriesPage() {
         const deliveryData = await deliveryResponse.json();
         deliveryId = deliveryData.id;
       }
+      await fetchPageData(currentDelivery.orderId);
+      setIsSaving(false);
       if (!deliveryId) throw new Error("Impossible de récupérer l'ID de la livraison");
 
       toast({
         title: currentDelivery.id ? "Livraison mise à jour" : "Livraison créée",
         description: "La livraison et les réservations de stock ont été enregistrées avec succès"
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+
+
       resetForm();
     } catch (error: any) {
+      setIsSaving(false);
       toast({
         title: "Erreur lors de la sauvegarde",
         description: error.message || "Erreur lors de la création ou de la réservation de stock",
@@ -1021,6 +973,22 @@ export default function DeliveriesPage() {
     });
 
     return summaryItems;
+  };
+
+  const handleValidateDelivery = async (delivery: any) => {
+    if (!delivery || delivery.status === InventoryOperationStatus.COMPLETED ||
+      delivery.status === InventoryOperationStatus.CANCELLED) { return; }
+    var isOk = await confirmGlobal("Validation de la livraison", "Confirmez-vous la validation de cette livraison ? Cette action est irréversible et entraînera le débit du stock.");
+    if (!isOk) return;
+
+    try {
+      await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
+      toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+      resetForm();
+    } catch (e: any) {
+      toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
+    }
   };
 
   const handleCancelDelivery = (delivery: any) => {
@@ -1291,7 +1259,8 @@ export default function DeliveriesPage() {
                   <TableHead>Total TTC</TableHead>
                   <TableHead>etat</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead>Date valdiation</TableHead>
+                  <TableHead>Date validation</TableHead>
+                  <TableHead className="hidden lg:table-cell">% de la commande</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1311,7 +1280,7 @@ export default function DeliveriesPage() {
                 ) : (
                   filteredDeliveries?.map((delivery) => (
                     <TableRow key={delivery.id} data-testid={`row-delivery-${delivery.id}`}>
-                      <TableCell className={`font-medium cursor-pointer ${currentDelivery?.id == delivery.id ? 'border-l-8 border-l-orange-500' : ''}`} onClick={() => selectCurrentDelivery(delivery)}>{delivery.code}</TableCell>
+                      <TableCell className={`font-medium cursor-pointer ${currentDelivery?.id == delivery.id ? 'border-l-8 border-l-orange-500' : ''}`} onClick={() => selectCurrentOrderAndDelivery(delivery.orderId, delivery.id)}>{delivery.code}</TableCell>
 
                       {!orderId && (
                         <>
@@ -1328,36 +1297,25 @@ export default function DeliveriesPage() {
                       <TableCell className="font-semibold">
                         {parseFloat(delivery.totalTTC || "0").toFixed(2)} DA
                       </TableCell>
-                      <TableCell>{getStatusBadge(delivery.isPartial)}</TableCell>
+                      <TableCell>{<Badge className={delivery.isPartial ? 'bg-teal-200 text-black' : 'bg-sky-500'} >{delivery.isPartial ? 'Partielle' : 'complète'}</Badge>}</TableCell>
                       <TableCell>
-                        <Select
-                          value={delivery.status}
-                          onValueChange={(newStatus) => {
-                            if (newStatus !== delivery.status) {
-                              updateDeliveryMutation.mutate({
-                                id: delivery.id,
-                                data: { status: newStatus }
-                              });
-                            }
-                          }}
-                          disabled={delivery.status === InventoryOperationStatus.COMPLETED}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="draft">Brouillon</SelectItem>
-                            <SelectItem value="pending">En attente</SelectItem>
-                            <SelectItem value="ready">Prêt</SelectItem>
-                            <SelectItem value="completed">Livré</SelectItem>
-                            <SelectItem value="cancelled">Annulé</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {getStatusBadge(delivery.status)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="w-52">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           {formatDate(delivery.validatedAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="w-44 hidden lg:table-cell">
+                        <div className="relative w-full">
+                          <Progress
+                            value={(delivery.totalDelivred / delivery.totalOrdred) * 100}
+                            className="h-3"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-medium ">
+                            {Math.round((delivery.totalDelivred / delivery.totalOrdred) * 100)}%
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1376,25 +1334,17 @@ export default function DeliveriesPage() {
                             <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
                               <Edit3 className="h-4 w-4" /> Modifier
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setAssignmentModal({ open: true, delivery })}>
-                              <User className="h-4 w-4" /> Assigner un livreur
+                            <DropdownMenuItem
+                              disabled={delivery.status === InventoryOperationStatus.COMPLETED || delivery.status === InventoryOperationStatus.CANCELLED}
+                              onClick={() => handleValidateDelivery(delivery)}
+                              data-testid={`button-cancel-delivery-${delivery.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-500" /> Valider
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setPackagesModal({ open: true, delivery })}>
-                              <Package className="h-4 w-4" /> Gérer les colis
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setTrackingModal({ open: true, delivery })}>
-                              <Truck className="h-4 w-4" /> Suivi de livraison
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setPaymentModal({ open: true, delivery })}>
-                              <CreditCard className="h-4 w-4" /> Paiement à la livraison
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               disabled={delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
-                              onClick={() => {
-                                const confirmMessage = delivery.status === InventoryOperationStatus.COMPLETED
-                                  ? "Cette livraison est validée et ne peut pas être supprimée."
-                                  : `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
+                              onClick={async () => {
+
                                 if (delivery.status === InventoryOperationStatus.COMPLETED) {
                                   toast({
                                     title: "Suppression impossible",
@@ -1403,7 +1353,9 @@ export default function DeliveriesPage() {
                                   });
                                   return;
                                 }
-                                if (confirm(confirmMessage)) {
+                                const confirmMessage = `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
+                                var isOk = await confirmGlobal('Supression de la livraison', confirmMessage);
+                                if (isOk) {
                                   deleteDeliveryMutation.mutate(delivery.id);
                                 }
                               }}
@@ -1418,6 +1370,23 @@ export default function DeliveriesPage() {
                             >
                               <X className="h-4 w-4 text-red-500" /> Annuler
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuItem onClick={() => setAssignmentModal({ open: true, delivery })}>
+                              <User className="h-4 w-4" /> Assigner un livreur
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPackagesModal({ open: true, delivery })}>
+                              <Package className="h-4 w-4" /> Gérer les colis
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTrackingModal({ open: true, delivery })}>
+                              <Truck className="h-4 w-4" /> Suivi de livraison
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPaymentModal({ open: true, delivery })}>
+                              <CreditCard className="h-4 w-4" /> Paiement à la livraison
+                            </DropdownMenuItem>
+
+
+
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -1463,30 +1432,12 @@ export default function DeliveriesPage() {
                   </Button> */}
                   <Button
                     onClick={saveDelivery}
-                    disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
+                    disabled={isSaving}
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {currentDelivery.id ? "Mettre à jour" : "Créer"}
                   </Button>
-                  {currentDelivery.id && currentDelivery.status !== InventoryOperationStatus.COMPLETED && (
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={async () => {
-                        try {
-                          await apiRequest(`/api/deliveries/${currentDelivery.id}/validate`, "POST");
-                          toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
-                          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
-                          resetForm();
-                        } catch (e: any) {
-                          toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
-                        }
-                      }}
-                      disabled={createDeliveryMutation.isPending || updateDeliveryMutation.isPending}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Valider la livraison
-                    </Button>
-                  )}
+
                 </div>
               )}
             </Card>

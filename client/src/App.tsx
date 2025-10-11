@@ -56,6 +56,7 @@ import PreparationPage from "./pages/prepration";
 import PreparateurPreparationsPage from "./pages/preparateur-preparations";
 import { LayoutProvider } from "./contexts/LayoutContext";
 import OrdersPage from "./pages/orders-new";
+import { ConfirmProvider } from "./contexts/confimContext";
 
 function LoginPage() {
   const { login } = useAuth();
@@ -249,8 +250,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <Toaster />
-          <AppContent />
+          <ConfirmProvider>
+            <Toaster />
+            <AppContent />
+          </ConfirmProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

@@ -18,7 +18,7 @@ export enum MeasurementUnitType {
 
 // Catégories d'articles
 export enum ArticleCategoryType {
-  PRODUCT = "produit",
+  PRODUCT = "product",
   INGREDIENT = "ingredient",
   SERVICE = "service", 
 }

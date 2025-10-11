@@ -56,6 +56,7 @@ import { RecipeDisplay } from "@/components/recipe-display";
 import { Layout } from "@/components/layout";
 import { RecipeForm } from "@/components/recipe-form";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { ArticleCategoryType } from "@shared/constants";
 
 // Schéma de validation pour les produits
 const productSchema = insertArticleSchema.extend({
@@ -83,7 +84,7 @@ export default function Products() {
     queryKey: ["/api/articles"],
     select: (data) => {
       console.log("🔥 PRODUCTS - Articles récupérés:", data);
-      const products = data.filter(article => article.type === "product");
+      const products = data.filter(article => article.type === ArticleCategoryType.PRODUCT);
       console.log("🔥 PRODUCTS - Produits filtrés:", products);
       return products;
     }
