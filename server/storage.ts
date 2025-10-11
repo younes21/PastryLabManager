@@ -2356,10 +2356,10 @@ export class DatabaseStorage implements IStorage {
             const articleId = (item as any).articleId || (item as any).idArticle;
             const article = await this.getArticle(articleId);
             if (!article) continue;
-            
+
             const totalStock = parseFloat(article.currentStock || '0');
             const requestedQuantity = parseFloat(((item as any).quantity || (item as any).qteLivree) as string);
-            
+
             // Calculer les réservations actives EXCLUANT cette livraison
             const activeReservations = await tx.select({ reservedQuantity: stockReservations.reservedQuantity })
               .from(stockReservations)
@@ -2369,10 +2369,10 @@ export class DatabaseStorage implements IStorage {
                 // Exclure cette livraison du calcul
                 sql`${stockReservations.inventoryOperationId} != ${operationId}`
               ));
-            
+
             const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
             const availableStock = totalStock - totalReserved;
-            
+
             if (availableStock < requestedQuantity) {
               throw new Error(`Stock insuffisant pour l'article ${articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
             }
@@ -3111,7 +3111,6 @@ export class DatabaseStorage implements IStorage {
       return updatedOp;
     });
   }
-
   async createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: any[]): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
 
@@ -3136,8 +3135,9 @@ export class DatabaseStorage implements IStorage {
         operationId: operation.id
       }));
 
+      // Insérer les items et obtenir leurs IDs
+      const itemsResult = await tx.insert(inventoryOperationItems).values(itemsToInsert).returning();
 
-      const res = await tx.insert(inventoryOperationItems).values(itemsToInsert);
       // 3. Si c'est une livraison, créer les réservations dans la même transaction
       if (insertOperation.type === InventoryOperationType.LIVRAISON) {
         // Libérer d'abord les anciennes réservations (au cas où)
@@ -3149,41 +3149,34 @@ export class DatabaseStorage implements IStorage {
             eq(stockReservations.status, StockReservationStatus.RESERVED)
           ));
         // Créer les réservations
-        const reservationItems = itemsToInsert.map(i => ({
-          articleId: i.articleId,
-          lotId: i.lotId,
-          storageZoneId: i.fromStorageZoneId,
-          orderItemId: i.orderItemId,
-          quantity: i.quantity,
-          operationId: operation.id
-        }));
-        // Utilise la méthode transactionnelle
-        for (const item of reservationItems) {
-          const article = await this.getArticle(item.articleId);
-          if (!article) throw new Error(`Article ${item.articleId} not found`);
+        for (const opItem of itemsResult) {
+          const article = await this.getArticle(opItem.articleId);
+          if (!article) throw new Error(`Article ${opItem.articleId} not found`);
           const totalStock = parseFloat(article.currentStock || '0');
           // Calcul du total réservé (toutes réservations actives)
           const activeReservations = await tx.select({ reservedQuantity: stockReservations.reservedQuantity })
             .from(stockReservations)
             .where(
               and(
-                eq(stockReservations.articleId, item.articleId),
+                eq(stockReservations.articleId, opItem.articleId),
                 eq(stockReservations.status, StockReservationStatus.RESERVED)
               )
             );
           const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
           const availableStock = totalStock - totalReserved;
-          const requestedQuantity = parseFloat(item.quantity as string);
+          const requestedQuantity = parseFloat(opItem.quantity);
           if (availableStock < requestedQuantity) {
-            throw new Error(`Stock insuffisant pour l'article ${item.articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
+            throw new Error(`Stock insuffisant pour l'article ${opItem.articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
           }
           // Créer la réservation
           await tx.insert(stockReservations).values({
-            articleId: item.articleId,
+            articleId: opItem.articleId,
             inventoryOperationId: operation.id,
-            orderItemId: item.orderItemId || null,
-            lotId: item.lotId || null,
-            storageZoneId: item.storageZoneId || null,
+            inventoryOperationItemId: opItem.id, // Correction principale
+            orderId: insertOperation.orderId || null,
+            orderItemId: opItem.orderItemId || null,
+            lotId: opItem.lotId || null,
+            storageZoneId: opItem.fromStorageZoneId || null,
             reservedQuantity: requestedQuantity.toString(),
             status: StockReservationStatus.RESERVED,
             reservationDirection: StockReservationDirection.OUT,
