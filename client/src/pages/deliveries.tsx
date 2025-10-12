@@ -1041,7 +1041,7 @@ export default function DeliveriesPage() {
   };
 
   const handleCancelDelivery = (delivery: any) => {
-    if(delivery.status !== InventoryOperationStatus.COMPLETED ) return;
+    if (delivery.status !== InventoryOperationStatus.COMPLETED) return;
     setSelectedDelivery(delivery);
     setIsCancelModalOpen(true);
   };
@@ -1381,7 +1381,7 @@ export default function DeliveriesPage() {
                             <DropdownMenuItem onClick={() => viewDelivery(delivery)} data-testid={`button-view-delivery-${delivery.id}`}>
                               <Eye className="h-4 w-4" /> Voir les détails
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
+                            <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
                               <Edit3 className="h-4 w-4" /> Modifier
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -1392,10 +1392,10 @@ export default function DeliveriesPage() {
                               <CheckCircle className="h-4 w-4 text-green-500" /> Valider
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              disabled={delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
+                              disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
                               onClick={async () => {
 
-                                if (delivery.status === InventoryOperationStatus.COMPLETED) {
+                                if (delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED) {
                                   toast({
                                     title: "Suppression impossible",
                                     description: "Les livraisons validées ne peuvent pas être supprimées",
@@ -1414,7 +1414,7 @@ export default function DeliveriesPage() {
                               <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              disabled={delivery.status !== InventoryOperationStatus.COMPLETED }
+                              disabled={delivery.status !== InventoryOperationStatus.COMPLETED}
                               onClick={() => handleCancelDelivery(delivery)}
                               data-testid={`button-cancel-delivery-${delivery.id}`}
                             >
@@ -1422,16 +1422,20 @@ export default function DeliveriesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
 
-                            <DropdownMenuItem onClick={() => setAssignmentModal({ open: true, delivery })}>
+                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                              onClick={() => setAssignmentModal({ open: true, delivery })}>
                               <User className="h-4 w-4" /> Assigner un livreur
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setPackagesModal({ open: true, delivery })}>
+                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                              onClick={() => setPackagesModal({ open: true, delivery })}>
                               <Package className="h-4 w-4" /> Gérer les colis
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setTrackingModal({ open: true, delivery })}>
+                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                              onClick={() => setTrackingModal({ open: true, delivery })}>
                               <Truck className="h-4 w-4" /> Suivi de livraison
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setPaymentModal({ open: true, delivery })}>
+                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                              onClick={() => setPaymentModal({ open: true, delivery })}>
                               <CreditCard className="h-4 w-4" /> Paiement à la livraison
                             </DropdownMenuItem>
 

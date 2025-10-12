@@ -4676,54 +4676,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Supprimer/libérer toutes les réservations de stock pour une livraison
-  app.delete("/api/deliveries/:id/reservations", async (req, res) => {
-    try {
-      const deliveryOperationId = parseInt(req.params.id);
-      // Annule toutes les réservations actives de type StockReservationType.DELIVERY pour cette opération
-      const result = await db.update(stockReservations)
-        .set({ status: StockReservationStatus.CANCELLED })
-        .where(and(
-          eq(stockReservations.inventoryOperationId, deliveryOperationId),
-          eq(stockReservations.reservationType, StockReservationType.DELIVERY),
-          eq(stockReservations.status, StockReservationStatus.RESERVED)
-        ));
-      res.json({ cancelledCount: result.rowCount || 0 });
-    } catch (error) {
-      console.error("Erreur lors de la suppression des réservations de livraison:", error);
-      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la suppression des réservations de livraison" });
-    }
-  });
+  // app.delete("/api/deliveries/:id/reservations", async (req, res) => {
+  //   try {
+  //     const deliveryOperationId = parseInt(req.params.id);
+  //     // Annule toutes les réservations actives de type StockReservationType.DELIVERY pour cette opération
+  //     const result = await db.update(stockReservations)
+  //       .set({ status: StockReservationStatus.CANCELLED })
+  //       .where(and(
+  //         eq(stockReservations.inventoryOperationId, deliveryOperationId),
+  //         eq(stockReservations.reservationType, StockReservationType.DELIVERY),
+  //         eq(stockReservations.status, StockReservationStatus.RESERVED)
+  //       ));
+  //     res.json({ cancelledCount: result.rowCount || 0 });
+  //   } catch (error) {
+  //     console.error("Erreur lors de la suppression des réservations de livraison:", error);
+  //     res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la suppression des réservations de livraison" });
+  //   }
+  // });
 
-  // Lister toutes les réservations de stock pour une livraison
-  app.get("/api/deliveries/:id/reservations", async (req, res) => {
-    try {
-      const deliveryOperationId = parseInt(req.params.id);
-      const reservations = await db.select().from(stockReservations)
-        .where(and(
-          eq(stockReservations.inventoryOperationId, deliveryOperationId),
-          eq(stockReservations.reservationType, StockReservationType.DELIVERY)
-        ));
-      res.json(reservations);
-    } catch (error) {
-      console.error("Erreur lors de la récupération des réservations de livraison:", error);
-      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des réservations de livraison" });
-    }
-  });
+  // // Lister toutes les réservations de stock pour une livraison
+  // app.get("/api/deliveries/:id/reservations", async (req, res) => {
+  //   try {
+  //     const deliveryOperationId = parseInt(req.params.id);
+  //     const reservations = await db.select().from(stockReservations)
+  //       .where(and(
+  //         eq(stockReservations.inventoryOperationId, deliveryOperationId),
+  //         eq(stockReservations.reservationType, StockReservationType.DELIVERY)
+  //       ));
+  //     res.json(reservations);
+  //   } catch (error) {
+  //     console.error("Erreur lors de la récupération des réservations de livraison:", error);
+  //     res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des réservations de livraison" });
+  //   }
+  // });
 
   // Récupérer les détails d'une livraison avec ses items
   app.get("/api/deliveries/:id", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      const delivery = await storage.getInventoryOperation(deliveryId);
-      if (!delivery) {
+      if (isNaN(deliveryId)) {
+        return res.status(400).json({ message: "ID invalide" });
+      }
+
+      // 🔹 1. Requête unique avec jointures
+      const rows = await db
+        .select({
+          articleId: articles.id,
+          articleName: articles.name,
+          articlePhoto: articles.photo,
+          articleUnit: articles.saleUnit, // car c’est une LIVRAISON
+          zoneId: storageZones.id,
+          zoneName: storageZones.designation,
+          lotId: lots.id,
+          lotName: lots.code,
+          quantity: inventoryOperationItems.quantity,
+          notes: inventoryOperationItems.notes,
+          // returnQuantity: inventoryOperationItems.returnQuantity,
+          // wasteQuantity: inventoryOperationItems.wasteQuantity,
+          // returnReason: inventoryOperationItems.returnReason,
+          // wasteReason: inventoryOperationItems.wasteReason,
+        })
+        .from(inventoryOperationItems)
+        .leftJoin(
+          inventoryOperations,
+          eq(inventoryOperationItems.operationId, inventoryOperations.id)
+        )
+        .leftJoin(articles, eq(inventoryOperationItems.articleId, articles.id))
+        .leftJoin(
+          storageZones,
+          eq(inventoryOperationItems.fromStorageZoneId, storageZones.id)
+        )
+        .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
+        .where(eq(inventoryOperationItems.operationId, deliveryId))
+        .orderBy(articles.name, storageZones.designation);
+
+      if (!rows.length) {
         return res.status(404).json({ message: "Livraison non trouvée" });
       }
-      const items = await storage.getInventoryOperationItems(deliveryId);
-      const deliveryWithItems = { ...delivery, items };
-      res.json(deliveryWithItems);
+
+      // 🔹 2. Regrouper les résultats par article
+      const summaryMap = new Map<number, any>();
+
+      for (const row of rows) {
+        if (!row.articleId) continue;
+        const existing = summaryMap.get(row.articleId);
+
+        const zoneData = {
+          zoneId: row.zoneId,
+          zoneName: row.zoneName,
+          lotId: row.lotId,
+          lotName: row.lotName,
+          quantity: row.quantity,
+          notes: row.notes,
+          returnQuantity: 0,
+          wasteQuantity: 0,
+          returnReason: "",
+          wasteReason: ""
+        };
+
+        if (existing) {
+          existing.totalQuantity += row.quantity;
+          existing.zones.push(zoneData);
+        } else {
+          summaryMap.set(row.articleId, {
+            articleId: row.articleId,
+            articleName: row.articleName,
+            articlePhoto: row.articlePhoto,
+            articleUnit: row.articleUnit,
+            totalQuantity: row.quantity,
+            zones: [zoneData],
+          });
+        }
+      }
+
+      // 🔹 3. Convertir la map en tableau
+      const summaryItems = Array.from(summaryMap.values());
+
+      res.json(summaryItems);
     } catch (error) {
       console.error("Erreur lors de la récupération des détails de la livraison:", error);
-      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des détails de la livraison" });
+      res.status(500).json({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erreur lors de la récupération des détails de la livraison",
+      });
     }
   });
 
@@ -4743,14 +4820,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/deliveries/:id/cancel-after-validation", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      const { reason,  cancellationItems } = req.body;
+      const { returnReason, WasteReason, cancellationItems } = req.body as CancellationData;
 
-      if (!reason || reason.trim().length < 3) {
-        return res.status(400).json({ message: "La raison d'annulation doit contenir au moins 3 caractères" });
+      if ((!returnReason && !WasteReason) || ((returnReason?.trim()?.length || 0) < 3 && (WasteReason?.trim()?.length || 0) < 3)) {
+        return res.status(400).json({ message: "La raison d'annulation (rebut ou retour) doit contenir au moins 3 caractères" });
       }
 
       const result = await storage.cancelDeliveryAfterValidation(deliveryId, {
-        reason: reason.trim(),
+        returnReason: returnReason?.trim(),
+        WasteReason: WasteReason?.trim(),
         cancellationItems
       });
 

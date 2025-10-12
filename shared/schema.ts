@@ -633,6 +633,8 @@ export const inventoryOperations = pgTable("inventory_operations", {
   type: text("type").notNull(), // reception, livraison, ajustement, inventaire, fabrication...
   status: text("status").notNull().default("draft"), // draft, pending, ready, completed, cancelled, etc.
   statusDate: timestamp("status_date", { mode: "string" }), // date etat
+
+  reason: text("reason"),  //  rebut fabrication , rebut livraion , retour livraison ....
   // Références
   supplierId: integer("supplier_id").references(() => suppliers.id), // si réception
   clientId: integer("client_id").references(() => clients.id), // si livraison
@@ -712,11 +714,8 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
     () => storageZones.id,
   ),
 
-  // Rebuts
-  wasteReason: text("waste_reason"),
-  wasteLocationId: integer("waste_location_id").references(
-    () => storageZones.id,
-  ),
+  reason: text("reason"),  //  rebut fabrication , rebut livraion , retour livraison ....
+
 
   // Suivi
   lineStatus: text("line_status").default("pending"), // pending, delivered, cancelled
@@ -783,7 +782,7 @@ export const stockReservations = pgTable("stock_reservations", {
   orderItemId: integer("order_item_id"), // Référence à la ligne de commande
 
   inventoryOperationId: integer("inventory_operation_id").references(() => inventoryOperations.id, { onDelete: "cascade" },), // Pour les préparations
-  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id,{ onDelete: "cascade" }), // Optionnel pour les préparations
+  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id, { onDelete: "cascade" }), // Optionnel pour les préparations
   lotId: integer("lot_id").references(() => lots.id), // Optionnel pour les préparations
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Optionnel pour les préparations
 

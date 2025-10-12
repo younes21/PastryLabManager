@@ -30,7 +30,7 @@ import {
   Stock
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, sql, gt, like } from "drizzle-orm";
+import { eq, desc, lt, and, sql, gt, like, getTableColumns } from "drizzle-orm";
 import camelcaseKeys from 'camelcase-keys';
 import {
   ArticleCategoryType,
@@ -295,22 +295,7 @@ export interface IStorage {
   validateDelivery(deliveryOperationId: number): Promise<InventoryOperation>;
 }
 
-// Types pour l'annulation de livraison
-interface CancellationItem {
-  articleId: number;
-  zones: Array<{
-    zoneId: number;
-    lotId: number | null;
-    wasteQuantity: number;
-    returnQuantity: number;
-    wasteReason: string;
-  }>;
-}
 
-interface CancellationData {
-  reason?: string;
-  cancellationItems: CancellationItem[];
-}
 
 export class DatabaseStorage implements IStorage {
   updateInvoiceStatus(id: number): Promise<Invoice | undefined> {
@@ -2620,12 +2605,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Inventory Operation Items
-  async getInventoryOperationItems(operationId: number): Promise<InventoryOperationItem[]> {
-    return await db.select().from(inventoryOperationItems)
+  async getInventoryOperationItems(
+    operationId: number,
+    includeArticle = false,
+    operationType?: InventoryOperationType
+  ): Promise<InventoryOperationItem[]> {
+    if (includeArticle) {
+      return await db
+        .select({
+          ...getTableColumns(inventoryOperationItems),
+          articleName: articles.name,
+          articlePhoto: articles.photo,
+          articleUnit:
+            operationType === InventoryOperationType.LIVRAISON
+              ? articles.saleUnit
+              : articles.unit,
+          fromZone: storageZones.designation,
+        })
+        .from(inventoryOperationItems)
+        .leftJoin(articles, eq(inventoryOperationItems.articleId, articles.id))
+        .leftJoin(storageZones, eq(inventoryOperationItems.fromStorageZoneId, storageZones.id))
+        .where(eq(inventoryOperationItems.operationId, operationId))
+        .orderBy(inventoryOperationItems.id);
+    }
+
+    // version simple sans jointure
+    return await db
+      .select()
+      .from(inventoryOperationItems)
       .where(eq(inventoryOperationItems.operationId, operationId))
       .orderBy(inventoryOperationItems.id);
   }
-
   async createInventoryOperationItem(insertItem: InsertInventoryOperationItem & { operationId: number }): Promise<InventoryOperationItem> {
     const [item] = await db.insert(inventoryOperationItems).values(insertItem).returning();
     return item;
@@ -3307,7 +3317,7 @@ export class DatabaseStorage implements IStorage {
       const operations = [];
 
       // Opération pour les rebuts (si il y en a)
-      const hasWasteItems = cancellationData.cancellationItems.some(item => 
+      const hasWasteItems = cancellationData.cancellationItems.some(item =>
         item.zones.some(zone => zone.wasteQuantity > 0)
       );
 
@@ -3320,8 +3330,9 @@ export class DatabaseStorage implements IStorage {
           statusDate: new Date().toISOString(),
           orderId: delivery.orderId,
           clientId: delivery.clientId,
+          reason: cancellationData.WasteReason,
           parentOperationId: deliveryId,
-          notes: `Rebut suite à annulation de livraison: ${cancellationData.reason || 'Voir détail tableau'}`,
+          notes: `Rebut suite à annulation de livraison: ${cancellationData.WasteReason || 'Voir détail tableau'}`,
           validatedAt: new Date().toISOString()
         }).returning();
 
@@ -3331,7 +3342,7 @@ export class DatabaseStorage implements IStorage {
         for (const cancellationItem of cancellationData.cancellationItems) {
           for (const zone of cancellationItem.zones) {
             if (zone.wasteQuantity > 0) {
-              const deliveryItem = deliveryItems.find(item => 
+              const deliveryItem = deliveryItems.find(item =>
                 item.articleId === cancellationItem.articleId &&
                 item.fromStorageZoneId === zone.zoneId &&
                 item.lotId === zone.lotId
@@ -3346,8 +3357,21 @@ export class DatabaseStorage implements IStorage {
                   quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.wasteQuantity.toString())).toString(),
                   lotId: zone.lotId,
                   fromStorageZoneId: zone.zoneId,
-                  wasteReason: zone.wasteReason,
+                  reason: zone.wasteReason,
                   notes: `Rebut: ${zone.wasteReason}`
+                });
+
+                // Créer une réservation de stock sortante pour le rebut
+                await tx.insert(stockReservations).values({
+                  articleId: cancellationItem.articleId,
+                  inventoryOperationId: wasteOperation.id,
+                  reservedQuantity: zone.wasteQuantity.toString(),
+                  reservationDirection: StockReservationDirection.OUT,
+                  reservationType: StockReservationType.INVENTORY,
+                  status: StockReservationStatus.RESERVED,
+                  notes: `Rebut livraison: ${zone.wasteReason || 'Voir détail'}`,
+                  lotId: zone.lotId,
+                  storageZoneId: zone.zoneId
                 });
               }
             }
@@ -3356,7 +3380,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Opération pour les retours au stock (si il y en a)
-      const hasReturnItems = cancellationData.cancellationItems.some(item => 
+      const hasReturnItems = cancellationData.cancellationItems.some(item =>
         item.zones.some(zone => zone.returnQuantity > 0)
       );
 
@@ -3369,8 +3393,9 @@ export class DatabaseStorage implements IStorage {
           statusDate: new Date().toISOString(),
           orderId: delivery.orderId,
           clientId: delivery.clientId,
+          reason: cancellationData.returnReason,
           parentOperationId: deliveryId,
-          notes: `Retour au stock suite à annulation de livraison: ${cancellationData.reason || 'Voir détail tableau'}`,
+          notes: `Retour au stock suite à annulation de livraison: ${cancellationData.returnReason || 'Voir détail tableau'}`,
           validatedAt: new Date().toISOString()
         }).returning();
 
@@ -3380,7 +3405,7 @@ export class DatabaseStorage implements IStorage {
         for (const cancellationItem of cancellationData.cancellationItems) {
           for (const zone of cancellationItem.zones) {
             if (zone.returnQuantity > 0) {
-              const deliveryItem = deliveryItems.find(item => 
+              const deliveryItem = deliveryItems.find(item =>
                 item.articleId === cancellationItem.articleId &&
                 item.fromStorageZoneId === zone.zoneId &&
                 item.lotId === zone.lotId
@@ -3395,7 +3420,21 @@ export class DatabaseStorage implements IStorage {
                   quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.returnQuantity.toString())).toString(),
                   lotId: zone.lotId,
                   fromStorageZoneId: zone.zoneId,
+                  reason: zone.returnReason,
                   notes: 'Retour au stock'
+                });
+
+                // Créer une réservation de stock entrante pour le retour
+                await tx.insert(stockReservations).values({
+                  articleId: cancellationItem.articleId,
+                  inventoryOperationId: returnOperation.id,
+                  reservedQuantity: zone.returnQuantity.toString(),
+                  reservationDirection: StockReservationDirection.IN,
+                  reservationType: StockReservationType.INVENTORY,
+                  status: StockReservationStatus.RESERVED,
+                  notes: 'Retour au stock suite annulation livraison',
+                  lotId: zone.lotId,
+                  storageZoneId: zone.zoneId
                 });
               }
             }
@@ -3403,12 +3442,16 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      let note = cancellationData.WasteReason ? 'rebut: ' + cancellationData.WasteReason : '';
+      note += cancellationData.returnReason ? 'retour: ' + cancellationData.returnReason : '';
+      if (!cancellationData.WasteReason && !cancellationData.returnReason) note = 'Voir détail tableau';
+
       // 4. Mettre à jour le statut de la livraison
       await tx.update(inventoryOperations)
-        .set({ 
+        .set({
           status: InventoryOperationStatus.CANCELLED,
           statusDate: new Date().toISOString(),
-          notes: `Annulée: ${cancellationData.reason || 'Voir détail tableau'}`
+          notes: note
         })
         .where(eq(inventoryOperations.id, deliveryId));
 
