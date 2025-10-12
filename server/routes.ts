@@ -4839,6 +4839,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Récupérer les détails d'annulation d'une livraison
+  app.get("/api/deliveries/:id/cancellation-details", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      
+      // Récupérer la livraison originale
+      const [delivery] = await db.select()
+        .from(inventoryOperations)
+        .where(and(
+          eq(inventoryOperations.id, deliveryId),
+          eq(inventoryOperations.type, InventoryOperationType.LIVRAISON)
+        ));
+
+      if (!delivery) {
+        return res.status(404).json({ message: "Livraison non trouvée" });
+      }
+
+      // Récupérer les opérations de retour et rebut liées
+      const [returnOperation] = await db.select()
+        .from(inventoryOperations)
+        .where(and(
+          eq(inventoryOperations.parentOperationId, deliveryId),
+          eq(inventoryOperations.type, InventoryOperationType.RETOUR_LIVRAISON)
+        ));
+
+      const [wasteOperation] = await db.select()
+        .from(inventoryOperations)
+        .where(and(
+          eq(inventoryOperations.parentOperationId, deliveryId),
+          eq(inventoryOperations.type, InventoryOperationType.REBUT_LIVRAISON)
+        ));
+
+      // Récupérer les items de retour
+      const returnItems = returnOperation ? await db.select({
+        inventoryOperationItems: inventoryOperationItems,
+        articles: articles,
+        storageZones: storageZones,
+        lots: lots
+      })
+        .from(inventoryOperationItems)
+        .leftJoin(articles, eq(inventoryOperationItems.articleId, articles.id))
+        .leftJoin(storageZones, eq(inventoryOperationItems.fromStorageZoneId, storageZones.id))
+        .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
+        .where(eq(inventoryOperationItems.operationId, returnOperation.id)) : [];
+
+      // Récupérer les items de rebut
+      const wasteItems = wasteOperation ? await db.select({
+        inventoryOperationItems: inventoryOperationItems,
+        articles: articles,
+        storageZones: storageZones,
+        lots: lots
+      })
+        .from(inventoryOperationItems)
+        .leftJoin(articles, eq(inventoryOperationItems.articleId, articles.id))
+        .leftJoin(storageZones, eq(inventoryOperationItems.fromStorageZoneId, storageZones.id))
+        .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
+        .where(eq(inventoryOperationItems.operationId, wasteOperation.id)) : [];
+
+      // Construire l'objet de réponse
+      const cancellationDetails = {
+        delivery: {
+          id: delivery.id,
+          code: delivery.code,
+          reason: delivery.notes
+        },
+        returnOperation: returnOperation ? {
+          id: returnOperation.id,
+          code: returnOperation.code,
+          reason: returnOperation.notes,
+          items: returnItems.map(item => ({
+            articleId: item.inventoryOperationItems.articleId,
+            articleName: item.articles?.name || '',
+            articlePhoto: item.articles?.photo || '',
+            articleUnit: item.articles?.unit || '',
+            zoneId: item.inventoryOperationItems.fromStorageZoneId,
+            zoneName: item.storageZones?.designation || '',
+            lotId: item.inventoryOperationItems.lotId,
+            lotName: item.lots?.code || 'vide',
+            quantity: parseFloat(item.inventoryOperationItems.quantity || '0'),
+            reason: item.inventoryOperationItems.reason || ''
+          }))
+        } : null,
+        wasteOperation: wasteOperation ? {
+          id: wasteOperation.id,
+          code: wasteOperation.code,
+          reason: wasteOperation.notes,
+          items: wasteItems.map(item => ({
+            articleId: item.inventoryOperationItems.articleId,
+            articleName: item.articles?.name || '',
+            articlePhoto: item.articles?.photo || '',
+            articleUnit: item.articles?.unit || '',
+            zoneId: item.inventoryOperationItems.fromStorageZoneId,
+            zoneName: item.storageZones?.designation || '',
+            lotId: item.inventoryOperationItems.lotId,
+            lotName: item.lots?.code || 'vide',
+            quantity: parseFloat(item.inventoryOperationItems.quantity || '0'),
+            reason: item.inventoryOperationItems.reason || ''
+          }))
+        } : null
+      };
+
+      res.json(cancellationDetails);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des détails d'annulation:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des détails" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

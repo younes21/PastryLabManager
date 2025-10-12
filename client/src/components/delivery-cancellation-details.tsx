@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogBody,
@@ -18,21 +19,23 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Eye, RotateCcw, Trash2, Link, Calendar, User } from 'lucide-react';
+import { Eye, RotateCcw, Trash2, Calendar, User, XCircle } from 'lucide-react';
+
+interface Delivery {
+  id: number;
+  code: string;
+  status: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: number;
+  order?: {
+    clientName: string;
+    totalAmount: string;
+  };
+}
 
 interface CancellationDetailsProps {
-  delivery: {
-    id: number;
-    code: string;
-    status: string;
-    cancellationReason?: string;
-    cancelledAt?: string;
-    cancelledBy?: number;
-    order?: {
-      clientName: string;
-      totalAmount: string;
-    };
-  };
+  delivery: Delivery;
   inventoryOperations: Array<{
     id: number;
     code: string;
@@ -48,208 +51,323 @@ interface CancellationDetailsProps {
       quantityBefore: string;
       quantityAfter: string;
       unitCost: string;
-      wasteReason?: string;
+      reason?: string;
     }>;
   }>;
 }
 
-export function CancellationDetails({ delivery, inventoryOperations }: CancellationDetailsProps) {
-  const getOperationTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      'retour_livraison': 'Retour au stock',
-      'rebut_livraison': 'Rebut',
-      'livraison': 'Livraison'
-    };
-    return labels[type] || type;
+interface CancellationDetailsData {
+  delivery: {
+    id: number;
+    code: string;
+    reason: string;
   };
+  returnOperation: {
+    id: number;
+    code: string;
+    reason: string;
+    items: Array<{
+      articleId: number;
+      articleName: string;
+      articlePhoto: string;
+      articleUnit: string;
+      zoneId: number;
+      zoneName: string;
+      lotId: number | null;
+      lotName: string;
+      quantity: number;
+      reason: string;
+    }>;
+  } | null;
+  wasteOperation: {
+    id: number;
+    code: string;
+    reason: string;
+    items: Array<{
+      articleId: number;
+      articleName: string;
+      articlePhoto: string;
+      articleUnit: string;
+      zoneId: number;
+      zoneName: string;
+      lotId: number | null;
+      lotName: string;
+      quantity: number;
+      reason: string;
+    }>;
+  } | null;
+}
 
-  const getOperationTypeIcon = (type: string) => {
-    switch (type) {
-      case 'retour_livraison':
-        return <RotateCcw className="h-4 w-4 text-green-600" />;
-      case 'rebut_livraison':
-        return <Trash2 className="h-4 w-4 text-red-600" />;
-      case 'livraison':
-        return <Link className="h-4 w-4 text-blue-600" />;
-      default:
-        return <Link className="h-4 w-4 text-gray-600" />;
+// Modal de consultation des détails d'annulation
+function CancellationDetailsModal({ delivery, isOpen, onClose }: { delivery: Delivery; isOpen: boolean; onClose: () => void }) {
+  const [cancellationData, setCancellationData] = useState<CancellationDetailsData | null>(null);
+
+  // Récupérer les détails d'annulation
+  const { data: detailsData, isLoading } = useQuery({
+    queryKey: ['cancellation-details', delivery.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/deliveries/${delivery.id}/cancellation-details`);
+      if (!response.ok) throw new Error('Erreur lors de la récupération des détails d\'annulation');
+      return response.json();
+    },
+    enabled: !!delivery.id && isOpen,
+    staleTime: 0,
+    gcTime: 0
+  });
+
+  useEffect(() => {
+    if (detailsData) {
+      setCancellationData(detailsData);
     }
-  };
+  }, [detailsData]);
 
-  const getOperationTypeBadge = (type: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      'retour_livraison': 'default',
-      'rebut_livraison': 'destructive',
-      'livraison': 'secondary'
-    };
-
-    return (
-      <Badge variant={variants[type] || "outline"}>
-        {getOperationTypeLabel(type)}
-      </Badge>
-    );
-  };
+  if (!delivery) return null;
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Eye className="h-4 w-4 mr-1" />
-          Voir détails
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            Détails de l'annulation - {delivery.code}
+            <XCircle className="h-5 w-5 text-red-500" />
+            Détails d'annulation - {delivery.code}
           </DialogTitle>
         </DialogHeader>
-        <DialogBody>
-          <div className="space-y-6">
-            {/* Informations de la livraison annulée */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Livraison annulée</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Code</label>
-                    <p className="font-mono text-lg">{delivery.code}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Client</label>
-                    <p>{delivery.order?.clientName || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Statut</label>
-                    <Badge variant="destructive">Annulée</Badge>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Montant commande</label>
-                    <p>{delivery.order?.totalAmount || 'N/A'} €</p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Raison de l'annulation</label>
-                  <p className="mt-1 p-3 bg-muted rounded-md">{delivery.cancellationReason}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Date d'annulation</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      {delivery.cancelledAt ? new Date(delivery.cancelledAt).toLocaleString('fr-FR') : 'N/A'}
+        <DialogBody className='py-2'>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              <span className="ml-2">Chargement des détails...</span>
+            </div>
+          ) : cancellationData ? (
+            <div className="space-y-4">
+              {/* Informations générales */}
+              <Card>
+                <CardHeader className='py-2'>
+                  <CardTitle className="text-lg">Informations d'annulation</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Code livraison</label>
+                      <p className="text-lg font-mono">{cancellationData.delivery.code}</p>
+                    </div>
+                    <div className='font-medium'>
+                      <label className="  text-gray-500 ">Raison d'annulation</label>
+                      {
+                        cancellationData.delivery?.reason?.split(',').map(reason=> <p className="text-lg">{ reason}</p>)
+                      }
+                     
                     </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Annulée par</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      {delivery.cancelledBy ? `Utilisateur ${delivery.cancelledBy}` : 'N/A'}
+                </CardContent>
+              </Card>
+
+              {/* Opération de retour */}
+              {cancellationData.returnOperation && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <RotateCcw className="h-5 w-5 text-green-600" />
+                      Retour au stock
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <p className=" text-gray-600">
+                        <strong>Code opération:</strong> {cancellationData.returnOperation.code}
+                      </p>
+                      <p className=" text-gray-600">
+                        <strong>Raison:</strong> {cancellationData.returnOperation.reason}
+                      </p>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                    
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Article</TableHead>
+                            <TableHead className="text-center">Zone</TableHead>
+                            <TableHead className="text-center">Lot</TableHead>
+                            <TableHead className="text-center">Quantité retournée</TableHead>
+                            <TableHead className="text-center">Raison</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cancellationData.returnOperation.items.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="p-2">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={item.articlePhoto || ''}
+                                    alt={item.articleName || ''}
+                                    className="w-[4rem] h-[3rem] object-cover rounded-lg shadow-sm"
+                                  />
+                                  <div>
+                                    <div className="font-medium text-gray-900">{item.articleName}</div>
+                                    <div className="text-sm text-gray-500">{item.articleUnit}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <div className="flex items-center justify-center gap-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="font-medium text-gray-900">{item.zoneName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                  {item.lotName}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <span className="font-bold text-green-700">
+                                  {item.quantity} {item.articleUnit}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <span className="text-sm text-gray-600">
+                                  {item.reason || "-"}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-            {/* Opérations d'inventaire liées */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Opérations d'inventaire liées</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {inventoryOperations.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">
-                    Aucune opération d'inventaire trouvée
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {inventoryOperations.map((operation) => (
-                      <div key={operation.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            {getOperationTypeIcon(operation.type)}
-                            <div>
-                              <h4 className="font-medium">{operation.code}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {getOperationTypeLabel(operation.type)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {getOperationTypeBadge(operation.type)}
-                            <Badge variant={operation.status === 'completed' ? 'default' : 'outline'}>
-                              {operation.status === 'completed' ? 'Terminée' : operation.status}
-                            </Badge>
-                          </div>
-                        </div>
+              {/* Opération de rebut */}
+              {cancellationData.wasteOperation && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Trash2 className="h-5 w-5 text-red-600" />
+                      Rebut
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600">
+                        <strong>Code opération:</strong> {cancellationData.wasteOperation.code}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <strong>Raison:</strong> {cancellationData.wasteOperation.reason}
+                      </p>
+                    </div>
+                    
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Article</TableHead>
+                            <TableHead className="text-center">Zone</TableHead>
+                            <TableHead className="text-center">Lot</TableHead>
+                            <TableHead className="text-center">Quantité rebutée</TableHead>
+                            <TableHead className="text-center">Raison</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cancellationData.wasteOperation.items.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="p-2">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={item.articlePhoto || ''}
+                                    alt={item.articleName || ''}
+                                    className="w-[4rem] h-[3rem] object-cover rounded-lg shadow-sm"
+                                  />
+                                  <div>
+                                    <div className="font-medium text-gray-900">{item.articleName}</div>
+                                    <div className="text-sm text-gray-500">{item.articleUnit}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <div className="flex items-center justify-center gap-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="font-medium text-gray-900">{item.zoneName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                  {item.lotName}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <span className="font-bold text-red-700">
+                                  {item.quantity} {item.articleUnit}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <span className="text-sm text-gray-600">
+                                  {item.reason || "-"}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                        {operation.notes && (
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {operation.notes}
-                          </p>
-                        )}
+              {/* Aucune opération trouvée */}
+              {!cancellationData.returnOperation && !cancellationData.wasteOperation && (
+                <Card>
+                  <CardContent className="py-8">
+                    <div className="text-center text-gray-500">
+                      <XCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-lg">Aucun détail d'annulation trouvé</p>
+                      <p className="text-sm">Cette livraison a été annulée sans opérations de retour ou rebut.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>Erreur lors du chargement des détails d'annulation</p>
+            </div>
+          )}
 
-                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                          <div>
-                            <span className="font-medium">Créée le :</span>{' '}
-                            {new Date(operation.createdAt).toLocaleDateString('fr-FR')}
-                          </div>
-                          <div>
-                            <span className="font-medium">Opérateur :</span>{' '}
-                            {operation.operatorName || `Utilisateur ${operation.operatorId}`}
-                          </div>
-                        </div>
-
-                        {/* Détails des articles */}
-                        {operation.items.length > 0 && (
-                          <div>
-                            <h5 className="font-medium mb-2">Articles concernés :</h5>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Article</TableHead>
-                                  <TableHead>Quantité</TableHead>
-                                  <TableHead>Stock avant</TableHead>
-                                  <TableHead>Stock après</TableHead>
-                                  <TableHead>Coût unitaire</TableHead>
-                                  {operation.type === 'rebut_livraison' && (
-                                    <TableHead>Raison rebut</TableHead>
-                                  )}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {operation.items.map((item, index) => (
-                                  <TableRow key={index}>
-                                    <TableCell className="font-medium">{item.articleName}</TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>{item.quantityBefore}</TableCell>
-                                    <TableCell>{item.quantityAfter}</TableCell>
-                                    <TableCell>{item.unitCost} €</TableCell>
-                                    {operation.type === 'rebut_livraison' && (
-                                      <TableCell className="text-red-600">
-                                        {item.wasteReason || 'N/A'}
-                                      </TableCell>
-                                    )}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <div className="flex gap-2 justify-end mt-6">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Fermer
+            </Button>
           </div>
         </DialogBody>
       </DialogContent>
     </Dialog>
   );
 }
+
+// Composant principal
+function CancellationDetails({ delivery, inventoryOperations }: CancellationDetailsProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setIsModalOpen(true)}
+        className="flex items-center gap-1 bg-red-50"
+      >
+        <Eye className="h-4 w-4" />
+        Annulation
+      </Button>
+
+      <CancellationDetailsModal
+        delivery={delivery}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </>
+  );
+}
+
+export default CancellationDetails;
+export { CancellationDetails };

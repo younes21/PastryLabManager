@@ -3421,7 +3421,7 @@ export class DatabaseStorage implements IStorage {
                   lotId: zone.lotId,
                   fromStorageZoneId: zone.zoneId,
                   reason: zone.returnReason,
-                  notes: 'Retour au stock'
+                 notes: `Rebut: ${zone.returnReason}`
                 });
 
                 // Créer une réservation de stock entrante pour le retour
@@ -3443,7 +3443,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       let note = cancellationData.WasteReason ? 'rebut: ' + cancellationData.WasteReason : '';
-      note += cancellationData.returnReason ? 'retour: ' + cancellationData.returnReason : '';
+      note += cancellationData.returnReason ? ' retour: ' + cancellationData.returnReason : '';
       if (!cancellationData.WasteReason && !cancellationData.returnReason) note = 'Voir détail tableau';
 
       // 4. Mettre à jour le statut de la livraison

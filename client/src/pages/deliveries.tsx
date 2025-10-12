@@ -1369,90 +1369,93 @@ export default function DeliveriesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="gap-2">
-                              Actions
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="min-w-[14rem]">
-                            <DropdownMenuLabel>Livraison {delivery.code}</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => viewDelivery(delivery)} data-testid={`button-view-delivery-${delivery.id}`}>
-                              <Eye className="h-4 w-4" /> Voir les détails
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
-                              <Edit3 className="h-4 w-4" /> Modifier
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={delivery.status === InventoryOperationStatus.COMPLETED || delivery.status === InventoryOperationStatus.CANCELLED}
-                              onClick={() => handleValidateDelivery(delivery)}
-                              data-testid={`button-cancel-delivery-${delivery.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-500" /> Valider
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
-                              onClick={async () => {
+                        <div className="flex gap-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="gap-2">
+                                Actions
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-[14rem]">
+                              <DropdownMenuLabel>Livraison {delivery.code}</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => viewDelivery(delivery)} data-testid={`button-view-delivery-${delivery.id}`}>
+                                <Eye className="h-4 w-4" /> Voir les détails
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
+                                <Edit3 className="h-4 w-4" /> Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={delivery.status === InventoryOperationStatus.COMPLETED || delivery.status === InventoryOperationStatus.CANCELLED}
+                                onClick={() => handleValidateDelivery(delivery)}
+                                data-testid={`button-cancel-delivery-${delivery.id}`}
+                              >
+                                <CheckCircle className="h-4 w-4 text-green-500" /> Valider
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
+                                onClick={async () => {
 
-                                if (delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED) {
-                                  toast({
-                                    title: "Suppression impossible",
-                                    description: "Les livraisons validées ne peuvent pas être supprimées",
-                                    variant: "destructive"
-                                  });
-                                  return;
-                                }
-                                const confirmMessage = `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
-                                var isOk = await confirmGlobal('Supression de la livraison', confirmMessage);
-                                if (isOk) {
-                                  deleteDeliveryMutation.mutate(delivery.id);
-                                }
+                                  if (delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED) {
+                                    toast({
+                                      title: "Suppression impossible",
+                                      description: "Les livraisons validées ne peuvent pas être supprimées",
+                                      variant: "destructive"
+                                    });
+                                    return;
+                                  }
+                                  const confirmMessage = `Êtes-vous sûr de vouloir supprimer la livraison ${delivery.code} ?\n\nCette action est irréversible.`;
+                                  var isOk = await confirmGlobal('Supression de la livraison', confirmMessage);
+                                  if (isOk) {
+                                    deleteDeliveryMutation.mutate(delivery.id);
+                                  }
+                                }}
+                                data-testid={`button-delete-delivery-${delivery.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={delivery.status !== InventoryOperationStatus.COMPLETED}
+                                onClick={() => handleCancelDelivery(delivery)}
+                                data-testid={`button-cancel-delivery-${delivery.id}`}
+                              >
+                                <X className="h-4 w-4 text-red-500" /> Annuler
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                                onClick={() => setAssignmentModal({ open: true, delivery })}>
+                                <User className="h-4 w-4" /> Assigner un livreur
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                                onClick={() => setPackagesModal({ open: true, delivery })}>
+                                <Package className="h-4 w-4" /> Gérer les colis
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                                onClick={() => setTrackingModal({ open: true, delivery })}>
+                                <Truck className="h-4 w-4" /> Suivi de livraison
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                                onClick={() => setPaymentModal({ open: true, delivery })}>
+                                <CreditCard className="h-4 w-4" /> Paiement à la livraison
+                              </DropdownMenuItem>
+
+
+
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <div >  {delivery.status === InventoryOperationStatus.CANCELLED && (
+                            <CancellationDetails
+                              delivery={{
+                                ...delivery,
+                                cancellationReason: delivery.cancellationReason || undefined
                               }}
-                              data-testid={`button-delete-delivery-${delivery.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={delivery.status !== InventoryOperationStatus.COMPLETED}
-                              onClick={() => handleCancelDelivery(delivery)}
-                              data-testid={`button-cancel-delivery-${delivery.id}`}
-                            >
-                              <X className="h-4 w-4 text-red-500" /> Annuler
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-
-                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
-                              onClick={() => setAssignmentModal({ open: true, delivery })}>
-                              <User className="h-4 w-4" /> Assigner un livreur
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
-                              onClick={() => setPackagesModal({ open: true, delivery })}>
-                              <Package className="h-4 w-4" /> Gérer les colis
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
-                              onClick={() => setTrackingModal({ open: true, delivery })}>
-                              <Truck className="h-4 w-4" /> Suivi de livraison
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
-                              onClick={() => setPaymentModal({ open: true, delivery })}>
-                              <CreditCard className="h-4 w-4" /> Paiement à la livraison
-                            </DropdownMenuItem>
-
-
-
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              inventoryOperations={getRelatedOperations(delivery.id)}
+                            />
+                          )}</div>
+                        </div>
                       </TableCell>
-                      {delivery.status === InventoryOperationStatus.CANCELLED && (
-                        <CancellationDetails
-                          delivery={{
-                            ...delivery,
-                            cancellationReason: delivery.cancellationReason || undefined
-                          }}
-                          inventoryOperations={getRelatedOperations(delivery.id)}
-                        />
-                      )}
+
                     </TableRow>
                   ))
                 )}

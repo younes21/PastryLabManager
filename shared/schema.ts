@@ -812,7 +812,8 @@ export const stockReservations = pgTable("stock_reservations", {
         (${table.reservationType} = 'delivery'         AND ${table.reservationDirection} = 'out') OR
         (${table.reservationType} = 'production'       AND ${table.reservationDirection} = 'out') OR
         (${table.reservationType} = 'production'       AND ${table.reservationDirection} = 'in')  OR
-        (${table.reservationType} = 'inventory'        AND ${table.reservationDirection} = 'in')
+        (${table.reservationType} = 'inventory'        AND ${table.reservationDirection} = 'in')  OR
+        (${table.reservationType} = 'inventory'        AND ${table.reservationDirection} = 'out')
       )
     `
   ),
