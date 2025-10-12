@@ -2677,7 +2677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // 3. Créer l'opération de rebut avec parentOperationId
           const wasteOperation = {
-            type: InventoryOperationType.AJUSTEMENT_REBUT,
+            type: InventoryOperationType.REBUT_LIVRAISON,
             status: InventoryOperationStatus.COMPLETED,
             operatorId: operation.operatorId,
             scheduledDate: new Date().toISOString(),
@@ -4710,6 +4710,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Récupérer les détails d'une livraison avec ses items
+  app.get("/api/deliveries/:id", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const delivery = await storage.getInventoryOperation(deliveryId);
+      if (!delivery) {
+        return res.status(404).json({ message: "Livraison non trouvée" });
+      }
+      const items = await storage.getInventoryOperationItems(deliveryId);
+      const deliveryWithItems = { ...delivery, items };
+      res.json(deliveryWithItems);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des détails de la livraison:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des détails de la livraison" });
+    }
+  });
+
   // Valider une livraison (déduire le stock, mettre à jour les statuts)
   app.post("/api/deliveries/:id/validate", async (req, res) => {
     try {
@@ -4719,6 +4736,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Erreur lors de la validation de la livraison:", error);
       res.status(400).json({ message: error instanceof Error ? error.message : "Erreur lors de la validation de la livraison" });
+    }
+  });
+
+  // Annuler une livraison après validation avec détails des quantités
+  app.post("/api/deliveries/:id/cancel-after-validation", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const { reason,  cancellationItems } = req.body;
+
+      if (!reason || reason.trim().length < 3) {
+        return res.status(400).json({ message: "La raison d'annulation doit contenir au moins 3 caractères" });
+      }
+
+      const result = await storage.cancelDeliveryAfterValidation(deliveryId, {
+        reason: reason.trim(),
+        cancellationItems
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Erreur lors de l'annulation après validation:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Erreur lors de l'annulation" });
     }
   });
 

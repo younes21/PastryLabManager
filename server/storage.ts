@@ -30,7 +30,7 @@ import {
   Stock
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, sql, gt } from "drizzle-orm";
+import { eq, desc, lt, and, sql, gt, like } from "drizzle-orm";
 import camelcaseKeys from 'camelcase-keys';
 import {
   ArticleCategoryType,
@@ -293,6 +293,23 @@ export interface IStorage {
    * @returns {Promise<InventoryOperation>}
    */
   validateDelivery(deliveryOperationId: number): Promise<InventoryOperation>;
+}
+
+// Types pour l'annulation de livraison
+interface CancellationItem {
+  articleId: number;
+  zones: Array<{
+    zoneId: number;
+    lotId: number | null;
+    wasteQuantity: number;
+    returnQuantity: number;
+    wasteReason: string;
+  }>;
+}
+
+interface CancellationData {
+  reason?: string;
+  cancellationItems: CancellationItem[];
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3258,6 +3275,166 @@ export class DatabaseStorage implements IStorage {
       }
       return operation;
     });
+  }
+
+  /**
+   * Annuler une livraison après validation avec création d'opérations d'inventaire
+   */
+  async cancelDeliveryAfterValidation(deliveryId: number, cancellationData: CancellationData): Promise<any> {
+    return await db.transaction(async (tx) => {
+      // 1. Récupérer la livraison et vérifier qu'elle est validée
+      const [delivery] = await tx.select()
+        .from(inventoryOperations)
+        .where(and(
+          eq(inventoryOperations.id, deliveryId),
+          eq(inventoryOperations.type, InventoryOperationType.LIVRAISON)
+        ));
+
+      if (!delivery) {
+        throw new Error("Livraison non trouvée");
+      }
+
+      if (delivery.status !== InventoryOperationStatus.COMPLETED) {
+        throw new Error("La livraison doit être validée pour être annulée après validation");
+      }
+
+      // 2. Récupérer les items de la livraison
+      const deliveryItems = await tx.select()
+        .from(inventoryOperationItems)
+        .where(eq(inventoryOperationItems.operationId, deliveryId));
+
+      // 3. Créer les opérations d'inventaire pour rebut et retour
+      const operations = [];
+
+      // Opération pour les rebuts (si il y en a)
+      const hasWasteItems = cancellationData.cancellationItems.some(item => 
+        item.zones.some(zone => zone.wasteQuantity > 0)
+      );
+
+      if (hasWasteItems) {
+        const wasteOperationCode = await this.generateOperationCode(InventoryOperationType.REBUT_LIVRAISON);
+        const [wasteOperation] = await tx.insert(inventoryOperations).values({
+          code: wasteOperationCode,
+          type: InventoryOperationType.REBUT_LIVRAISON,
+          status: InventoryOperationStatus.DRAFT,
+          statusDate: new Date().toISOString(),
+          orderId: delivery.orderId,
+          clientId: delivery.clientId,
+          parentOperationId: deliveryId,
+          notes: `Rebut suite à annulation de livraison: ${cancellationData.reason || 'Voir détail tableau'}`,
+          validatedAt: new Date().toISOString()
+        }).returning();
+
+        operations.push(wasteOperation);
+
+        // Créer les items de rebut
+        for (const cancellationItem of cancellationData.cancellationItems) {
+          for (const zone of cancellationItem.zones) {
+            if (zone.wasteQuantity > 0) {
+              const deliveryItem = deliveryItems.find(item => 
+                item.articleId === cancellationItem.articleId &&
+                item.fromStorageZoneId === zone.zoneId &&
+                item.lotId === zone.lotId
+              );
+
+              if (deliveryItem) {
+                await tx.insert(inventoryOperationItems).values({
+                  operationId: wasteOperation.id,
+                  articleId: cancellationItem.articleId,
+                  quantity: zone.wasteQuantity.toString(),
+                  quantityBefore: deliveryItem.quantityAfter,
+                  quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.wasteQuantity.toString())).toString(),
+                  lotId: zone.lotId,
+                  fromStorageZoneId: zone.zoneId,
+                  wasteReason: zone.wasteReason,
+                  notes: `Rebut: ${zone.wasteReason}`
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Opération pour les retours au stock (si il y en a)
+      const hasReturnItems = cancellationData.cancellationItems.some(item => 
+        item.zones.some(zone => zone.returnQuantity > 0)
+      );
+
+      if (hasReturnItems) {
+        const returnOperationCode = await this.generateOperationCode(InventoryOperationType.RETOUR_LIVRAISON);
+        const [returnOperation] = await tx.insert(inventoryOperations).values({
+          code: returnOperationCode,
+          type: InventoryOperationType.RETOUR_LIVRAISON,
+          status: InventoryOperationStatus.DRAFT,
+          statusDate: new Date().toISOString(),
+          orderId: delivery.orderId,
+          clientId: delivery.clientId,
+          parentOperationId: deliveryId,
+          notes: `Retour au stock suite à annulation de livraison: ${cancellationData.reason || 'Voir détail tableau'}`,
+          validatedAt: new Date().toISOString()
+        }).returning();
+
+        operations.push(returnOperation);
+
+        // Créer les items de retour
+        for (const cancellationItem of cancellationData.cancellationItems) {
+          for (const zone of cancellationItem.zones) {
+            if (zone.returnQuantity > 0) {
+              const deliveryItem = deliveryItems.find(item => 
+                item.articleId === cancellationItem.articleId &&
+                item.fromStorageZoneId === zone.zoneId &&
+                item.lotId === zone.lotId
+              );
+
+              if (deliveryItem) {
+                await tx.insert(inventoryOperationItems).values({
+                  operationId: returnOperation.id,
+                  articleId: cancellationItem.articleId,
+                  quantity: zone.returnQuantity.toString(),
+                  quantityBefore: deliveryItem.quantityAfter,
+                  quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.returnQuantity.toString())).toString(),
+                  lotId: zone.lotId,
+                  fromStorageZoneId: zone.zoneId,
+                  notes: 'Retour au stock'
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Mettre à jour le statut de la livraison
+      await tx.update(inventoryOperations)
+        .set({ 
+          status: InventoryOperationStatus.CANCELLED,
+          statusDate: new Date().toISOString(),
+          notes: `Annulée: ${cancellationData.reason || 'Voir détail tableau'}`
+        })
+        .where(eq(inventoryOperations.id, deliveryId));
+
+      // 5. Mettre à jour les items de la livraison
+      await tx.update(inventoryOperationItems)
+        .set({ lineStatus: 'cancelled' })
+        .where(eq(inventoryOperationItems.operationId, deliveryId));
+
+      return {
+        deliveryId,
+        operations,
+        message: "Livraison annulée avec succès"
+      };
+    });
+  }
+
+  /**
+   * Générer un code d'opération unique
+   */
+  private async generateOperationCode(prefix: string): Promise<string> {
+    const count = await db.select({ count: sql<number>`count(*)` })
+      .from(inventoryOperations)
+      .where(sql`${inventoryOperations.code} LIKE ${prefix + '-%'}`);
+
+    const nextNumber = (count[0]?.count || 0) + 1;
+    return `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
   }
 }
 

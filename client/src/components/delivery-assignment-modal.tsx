@@ -26,7 +26,7 @@ export function DeliveryAssignmentModal({ open, onOpenChange, delivery, onSucces
     queryFn: async () => {
       const response = await fetch("/api/deliveries/available-delivery-persons");
       return response.json();
-    },
+    },enabled:false
   });
 
   // Mutation pour assigner un livreur

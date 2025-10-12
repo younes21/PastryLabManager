@@ -93,42 +93,164 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
   const [reason, setReason] = useState('');
   const [isReturnToStock, setIsReturnToStock] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cancellationItems, setCancellationItems] = useState<Array<{
+    articleId: number;
+    article: any;
+    totalQuantity: number;
+    zones: Array<{
+      zoneId: number;
+      zoneName: string;
+      lotId: number | null;
+      lotName: string;
+      quantity: number;
+      notes: string;
+      wasteQuantity: number;
+      returnQuantity: number;
+      wasteReason: string;
+    }>;
+  }>>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Récupérer les données de la livraison pour générer le tableau summary
+  const { data: deliveryData } = useQuery({
+    queryKey: ['delivery-details', delivery?.id],
+    queryFn: async () => {
+      if (!delivery?.id) return null;
+      const response = await fetch(`/api/deliveries/${delivery.id}`);
+      if (!response.ok) throw new Error('Erreur lors de la récupération des détails de la livraison');
+      return response.json();
+    },
+    enabled: !!delivery?.id && isOpen
+  });
+
+  // Générer les données du tableau summary
+  const generateSummaryData = () => {
+    if (!deliveryData?.items) return [];
+    
+    const summaryItems: Array<{
+      articleId: number;
+      article: any;
+      totalQuantity: number;
+      zones: Array<{
+        zoneId: number;
+        zoneName: string;
+        lotId: number | null;
+        lotName: string;
+        quantity: number;
+        notes: string;
+        wasteQuantity: number;
+        returnQuantity: number;
+        wasteReason: string;
+      }>;
+    }> = [];
+
+    deliveryData.items.forEach((item: any) => {
+      if (item.quantity === 0) return;
+
+      const articleId = item.articleId;
+      const article = item.article;
+      const quantity = item.quantity;
+
+      // Pour chaque article, créer une entrée avec les zones
+      summaryItems.push({
+        articleId,
+        article,
+        totalQuantity: quantity,
+        zones: [{
+          zoneId: item.fromStorageZoneId || 0,
+          zoneName: item.storageZone?.designation || `Zone ${item.fromStorageZoneId || '-'}`,
+          lotId: item.lotId,
+          lotName: item.lot?.code || 'vide',
+          quantity: quantity,
+          notes: item.notes || "",
+          wasteQuantity: 0,
+          returnQuantity: quantity,
+          wasteReason: ""
+        }]
+      });
+    });
+
+    return summaryItems;
+  };
+
+  // Mettre à jour les données d'annulation quand les données de livraison changent
+  useEffect(() => {
+    if (deliveryData) {
+      const summaryData = generateSummaryData();
+      setCancellationItems(summaryData);
+    }
+  }, [deliveryData]);
+
+  // Fonctions pour gérer les changements dans les inputs
+  const updateWasteQuantity = (articleId: number, zoneIndex: number, value: number) => {
+    setCancellationItems(prev => prev.map(item => {
+      if (item.articleId === articleId) {
+        const updatedZones = [...item.zones];
+        updatedZones[zoneIndex] = { ...updatedZones[zoneIndex], wasteQuantity: value };
+        return { ...item, zones: updatedZones };
+      }
+      return item;
+    }));
+  };
+
+  const updateReturnQuantity = (articleId: number, zoneIndex: number, value: number) => {
+    setCancellationItems(prev => prev.map(item => {
+      if (item.articleId === articleId) {
+        const updatedZones = [...item.zones];
+        updatedZones[zoneIndex] = { ...updatedZones[zoneIndex], returnQuantity: value };
+        return { ...item, zones: updatedZones };
+      }
+      return item;
+    }));
+  };
+
+  const updateWasteReason = (articleId: number, zoneIndex: number, value: string) => {
+    setCancellationItems(prev => prev.map(item => {
+      if (item.articleId === articleId) {
+        const updatedZones = [...item.zones];
+        updatedZones[zoneIndex] = { ...updatedZones[zoneIndex], wasteReason: value };
+        return { ...item, zones: updatedZones };
+      }
+      return item;
+    }));
+  };
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
       if (!delivery) return;
 
-      if (delivery.isValidated) {
-        // Annulation après validation
-        const response = await fetch(`/api/deliveries/${delivery.id}/cancel-after-validation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason, isReturnToStock })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Erreur lors de l\'annulation');
-        }
-
-        return response.json();
-      } else {
-        // Annulation avant validation
-        const response = await fetch(`/api/deliveries/${delivery.id}/cancel-before-validation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Erreur lors de l\'annulation');
-        }
-
-        return response.json();
+      // Vérifier que la livraison est validée
+      if (!delivery.isValidated) {
+        throw new Error("Seules les livraisons validées peuvent être annulées");
       }
+
+      // Annulation avec détails des quantités
+      const response = await fetch(`/api/deliveries/${delivery.id}/cancel-after-validation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reason, 
+          isReturnToStock,
+          cancellationItems: cancellationItems.map(item => ({
+            articleId: item.articleId,
+            zones: item.zones.map(zone => ({
+              zoneId: zone.zoneId,
+              lotId: zone.lotId,
+              wasteQuantity: zone.wasteQuantity,
+              returnQuantity: zone.returnQuantity,
+              wasteReason: zone.wasteReason
+            }))
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erreur lors de l\'annulation');
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -173,6 +295,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
     setReason('');
     setIsReturnToStock(true);
     setIsSubmitting(false);
+    setCancellationItems([]);
     onClose();
   };
 
@@ -180,7 +303,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <XCircle className="h-5 w-5 text-red-500" />
@@ -188,7 +311,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
           </DialogTitle>
         </DialogHeader>
         <DialogBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 Raison de l'annulation *
@@ -205,7 +328,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
               </p>
             </div>
 
-            {delivery.isValidated && (
+            <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   Type d'annulation
@@ -237,7 +360,114 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
                   }
                 </p>
               </div>
-            )}
+
+              {/* Tableau summary avec inputs */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Détail des quantités par article
+                </label>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Article</TableHead>
+                        <TableHead className="text-center">Quantité à livrer</TableHead>
+                        <TableHead className="text-center">Zone</TableHead>
+                        <TableHead className="text-center">Lot</TableHead>
+                        <TableHead className="text-center">Quantité par zone</TableHead>
+                        <TableHead className="text-center">Qté Rebut</TableHead>
+                        <TableHead className="text-center">Qté Retour</TableHead>
+                        <TableHead className="text-center">Cause Rebut</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cancellationItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <span className="text-lg font-bold text-red-900 uppercase">Aucun produit à livrer</span>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        cancellationItems.map((summaryItem) => {
+                          const { articleId, article, totalQuantity, zones } = summaryItem;
+
+                          return zones.map((zone, zoneIndex) => (
+                            <TableRow key={`${articleId}-${zoneIndex}`}>
+                              {zoneIndex === 0 && (
+                                <TableCell rowSpan={zones.length} className="p-2">
+                                  <div className="flex items-center gap-3">
+                                    <img
+                                      src={article?.photo || ''}
+                                      alt={article?.name || ''}
+                                      className="w-[4rem] h-[3rem] object-cover rounded-lg shadow-sm"
+                                    />
+                                    <div>
+                                      <div className="font-medium text-gray-900">{article?.name}</div>
+                                      <div className="text-sm text-gray-500">{article?.unit}</div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              )}
+                              {zoneIndex === 0 && (
+                                <TableCell rowSpan={zones.length} className="text-center p-2">
+                                  <div className="font-bold text-green-700">
+                                    {totalQuantity} {article?.unit}
+                                  </div>
+                                </TableCell>
+                              )}
+                              <TableCell className="text-center p-2">
+                                <div className="text-sm">{zone.zoneName}</div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <div className="text-sm">{zone.lotName}</div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <div className="font-bold text-blue-700">
+                                  {zone.quantity} {article?.unit}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={zone.quantity}
+                                  value={zone.wasteQuantity}
+                                  onChange={(e) => updateWasteQuantity(articleId, zoneIndex, parseFloat(e.target.value) || 0)}
+                                  className="w-20 text-center"
+                                  placeholder="0"
+                                />
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={zone.quantity}
+                                  value={zone.returnQuantity}
+                                  onChange={(e) => updateReturnQuantity(articleId, zoneIndex, parseFloat(e.target.value) || 0)}
+                                  className="w-20 text-center"
+                                  placeholder="0"
+                                />
+                              </TableCell>
+                              <TableCell className="text-center p-2">
+                                {zone.wasteQuantity > 0 && (
+                                  <Input
+                                    type="text"
+                                    value={zone.wasteReason}
+                                    onChange={(e) => updateWasteReason(articleId, zoneIndex, e.target.value)}
+                                    placeholder="Cause du rebut"
+                                    className="w-32"
+                                  />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ));
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
 
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={handleClose}>
