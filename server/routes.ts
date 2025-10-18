@@ -1871,6 +1871,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const deliveryQuantities: Record<number, { toDeliver: number; delivered: number }> = {};
 
       deliveries.forEach(delivery => {
+        // Exclure les livraisons annulées du calcul des quantités
+        if (delivery.status === InventoryOperationStatus.CANCELLED) {
+          return;
+        }
+
         delivery.items.forEach(deliveryItem => {
           const articleId = deliveryItem.articleId;
           const quantity = parseFloat(deliveryItem.quantity);
@@ -2051,6 +2056,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const deliveries = await storage.getInventoryOperationsByOrder(orderId);
 
         deliveries.forEach(delivery => {
+          // Exclure les livraisons annulées du calcul des quantités
+          if (delivery.status === InventoryOperationStatus.CANCELLED) {
+            return;
+          }
+
           delivery.items.forEach(deliveryItem => {
             const articleId = deliveryItem.articleId;
             const quantity = parseFloat(deliveryItem.quantity);
@@ -4303,7 +4313,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalOrdred = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
 
           // Calculer le total livré pour cette livraison spécifique
-          totalDelivred = items.reduce((sum, item) => sum + parseFloat(String(item.quantity)), 0);
+          // Exclure les livraisons annulées du calcul des quantités livrées
+          if (delivery.status !== InventoryOperationStatus.CANCELLED) {
+            totalDelivred = items.reduce((sum, item) => sum + parseFloat(String(item.quantity)), 0);
+          }
         }
 
         // Déterminer si c'est une livraison partielle
@@ -4330,13 +4343,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Pour chaque item, calculer qté déjà livrée et qté restante
           const itemsWithDelivery = orderItems.map(item => {
             // Somme des quantités livrées pour cet article dans toutes les livraisons
+            // Exclure les livraisons annulées du calcul
             let delivered = 0;
             existingDeliveries.forEach(delivery => {
-              delivery.items.forEach(deliveryItem => {
-                if (deliveryItem.articleId === item.articleId) {
-                  delivered += parseFloat(deliveryItem.quantity);
-                }
-              });
+              // Ne pas compter les livraisons annulées
+              if (delivery.status !== InventoryOperationStatus.CANCELLED) {
+                delivery.items.forEach(deliveryItem => {
+                  if (deliveryItem.articleId === item.articleId) {
+                    delivered += parseFloat(deliveryItem.quantity);
+                  }
+                });
+              }
             });
             const quantityOrdered = parseFloat(item.quantity);
 
@@ -4422,6 +4439,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         existingDeliveries.forEach((delivery: any) => {
           // Exclure la livraison spécifiée si elle est en cours de modification
           if (excludeDeliveryId && delivery.id === excludeDeliveryId) {
+            return;
+          }
+
+          // Exclure les livraisons annulées du calcul des quantités
+          if (delivery.status === InventoryOperationStatus.CANCELLED) {
             return;
           }
 

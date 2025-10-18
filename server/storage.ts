@@ -579,12 +579,12 @@ export class DatabaseStorage implements IStorage {
     LEFT JOIN (SELECT article_id,lot_id,storage_zone_id,SUM(reserved_quantity) total_reserved 
                FROM stock_reservations WHERE status=${StockReservationStatus.RESERVED} AND reservation_direction=${StockReservationDirection.IN} 
                GROUP BY article_id,lot_id,storage_zone_id) sr_in 
-      ON sr_in.article_id=a.id AND sr_in.lot_id=s.lot_id AND sr_in.storage_zone_id=s.storage_zone_id
+      ON sr_in.article_id=a.id AND sr_in.lot_id IS NOT DISTINCT FROM s.lot_id AND sr_in.storage_zone_id=s.storage_zone_id
     LEFT JOIN (SELECT article_id,lot_id,storage_zone_id,SUM(reserved_quantity) total_reserved 
                FROM stock_reservations WHERE status=${StockReservationStatus.RESERVED} AND reservation_direction=${StockReservationDirection.OUT} 
                ${excludeDeliveryId ? sql`AND inventory_operation_id != ${excludeDeliveryId}` : sql``}
                GROUP BY article_id,lot_id,storage_zone_id) sr_out 
-      ON sr_out.article_id=a.id AND sr_out.lot_id=s.lot_id AND sr_out.storage_zone_id=s.storage_zone_id
+      ON sr_out.article_id=a.id AND sr_out.lot_id IS NOT DISTINCT FROM s.lot_id AND sr_out.storage_zone_id=s.storage_zone_id
     WHERE a.active=true
     ${typeof articleIds === "number"
         ? sql`AND a.id=${articleIds}`
@@ -3361,18 +3361,18 @@ export class DatabaseStorage implements IStorage {
                   notes: `Rebut: ${zone.wasteReason}`
                 });
 
-                // Créer une réservation de stock sortante pour le rebut
-                await tx.insert(stockReservations).values({
-                  articleId: cancellationItem.articleId,
-                  inventoryOperationId: wasteOperation.id,
-                  reservedQuantity: zone.wasteQuantity.toString(),
-                  reservationDirection: StockReservationDirection.OUT,
-                  reservationType: StockReservationType.INVENTORY,
-                  status: StockReservationStatus.RESERVED,
-                  notes: `Rebut livraison: ${zone.wasteReason || 'Voir détail'}`,
-                  lotId: zone.lotId,
-                  storageZoneId: zone.zoneId
-                });
+                // // Créer une réservation de stock sortante pour le rebut
+                // await tx.insert(stockReservations).values({
+                //   articleId: cancellationItem.articleId,
+                //   inventoryOperationId: wasteOperation.id,
+                //   reservedQuantity: zone.wasteQuantity.toString(),
+                //   reservationDirection: StockReservationDirection.OUT,
+                //   reservationType: StockReservationType.INVENTORY,
+                //   status: StockReservationStatus.RESERVED,
+                //   notes: `Rebut livraison: ${zone.wasteReason || 'Voir détail'}`,
+                //   lotId: zone.lotId,
+                //   storageZoneId: zone.zoneId
+                // });
               }
             }
           }
