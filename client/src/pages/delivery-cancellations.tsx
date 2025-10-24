@@ -59,6 +59,7 @@ interface Delivery {
     clientName: string;
     totalAmount: string;
   };
+  mode?: 'full' | 'partial'; // Added mode property
 }
 
 interface InventoryOperation {
@@ -284,6 +285,21 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
         variant: "destructive",
       });
       return;
+    }
+
+    // BLOQUER pour le mode "partial" : si tout est annulé, impossible
+    if (delivery?.mode === 'partial') {
+      const toutAnnule = cancellationItems.every(item =>
+        item.zones.every(zone => (zone.returnQuantity + zone.wasteQuantity) >= zone.quantity)
+      );
+      if (toutAnnule) {
+        toast({
+          title: "Validation partielle impossible",
+          description: "La somme des retours et rebuts NE DOIT PAS couvrir la totalité des quantités livrées. Pour tout annuler, utilisez l'annulation totale.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // Vérifier que les quantités ne dépassent pas la quantité livrée

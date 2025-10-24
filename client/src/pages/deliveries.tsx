@@ -15,6 +15,9 @@ import {
   AlertTriangle,
   Plus,
   CreditCard,
+  Check,
+  AlarmClock,
+  CircleX,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -120,7 +123,13 @@ export default function DeliveriesPage() {
   } | null>(null);
   const [deliveriesLoading, setDeliveriesLoading] = useState(true);
 
-
+  const canUpdate = (status: InventoryOperationStatus) => status == InventoryOperationStatus.DRAFT;
+  const canDelete = (status: InventoryOperationStatus) => status == InventoryOperationStatus.DRAFT;
+  const canValidate = (status: InventoryOperationStatus) => status == InventoryOperationStatus.DRAFT;
+  const canInValidate = (status: InventoryOperationStatus) => status == InventoryOperationStatus.READY;
+  const canStartDelivery = (status: InventoryOperationStatus) => status == InventoryOperationStatus.READY;
+  const canDeliver = (status: InventoryOperationStatus) => status == InventoryOperationStatus.IN_PROGRESS;
+  const canCancel = (status: InventoryOperationStatus) => status == InventoryOperationStatus.IN_PROGRESS || status == InventoryOperationStatus.PARTIALLY_COMPLETED || status == InventoryOperationStatus.COMPLETED;
   // Récupérer le paramètre orderId de l'URL au chargement de la page
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -256,28 +265,28 @@ export default function DeliveriesPage() {
     });
   }
 
-  // const updateDeliveryStateMutation = useMutation({
-  //   mutationFn: async ({ id, data }: { id: number; data: any }) => {
-  //     const payload = {
-  //       status: data.status,
-  //     };
-  //     return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
-  //   },
-  //   onSuccess: () => {
-  //     toast({
-  //       title: "Status mis à jour",
-  //       description: "Status mis à jour avec succès"
-  //     });
-  //     resetForm();
-  //   },
-  //   onError: (error: any) => {
-  //     toast({
-  //       title: "Erreur",
-  //       description: error.message || "Erreur lors de la mise à jour du status",
-  //       variant: "destructive"
-  //     });
-  //   },
-  // });
+  const updateDeliveryStateMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number, status: InventoryOperationStatus }) => {
+      const payload = {
+        status: status,
+      };
+      return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Status mis à jour",
+        description: "Status mis à jour avec succès"
+      });
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Erreur lors de la mise à jour du status",
+        variant: "destructive"
+      });
+    },
+  });
 
   const deleteDeliveryMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -1025,8 +1034,7 @@ export default function DeliveriesPage() {
   };
 
   const handleValidateDelivery = async (delivery: any) => {
-    if (!delivery || delivery.status === InventoryOperationStatus.COMPLETED ||
-      delivery.status === InventoryOperationStatus.CANCELLED) { return; }
+    if (!delivery || !canStartDelivery(delivery.status)) { return; }
     var isOk = await confirmGlobal("Validation de la livraison", "Confirmez-vous la validation de cette livraison ? Cette action est irréversible et entraînera le débit du stock.");
     if (!isOk) return;
 
@@ -1039,11 +1047,28 @@ export default function DeliveriesPage() {
       toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
     }
   };
-
-  const handleCancelDelivery = (delivery: any) => {
-    if (delivery.status !== InventoryOperationStatus.COMPLETED) return;
-    setSelectedDelivery(delivery);
+  const handlePartialDelivery = async (delivery: any) => {
+    if (!canDeliver(delivery.status)) return;
+    const confirmMessage = `Êtes-vous sûr de valider partiellement cette livraison ${delivery.code}  ?\n\nCette action est irréversible.`;
+    var isOk = await confirmGlobal('Validation partielle de la livraison', confirmMessage);
+    if (!isOk) return;
+    setSelectedDelivery({ ...delivery, mode: 'partial' });
     setIsCancelModalOpen(true);
+  };
+
+
+  const handleCancelDelivery = async (delivery: any) => {
+    if (!canCancel(delivery.status)) return;
+    const confirmMessage = `Êtes-vous sûr d'annuler cette livraison ${delivery.code}  ?\n\nCette action est irréversible.`;
+    var isOk = await confirmGlobal('Annulation de la livraison', confirmMessage);
+    if (!isOk) return;
+    if (delivery.status == InventoryOperationStatus.IN_PROGRESS || delivery.status == InventoryOperationStatus.COMPLETED) {
+      // Pour l'annulation totale, appel a une nouvelle api et non a cancellationModal
+     
+    } else {
+      setSelectedDelivery({ ...delivery, mode: 'cancel' });
+      setIsCancelModalOpen(true);
+    }
   };
 
   const handleCancelModalSuccess = () => {
@@ -1382,21 +1407,15 @@ export default function DeliveriesPage() {
                               <DropdownMenuItem onClick={() => viewDelivery(delivery)} data-testid={`button-view-delivery-${delivery.id}`}>
                                 <Eye className="h-4 w-4" /> Voir les détails
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED} data-testid={`button-edit-delivery-${delivery.id}`}>
+                              <DropdownMenuItem onClick={() => editDelivery(delivery)} disabled={!canUpdate(delivery.status)} data-testid={`button-edit-delivery-${delivery.id}`}>
                                 <Edit3 className="h-4 w-4" /> Modifier
                               </DropdownMenuItem>
+
                               <DropdownMenuItem
-                                disabled={delivery.status === InventoryOperationStatus.COMPLETED || delivery.status === InventoryOperationStatus.CANCELLED}
-                                onClick={() => handleValidateDelivery(delivery)}
-                                data-testid={`button-cancel-delivery-${delivery.id}`}
-                              >
-                                <CheckCircle className="h-4 w-4 text-green-500" /> Valider
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED || deleteDeliveryMutation.isPending}
+                                disabled={!canDelete(delivery.status) || deleteDeliveryMutation.isPending}
                                 onClick={async () => {
 
-                                  if (delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED) {
+                                  if (!canDelete(delivery.status)) {
                                     toast({
                                       title: "Suppression impossible",
                                       description: "Les livraisons validées ne peuvent pas être supprimées",
@@ -1414,12 +1433,65 @@ export default function DeliveriesPage() {
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" /> Supprimer
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+
                               <DropdownMenuItem
-                                disabled={delivery.status !== InventoryOperationStatus.COMPLETED}
+                                disabled={!canValidate(delivery.status) && !canInValidate(delivery.status)}
+                                onClick={() => {
+                                  if (canValidate(delivery.status)) {
+                                    updateDeliveryStateMutation.mutate({ id: delivery.id, status: InventoryOperationStatus.READY })
+                                  } else if (canInValidate(delivery.status)) {
+                                    updateDeliveryStateMutation.mutate({ id: delivery.id, status: InventoryOperationStatus.DRAFT })
+                                  }
+
+                                }}
+                                data-testid={`button-cancel-delivery-${delivery.id}`}
+                              >
+                                <Package className={`h-4 w-4 ${canValidate(delivery.status) ? 'text-green-500' : 'text-red-500'}`} />
+                                {canValidate(delivery.status) && <CheckCircle className='h-4 w-4 text-green-500' />}
+                                {!canValidate(delivery.status) && <CircleX className='h-4 w-4 text-red-500' />}
+                                {canValidate(delivery.status) ? 'Valider (prête à livrer)' : 'Annuler validation'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={!canStartDelivery(delivery.status)}
+                                onClick={() => handleValidateDelivery(delivery)}
+                                data-testid={`button-cancel-delivery-${delivery.id}`}
+                              >
+                                <Truck className="h-4 w-4 text-orange-500" />
+                                <AlarmClock className="h-4 w-4 text-orange-500" /> Débuter la livraison
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={!canDeliver(delivery.status)}
+                                onClick={() => handlePartialDelivery(delivery)}
+                                data-testid={`button-cancel-delivery-${delivery.id}`}
+                              >
+                                <Truck className="h-4 w-4 text-purple-500" />
+                                <Check className="h-4 w-4 text-purple-500" /> Livrer partiellement
+
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={!canDeliver(delivery.status)}
+                                onClick={async () => {
+                                  if (canDeliver(delivery.status)) {
+                                    const confirmMessage = `Êtes-vous sûr que cette livraison ${delivery.code} est totalement livrée ?\n\nCette action est irréversible.`;
+                                    var isOk = await confirmGlobal('Completion de la livraison', confirmMessage);
+                                    if (isOk) {
+                                      updateDeliveryStateMutation.mutate({ id: delivery.id, status: InventoryOperationStatus.COMPLETED })
+                                    }
+                                  }
+                                }}
+                                data-testid={`button-cancel-delivery-${delivery.id}`}
+                              >
+                                <> <Truck className="h-4 w-4 text-green-500" />
+                                  <CheckCircle className="h-4 w-4 text-green-500" /> Livrer tout
+                                </>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={!canCancel(delivery.status)}
                                 onClick={() => handleCancelDelivery(delivery)}
                                 data-testid={`button-cancel-delivery-${delivery.id}`}
                               >
-                                <X className="h-4 w-4 text-red-500" /> Annuler
+                                <CircleX className="h-4 w-4 text-red-500" /> Annuler
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
 

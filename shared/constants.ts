@@ -166,6 +166,7 @@ export enum InventoryOperationStatus {
   READY = "ready",
   IN_PROGRESS = "in_progress",
   COMPLETED = "completed",
+  PARTIALLY_COMPLETED = "partially_completed",
   CANCELLED = "cancelled",
 }
 
