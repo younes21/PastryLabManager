@@ -25,6 +25,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { type Order, type Client, type Article, type ArticleCategory, type Tax } from "@shared/schema";
+import { ArticleCategoryType } from "@shared/constants";
 
 interface CartItem {
   articleId: number;
@@ -125,7 +126,7 @@ export function OrderForm({ order, onSuccess, onCancel }: OrderFormProps) {
     select: (data) =>
       data?.filter(
         (article: Article) =>
-          article.type === "product" &&
+          article.type === ArticleCategoryType.PRODUCT &&
           article.allowSale &&
           article.active &&
           (!selectedCategory || article.saleCategoryId === selectedCategory),

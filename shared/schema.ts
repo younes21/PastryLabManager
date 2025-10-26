@@ -647,7 +647,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
 
   // Dates
   scheduledDate: timestamp("scheduled_date", { mode: "string" }), // preparation
-  startedAt: timestamp("started_at", { mode: "string" }), // preparation
+  startedAt: timestamp("started_at", { mode: "string" }), // preparation or delivery
   completedAt: timestamp("completed_at", { mode: "string" }), // preparation
   validatedAt: timestamp("validated_at", { mode: "string" }), // quand verrouillé
   recipeId: integer("recipe_id").references(() => recipes.id), // preparation

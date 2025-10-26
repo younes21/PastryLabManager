@@ -81,7 +81,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
 
   // Filtrer les produits qui n'ont pas encore de recette (sauf si on est en mode édition)
   const products = (allArticles as Article[]).filter((article: Article) => {
-    if (article.type !== "product") return false;
+    if (article.type !== ArticleCategoryType.PRODUCT) return false;
 
     // Si on est en mode édition, inclure le produit actuel
     if (recipe?.id && article.id === recipe.articleId) return true;

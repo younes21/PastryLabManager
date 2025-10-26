@@ -37,6 +37,7 @@ import type {
 
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { ArticleCategoryType } from "@shared/constants";
 
 const orderTypeLabels = {
   quote: 'Devis',
@@ -127,7 +128,7 @@ export default function ClientOrdersPage() {
     select: (data) =>
       data?.filter(
         (article: Article) =>
-          article.type === "product" &&
+          article.type === ArticleCategoryType.PRODUCT &&
           article.allowSale &&
           article.active &&
           (!selectedCategory || article.saleCategoryId === selectedCategory),

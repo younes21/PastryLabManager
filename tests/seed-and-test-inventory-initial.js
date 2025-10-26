@@ -4,7 +4,8 @@ const BASE_URL = 'http://localhost:5000/api';
 
 // Fonction pour générer une quantité aléatoire entre 2 et 10
 function getRandomQuantity() {
-  return Math.floor(Math.random() * 9) + 2; // Entre 2 et 10
+  // return Math.floor(Math.random() * 9) + 2; // Entre 2 et 10
+  return 10;
 }
 
 // Fonction pour générer un prix réaliste basé sur le type d'article

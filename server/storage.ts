@@ -292,7 +292,7 @@ export interface IStorage {
    * @param {number} deliveryOperationId
    * @returns {Promise<InventoryOperation>}
    */
-  validateDelivery(deliveryOperationId: number): Promise<InventoryOperation>;
+  StartDelivery(deliveryOperationId: number): Promise<InventoryOperation>;
 }
 
 
@@ -3058,17 +3058,17 @@ export class DatabaseStorage implements IStorage {
 
 
   /**
-   * Valide une livraison : déduit le stock, met à jour le statut de l'opération et des réservations
+   * démarrer une livraison : déduit le stock, met à jour le statut de l'opération et des réservations
    * @param {number} deliveryOperationId
    * @returns {Promise<InventoryOperation>}
    */
-  async validateDelivery(deliveryOperationId: number): Promise<InventoryOperation> {
+  async StartDelivery(deliveryOperationId: number): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
       // 1. Récupérer l'opération et vérifier sa validité
       const [operation] = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.id, deliveryOperationId));
       if (!operation) throw new Error(`Opération ${deliveryOperationId} non trouvée`);
       if (operation.type !== InventoryOperationType.LIVRAISON) throw new Error(`L'opération ${deliveryOperationId} n'est pas une livraison`);
-      if (operation.isValidated) throw new Error(`Livraison ${deliveryOperationId} déjà validée`);
+      if (operation.startedAt) throw new Error(`Livraison ${deliveryOperationId} déjà en cours`);
 
       // 2. Récupérer les items de l'opération pour vérification
       const operationItems = await tx.select().from(inventoryOperationItems)
@@ -3140,18 +3140,17 @@ export class DatabaseStorage implements IStorage {
           .set({
             status: StockReservationStatus.COMPLETED,
             stateChangedAt: new Date().toISOString(),
-            notes: `Livraison validée le ${new Date().toISOString()}`
+            notes: `Livraison débutée le ${new Date().toISOString()}`
           })
           .where(eq(stockReservations.id, res.id));
       }
 
-      // 6. Mettre à jour l'opération comme validée
+      // 6. Mettre à jour l'opération comme en cours
       const [updatedOp] = await tx.update(inventoryOperations)
         .set({
-          isValidated: true,
-          validatedAt: new Date().toISOString(),
-          status: InventoryOperationStatus.COMPLETED,
-          completedAt: new Date().toISOString()
+       
+          startedAt: new Date().toISOString(),
+          status: InventoryOperationStatus.IN_PROGRESS,
         })
         .where(eq(inventoryOperations.id, deliveryOperationId))
         .returning();

@@ -41,6 +41,7 @@ import {
   orderItems,
   insertStockReservationSchema,
   stockReservations,
+  InventoryOperation,
 } from "@shared/schema";
 import { z } from "zod";
 import {
@@ -57,7 +58,6 @@ import {
   ProductionItemStatus,
   FILTER_ALL,
   DateTypes,
-
 } from "@shared/constants";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -2500,9 +2500,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/inventory-operations/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { status, scheduledDate } = req.body;
+      const { status, scheduledDate, isDeliveryValidated } = req.body;
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid operation ID" });
+      }
+      // Pour mettre à jour uniquement le statut de validation de la livraison
+      if (typeof isDeliveryValidated === 'boolean') {
+        const operation = await storage.getInventoryOperation(id);
+        if (!operation) {
+          return res.status(404).json({ message: "Operation not found" });
+        }
+        // Vérifier que c'est bien une livraison
+        if (operation.type !== InventoryOperationType.LIVRAISON) {
+          return res.status(400).json({ message: "Operation is not a delivery" });
+        }
+        // Mettre à jour isValidated
+        const data = {
+          isValidated: isDeliveryValidated,
+          status,
+          statusDate: new Date().toISOString(),
+          validatedAt: isDeliveryValidated ? new Date().toISOString() : null
+        } as InventoryOperation;
+        const result = await storage.updateInventoryOperation(id, data);
+        if (result) {
+          res.json(result);
+        } else {
+          res.status(404).json({ message: "Failed to update delivery status" });
+        }
+        return;
       }
 
       // If only status is being updated and it's a completion/cancellation
@@ -4826,15 +4851,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Valider une livraison (déduire le stock, mettre à jour les statuts)
-  app.post("/api/deliveries/:id/validate", async (req, res) => {
+  // debuter une livraison (déduire le stock, mettre à jour les statuts)
+  app.post("/api/deliveries/:id/start", async (req, res) => {
     try {
       const deliveryOperationId = parseInt(req.params.id);
-      const validatedOp = await storage.validateDelivery(deliveryOperationId);
+      const validatedOp = await storage.StartDelivery(deliveryOperationId);
       res.json(validatedOp);
     } catch (error) {
-      console.error("Erreur lors de la validation de la livraison:", error);
-      res.status(400).json({ message: error instanceof Error ? error.message : "Erreur lors de la validation de la livraison" });
+      console.error("Erreur lors du changement d'état de la livraison:", error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Erreur lors du changement d'état de la livraison" });
     }
   });
 
@@ -4865,7 +4890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliveries/:id/cancellation-details", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      
+
       // Récupérer la livraison originale
       const [delivery] = await db.select()
         .from(inventoryOperations)

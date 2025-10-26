@@ -259,7 +259,7 @@ export default function DeliveriesPage() {
       status: fullDelivery.status || InventoryOperationStatus.DRAFT,
       clientId: fullDelivery.clientId || fullDelivery.order?.clientId || null,
       orderId: fullDelivery.orderId || null,
-      scheduledDate: fullDelivery.deliveryDate || fullDelivery.scheduledDate || new Date().toISOString().split('T')[0],
+      scheduledDate: new Date(fullDelivery.scheduledDate || new Date()).toLocaleDateString('en-CA'),
       notes: fullDelivery.notes || '',
       currency: DEFAULT_CURRENCY_DZD,
     });
@@ -269,15 +269,22 @@ export default function DeliveriesPage() {
     mutationFn: async ({ id, status }: { id: number, status: InventoryOperationStatus }) => {
       const payload = {
         status: status,
+        isDeliveryValidated: status == InventoryOperationStatus.READY
       };
-      return await apiRequest(`/api/deliveries/${id}`, "PUT", payload);
+      return await apiRequest(`/api/inventory-operations/${id}`, "PATCH", payload);
     },
-    onSuccess: () => {
+    onSuccess: async (res: any) => {
       toast({
         title: "Status mis à jour",
         description: "Status mis à jour avec succès"
       });
       resetForm();
+      const del = await res.json();
+      const delivery = filteredDeliveries?.find(f => f.id == del.id);
+      if (!delivery) return;
+      delivery.status = del.status;
+      delivery.isValidated = del.isValidated;
+      delivery.validatedAt = del.validatedAt;
     },
     onError: (error: any) => {
       toast({
@@ -374,7 +381,7 @@ export default function DeliveriesPage() {
         status: "draft",
         clientId: null,
         orderId: null,
-        scheduledDate: new Date().toISOString().split('T')[0],
+        scheduledDate: null,
         notes: "",
         currency: "DZD",
         // Ne plus initialiser les totaux - ils seront calculés côté serveur
@@ -804,6 +811,7 @@ export default function DeliveriesPage() {
       draft: { variant: "secondary" as const, label: "Brouillon" },
       pending: { variant: "default" as const, label: "En attente" },
       ready: { variant: "default" as const, label: "Prêt" },
+      in_progress: { variant: "default" as const, label: "en cours" },
       completed: { variant: "default" as const, label: "Livré" },
       cancelled: { variant: "destructive" as const, label: "Annulé" },
     };
@@ -1039,12 +1047,12 @@ export default function DeliveriesPage() {
     if (!isOk) return;
 
     try {
-      await apiRequest(`/api/deliveries/${delivery.id}/validate`, "POST");
-      toast({ title: "Livraison validée", description: "Le stock a été déduit et l'opération d'inventaire créée." });
+      await apiRequest(`/api/deliveries/${delivery.id}/start`, "POST");
+      toast({ title: "Livraison en cours", description: "Le stock a été déduit et l'opération d'inventaire créée." });
       fetchPageData(delivery.orderId, delivery.id);
       resetForm();
     } catch (e: any) {
-      toast({ title: "Erreur lors de la validation", description: e?.message || "Erreur inconnue", variant: "destructive" });
+      toast({ title: "Erreur lors de du changement d'etat de la livraison", description: e?.message || "Erreur inconnue", variant: "destructive" });
     }
   };
   const handlePartialDelivery = async (delivery: any) => {
@@ -1064,7 +1072,7 @@ export default function DeliveriesPage() {
     if (!isOk) return;
     if (delivery.status == InventoryOperationStatus.IN_PROGRESS || delivery.status == InventoryOperationStatus.COMPLETED) {
       // Pour l'annulation totale, appel a une nouvelle api et non a cancellationModal
-     
+
     } else {
       setSelectedDelivery({ ...delivery, mode: 'cancel' });
       setIsCancelModalOpen(true);
@@ -1559,6 +1567,17 @@ export default function DeliveriesPage() {
                     <X className="h-4 w-4 mr-2" />
                     Annuler
                   </Button> */}
+                  <span className="w-52 m-auto"> Date livraison</span>
+
+                  <Input
+                    type="date"
+
+                    value={currentDelivery.scheduledDate}
+                    onChange={(e) => {
+                      setCurrentDelivery({ ...currentDelivery, scheduledDate: e.target.value })
+                    }}
+                    className="text-center"
+                  />
                   <Button
                     onClick={saveDelivery}
                     disabled={isSaving}

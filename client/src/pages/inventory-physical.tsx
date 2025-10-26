@@ -38,6 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddLotModal } from "@/components/add-lot-modal";
+import { ArticleCategoryType, InventoryOperationStatus, InventoryOperationType } from "@shared/constants";
 
 const InventoryPhysicalInterface = () => {
   const [operations, setOperations] = useState<any[]>([]);
@@ -149,7 +150,7 @@ const InventoryPhysicalInterface = () => {
     // On considère que le type 'inventaire_initiale' est utilisé pour l'inventaire initial
     const initial = operations.find(
       (op) =>
-        op.type === "inventaire_initiale" &&
+        op.type === InventoryOperationType.INVENTAIRE_INITIALE &&
         op.storageZoneId === selectedZoneId,
     );
     setHasInitialInventory(!!initial);
@@ -164,7 +165,7 @@ const InventoryPhysicalInterface = () => {
           apiRequest("/api/articles", "GET"),
           apiRequest("/api/stock/items", "GET"),
           apiRequest(
-            "/api/inventory-operations?type=ajustement,inventaire_initiale",
+            `/api/inventory-operations?type=${InventoryOperationType.AJUSTEMENT},${InventoryOperationType.INVENTAIRE, InventoryOperationType.INVENTAIRE_INITIALE} `,
             "GET",
           ),
           apiRequest("/api/suppliers", "GET"),
@@ -210,8 +211,8 @@ const InventoryPhysicalInterface = () => {
     const newOp = {
       id: -Date.now(),
       code: undefined,
-      status: "draft",
-      type: isInitial ? "inventaire_initiale" : "ajustement",
+      status: InventoryOperationStatus.DRAFT,
+      type: isInitial ? InventoryOperationType.INVENTAIRE_INITIALE : InventoryOperationType.AJUSTEMENT,
       storageZoneId: selectedZoneId || defaultZoneId,
       notes: "",
       createdAt: new Date().toISOString(),
@@ -249,7 +250,7 @@ const InventoryPhysicalInterface = () => {
 
   const editOperation = async (op: any) => {
     try {
-      if (op.status === "completed") {
+      if (op.status ===InventoryOperationStatus.COMPLETED) {
         alert("Impossible de modifier un inventaire déjà complété.");
         return;
       }
@@ -258,7 +259,7 @@ const InventoryPhysicalInterface = () => {
       const data = await res.json();
       // Mettre à jour selectedZoneId avec la zone de l'opération
       setSelectedZoneId(data.storageZoneId);
-      
+
       setCurrentOperation({
         id: data.id,
         code: data.code,
@@ -361,12 +362,12 @@ const InventoryPhysicalInterface = () => {
 
     try {
       await apiRequest(`/api/inventory-operations/${op.id}`, "PATCH", {
-        status: "cancelled",
+        status: InventoryOperationStatus.CANCELLED,
       });
       setOperations(
         operations.map((operation) =>
           operation.id === op.id
-            ? { ...operation, status: "cancelled" }
+            ? { ...operation, status: InventoryOperationStatus.CANCELLED }
             : operation,
         ),
       );
@@ -469,10 +470,10 @@ const InventoryPhysicalInterface = () => {
         items.map((item) =>
           item.id === selectedItemForLot.id
             ? {
-                ...item,
-                lotId: newLot.id,
-                lotCode: newLot.code,
-              }
+              ...item,
+              lotId: newLot.id,
+              lotCode: newLot.code,
+            }
             : item
         )
       );
@@ -497,7 +498,7 @@ const InventoryPhysicalInterface = () => {
     try {
       const operationData = {
         type: currentOperation.type,
-        status: currentOperation.status || "draft",
+        status: currentOperation.status || InventoryOperationStatus.DRAFT,
         storageZoneId: currentOperation.storageZoneId,
         notes: currentOperation.notes.trim(),
       };
@@ -508,7 +509,7 @@ const InventoryPhysicalInterface = () => {
         quantityBefore: it.currentStock.toString(),
         quantityAfter: it.newQuantity.toString(),
         unitCost:
-          currentOperation.type === "inventaire_initiale"
+          currentOperation.type === InventoryOperationType.INVENTAIRE_INITIALE
             ? (it.unitCost || "0").toString()
             : "0",
         toStorageZoneId: it.storageZoneId || currentOperation.storageZoneId,
@@ -576,7 +577,7 @@ const InventoryPhysicalInterface = () => {
         const stockRes = await apiRequest("/api/stock/items", "GET");
         const stockData = await stockRes.json();
         setStockItems(stockData || []);
-      } catch {}
+      } catch { }
     } catch (e) {
       console.error("Failed to save inventory operation", e);
       alert("Erreur lors de la sauvegarde");
@@ -603,21 +604,21 @@ const InventoryPhysicalInterface = () => {
       await apiRequest(
         `/api/inventory-operations/${currentOperation.id}`,
         "PATCH",
-        { status: "completed" },
+        { status:InventoryOperationStatus.COMPLETED },
       );
       setOperations(
         operations.map((op) =>
-          op.id === currentOperation.id ? { ...op, status: "completed" } : op,
+          op.id === currentOperation.id ? { ...op, status:InventoryOperationStatus.COMPLETED } : op,
         ),
       );
-      setCurrentOperation({ ...currentOperation, status: "completed" });
+      setCurrentOperation({ ...currentOperation, status:InventoryOperationStatus.COMPLETED });
 
       // Refresh stock data
       try {
         const stockRes = await apiRequest("/api/stock/items", "GET");
         const stockData = await stockRes.json();
         setStockItems(stockData || []);
-      } catch {}
+      } catch { }
 
       alert("Inventaire complété");
     } catch (e) {
@@ -626,7 +627,7 @@ const InventoryPhysicalInterface = () => {
     }
   };
 
-  const getStatusBadge = (status: "draft" | "completed" | "cancelled") => {
+  const getStatusBadge = (status: InventoryOperationStatus.DRAFT |InventoryOperationStatus.COMPLETED | InventoryOperationStatus.CANCELLED) => {
     const styles = {
       draft: "bg-yellow-100 text-yellow-800",
       completed: "bg-green-100 text-green-800",
@@ -647,8 +648,8 @@ const InventoryPhysicalInterface = () => {
       article.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType =
       activeTab === "ingredients"
-        ? article.type === "ingredient"
-        : article.type === "product";
+        ? article.type === ArticleCategoryType.INGREDIENT
+        : article.type === ArticleCategoryType.PRODUCT;
     // Vérifier si l'article n'est pas déjà dans les items de la zone
     const alreadyInItems = items.some((item) => item.articleId === article.id);
 
@@ -657,8 +658,8 @@ const InventoryPhysicalInterface = () => {
 
   // Afficher l'inventaire initial dans la liste des opérations (pas seulement les ajustements)
   const filteredOperations = operations.filter(
-    (op) => 
-      (op.type === "ajustement" || op.type === "inventaire_initiale") &&
+    (op) =>
+      (op.type === InventoryOperationType.AJUSTEMENT || op.type === InventoryOperationType.INVENTAIRE_INITIALE) &&
       (!selectedZoneId || op.storageZoneId === selectedZoneId)
   );
 
@@ -762,13 +763,13 @@ const InventoryPhysicalInterface = () => {
                 .sort((a, b) => {
                   // Inventaire initial en premier, puis par date
                   if (
-                    a.type === "inventaire_initiale" &&
-                    b.type !== "inventaire_initiale"
+                    a.type === InventoryOperationType.INVENTAIRE_INITIALE &&
+                    b.type !== InventoryOperationType.INVENTAIRE_INITIALE
                   )
                     return -1;
                   if (
-                    a.type !== "inventaire_initiale" &&
-                    b.type === "inventaire_initiale"
+                    a.type !== InventoryOperationType.INVENTAIRE_INITIALE &&
+                    b.type === InventoryOperationType.INVENTAIRE_INITIALE
                   )
                     return 1;
                   return (
@@ -777,7 +778,7 @@ const InventoryPhysicalInterface = () => {
                   );
                 })
                 .map((op) => {
-                  const isInitial = op.type === "inventaire_initiale";
+                  const isInitial = op.type === InventoryOperationType.INVENTAIRE_INITIALE;
                   const rowClass = isInitial
                     ? "hover:bg-blue-50 border-l-4 border-l-blue-500 bg-blue-50/30"
                     : "hover:bg-orange-50 border-l-4 border-l-orange-500 bg-orange-50/30";
@@ -793,7 +794,7 @@ const InventoryPhysicalInterface = () => {
                               : "bg-orange-100 text-orange-800 hover:bg-orange-200"
                           }
                         >
-                          {isInitial ? "Inventaire Initial" : "Ajustement"}
+                          {isInitial ? InventoryOperationType.INVENTAIRE_INITIALE : InventoryOperationType.AJUSTEMENT}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -818,7 +819,7 @@ const InventoryPhysicalInterface = () => {
                           </Button>
 
                           {/* Bouton Annuler - seulement pour les inventaires terminés */}
-                          {op.status === "completed" && (
+                          {op.status ===InventoryOperationStatus.COMPLETED && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -830,7 +831,7 @@ const InventoryPhysicalInterface = () => {
                           )}
 
                           {/* Boutons Modifier/Supprimer - seulement pour les brouillons */}
-                          {op.status === "draft" && (
+                          {op.status === InventoryOperationStatus.DRAFT && (
                             <>
                               <Button
                                 variant="outline"
@@ -912,7 +913,7 @@ const InventoryPhysicalInterface = () => {
                 <Select
                   value={selectedZoneId?.toString() || ""}
                   onValueChange={(value) => setSelectedZoneId(parseInt(value))}
-                  disabled={currentOperation?.status !== "draft" || isViewing}
+                  disabled={currentOperation?.status !== InventoryOperationStatus.DRAFT|| isViewing}
                 >
                   <SelectTrigger className="w-64">
                     <SelectValue placeholder="Sélectionner une zone de stockage" />
@@ -955,7 +956,7 @@ const InventoryPhysicalInterface = () => {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 resize-none"
                   rows={2}
                   placeholder="Motif obligatoire de cet inventaire..."
-                  disabled={currentOperation?.status !== "draft" || isViewing}
+                  disabled={currentOperation?.status !== InventoryOperationStatus.DRAFT || isViewing}
                   required
                 />
               </div>
@@ -984,7 +985,7 @@ const InventoryPhysicalInterface = () => {
                   <button
                     onClick={() => setShowArticleSelect(!showArticleSelect)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                    disabled={currentOperation?.status !== "draft"}
+                    disabled={currentOperation?.status !== InventoryOperationStatus.DRAFT}
                   >
                     <span>
                       {selectedArticle
@@ -1064,7 +1065,7 @@ const InventoryPhysicalInterface = () => {
                   <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">
                     Qté Réelle
                   </TableHead>
-                  {currentOperation?.type === "inventaire_initiale" && (
+                  {currentOperation?.type === InventoryOperationType.INVENTAIRE_INITIALE && (
                     <TableHead className="px-4 py-3 text-center text-sm font-semibold text-gray-700">
                       Prix d'achat
                     </TableHead>
@@ -1093,8 +1094,8 @@ const InventoryPhysicalInterface = () => {
                     );
                     const articleZone = item.article
                       ? storageZones.find(
-                          (z) => z.id === item.article.storageZoneId,
-                        )
+                        (z) => z.id === item.article.storageZoneId,
+                      )
                       : null;
                     const displayZone = zone || articleZone;
 
@@ -1139,7 +1140,7 @@ const InventoryPhysicalInterface = () => {
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <span className="text-gray-400">-</span>
-                                  {!isViewing && currentOperation?.status === "draft" && (
+                                  {!isViewing && currentOperation?.status === InventoryOperationStatus.DRAFT && (
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -1181,12 +1182,12 @@ const InventoryPhysicalInterface = () => {
                                 }
                                 min="0"
                                 className={`w-24 text-center text-sm ${item.newQuantity === 0 ? "border-red-300 bg-red-50" : ""}`}
-                                disabled={currentOperation?.status !== "draft"}
+                                disabled={currentOperation?.status !== InventoryOperationStatus.DRAFT}
                               />
                             </div>
                           )}
                         </TableCell>
-                        {currentOperation?.type === "inventaire_initiale" && (
+                        {currentOperation?.type === InventoryOperationType.INVENTAIRE_INITIALE && (
                           <TableCell className="text-center p-2">
                             {isViewing ? (
                               <span className="text-sm font-medium">
@@ -1202,7 +1203,7 @@ const InventoryPhysicalInterface = () => {
                                 min="0"
                                 step="0.01"
                                 className="w-24 text-center text-sm"
-                                disabled={currentOperation?.status !== "draft"}
+                                disabled={currentOperation?.status !== InventoryOperationStatus.DRAFT}
                               />
                             )}
                           </TableCell>
@@ -1212,7 +1213,7 @@ const InventoryPhysicalInterface = () => {
                         </TableCell>
                         {!isViewing && (
                           <TableCell className="text-center p-2">
-                            {currentOperation?.status === "draft" && (
+                            {currentOperation?.status === InventoryOperationStatus.DRAFT && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1253,7 +1254,7 @@ const InventoryPhysicalInterface = () => {
           </Button>
 
           {/* Actions d'édition - seulement en mode édition et pour les brouillons */}
-          {isEditing && currentOperation?.status === "draft" && (
+          {isEditing && currentOperation?.status === InventoryOperationStatus.DRAFT && (
             <>
               <Button
                 onClick={saveOperation}

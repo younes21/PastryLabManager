@@ -198,14 +198,14 @@ export function ProductFilter({ onFilter }: Props) {
         <div className="flex gap-2 ml-10">
             <Button
 
-                variant={active === "product" ? "default" : "outline"}
-                onClick={() => handleClick("product")}
+                variant={active === ArticleCategoryType.PRODUCT? "default" : "outline"}
+                onClick={() => handleClick(ArticleCategoryType.PRODUCT)}
             >
                 Produits
             </Button>
             <Button
-                variant={active === "ingredient" ? "default" : "outline"}
-                onClick={() => handleClick("ingredient")}
+                variant={active === ArticleCategoryType.INGREDIENT ? "default" : "outline"}
+                onClick={() => handleClick(ArticleCategoryType.INGREDIENT)}
             >
                 Ingrédients
             </Button>

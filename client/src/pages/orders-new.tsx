@@ -35,6 +35,7 @@ import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/
 import { useQuery as useQueryTanstack } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { OrdersTable } from "@/components/orders-table";
+import { ArticleCategoryType } from "@shared/constants";
 
 const orderStatusLabels = {
   draft: "Devis (brouillon)",
@@ -103,7 +104,7 @@ export default function OrdersPage() {
 
   const { data: products = [] } = useQuery<Article[]>({
     queryKey: ["/api/articles"],
-    select: (data) => data?.filter((article: Article) => article.type === "product" && article.allowSale),
+    select: (data) => data?.filter((article: Article) => article.type === ArticleCategoryType.PRODUCT && article.allowSale),
   });
 
   // Mutations
