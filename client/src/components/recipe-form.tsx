@@ -522,9 +522,14 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Informations générales</h3>
               <div className="grid grid-cols-4 gap-3">
+                <div className="flex items-center gap-4 col-span-1 row-span-2 text-xs font-bold flex-1">
+
+                  <img src={allArticles.find((a: Article) => a.id === form.watch("articleId"))?.photo || ""} alt='vérifier photo' className="w-48 h-32 object-cover rounded-lg shadow-sm" />
+
+                </div>
                 {/* Si pas de articleId, afficher le select produit */}
                 {!articleId && (
-                  <div className="col-span-2">
+                  <div className="col-span-1">
                     <Label htmlFor="articleId" className="text-xs">Produit *</Label>
                     {/* <Select
                     value={form.watch("articleId")?.toString()}
@@ -543,7 +548,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                     </SelectContent>
                   </Select> */}
                     <ProductSelectorCompact products={products} value={form.watch("articleId")?.toString()}
-                      onSelect={(value: any) => form.setValue("articleId", parseInt(value))}></ProductSelectorCompact>
+                      onSelect={(value: any) => { form.setValue("articleId", parseInt(value)); form.setValue("designation", allArticles.find((a: Article) => a.id === form.watch("articleId"))?.name || "") }}></ProductSelectorCompact>
                   </div>
                 )}
                 {/* Si articleId fourni, afficher le nom du produit en lecture seule */}
@@ -555,7 +560,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                     </span>
                   </div>
                 )}
-                <div className="col-span-2 ">
+                <div className="col-span-2">
                   <Label className="text-xs" htmlFor="designation">Désignation *</Label>
                   <Input
                     className="h-8 text-sm"
@@ -568,7 +573,14 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                     </p>
                   )}
                 </div>
-
+  <div className="flex items-center justify-center space-x-2  border border-gray-300 mt-2 border-dashed rounded-xl ">
+                  <Checkbox
+                    checked={form.watch("isSubRecipe")}
+                    onCheckedChange={(checked) => form.setValue("isSubRecipe", Boolean(checked))}
+                    data-testid="checkbox-isSubRecipe"
+                  />
+                  <Label className="text-xs">Sous-recette</Label>
+                </div>
                 <div>
                   <Label htmlFor="quantity" className="text-xs">Quantité *</Label>
                   <Input
@@ -585,14 +597,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                     Unité de l'article:  <b className="ml-2">{selectedArticle?.unit}</b></div>
                 </div>
 
-                <div className="flex items-center space-x-2 ">
-                  <Checkbox
-                    checked={form.watch("isSubRecipe")}
-                    onCheckedChange={(checked) => form.setValue("isSubRecipe", Boolean(checked))}
-                    data-testid="checkbox-isSubRecipe"
-                  />
-                  <Label className="text-xs">Sous-recette</Label>
-                </div>
+              
 
                 <div className="col-span-4">
                   <Label htmlFor="description" className="text-xs">Description</Label>
@@ -630,7 +635,7 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                       <h3 className="font-medium mb-3">Ajouter un ingrédient</h3>
                       <div className="grid grid-cols-4 gap-3 mb-3">
                         <div className="col-span-2">
-                          <Select
+                          {/* <Select
                             value={currentIngredient.articleId}
                             onValueChange={(value) => setCurrentIngredient(prev => ({ ...prev, articleId: value }))}
                             data-testid="select-ingredient-article"
@@ -659,7 +664,19 @@ export function RecipeForm({ recipe, onSubmit, onCancel, articleId }: RecipeForm
                                   </SelectItem>
                                 ))}
                             </SelectContent>
-                          </Select>
+                          </Select> */}
+                          <ProductSelectorCompact products={(allArticles as Article[])
+                            .filter((art: Article) => {
+                              if (art.type === ArticleCategoryType.INGREDIENT) return true;
+                              if (art.type === ArticleCategoryType.PRODUCT) {
+                                // On cherche une recette pour ce produit qui est une sous-recette
+                                return existingRecipes.some((rec: any) => rec.articleId === art.id && rec.isSubRecipe);
+                              }
+                              return false;
+                            })}
+
+                            value={currentIngredient.articleId}
+                            onSelect={(value: any) => setCurrentIngredient(prev => ({ ...prev, articleId: value }))}></ProductSelectorCompact>
                         </div>
                         <Input
                           placeholder="Quantité"
