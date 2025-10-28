@@ -1,15 +1,41 @@
 import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { CreditCard, Banknote, Receipt, Trash2, XCircle, Edit } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  CreditCard,
+  Banknote,
+  Receipt,
+  Trash2,
+  XCircle,
+  Edit,
+} from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -39,7 +65,12 @@ interface PaymentData {
   receivedBy?: number;
 }
 
-export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }: DeliveryPaymentModalProps) {
+export function DeliveryPaymentModal({
+  open,
+  onOpenChange,
+  delivery,
+  onSuccess,
+}: DeliveryPaymentModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [paymentData, setPaymentData] = useState<PaymentData>({
@@ -47,7 +78,7 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
     method: "cash",
     reference: "",
     notes: "",
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split("T")[0],
     receivedBy: undefined,
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -69,7 +100,9 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
   const { data: deliveryPersons = [] } = useQuery({
     queryKey: ["/api/deliveries/available-delivery-persons"],
     queryFn: async () => {
-      const response = await fetch(`/api/deliveries/available-delivery-persons`);
+      const response = await fetch(
+        `/api/deliveries/available-delivery-persons`,
+      );
       return response.json();
     },
     enabled: open,
@@ -84,7 +117,11 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
         deliveryId: delivery.id,
         clientId: delivery.clientId,
       };
-      return await apiRequest(`/api/deliveries/${delivery.id}/payments`, "POST", payloadWithIds);
+      return await apiRequest(
+        `/api/deliveries/${delivery.id}/payments`,
+        "POST",
+        payloadWithIds,
+      );
     },
     onSuccess: () => {
       refetch();
@@ -158,7 +195,7 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
       method: "cash",
       reference: "",
       notes: "",
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split("T")[0],
       receivedBy: undefined,
     });
     setIsEditing(false);
@@ -171,7 +208,9 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
       method: payment.method,
       reference: payment.reference || "",
       notes: payment.notes || "",
-      date: payment.date ? new Date(payment.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      date: payment.date
+        ? new Date(payment.date).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
       receivedBy: payment.receivedBy || undefined,
     });
     setIsEditing(true);
@@ -203,35 +242,51 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
   };
 
   // Calculate totals based on delivery, not order
-  const deliveryTotal = parseFloat(delivery?.totalTTC || "0");
+  const deliveryTotal = parseFloat(delivery?.totalTtc || "0");
   const totalPaid = existingPayments
-    .filter((p: any) => p.status !== 'CANCELLED')
-    .reduce((sum: number, payment: any) => sum + parseFloat(payment.amount || "0"), 0);
+    .filter((p: any) => p.status !== "CANCELLED")
+    .reduce(
+      (sum: number, payment: any) => sum + parseFloat(payment.amount || "0"),
+      0,
+    );
   const remainingAmount = deliveryTotal - totalPaid;
 
   const getMethodIcon = (method: string) => {
     switch (method) {
-      case "cash": return <Banknote className="h-4 w-4" />;
-      case "card": return <CreditCard className="h-4 w-4" />;
-      case "bank": return <Receipt className="h-4 w-4" />;
-      default: return <Banknote className="h-4 w-4" />;
+      case "cash":
+        return <Banknote className="h-4 w-4" />;
+      case "card":
+        return <CreditCard className="h-4 w-4" />;
+      case "bank":
+        return <Receipt className="h-4 w-4" />;
+      default:
+        return <Banknote className="h-4 w-4" />;
     }
   };
 
   const getMethodLabel = (method: string) => {
     switch (method) {
-      case "cash": return "Espèces";
-      case "card": return "Carte bancaire";
-      case "bank": return "Virement";
-      case "cheque": return "Chèque";
-      default: return method;
+      case "cash":
+        return "Espèces";
+      case "card":
+        return "Carte bancaire";
+      case "bank":
+        return "Virement";
+      case "cheque":
+        return "Chèque";
+      default:
+        return method;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "VALID":
-        return <Badge variant="default" className="bg-green-600">Validé</Badge>;
+        return (
+          <Badge variant="default" className="bg-green-600">
+            Validé
+          </Badge>
+        );
       case "PENDING":
         return <Badge variant="secondary">En attente</Badge>;
       case "CANCELLED":
@@ -256,22 +311,36 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
               {/* Informations de la livraison */}
               <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Total livraison</Label>
-                  <p className="text-lg font-semibold">{deliveryTotal.toFixed(2)} DA</p>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Total livraison
+                  </Label>
+                  <p className="text-lg font-semibold">
+                    {deliveryTotal.toFixed(2)} DA
+                  </p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Montant payé</Label>
-                  <p className="text-lg font-semibold text-green-600">{totalPaid.toFixed(2)} DA</p>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Montant payé
+                  </Label>
+                  <p className="text-lg font-semibold text-green-600">
+                    {totalPaid.toFixed(2)} DA
+                  </p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Reste à payer</Label>
-                  <p className="text-lg font-semibold text-orange-600">{remainingAmount.toFixed(2)} DA</p>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Reste à payer
+                  </Label>
+                  <p className="text-lg font-semibold text-orange-600">
+                    {remainingAmount.toFixed(2)} DA
+                  </p>
                 </div>
               </div>
 
               {/* Formulaire de paiement */}
               <div className="p-4 border rounded-lg">
-                <h3 className="font-medium mb-4">{isEditing ? "Modifier le paiement" : "Nouveau paiement"}</h3>
+                <h3 className="font-medium mb-4">
+                  {isEditing ? "Modifier le paiement" : "Nouveau paiement"}
+                </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -281,14 +350,24 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                         type="number"
                         step="0.01"
                         value={paymentData.amount || ""}
-                        onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          setPaymentData({
+                            ...paymentData,
+                            amount: parseFloat(e.target.value) || 0,
+                          })
+                        }
                         placeholder="0.00"
                         required
                       />
                     </div>
                     <div>
                       <Label htmlFor="method">Méthode de paiement *</Label>
-                      <Select value={paymentData.method} onValueChange={(value) => setPaymentData({ ...paymentData, method: value })}>
+                      <Select
+                        value={paymentData.method}
+                        onValueChange={(value) =>
+                          setPaymentData({ ...paymentData, method: value })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -329,19 +408,35 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                         id="date"
                         type="date"
                         value={paymentData.date}
-                        onChange={(e) => setPaymentData({ ...paymentData, date: e.target.value })}
+                        onChange={(e) =>
+                          setPaymentData({
+                            ...paymentData,
+                            date: e.target.value,
+                          })
+                        }
                         required
                       />
                     </div>
                     <div>
                       <Label htmlFor="receivedBy">Reçu par</Label>
-                      <Select value={paymentData.receivedBy?.toString() || ""} onValueChange={(value) => setPaymentData({ ...paymentData, receivedBy: value ? parseInt(value) : undefined })}>
+                      <Select
+                        value={paymentData.receivedBy?.toString() || ""}
+                        onValueChange={(value) =>
+                          setPaymentData({
+                            ...paymentData,
+                            receivedBy: value ? parseInt(value) : undefined,
+                          })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner un livreur" />
                         </SelectTrigger>
                         <SelectContent>
                           {deliveryPersons.map((person: any) => (
-                            <SelectItem key={person.id} value={person.id.toString()}>
+                            <SelectItem
+                              key={person.id}
+                              value={person.id.toString()}
+                            >
                               {person.firstName} {person.lastName}
                             </SelectItem>
                           ))}
@@ -355,7 +450,12 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                     <Input
                       id="reference"
                       value={paymentData.reference}
-                      onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
+                      onChange={(e) =>
+                        setPaymentData({
+                          ...paymentData,
+                          reference: e.target.value,
+                        })
+                      }
                       placeholder="N° de transaction, chèque, etc."
                     />
                   </div>
@@ -365,7 +465,12 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                     <Textarea
                       id="notes"
                       value={paymentData.notes}
-                      onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                      onChange={(e) =>
+                        setPaymentData({
+                          ...paymentData,
+                          notes: e.target.value,
+                        })
+                      }
                       placeholder="Notes sur le paiement..."
                       rows={3}
                     />
@@ -379,7 +484,11 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                       type="submit"
                       disabled={savePaymentMutation.isPending}
                     >
-                      {savePaymentMutation.isPending ? "Enregistrement..." : (isEditing ? "Mettre à jour" : "Enregistrer le paiement")}
+                      {savePaymentMutation.isPending
+                        ? "Enregistrement..."
+                        : isEditing
+                          ? "Mettre à jour"
+                          : "Enregistrer le paiement"}
                     </Button>
                   </div>
                 </form>
@@ -413,7 +522,9 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                       {existingPayments.map((payment: any) => (
                         <TableRow key={payment.id}>
                           <TableCell>
-                            {payment.date ? new Date(payment.date).toLocaleDateString() : "-"}
+                            {payment.date
+                              ? new Date(payment.date).toLocaleDateString()
+                              : "-"}
                           </TableCell>
                           <TableCell className="font-semibold">
                             {parseFloat(payment.amount).toFixed(2)} DA
@@ -425,31 +536,36 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
                             </div>
                           </TableCell>
                           <TableCell>
-                            {deliveryPersons.find((p: any) => p.id === payment.receivedBy)?.firstName || "-"}
+                            {deliveryPersons.find(
+                              (p: any) => p.id === payment.receivedBy,
+                            )?.firstName || "-"}
                           </TableCell>
                           <TableCell>{payment.reference || "-"}</TableCell>
-                          <TableCell>{getStatusBadge(payment.status || "PENDING")}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(payment.status || "PENDING")}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              {payment.status !== 'CANCELLED' && payment.status !== 'VALID' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleEdit(payment)}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleDelete(payment)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-600" />
-                                  </Button>
-                                </>
-                              )}
-                              {payment.status === 'VALID' && (
+                              {payment.status !== "CANCELLED" &&
+                                payment.status !== "VALID" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEdit(payment)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDelete(payment)}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </>
+                                )}
+                              {payment.status === "VALID" && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -477,14 +593,17 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer ce paiement de {selectedPayment?.amount} DA ?
-              Cette action est irréversible.
+              Êtes-vous sûr de vouloir supprimer ce paiement de{" "}
+              {selectedPayment?.amount} DA ? Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => selectedPayment && deletePaymentMutation.mutate(selectedPayment.id)}
+              onClick={() =>
+                selectedPayment &&
+                deletePaymentMutation.mutate(selectedPayment.id)
+              }
               className="bg-red-600 hover:bg-red-700"
             >
               Supprimer
@@ -499,14 +618,18 @@ export function DeliveryPaymentModal({ open, onOpenChange, delivery, onSuccess }
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer l'annulation</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir annuler ce paiement validé de {selectedPayment?.amount} DA ?
-              Le paiement sera marqué comme annulé mais restera dans l'historique.
+              Êtes-vous sûr de vouloir annuler ce paiement validé de{" "}
+              {selectedPayment?.amount} DA ? Le paiement sera marqué comme
+              annulé mais restera dans l'historique.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Non</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => selectedPayment && cancelPaymentMutation.mutate(selectedPayment.id)}
+              onClick={() =>
+                selectedPayment &&
+                cancelPaymentMutation.mutate(selectedPayment.id)
+              }
               className="bg-orange-600 hover:bg-orange-700"
             >
               Annuler le paiement
