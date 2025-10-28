@@ -25,7 +25,7 @@ export function DeliveryTrackingModal({ open, onOpenChange, delivery, onSuccess 
   const { data: deliveryDetails, refetch } = useQuery({
     queryKey: ["/api/deliveries", delivery?.id],
     queryFn: async () => {
-      const response = await fetch(`/api/deliveries/${delivery?.id}`);
+      const response = await fetch(`/api/deliveries/${delivery?.id}/details`);
       return response.json();
     },
     enabled: !!delivery?.id && open,

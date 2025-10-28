@@ -121,7 +121,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
     queryKey: ['delivery-details', delivery?.id, isOpen],
     queryFn: async () => {
       if (!delivery?.id) return null;
-      const response = await fetch(`/api/deliveries/${delivery.id}`);
+      const response = await fetch(`/api/deliveries/${delivery.id}/details`);
       if (!response.ok) throw new Error('Erreur lors de la récupération des détails de la livraison');
       return response.json();
     },

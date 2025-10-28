@@ -130,6 +130,7 @@ export default function DeliveriesPage() {
   const canStartDelivery = (status: InventoryOperationStatus) => status == InventoryOperationStatus.READY;
   const canDeliver = (status: InventoryOperationStatus) => status == InventoryOperationStatus.IN_PROGRESS;
   const canCancel = (status: InventoryOperationStatus) => status == InventoryOperationStatus.IN_PROGRESS || status == InventoryOperationStatus.PARTIALLY_COMPLETED || status == InventoryOperationStatus.COMPLETED;
+  const canAssignDeliveryPerson = (status: InventoryOperationStatus) => status != InventoryOperationStatus.DRAFT;
   // Récupérer le paramètre orderId de l'URL au chargement de la page
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -285,6 +286,8 @@ export default function DeliveriesPage() {
       delivery.status = del.status;
       delivery.isValidated = del.isValidated;
       delivery.validatedAt = del.validatedAt;
+      delivery.deliveryPersonId = del.deliveryPersonId;
+      if (!del.deliveryPersonId) delivery.deliveryPerson = null;
     },
     onError: (error: any) => {
       toast({
@@ -1340,8 +1343,8 @@ export default function DeliveriesPage() {
                   {!orderId && (<TableHead>Commande</TableHead>)}
 
                   <TableHead>Total TTC</TableHead>
-                  <TableHead>etat</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead>Livreur</TableHead>
                   <TableHead>Date validation</TableHead>
                   <TableHead className="hidden lg:table-cell">% de la commande</TableHead>
                   <TableHead>Actions</TableHead>
@@ -1370,7 +1373,7 @@ export default function DeliveriesPage() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-muted-foreground" />
-                              {getClientName(delivery.clientId || 0)}
+                              <b className="text-red-900">{getClientName(delivery.clientId || 0)}</b>
                             </div>
                           </TableCell>
                           <TableCell>{getOrderCode(delivery.orderId)}</TableCell>
@@ -1380,10 +1383,11 @@ export default function DeliveriesPage() {
                       <TableCell className="font-semibold">
                         {parseFloat(delivery.totalTtc || "0").toFixed(2)} DA
                       </TableCell>
-                      <TableCell>{<Badge className={delivery.isPartial ? 'bg-teal-200 text-black' : 'bg-sky-500'} >{delivery.isPartial ? 'Partielle' : 'complète'}</Badge>}</TableCell>
                       <TableCell>
                         {getStatusBadge(delivery.status)}
                       </TableCell>
+                      <TableCell><b>{delivery.deliveryPerson?.firstName} {delivery.deliveryPerson?.lastName || '-'}</b></TableCell>
+
                       <TableCell className="w-52">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -1503,9 +1507,9 @@ export default function DeliveriesPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
 
-                              <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
+                              <DropdownMenuItem disabled={!canAssignDeliveryPerson(delivery.status)}
                                 onClick={() => setAssignmentModal({ open: true, delivery })}>
-                                <User className="h-4 w-4" /> Assigner un livreur
+                                <User className="h-4 w-4" /> {delivery.deliveryPersonId ? 'Changer le' : 'Assigner un'}  livreur
                               </DropdownMenuItem>
                               <DropdownMenuItem disabled={delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.COMPLETED}
                                 onClick={() => setPackagesModal({ open: true, delivery })}>
@@ -2080,8 +2084,8 @@ export default function DeliveriesPage() {
         open={assignmentModal.open}
         onOpenChange={(open) => setAssignmentModal({ open, delivery: null })}
         delivery={assignmentModal.delivery}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+        onSuccess={async () => {
+          await fetchPageData(orderId);
         }}
       />
 
@@ -2089,8 +2093,8 @@ export default function DeliveriesPage() {
         open={packagesModal.open}
         onOpenChange={(open) => setPackagesModal({ open, delivery: null })}
         delivery={packagesModal.delivery}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+        onSuccess={async () => {
+          await fetchPageData(orderId);
         }}
       />
 
@@ -2098,8 +2102,8 @@ export default function DeliveriesPage() {
         open={trackingModal.open}
         onOpenChange={(open) => setTrackingModal({ open, delivery: null })}
         delivery={trackingModal.delivery}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+        onSuccess={async() => {
+        await fetchPageData(orderId);
         }}
       />
 
@@ -2107,8 +2111,8 @@ export default function DeliveriesPage() {
         open={paymentModal.open}
         onOpenChange={(open) => setPaymentModal({ open, delivery: null })}
         delivery={paymentModal.delivery}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/deliveries/page-data"] });
+        onSuccess={async() => {
+         await fetchPageData(orderId);
         }}
       />
     </div>

@@ -21,20 +21,44 @@ export function DeliveryAssignmentModal({ open, onOpenChange, delivery, onSucces
   const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState<string>("");
 
   // Récupérer les livreurs disponibles
-  const { data: availableDeliveryPersons = [] } = useQuery({
+  const { data: availableDeliveryPersons = [], isLoading, isError, error } = useQuery({
     queryKey: ["/api/deliveries/available-delivery-persons"],
     queryFn: async () => {
-      const response = await fetch("/api/deliveries/available-delivery-persons");
-      return response.json();
-    },enabled:false
+      try {
+        const response = await fetch("/api/deliveries/available-delivery-persons");
+        if (!response.ok) {
+          throw new Error("Erreur lors de la récupération des livreurs");
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error("Error fetching delivery persons:", error);
+        throw error;
+      }
+    },
+    enabled: open, // Only fetch when modal is open
   });
 
   // Mutation pour assigner un livreur
   const assignMutation = useMutation({
     mutationFn: async (deliveryPersonId: number) => {
-      return await apiRequest(`/api/deliveries/${delivery.id}/assign`, "PUT", {
-        deliveryPersonId,
+      if (!delivery?.id) {
+        throw new Error("ID de livraison manquant");
+      }
+      const response = await fetch(`/api/deliveries/${delivery.id}/assign`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ deliveryPersonId }),
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Erreur lors de l'assignation du livreur");
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
@@ -87,21 +111,40 @@ export function DeliveryAssignmentModal({ open, onOpenChange, delivery, onSucces
 
             <div className="space-y-2">
               <Label htmlFor="deliveryPerson">Livreur *</Label>
-              <Select value={selectedDeliveryPersonId} onValueChange={setSelectedDeliveryPersonId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un livreur" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.isArray(availableDeliveryPersons) && availableDeliveryPersons.map((person: any) => (
-                    <SelectItem key={person.id} value={person.id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        {person.firstName} {person.lastName}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isError ? (
+                <div className="text-red-500 text-sm">
+                  Erreur lors du chargement des livreurs : {(error as Error)?.message || "Erreur inconnue"}
+                </div>
+              ) : (
+                <Select 
+                  value={selectedDeliveryPersonId} 
+                  onValueChange={setSelectedDeliveryPersonId}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoading ? "Chargement..." : "Sélectionner un livreur"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDeliveryPersons.length === 0 ? (
+                      <div className="p-2 text-sm text-gray-500">Aucun livreur disponible</div>
+                    ) : (
+                      availableDeliveryPersons.map((person: any) => (
+                        <SelectItem key={person.id} value={person.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {`${person.firstName} ${person.lastName}`}
+                            {person.email && (
+                              <span className="text-xs text-gray-500">
+                                ({person.email})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">

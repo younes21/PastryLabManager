@@ -1,7 +1,7 @@
 import {
   users,
   measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
-  taxes, currencies, deliveryMethods, accountingJournals, accountingAccounts, storageZones, workStations,
+  taxes, currencies, shippingMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems,
   invoices, invoiceItems, stockReservations,
@@ -792,11 +792,11 @@ export class DatabaseStorage implements IStorage {
 
   // Delivery Methods
   async getAllDeliveryMethods(): Promise<DeliveryMethod[]> {
-    return await db.select().from(deliveryMethods);
+    return await db.select().from(shippingMethods);
   }
 
   async getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined> {
-    const [deliveryMethod] = await db.select().from(deliveryMethods).where(eq(deliveryMethods.id, id));
+    const [deliveryMethod] = await db.select().from(shippingMethods).where(eq(shippingMethods.id, id));
     return deliveryMethod || undefined;
   }
 
@@ -811,20 +811,20 @@ export class DatabaseStorage implements IStorage {
       code,
     };
 
-    const [deliveryMethod] = await db.insert(deliveryMethods).values(methodData).returning();
+    const [deliveryMethod] = await db.insert(shippingMethods).values(methodData).returning();
     return deliveryMethod;
   }
 
   async updateDeliveryMethod(id: number, updateData: Partial<InsertDeliveryMethod>): Promise<DeliveryMethod | undefined> {
-    const [deliveryMethod] = await db.update(deliveryMethods)
+    const [deliveryMethod] = await db.update(shippingMethods)
       .set(updateData)
-      .where(eq(deliveryMethods.id, id))
+      .where(eq(shippingMethods.id, id))
       .returning();
     return deliveryMethod || undefined;
   }
 
   async deleteDeliveryMethod(id: number): Promise<boolean> {
-    const result = await db.delete(deliveryMethods).where(eq(deliveryMethods.id, id));
+    const result = await db.delete(shippingMethods).where(eq(shippingMethods.id, id));
     return (result.rowCount || 0) > 0;
   }
 

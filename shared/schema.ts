@@ -9,6 +9,7 @@ import {
   AnyPgColumn,
   doublePrecision,
   check,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -115,13 +116,43 @@ export const currencies = pgTable("currencies", {
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
-export const deliveryMethods = pgTable("delivery_methods", {
+//    -------------- SHIPPING --------------
+
+export const shippingMethods = pgTable("shipping_methods", {
   id: serial("id").primaryKey(),
-  designation: text("designation").notNull(),
-  code: text("code").notNull().unique(), // LIV-000001
-  price: decimal("price", { precision: 10, scale: 2 }).default('0.00'),
+  code: text("code").notNull().unique(), // ex: "STD", "EXP"
+  name: text("name").notNull(),          // ex: "Standard", "Express"
   description: text("description"),
-  active: boolean("active").default(true),
+
+  baseCost: numeric("base_cost", { precision: 10, scale: 2 }).default("0.00"),
+  costPerKm: numeric("cost_per_km", { precision: 10, scale: 2 }).default("0.00"),
+  costPerKg: numeric("cost_per_kg", { precision: 10, scale: 2 }).default("0.00"),
+
+  externalProvider: text("external_provider"),
+  isActive: boolean("is_active").default(true),
+
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
+export const shippingZones = pgTable("shipping_zones", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // ex: "ZONE_A"
+  name: text("name").notNull(), // ex: "Alger Centre", "Blida", "Oran"
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+});
+
+export const shippingMethodRates = pgTable("shipping_method_rates", {
+  id: serial("id").primaryKey(),
+  methodId: integer("method_id").references(() => shippingMethods.id).notNull(),
+  zoneId: integer("zone_id").references(() => shippingZones.id).notNull(),
+
+  cost: numeric("cost", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("DZD"),
+
+  estimatedDays: integer("estimated_days"), // ⬅️ déplacé ici
+
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
@@ -469,7 +500,7 @@ export const insertCurrencySchema = createInsertSchema(currencies).omit({
   createdAt: true,
 });
 export const insertDeliveryMethodSchema = createInsertSchema(
-  deliveryMethods,
+  shippingMethods,
 ).omit({ id: true, code: true, createdAt: true });
 export const insertAccountingJournalSchema = createInsertSchema(
   accountingJournals,
@@ -527,7 +558,7 @@ export type Tax = typeof taxes.$inferSelect;
 export type InsertTax = z.infer<typeof insertTaxSchema>;
 export type Currency = typeof currencies.$inferSelect;
 export type InsertCurrency = z.infer<typeof insertCurrencySchema>;
-export type DeliveryMethod = typeof deliveryMethods.$inferSelect;
+export type DeliveryMethod = typeof shippingMethods.$inferSelect;
 export type InsertDeliveryMethod = z.infer<typeof insertDeliveryMethodSchema>;
 export type AccountingJournal = typeof accountingJournals.$inferSelect;
 export type InsertAccountingJournal = z.infer<
@@ -579,7 +610,7 @@ export const orders = pgTable("orders", {
   totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
   totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).default("0.00"),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
-
+  priceDiscountId: integer("price_discount_id").references(() => priceLists.id), // pour historique
   // Notes
   notes: text("notes"),
   deliveryNotes: text("delivery_notes"),
@@ -669,6 +700,14 @@ export const inventoryOperations = pgTable("inventory_operations", {
   notes: text("notes"),
   cancellationReason: text("cancellation_reason"),
   isValidated: boolean("is_validated").default(false),
+
+  // livraison
+  deliveryPersonId: integer("delivery_person_id").references(() => users.id),
+
+  shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id), // pour historique
+  shippingZoneId: integer("shipping_zone_id").references(() => shippingZones.id),// pour historique
+  shippingCost: numeric("shipping_cost", { precision: 10, scale: 2 }).default("0.00"),// pour historique
+  estimatedDays: integer("estimated_days"), // // pour historique
 
   // Audit
   createdBy: integer("created_by").references(() => users.id),
@@ -916,118 +955,16 @@ export type InsertStockReservation = z.infer<
   typeof insertStockReservationSchema
 >;
 export type StockReservation = typeof stockReservations.$inferSelect;
-// ============ LIVRAISONS ============
-
-// export const deliveries = pgTable("deliveries", {
-//   id: serial("id").primaryKey(),
-//   code: text("code").notNull().unique(), // LIV-000001
-//   orderId: integer("order_id")
-//     .references(() => orders.id)
-//     .notNull(),
-//   operationId: integer("operation_id").references(() => inventoryOperations.id), // Opération de livraison liée
-
-//   // Livreur et dates
-//   deliveryPersonId: integer("delivery_person_id").references(() => users.id),
-//   scheduledDate: timestamp("scheduled_date", { mode: "string" }),
-//   deliveredAt: timestamp("delivered_at", { mode: "string" }),
-
-//   // Statut et adresse
-//   status: text("status").notNull().default("pending"), // pending, in_transit, delivered, cancelled
-//   deliveryAddress: text("delivery_address"),
-//   deliveryNotes: text("delivery_notes"),
-
-//   // Validation et stock
-//   isValidated: boolean("is_validated").default(false), // Nouveau champ pour gérer la validation
-//   validatedAt: timestamp("validated_at", { mode: "string" }), // Date de validation
-
-//   // Colis
-//   packageCount: integer("package_count").default(1),
-//   trackingNumbers: text("tracking_numbers"), // JSON array of tracking numbers
-
-//   // Audit
-//   createdBy: integer("created_by").references(() => users.id),
-//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-//   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
-// });
-
-// export const deliveryPackages = pgTable("delivery_packages", {
-//   id: serial("id").primaryKey(),
-//   deliveryId: integer("delivery_id")
-//     .references(() => deliveries.id, { onDelete: "cascade" })
-//     .notNull(),
-//   packageNumber: text("package_number").notNull(), // COL-000001
-//   weight: decimal("weight", { precision: 8, scale: 3 }),
-//   dimensions: text("dimensions"), // LxWxH
-//   notes: text("notes"),
-//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-// });
-
-// export const deliveryItems = pgTable("delivery_items", {
-//   id: serial("id").primaryKey(),
-//   deliveryId: integer("delivery_id")
-//     .references(() => deliveries.id, { onDelete: "cascade" })
-//     .notNull(),
-//   packageId: integer("package_id").references(() => deliveryPackages.id),
-//   orderItemId: integer("order_item_id")
-//     .references(() => orderItems.id)
-//     .notNull(),
-//   articleId: integer("article_id")
-//     .references(() => articles.id)
-//     .notNull(),
-//   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
-//   notes: text("notes"),
-//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-// });
-
-// // Nouvelle table pour gérer les réservations de stock spécifiques aux livraisons
-// export const deliveryStockReservations = pgTable("delivery_stock_reservations", {
-//   id: serial("id").primaryKey(),
-//   deliveryId: integer("delivery_id")
-//     .references(() => deliveries.id, { onDelete: "cascade" })
-//     .notNull(),
-//   articleId: integer("article_id")
-//     .references(() => articles.id)
-//     .notNull(),
-//   orderItemId: integer("order_item_id")
-//     .references(() => orderItems.id)
-//     .notNull(),
-
-//   // Quantités
-//   reservedQuantity: decimal("reserved_quantity", {
-//     precision: 10,
-//     scale: 3,
-//   }).notNull(),
-//   deliveredQuantity: decimal("delivered_quantity", {
-//     precision: 10,
-//     scale: 3,
-//   }).default("0.00"),
-
-//   // Statut de la réservation
-//   status: text("status").notNull().default("reserved"), // 'reserved', 'partially_delivered', 'delivered', 'cancelled'
-
-//   // Traçabilité
-//   parentOperationId: integer("parent_operation_id").references(() => inventoryOperations.id), // Opération mère (livraison)
-
-//   // Dates
-//   reservedAt: timestamp("reserved_at", { mode: "string" }).defaultNow(),
-//   expiresAt: timestamp("expires_at", { mode: "string" }), // Expiration de la réservation
-
-//   notes: text("notes"),
-//   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-// });
-
-// ============ FACTURATION ============
 
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // FAC-000001
   orderId: integer("order_id").references(() => orders.id),
-  clientId: integer("client_id")
-    .references(() => clients.id)
-    .notNull(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  deliveryId: integer("delivery_id").references(() => inventoryOperations.id),
 
   // Statut et dates
-  status: text("status").notNull().default("draft"), // draft, sent, paid, partial, cancelled
+  status: text("status").notNull().default("draft"), // draft, sent, paid, cancelled
   issueDate: timestamp("issue_date", { mode: "string" }).defaultNow(),
   dueDate: timestamp("due_date", { mode: "string" }),
   paidAt: timestamp("paid_at", { mode: "string" }),
@@ -1036,8 +973,13 @@ export const invoices = pgTable("invoices", {
   subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).notNull(),
   totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
   totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).notNull(),
-  discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
+  extraDiscount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
   amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0.00"),
+
+  shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id), // pour historique
+  shippingZoneId: integer("shipping_zone_id").references(() => shippingZones.id),// pour historique
+  shippingTotalCost: numeric("shipping_cost", { precision: 10, scale: 2 }).default("0.00"),// pour historique
+  estimatedDays: integer("estimated_days"), // // pour historique
 
   // Adresses et notes
   billingAddress: text("billing_address"),
@@ -1060,9 +1002,7 @@ export const invoiceItems = pgTable("invoice_items", {
     .notNull(),
   articleId: integer("article_id").references(() => articles.id),
   orderItemId: integer("order_item_id").references(() => orderItems.id),
-  inventoryOperationItemId: integer("inventory_operation_item_id")
-    .references(() => inventoryOperationItems.id)
-    .notNull(), // Traçabilité vers les livraisons
+  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id).notNull(), // Traçabilité vers les livraisons
 
   description: text("description").notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
@@ -1076,9 +1016,13 @@ export const invoiceItems = pgTable("invoice_items", {
 
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
-  invoiceId: integer("invoice_id")
-    .references(() => invoices.id, { onDelete: "cascade" })
-    .notNull(),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(), // cas payement à l'avance
+  deliveryId: integer("delivery_id").references(() => inventoryOperations.id, { onDelete: "cascade" }).notNull(), // cas payement à la livraison
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(), // payement aprés livraison total ou rattaché à la fin
+ 
+  clientId: integer("client_id").references(() => clients.id),
+  receivedBy: integer("received_by").references(() => users.id), // livreur ou caisse
+
   date: timestamp("date", { mode: "string" }).defaultNow(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   method: text("method").notNull(), // cash, bank, card, cheque

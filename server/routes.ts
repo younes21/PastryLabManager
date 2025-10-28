@@ -2521,6 +2521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           statusDate: new Date().toISOString(),
           validatedAt: isDeliveryValidated ? new Date().toISOString() : null
         } as InventoryOperation;
+        if (!isDeliveryValidated) data.deliveryPersonId = null; // detach delivery person when the delivery is invalid
         const result = await storage.updateInventoryOperation(id, data);
         if (result) {
           res.json(result);
@@ -4218,6 +4219,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Récupérer toutes les livraisons avec leurs données complètes
       const deliveries = await storage.getInventoryOperationsByType(InventoryOperationType.LIVRAISON, false);
 
+      const deliveryPersons = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      }).from(users).where(eq(users.role, UserRole.LIVREUR));
+      const deliveryPersonsDict = Object.fromEntries(deliveryPersons.map(p => [p.id, p]));
+
+
       // Filtrer par orderId si fourni
       let filteredDeliveries = deliveries;
       if (orderId) {
@@ -4353,6 +4363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalOrdred: totalOrdred,
           totalDelivred: totalDelivred,
           isPartial: livraisonPartielle,
+          deliveryPerson: delivery.deliveryPersonId ? deliveryPersonsDict[delivery.deliveryPersonId] || null : null
         };
       });
 
@@ -4758,7 +4769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // });
 
   // Récupérer les détails d'une livraison avec ses items
-  app.get("/api/deliveries/:id", async (req, res) => {
+  app.get("/api/deliveries/:id/details", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
       if (isNaN(deliveryId)) {
@@ -4993,6 +5004,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error instanceof Error ? error.message : "Erreur lors de la récupération des détails" });
     }
   });
+
+  // Get available delivery persons (users with role = "livreur")
+  app.get("/api/deliveries/available-delivery-persons", async (req, res) => {
+    try {
+      const deliveryPersons = await db.query.users.findMany({
+        where: eq(users.role, UserRole.LIVREUR),
+        columns: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      });
+
+      return res.json(deliveryPersons);
+    } catch (error: any) {
+      console.error("Error fetching delivery persons:", error);
+      return res.status(500).json({
+        message: "Erreur lors de la récupération des livreurs",
+        error: error.message
+      });
+    }
+  });
+
+  // Assign a delivery person to a delivery
+  app.put("/api/deliveries/:deliveryId/assign", async (req, res) => {
+    const deliveryId = parseInt(req.params.deliveryId);
+    const { deliveryPersonId } = req.body;
+
+    if (!deliveryId || !deliveryPersonId) {
+      return res.status(400).json({
+        message: "L'ID de la livraison et l'ID du livreur sont requis"
+      });
+    }
+
+    try {
+      // Verify that the delivery person exists and is a delivery person
+      const deliveryPerson = await db.query.users.findFirst({
+        where: eq(users.id, deliveryPersonId),
+      });
+
+      if (!deliveryPerson || deliveryPerson.role !== "livreur") {
+        return res.status(404).json({
+          message: "Livreur non trouvé ou non autorisé"
+        });
+      }
+
+      // Update the delivery with the assigned delivery person
+      await db
+        .update(inventoryOperations)
+        .set({
+          deliveryPersonId: deliveryPersonId,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(inventoryOperations.id, deliveryId));
+
+      return res.json({
+        message: "Livreur assigné avec succès",
+        deliveryPersonId
+      });
+    } catch (error: any) {
+      console.error("Error assigning delivery person:", error);
+      return res.status(500).json({
+        message: "Erreur lors de l'assignation du livreur",
+        error: error.message
+      });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;
