@@ -5028,6 +5028,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get payments for a delivery
+  app.get("/api/deliveries/:deliveryId/payments", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.deliveryId);
+      const payments = await storage.getPaymentsByDelivery(deliveryId);
+      res.json(payments);
+    } catch (error: any) {
+      console.error("Error fetching delivery payments:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de la récupération des paiements" });
+    }
+  });
+
+  // Create or update a payment for a delivery
+  app.post("/api/deliveries/:deliveryId/payments", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.deliveryId);
+      const paymentData = req.body;
+
+      // Get delivery to retrieve clientId and total
+      const [delivery] = await db.select()
+        .from(inventoryOperations)
+        .where(eq(inventoryOperations.id, deliveryId));
+
+      if (!delivery) {
+        return res.status(404).json({ message: "Livraison non trouvée" });
+      }
+
+      // Prepare payment data with deliveryId and clientId auto-filled
+      const payment = {
+        ...paymentData,
+        deliveryId,
+        clientId: delivery.clientId || paymentData.clientId,
+      };
+
+      let result;
+      if (paymentData.id) {
+        // Update existing payment
+        result = await storage.updatePayment(paymentData.id, payment);
+      } else {
+        // Create new payment
+        result = await storage.createPayment(payment);
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error saving payment:", error);
+      res.status(400).json({ message: error.message || "Erreur lors de la sauvegarde du paiement" });
+    }
+  });
+
+  // Delete a payment
+  app.delete("/api/payments/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Check if payment exists
+      const payment = await storage.getPayment(id);
+      if (!payment) {
+        return res.status(404).json({ message: "Paiement non trouvé" });
+      }
+
+      // Only allow deletion of non-validated payments
+      if (payment.status === 'VALID') {
+        return res.status(400).json({ message: "Impossible de supprimer un paiement validé. Vous devez l'annuler." });
+      }
+
+      const deleted = await storage.deletePayment(id);
+      if (deleted) {
+        res.json({ message: "Paiement supprimé avec succès" });
+      } else {
+        res.status(404).json({ message: "Paiement non trouvé" });
+      }
+    } catch (error: any) {
+      console.error("Error deleting payment:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de la suppression du paiement" });
+    }
+  });
+
+  // Cancel a payment
+  app.put("/api/payments/:id/cancel", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Check if payment exists
+      const payment = await storage.getPayment(id);
+      if (!payment) {
+        return res.status(404).json({ message: "Paiement non trouvé" });
+      }
+
+      if (payment.status === 'CANCELLED') {
+        return res.status(400).json({ message: "Ce paiement est déjà annulé" });
+      }
+
+      const cancelled = await storage.cancelPayment(id);
+      res.json(cancelled);
+    } catch (error: any) {
+      console.error("Error cancelling payment:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de l'annulation du paiement" });
+    }
+  });
+
   // Assign a delivery person to a delivery
   app.put("/api/deliveries/:deliveryId/assign", async (req, res) => {
     const deliveryId = parseInt(req.params.deliveryId);

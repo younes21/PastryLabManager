@@ -4,7 +4,7 @@ import {
   taxes, currencies, shippingMethods, accountingJournals, accountingAccounts, storageZones, workStations,
   suppliers, clients, recipes, recipeIngredients, recipeOperations,
   orders, orderItems, inventoryOperations, inventoryOperationItems,
-  invoices, invoiceItems, stockReservations,
+  invoices, invoiceItems, payments, stockReservations,
   lots,
 
   type User, type InsertUser,
@@ -249,11 +249,13 @@ export interface IStorage {
   getPayment(id: number): Promise<Payment | undefined>;
   getPaymentsByInvoice(invoiceId: number): Promise<Payment[]>;
   getPaymentsByClient(clientId: number): Promise<Payment[]>;
+  getPaymentsByDelivery(deliveryId: number): Promise<Payment[]>;
   getOutstandingPayments(): Promise<any[]>;
   getPaymentStatistics(): Promise<any>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: number, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
   deletePayment(id: number): Promise<boolean>;
+  cancelPayment(id: number): Promise<Payment | undefined>;
 
   // ============ GESTION AVANCEE DES STOCKS ============
 
@@ -301,9 +303,6 @@ export class DatabaseStorage implements IStorage {
   updateInvoiceStatus(id: number): Promise<Invoice | undefined> {
     throw new Error("Method not implemented.");
   }
-  getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
-    throw new Error("Method not implemented.");
-  }
   createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
     throw new Error("Method not implemented.");
   }
@@ -320,30 +319,6 @@ export class DatabaseStorage implements IStorage {
     throw new Error("Method not implemented.");
   }
   generateInvoiceCode(): Promise<string> {
-    throw new Error("Method not implemented.");
-  }
-  getAllPayments(): Promise<Payment[]> {
-    throw new Error("Method not implemented.");
-  }
-  getPayment(id: number): Promise<Payment | undefined> {
-    throw new Error("Method not implemented.");
-  }
-  getPaymentsByClient(clientId: number): Promise<Payment[]> {
-    throw new Error("Method not implemented.");
-  }
-  getOutstandingPayments(): Promise<any[]> {
-    throw new Error("Method not implemented.");
-  }
-  getPaymentStatistics(): Promise<any> {
-    throw new Error("Method not implemented.");
-  }
-  createPayment(payment: InsertPayment): Promise<Payment> {
-    throw new Error("Method not implemented.");
-  }
-  updatePayment(id: number, payment: Partial<InsertPayment>): Promise<Payment | undefined> {
-    throw new Error("Method not implemented.");
-  }
-  deletePayment(id: number): Promise<boolean> {
     throw new Error("Method not implemented.");
   }
 
@@ -2738,6 +2713,68 @@ export class DatabaseStorage implements IStorage {
   async deleteInvoiceItem(id: number): Promise<boolean> {
     const result = await db.delete(invoiceItems).where(eq(invoiceItems.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Payments
+  async getAllPayments(): Promise<Payment[]> {
+    return await db.select().from(payments).orderBy(desc(payments.createdAt));
+  }
+
+  async getPayment(id: number): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment || undefined;
+  }
+
+  async getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.invoiceId, invoiceId))
+      .orderBy(desc(payments.date));
+  }
+
+  async getPaymentsByClient(clientId: number): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.clientId, clientId))
+      .orderBy(desc(payments.date));
+  }
+
+  async getPaymentsByDelivery(deliveryId: number): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.deliveryId, deliveryId))
+      .orderBy(desc(payments.date));
+  }
+
+  async getOutstandingPayments(): Promise<any[]> {
+    return [];
+  }
+
+  async getPaymentStatistics(): Promise<any> {
+    return {};
+  }
+
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const [payment] = await db.insert(payments).values(insertPayment).returning();
+    return payment;
+  }
+
+  async updatePayment(id: number, updateData: Partial<InsertPayment>): Promise<Payment | undefined> {
+    const [payment] = await db.update(payments)
+      .set(updateData)
+      .where(eq(payments.id, id))
+      .returning();
+    return payment || undefined;
+  }
+
+  async deletePayment(id: number): Promise<boolean> {
+    const result = await db.delete(payments).where(eq(payments.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async cancelPayment(id: number): Promise<Payment | undefined> {
+    const [payment] = await db.update(payments)
+      .set({ status: 'CANCELLED' })
+      .where(eq(payments.id, id))
+      .returning();
+    return payment || undefined;
   }
 
   // ============ ACHATS VIA INVENTORY (aucune table purchase_*) ============

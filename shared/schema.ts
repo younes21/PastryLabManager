@@ -121,12 +121,16 @@ export const currencies = pgTable("currencies", {
 export const shippingMethods = pgTable("shipping_methods", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // ex: "STD", "EXP"
-  name: text("name").notNull(),          // ex: "Standard", "Express"
+  name: text("name").notNull(), // ex: "Standard", "Express"
   description: text("description"),
 
   baseCost: numeric("base_cost", { precision: 10, scale: 2 }).default("0.00"),
-  costPerKm: numeric("cost_per_km", { precision: 10, scale: 2 }).default("0.00"),
-  costPerKg: numeric("cost_per_kg", { precision: 10, scale: 2 }).default("0.00"),
+  costPerKm: numeric("cost_per_km", { precision: 10, scale: 2 }).default(
+    "0.00",
+  ),
+  costPerKg: numeric("cost_per_kg", { precision: 10, scale: 2 }).default(
+    "0.00",
+  ),
 
   externalProvider: text("external_provider"),
   isActive: boolean("is_active").default(true),
@@ -145,8 +149,12 @@ export const shippingZones = pgTable("shipping_zones", {
 
 export const shippingMethodRates = pgTable("shipping_method_rates", {
   id: serial("id").primaryKey(),
-  methodId: integer("method_id").references(() => shippingMethods.id).notNull(),
-  zoneId: integer("zone_id").references(() => shippingZones.id).notNull(),
+  methodId: integer("method_id")
+    .references(() => shippingMethods.id)
+    .notNull(),
+  zoneId: integer("zone_id")
+    .references(() => shippingZones.id)
+    .notNull(),
 
   cost: numeric("cost", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").default("DZD"),
@@ -615,8 +623,6 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   deliveryNotes: text("delivery_notes"),
 
-
-
   // Audit
   createdBy: integer("created_by").references(() => users.id),
   validatedBy: integer("validated_by").references(() => users.id),
@@ -665,7 +671,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
   status: text("status").notNull().default("draft"), // draft, pending, ready, completed, cancelled, etc.
   statusDate: timestamp("status_date", { mode: "string" }), // date etat
 
-  reason: text("reason"),  //  rebut fabrication , rebut livraion , retour livraison ....
+  reason: text("reason"), //  rebut fabrication , rebut livraion , retour livraison ....
   // Références
   supplierId: integer("supplier_id").references(() => suppliers.id), // si réception
   clientId: integer("client_id").references(() => clients.id), // si livraison
@@ -674,7 +680,7 @@ export const inventoryOperations = pgTable("inventory_operations", {
     (): AnyPgColumn => inventoryOperations.id,
   ),
   storageZoneId: integer("storage_zone_id").references(() => storageZones.id),
-  operatorId: integer("operator_id").references(() => users.id),// preprateur
+  operatorId: integer("operator_id").references(() => users.id), // preprateur
 
   // Dates
   scheduledDate: timestamp("scheduled_date", { mode: "string" }), // preparation
@@ -704,9 +710,15 @@ export const inventoryOperations = pgTable("inventory_operations", {
   // livraison
   deliveryPersonId: integer("delivery_person_id").references(() => users.id),
 
-  shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id), // pour historique
-  shippingZoneId: integer("shipping_zone_id").references(() => shippingZones.id),// pour historique
-  shippingCost: numeric("shipping_cost", { precision: 10, scale: 2 }).default("0.00"),// pour historique
+  shippingMethodId: integer("shipping_method_id").references(
+    () => shippingMethods.id,
+  ), // pour historique
+  shippingZoneId: integer("shipping_zone_id").references(
+    () => shippingZones.id,
+  ), // pour historique
+  shippingCost: numeric("shipping_cost", { precision: 10, scale: 2 }).default(
+    "0.00",
+  ), // pour historique
   estimatedDays: integer("estimated_days"), // // pour historique
 
   // Audit
@@ -734,10 +746,22 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
   unitCost: decimal("unit_cost", { precision: 12, scale: 2 }).default("0.00"), // coût d’achat
   totalCost: decimal("total_cost", { precision: 12, scale: 2 }).default("0.00"),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0.00"),
-  taxAmountCost: decimal("tax_amount_cost", { precision: 12, scale: 2 }).default("0.00"),
-  unitPriceSale: decimal("unit_price_sale", { precision: 12, scale: 3 }).default("0.000"), // prix de vente (si vente)
-  totalPriceSale: decimal("total_price_sale", { precision: 12, scale: 3, }).default("0.000"), // prix de vente (si vente)
-  taxAmountSale: decimal("tax_amount_sale", { precision: 12, scale: 3, }).default("0.000"), // prix de vente (si vente)
+  taxAmountCost: decimal("tax_amount_cost", {
+    precision: 12,
+    scale: 2,
+  }).default("0.00"),
+  unitPriceSale: decimal("unit_price_sale", {
+    precision: 12,
+    scale: 3,
+  }).default("0.000"), // prix de vente (si vente)
+  totalPriceSale: decimal("total_price_sale", {
+    precision: 12,
+    scale: 3,
+  }).default("0.000"), // prix de vente (si vente)
+  taxAmountSale: decimal("tax_amount_sale", {
+    precision: 12,
+    scale: 3,
+  }).default("0.000"), // prix de vente (si vente)
 
   // Traçabilité
   lotId: integer("lot_id").references(() => lots.id),
@@ -753,8 +777,7 @@ export const inventoryOperationItems = pgTable("inventory_operation_items", {
     () => storageZones.id,
   ),
 
-  reason: text("reason"),  //  rebut fabrication , rebut livraion , retour livraison ....
-
+  reason: text("reason"), //  rebut fabrication , rebut livraion , retour livraison ....
 
   // Suivi
   lineStatus: text("line_status").default("pending"), // pending, delivered, cancelled
@@ -807,45 +830,62 @@ export const lots = pgTable("lots", {
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
-
-
 // Table pour les réservations de stock (pour les commandes et préparations)
-export const stockReservations = pgTable("stock_reservations", {
-  id: serial("id").primaryKey(),
-  articleId: integer("article_id")
-    .references(() => articles.id)
-    .notNull(),
+export const stockReservations = pgTable(
+  "stock_reservations",
+  {
+    id: serial("id").primaryKey(),
+    articleId: integer("article_id")
+      .references(() => articles.id)
+      .notNull(),
 
-  // Références (peut être une commande OU une opération d'inventaire)
-  orderId: integer("order_id").references(() => orders.id), // Optionnel pour les préparations
-  orderItemId: integer("order_item_id"), // Référence à la ligne de commande
+    // Références (peut être une commande OU une opération d'inventaire)
+    orderId: integer("order_id").references(() => orders.id), // Optionnel pour les préparations
+    orderItemId: integer("order_item_id"), // Référence à la ligne de commande
 
-  inventoryOperationId: integer("inventory_operation_id").references(() => inventoryOperations.id, { onDelete: "cascade" },), // Pour les préparations
-  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id, { onDelete: "cascade" }), // Optionnel pour les préparations
-  lotId: integer("lot_id").references(() => lots.id), // Optionnel pour les préparations
-  storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Optionnel pour les préparations
+    inventoryOperationId: integer("inventory_operation_id").references(
+      () => inventoryOperations.id,
+      { onDelete: "cascade" },
+    ), // Pour les préparations
+    inventoryOperationItemId: integer("inventory_operation_item_id").references(
+      () => inventoryOperationItems.id,
+      { onDelete: "cascade" },
+    ), // Optionnel pour les préparations
+    lotId: integer("lot_id").references(() => lots.id), // Optionnel pour les préparations
+    storageZoneId: integer("storage_zone_id").references(() => storageZones.id), // Optionnel pour les préparations
 
-  status: text("status").notNull().default("reserved"), // 'reserved','completed','cancelled'
-  stateChangedAt: timestamp("state_changed_at", { mode: "string" }), // Expiration / completion de la réservation
+    status: text("status").notNull().default("reserved"), // 'reserved','completed','cancelled'
+    stateChangedAt: timestamp("state_changed_at", { mode: "string" }), // Expiration / completion de la réservation
 
-  reservedQuantity: decimal("reserved_quantity", { precision: 10, scale: 3 }).notNull(),
-  reservationType: text("reservation_type").notNull(), // 'order','delivery','production','inventory'
-  reservationDirection: text("reservation_direction").notNull(),
+    reservedQuantity: decimal("reserved_quantity", {
+      precision: 10,
+      scale: 3,
+    }).notNull(),
+    reservationType: text("reservation_type").notNull(), // 'order','delivery','production','inventory'
+    reservationDirection: text("reservation_direction").notNull(),
 
-
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
-}, (table) => [
-
-  check("chk_reserved_quantity_positive", sql`${table.reservedQuantity} > 0`),// quantité > 0
-  check("chk_status_valid", sql`${table.status} IN ('reserved','completed','cancelled')`), // statuts valides
-  check("chk_reservation_type_valid", sql`${table.reservationType} IN ('order','delivery','production','inventory')`),  // types valides
-  // directions valides
-  check("chk_reservation_direction_valid", sql`${table.reservationDirection} IN ('in','out')`),
-  // cohérence type ↔ direction
-  check(
-    "chk_reservation_direction",
-    sql`
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    check("chk_reserved_quantity_positive", sql`${table.reservedQuantity} > 0`), // quantité > 0
+    check(
+      "chk_status_valid",
+      sql`${table.status} IN ('reserved','completed','cancelled')`,
+    ), // statuts valides
+    check(
+      "chk_reservation_type_valid",
+      sql`${table.reservationType} IN ('order','delivery','production','inventory')`,
+    ), // types valides
+    // directions valides
+    check(
+      "chk_reservation_direction_valid",
+      sql`${table.reservationDirection} IN ('in','out')`,
+    ),
+    // cohérence type ↔ direction
+    check(
+      "chk_reservation_direction",
+      sql`
       (
         (${table.reservationType} = 'order'            AND ${table.reservationDirection} = 'out') OR
         (${table.reservationType} = 'delivery'         AND ${table.reservationDirection} = 'out') OR
@@ -854,9 +894,10 @@ export const stockReservations = pgTable("stock_reservations", {
         (${table.reservationType} = 'inventory'        AND ${table.reservationDirection} = 'in')  OR
         (${table.reservationType} = 'inventory'        AND ${table.reservationDirection} = 'out')
       )
-    `
-  ),
-]);
+    `,
+    ),
+  ],
+);
 
 // ============ RELATIONS ============
 
@@ -887,7 +928,6 @@ export const lotsRelations = relations(lots, ({ one }) => ({
     references: [suppliers.id],
   }),
 }));
-
 
 export const stockReservationsRelations = relations(
   stockReservations,
@@ -934,7 +974,9 @@ export const insertStockReservationSchema = createInsertSchema(
     inventoryOperationItemId: z.union([z.number(), z.null()]).optional(),
     lotId: z.union([z.number(), z.null()]).optional(),
     storageZoneId: z.union([z.number(), z.null()]).optional(),
-    reservationType: z.enum(['order', 'delivery', 'production', 'inventory']).default("order"),
+    reservationType: z
+      .enum(["order", "delivery", "production", "inventory"])
+      .default("order"),
   })
   .refine(
     (data) => {
@@ -960,7 +1002,9 @@ export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // FAC-000001
   orderId: integer("order_id").references(() => orders.id),
-  clientId: integer("client_id").references(() => clients.id).notNull(),
+  clientId: integer("client_id")
+    .references(() => clients.id)
+    .notNull(),
   deliveryId: integer("delivery_id").references(() => inventoryOperations.id),
 
   // Statut et dates
@@ -973,12 +1017,23 @@ export const invoices = pgTable("invoices", {
   subtotalHT: decimal("subtotal_ht", { precision: 10, scale: 2 }).notNull(),
   totalTax: decimal("total_tax", { precision: 10, scale: 2 }).default("0.00"),
   totalTTC: decimal("total_ttc", { precision: 10, scale: 2 }).notNull(),
-  extraDiscount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
-  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0.00"),
+  extraDiscount: decimal("discount", { precision: 10, scale: 2 }).default(
+    "0.00",
+  ),
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default(
+    "0.00",
+  ),
 
-  shippingMethodId: integer("shipping_method_id").references(() => shippingMethods.id), // pour historique
-  shippingZoneId: integer("shipping_zone_id").references(() => shippingZones.id),// pour historique
-  shippingTotalCost: numeric("shipping_cost", { precision: 10, scale: 2 }).default("0.00"),// pour historique
+  shippingMethodId: integer("shipping_method_id").references(
+    () => shippingMethods.id,
+  ), // pour historique
+  shippingZoneId: integer("shipping_zone_id").references(
+    () => shippingZones.id,
+  ), // pour historique
+  shippingTotalCost: numeric("shipping_cost", {
+    precision: 10,
+    scale: 2,
+  }).default("0.00"), // pour historique
   estimatedDays: integer("estimated_days"), // // pour historique
 
   // Adresses et notes
@@ -1002,7 +1057,9 @@ export const invoiceItems = pgTable("invoice_items", {
     .notNull(),
   articleId: integer("article_id").references(() => articles.id),
   orderItemId: integer("order_item_id").references(() => orderItems.id),
-  inventoryOperationItemId: integer("inventory_operation_item_id").references(() => inventoryOperationItems.id).notNull(), // Traçabilité vers les livraisons
+  inventoryOperationItemId: integer("inventory_operation_item_id")
+    .references(() => inventoryOperationItems.id)
+    .notNull(), // Traçabilité vers les livraisons
 
   description: text("description").notNull(),
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
@@ -1016,10 +1073,10 @@ export const invoiceItems = pgTable("invoice_items", {
 
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
-  orderId: integer("order_id").references(() => orders.id, { onDelete: "cascade" }).notNull(), // cas payement à l'avance
-  deliveryId: integer("delivery_id").references(() => inventoryOperations.id, { onDelete: "cascade" }).notNull(), // cas payement à la livraison
-  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }).notNull(), // payement aprés livraison total ou rattaché à la fin
- 
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "cascade" }), // cas payement à l'avance
+  deliveryId: integer("delivery_id").references(() => inventoryOperations.id, { onDelete: "cascade" }), // cas payement à la livraison
+  invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }), // payement aprés livraison total ou rattaché à la fin
+
   clientId: integer("client_id").references(() => clients.id),
   receivedBy: integer("received_by").references(() => users.id), // livreur ou caisse
 
@@ -1029,6 +1086,7 @@ export const payments = pgTable("payments", {
   reference: text("reference"), // n° transaction, chèque, etc.
   notes: text("notes"),
 
+  status: text("status").default("PENDING"), // VALID, CANCELLED, PENDING, REFUNDED
   createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
@@ -1142,8 +1200,6 @@ export const updateInventoryOperationWithItemsSchema = z.object({
     .min(1, "Au moins un article est requis."),
 });
 
-
-
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true,
   code: true,
@@ -1198,55 +1254,45 @@ export type InsertAccountingEntryLine = z.infer<
 
 // ============ ADDITIONAL RELATIONS ============
 
-export const invoicesRelations = relations(
-  invoices,
-  ({ one, many }) => ({
-    client: one(clients, {
-      fields: [invoices.clientId],
-      references: [clients.id],
-    }),
-    order: one(orders, {
-      fields: [invoices.orderId],
-      references: [orders.id],
-    }),
-    items: many(invoiceItems),
-    payments: many(payments),
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  client: one(clients, {
+    fields: [invoices.clientId],
+    references: [clients.id],
   }),
-);
-
-export const invoiceItemsRelations = relations(
-  invoiceItems,
-  ({ one }) => ({
-    invoice: one(invoices, {
-      fields: [invoiceItems.invoiceId],
-      references: [invoices.id],
-    }),
-    article: one(articles, {
-      fields: [invoiceItems.articleId],
-      references: [articles.id],
-    }),
-    orderItem: one(orderItems, {
-      fields: [invoiceItems.orderItemId],
-      references: [orderItems.id],
-    }),
-    inventoryOperationItem: one(inventoryOperationItems, {
-      fields: [invoiceItems.inventoryOperationItemId],
-      references: [inventoryOperationItems.id],
-    }),
+  order: one(orders, {
+    fields: [invoices.orderId],
+    references: [orders.id],
   }),
-);
+  items: many(invoiceItems),
+  payments: many(payments),
+}));
 
-export const paymentsRelations = relations(
-  payments,
-  ({ one }) => ({
-    invoice: one(invoices, {
-      fields: [payments.invoiceId],
-      references: [invoices.id],
-    }),
-    createdBy: one(users, {
-      fields: [payments.createdBy],
-      references: [users.id],
-    }),
+export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [invoiceItems.invoiceId],
+    references: [invoices.id],
   }),
-);
+  article: one(articles, {
+    fields: [invoiceItems.articleId],
+    references: [articles.id],
+  }),
+  orderItem: one(orderItems, {
+    fields: [invoiceItems.orderItemId],
+    references: [orderItems.id],
+  }),
+  inventoryOperationItem: one(inventoryOperationItems, {
+    fields: [invoiceItems.inventoryOperationItemId],
+    references: [inventoryOperationItems.id],
+  }),
+}));
 
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [payments.invoiceId],
+    references: [invoices.id],
+  }),
+  createdBy: one(users, {
+    fields: [payments.createdBy],
+    references: [users.id],
+  }),
+}));
