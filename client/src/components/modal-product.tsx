@@ -5,9 +5,10 @@ import {
     DialogContent,
     DialogTitle,
     DialogBody,
+    DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Search, Delete, LayoutGrid, RotateCcw, Package, Utensils } from "lucide-react";
+import { Search, Delete, LayoutGrid, RotateCcw, Package, Utensils, X, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Article } from "@shared/schema";
 import { ArticleCategoryType } from "@shared/constants";
@@ -78,6 +79,12 @@ export default function ProductSelectorCompact({
             <DialogContent className="max-w-6xl max-h-[100vh] flex flex-col p-4">
                 <DialogTitle className="sr-only">Sélection de produit</DialogTitle>
                 <DialogBody>
+                    <DialogClose asChild>
+                        <button className="absolute right-3 top-1 bg-slate-300 rounded-full p-1 hover:bg-slate-400">
+                            <XCircle className="w-5 h-5" />
+                        </button>
+                    </DialogClose>
+                  
                     {/* Recherche rapide */}
                     <div className="flex flex-col sm:flex-row gap-2 mb-3 w-[95%] sm:w-[70%]">
                         {/* Ligne recherche + boutons */}
@@ -198,7 +205,7 @@ export function ProductFilter({ onFilter }: Props) {
         <div className="flex gap-2 ml-10">
             <Button
 
-                variant={active === ArticleCategoryType.PRODUCT? "default" : "outline"}
+                variant={active === ArticleCategoryType.PRODUCT ? "default" : "outline"}
                 onClick={() => handleClick(ArticleCategoryType.PRODUCT)}
             >
                 Produits
