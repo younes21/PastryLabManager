@@ -2,19 +2,15 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { useRoute, useLocation } from "wouter";
-import { 
-  ArrowLeft, Package, Phone, Navigation, MapPin, Clock, 
-  CheckCircle, XCircle, AlertTriangle, Camera
-} from "lucide-react";
+import { ArrowLeft, Package, Phone, Navigation, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+// Select/Input components not used in this page
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import {  queryClient } from "@/lib/queryClient";
 
 export default function DeliveryDetailPage() {
   const { user } = useAuth();
@@ -28,15 +24,20 @@ export default function DeliveryDetailPage() {
 
   const deliveryId = parseInt(params?.id || "0");
 
+
   // Récupérer les détails de la livraison
   const { data: delivery, isLoading } = useQuery({
     queryKey: ["/api/deliveries", deliveryId],
+       queryFn: async () => {
+      const response = await fetch(`/api/deliveries/${deliveryId}/details-deliver`);
+      return response.json();
+    },
   });
 
   // Mutation pour changer le statut
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
-      return apiRequest(`/api/deliveries/${deliveryId}/status`, {
+      return fetch(`/api/deliveries/${deliveryId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ statusDeliveryPerson: newStatus }),
       });
@@ -62,7 +63,7 @@ export default function DeliveryDetailPage() {
   // Mutation pour signaler un problème
   const reportProblemMutation = useMutation({
     mutationFn: async (problemData: any) => {
-      return apiRequest(`/api/deliveries/${deliveryId}/problem`, {
+      return fetch(`/api/deliveries/${deliveryId}/problem`, {
         method: "PATCH",
         body: JSON.stringify({ deliveryPersonNote: JSON.stringify(problemData) }),
       });

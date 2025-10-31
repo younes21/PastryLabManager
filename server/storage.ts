@@ -30,7 +30,7 @@ import {
   Stock
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, sql, gt, like, getTableColumns } from "drizzle-orm";
+import { eq, desc, lt, and, sql, gt, like, getTableColumns, inArray } from "drizzle-orm";
 import camelcaseKeys from 'camelcase-keys';
 import {
   ArticleCategoryType,
@@ -2716,8 +2716,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Payments
-  async getAllPayments(): Promise<Payment[]> {
-    return await db.select().from(payments).orderBy(desc(payments.createdAt));
+  async getAllPayments(deliveryPersonId?: number): Promise<Payment[]> {
+    let query = db.select().from(payments).orderBy(desc(payments.createdAt));
+
+    if (deliveryPersonId) {
+      return await query.where(eq(payments.receivedBy, deliveryPersonId));
+    }
+
+    return await query;
   }
 
   async getPayment(id: number): Promise<Payment | undefined> {
@@ -2744,11 +2750,106 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOutstandingPayments(): Promise<any[]> {
-    return [];
+    const result = await db.execute(sql`
+      WITH payment_totals AS (
+        SELECT 
+          invoice_id,
+          COALESCE(SUM(CAST(amount AS DECIMAL)), 0) as total_paid
+        FROM payments 
+        WHERE status = 'completed'
+        GROUP BY invoice_id
+      )
+      SELECT 
+        c.id as "clientId",
+        c.code as "clientCode",
+        c.first_name as "clientName",
+        c.last_name as "clientPrenom",
+        c.company_name as "clientRaisonSociale",
+        i.id as "invoiceId",
+        i.code as "invoiceCode",
+        CAST(i.total_ttc AS DECIMAL) as "invoiceTotalTTC",
+        COALESCE(pt.total_paid, 0) as "invoiceAmountPaid",
+        CAST(i.total_ttc AS DECIMAL) - COALESCE(pt.total_paid, 0) as "outstandingAmount",
+        i.status as "invoiceStatus",
+        i.due_date as "dueDate",
+        CASE 
+          WHEN i.due_date < CURRENT_DATE THEN 
+            CAST(EXTRACT(DAY FROM CURRENT_DATE - i.due_date) AS INTEGER)
+          ELSE 0 
+        END as "daysOverdue",
+        o.code as "orderCode",
+        o.status as "orderStatus",
+        io.code as "deliveryCode",
+        io.status as "deliveryStatus"
+      FROM invoices i
+      JOIN clients c ON c.id = i.client_id
+      LEFT JOIN orders o ON o.id = i.order_id
+      LEFT JOIN inventory_operations io ON io.id = i.delivery_id
+      LEFT JOIN payment_totals pt ON pt.invoice_id = i.id
+      WHERE i.status != 'cancelled'
+      AND CAST(i.total_ttc AS DECIMAL) > COALESCE(pt.total_paid, 0)
+      ORDER BY i.due_date ASC;
+    `);
+
+    return result.rows;
   }
 
   async getPaymentStatistics(): Promise<any> {
-    return {};
+    const result = await db.execute(sql`
+      WITH current_month_invoices AS (
+        SELECT
+          COUNT(*) as total_count,
+          COALESCE(SUM(CAST(total_ttc AS DECIMAL)), 0) as total_amount,
+          COALESCE(SUM(CASE WHEN status = 'paid' THEN CAST(total_ttc AS DECIMAL) ELSE 0 END), 0) as paid_amount
+        FROM invoices
+        WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
+        AND status != 'cancelled'
+      ),
+      overdue_invoices AS (
+        SELECT 
+          COUNT(*) as overdue_count,
+          COALESCE(SUM(CAST(total_ttc AS DECIMAL)), 0) as overdue_amount
+        FROM invoices
+        WHERE due_date < CURRENT_DATE
+        AND status NOT IN ('paid', 'cancelled')
+      ),
+      recent_payments AS (
+        SELECT
+          COUNT(*) as payment_count,
+          COALESCE(SUM(CAST(amount AS DECIMAL)), 0) as payment_amount
+        FROM payments
+        WHERE status = 'completed'
+        AND EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
+      )
+      SELECT
+        jsonb_build_object(
+          'totalInvoices', jsonb_build_object(
+            'count', mi.total_count,
+            'totalAmount', mi.total_amount,
+            'paidAmount', mi.paid_amount,
+            'outstandingAmount', mi.total_amount - mi.paid_amount
+          ),
+          'overdueInvoices', jsonb_build_object(
+            'count', oi.overdue_count,
+            'totalAmount', oi.overdue_amount
+          ),
+          'recentPayments', jsonb_build_object(
+            'count', rp.payment_count,
+            'totalAmount', rp.payment_amount
+          )
+        ) as statistics
+      FROM current_month_invoices mi
+      CROSS JOIN overdue_invoices oi
+      CROSS JOIN recent_payments rp;
+    `);
+
+    return result.rows[0]?.statistics || {
+      totalInvoices: { count: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0 },
+      overdueInvoices: { count: 0, totalAmount: 0 },
+      recentPayments: { count: 0, totalAmount: 0 }
+    };
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
@@ -3185,7 +3286,7 @@ export class DatabaseStorage implements IStorage {
       // 6. Mettre à jour l'opération comme en cours
       const [updatedOp] = await tx.update(inventoryOperations)
         .set({
-       
+
           startedAt: new Date().toISOString(),
           status: InventoryOperationStatus.IN_PROGRESS,
         })
@@ -3457,7 +3558,7 @@ export class DatabaseStorage implements IStorage {
                   lotId: zone.lotId,
                   fromStorageZoneId: zone.zoneId,
                   reason: zone.returnReason,
-                 notes: `Rebut: ${zone.returnReason}`
+                  notes: `Rebut: ${zone.returnReason}`
                 });
 
                 // Créer une réservation de stock entrante pour le retour
@@ -3515,6 +3616,15 @@ export class DatabaseStorage implements IStorage {
     const nextNumber = (count[0]?.count || 0) + 1;
     return `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
   }
+
+  private getClientsByIds(ids: number[]) {
+    return db.select().from(clients).where(inArray(clients.id, ids));
+  }
+
+  private async getOrdersByIds(ids: number[]) {
+    return db.select().from(orders).where(inArray(orders.id, ids));
+  }
+
 }
 
 export const storage = new DatabaseStorage();

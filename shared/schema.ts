@@ -909,6 +909,15 @@ export const inventoryOperationsRelations = relations(
     items: many(inventoryOperationItems),
   }),
 );
+export const inventoryOperationItemsArticleRelations = relations(
+  inventoryOperationItems,
+  ({ one }) => ({
+    article: one(articles, {
+      fields: [inventoryOperationItems.articleId],
+      references: [articles.id],
+    }),
+  }),
+);
 
 export const inventoryOperationItemsRelations = relations(
   inventoryOperationItems,

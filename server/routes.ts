@@ -5082,7 +5082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/payments/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      
+
       // Check if payment exists
       const payment = await storage.getPayment(id);
       if (!payment) {
@@ -5110,7 +5110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/payments/:id/cancel", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      
+
       // Check if payment exists
       const payment = await storage.getPayment(id);
       if (!payment) {
@@ -5175,14 +5175,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ====================== ROUTES LIVREUR ======================
-  
+
   // Get delivery statistics for a delivery person
   app.get("/api/deliveries/stats/:userId", async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const deliveries = await db.query.inventoryOperations.findMany({
         where: and(
           eq(inventoryOperations.deliveryPersonId, userId),
@@ -5191,12 +5191,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const total = deliveries.length;
-      const delivered = deliveries.filter(d => 
+      const delivered = deliveries.filter(d =>
         d.statusDeliveryPerson === 'delivered' || d.statusDeliveryPerson === 'partially_delivered'
       ).length;
       const inProgress = deliveries.filter(d => d.statusDeliveryPerson === 'in_progress').length;
       const pending = deliveries.filter(d => d.statusDeliveryPerson === 'pending' || !d.statusDeliveryPerson).length;
-      const cancelled = deliveries.filter(d => 
+      const cancelled = deliveries.filter(d =>
         d.statusDeliveryPerson === 'cancelled' || d.status === InventoryOperationStatus.CANCELLED
       ).length;
 
@@ -5211,29 +5211,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliveries/livreur/:userId", async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
-      
+
       const deliveries = await db.query.inventoryOperations.findMany({
         where: and(
           eq(inventoryOperations.deliveryPersonId, userId),
           eq(inventoryOperations.type, InventoryOperationType.LIVRAISON),
         ),
-        with: {
-          items: {
-            with: {
-              article: true,
-            },
-          },
-        },
       });
 
       // Get additional data for each delivery
       const deliveriesWithDetails = await Promise.all(
         deliveries.map(async (delivery) => {
-          const client = delivery.clientId 
+          const client = delivery.clientId
             ? await storage.getClient(delivery.clientId)
             : null;
-          
-          const order = delivery.orderId 
+
+          const order = delivery.orderId
             ? await storage.getOrder(delivery.orderId)
             : null;
 
@@ -5253,18 +5246,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get delivery details
-  app.get("/api/deliveries/:id", async (req, res) => {
+  app.get("/api/deliveries/:id/details-deliver", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      
+
       const delivery = await db.query.inventoryOperations.findFirst({
         where: eq(inventoryOperations.id, deliveryId),
         with: {
           items: {
             with: {
-              article: true,
-            },
-          },
+              article:true
+            }
+          }
         },
       });
 
@@ -5272,11 +5265,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Delivery not found" });
       }
 
-      const client = delivery.clientId 
+      const client = delivery.clientId
         ? await storage.getClient(delivery.clientId)
         : null;
-      
-      const order = delivery.orderId 
+
+      const order = delivery.orderId
         ? await storage.getOrder(delivery.orderId)
         : null;
 
@@ -5295,12 +5288,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/deliveries/:id/status", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      
+
       // Validate request body
       const statusSchema = z.object({
         statusDeliveryPerson: z.enum(['pending', 'in_progress', 'delivered', 'partially_delivered', 'cancelled']),
       });
-      
+
       const { statusDeliveryPerson } = statusSchema.parse(req.body);
 
       await db
@@ -5327,12 +5320,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/deliveries/:id/problem", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      
+
       // Validate request body
       const problemSchema = z.object({
         deliveryPersonNote: z.string().min(1, "Note is required").max(5000, "Note is too long"),
       });
-      
+
       const { deliveryPersonNote } = problemSchema.parse(req.body);
 
       await db
@@ -5357,32 +5350,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payments/livreur/:userId", async (req, res) => {
     try {
       const userId = parseInt(req.params.userId);
-      
+
       // Get all payments where the delivery is assigned to this user
-      const payments = await storage.getAllPayments();
-      
+      const payments = await storage.getAllPayments(userId);
+
       const paymentsWithDetails = await Promise.all(
         payments.map(async (payment) => {
-          if (!payment.deliveryOperationId) return null;
-          
+
+
           const delivery = await db.query.inventoryOperations.findFirst({
-            where: eq(inventoryOperations.id, payment.deliveryOperationId),
+            where: payment.deliveryId ? eq(inventoryOperations.id, payment.deliveryId) : undefined,
             with: {
-              items: {
-                with: {
-                  article: true,
-                },
-              },
+              items: true
             },
           });
 
           if (!delivery || delivery.deliveryPersonId !== userId) return null;
 
-          const client = delivery.clientId 
+          const client = delivery.clientId
             ? await storage.getClient(delivery.clientId)
             : null;
-          
-          const order = delivery.orderId 
+
+          const order = delivery.orderId
             ? await storage.getOrder(delivery.orderId)
             : null;
 
@@ -5409,20 +5398,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/payments/:id/confirm", async (req, res) => {
     try {
       const paymentId = parseInt(req.params.id);
-      
+
       // Validate request body
       const paymentConfirmSchema = z.object({
-        confirmedByDeliver: z.boolean(),
-        confirmationDate: z.string().nullable().optional(),
-        deliveredAmount: z.number().positive().optional().nullable(),
+        status: z.string(),
+        notes: z.string().nullable().optional(),
+        amount: z.string(),
       });
-      
-      const { confirmedByDeliver, confirmationDate, deliveredAmount } = paymentConfirmSchema.parse(req.body);
+
+      const { status, notes, amount } = paymentConfirmSchema.parse(req.body);
 
       await storage.updatePayment(paymentId, {
-        confirmedByDeliver,
-        confirmationDate,
-        deliveredAmount,
+        status,
+        notes,
+        amount,
       });
 
       res.json({ message: "Payment updated successfully" });

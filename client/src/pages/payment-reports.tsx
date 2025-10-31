@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
+import {
   BarChart3,
-  TrendingUp, 
+  TrendingUp,
   TrendingDown,
   DollarSign,
   Users,
@@ -79,7 +79,7 @@ interface ClientSummary {
 
 export default function PaymentReports() {
   usePageTitle("Rapports de Règlements");
-  
+
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -135,17 +135,17 @@ export default function PaymentReports() {
         acc[clientId].invoiceCount += 1;
         return acc;
       }, {} as Record<number, ClientSummary>);
-      
+
       return Object.values(clients);
     },
     enabled: outstandingPayments.length > 0,
   });
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount?: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'DZD'
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const getStatusBadge = (status: string) => {
@@ -156,7 +156,7 @@ export default function PaymentReports() {
       partial: { label: "Partiel", variant: "outline" as const },
       cancelled: { label: "Annulée", variant: "destructive" as const },
     };
-    
+
     const config = statusConfig[status as keyof typeof statusConfig] || { label: status, variant: "secondary" as const };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
@@ -236,7 +236,7 @@ export default function PaymentReports() {
                 onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Date de fin</label>
               <Input
@@ -290,10 +290,10 @@ export default function PaymentReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(statistics?.totalInvoices.totalAmount || 0)}
+              {formatCurrency(statistics?.totalInvoices?.totalAmount || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {statistics?.totalInvoices.count || 0} factures
+              {statistics?.totalInvoices?.count || 0} factures
             </p>
           </CardContent>
         </Card>
@@ -305,11 +305,11 @@ export default function PaymentReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {formatCurrency(statistics?.totalInvoices.paidAmount || 0)}
+              {formatCurrency(statistics?.totalInvoices?.paidAmount || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {statistics?.totalInvoices.totalAmount ? 
-                Math.round((statistics.totalInvoices.paidAmount / statistics.totalInvoices.totalAmount) * 100) : 0}% du CA
+              {statistics?.totalInvoices?.totalAmount ?
+                Math.round((statistics.totalInvoices?.paidAmount / statistics?.totalInvoices?.totalAmount) * 100) : 0}% du CA
             </p>
           </CardContent>
         </Card>
@@ -321,10 +321,10 @@ export default function PaymentReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(statistics?.totalInvoices.outstandingAmount || 0)}
+              {formatCurrency(statistics?.totalInvoices?.outstandingAmount || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {statistics?.overdueInvoices.count || 0} en retard
+              {statistics?.overdueInvoices?.count || 0} en retard
             </p>
           </CardContent>
         </Card>
@@ -336,8 +336,8 @@ export default function PaymentReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {statistics?.totalInvoices.totalAmount ? 
-                Math.round((statistics.totalInvoices.paidAmount / statistics.totalInvoices.totalAmount) * 100) : 0}%
+              {statistics?.totalInvoices?.totalAmount ?
+                Math.round((statistics.totalInvoices?.paidAmount / statistics?.totalInvoices?.totalAmount) * 100) : 0}%
             </div>
             <p className="text-xs text-muted-foreground">
               Paiements / Factures
@@ -347,12 +347,12 @@ export default function PaymentReports() {
       </div>
 
       {/* Alertes importantes */}
-      {statistics?.overdueInvoices.count > 0 && (
+      {statistics?.overdueInvoices?.count || 0 > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>{statistics.overdueInvoices.count}</strong> factures en retard pour un montant de{" "}
-            <strong>{formatCurrency(statistics.overdueInvoices.totalAmount)}</strong>
+            <strong>{statistics?.overdueInvoices?.count}</strong> factures en retard pour un montant de{" "}
+            <strong>{formatCurrency(statistics?.overdueInvoices?.totalAmount)}</strong>
           </AlertDescription>
         </Alert>
       )}
@@ -390,7 +390,7 @@ export default function PaymentReports() {
                   {clientSummaries.map((client) => {
                     const status = getClientPaymentStatus(client.outstandingAmount, client.totalInvoiced);
                     const StatusIcon = status.icon;
-                    
+
                     return (
                       <TableRow key={client.clientId}>
                         <TableCell>

@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  AlertTriangle, 
-  Clock, 
+import {
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  Clock,
   CheckCircle,
   Search,
   Filter,
@@ -60,7 +60,7 @@ interface OutstandingPayment {
 
 export default function PaymentDashboard() {
   usePageTitle("Tableau de Bord des Règlements");
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [overdueFilter, setOverdueFilter] = useState<string>("all");
@@ -86,26 +86,26 @@ export default function PaymentDashboard() {
 
   // Filtrage des données
   const filteredPayments = outstandingPayments.filter(payment => {
-    const matchesSearch = 
+    const matchesSearch =
       payment.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.clientCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.invoiceCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.orderCode.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === "all" || payment.invoiceStatus === statusFilter;
-    
-    const matchesOverdue = overdueFilter === "all" || 
+
+    const matchesOverdue = overdueFilter === "all" ||
       (overdueFilter === "overdue" && payment.daysOverdue > 0) ||
       (overdueFilter === "not_overdue" && payment.daysOverdue === 0);
-    
+
     return matchesSearch && matchesStatus && matchesOverdue;
   });
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount?: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'DZD'
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const getStatusBadge = (status: string) => {
@@ -116,7 +116,7 @@ export default function PaymentDashboard() {
       partial: { label: "Partiel", variant: "outline" as const },
       cancelled: { label: "Annulée", variant: "destructive" as const },
     };
-    
+
     const config = statusConfig[status as keyof typeof statusConfig] || { label: status, variant: "secondary" as const };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
@@ -170,9 +170,9 @@ export default function PaymentDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statistics?.totalInvoices.count || 0}</div>
+            <div className="text-2xl font-bold">{statistics?.totalInvoices?.count || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(statistics?.totalInvoices.totalAmount || 0)}
+              {formatCurrency(statistics?.totalInvoices?.totalAmount || 0)}
             </p>
           </CardContent>
         </Card>
@@ -184,11 +184,11 @@ export default function PaymentDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(statistics?.totalInvoices.paidAmount || 0)}
+              {formatCurrency(statistics?.totalInvoices?.paidAmount || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {statistics?.totalInvoices.totalAmount ? 
-                Math.round((statistics.totalInvoices.paidAmount / statistics.totalInvoices.totalAmount) * 100) : 0}% du total
+              {statistics?.totalInvoices?.totalAmount ?
+                Math.round((statistics.totalInvoices?.paidAmount / statistics.totalInvoices?.totalAmount) * 100) : 0}% du total
             </p>
           </CardContent>
         </Card>
@@ -200,10 +200,10 @@ export default function PaymentDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(statistics?.totalInvoices.outstandingAmount || 0)}
+              {formatCurrency(statistics?.totalInvoices?.outstandingAmount || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {statistics?.overdueInvoices.count || 0} factures en retard
+              {statistics?.overdueInvoices?.count || 0} factures en retard
             </p>
           </CardContent>
         </Card>
@@ -215,22 +215,22 @@ export default function PaymentDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {formatCurrency(statistics?.recentPayments.totalAmount || 0)}
+              {formatCurrency(statistics?.recentPayments?.totalAmount || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {statistics?.recentPayments.count || 0} paiements
+              {statistics?.recentPayments?.count || 0} paiements
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Alertes */}
-      {statistics?.overdueInvoices.count > 0 && (
+      {statistics?.overdueInvoices?.count || 0 > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>{statistics.overdueInvoices.count}</strong> factures en retard pour un montant de{" "}
-            <strong>{formatCurrency(statistics.overdueInvoices.totalAmount)}</strong>
+            <strong>{statistics?.overdueInvoices?.count}</strong> factures en retard pour un montant de{" "}
+            <strong>{formatCurrency(statistics?.overdueInvoices?.totalAmount)}</strong>
           </AlertDescription>
         </Alert>
       )}
@@ -265,7 +265,7 @@ export default function PaymentDashboard() {
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Statut</label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
