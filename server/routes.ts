@@ -5174,6 +5174,238 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ====================== ROUTES LIVREUR ======================
+  
+  // Get delivery statistics for a delivery person
+  app.get("/api/deliveries/stats/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const deliveries = await db.query.inventoryOperations.findMany({
+        where: and(
+          eq(inventoryOperations.deliveryPersonId, userId),
+          eq(inventoryOperations.type, InventoryOperationType.LIVRAISON),
+        ),
+      });
+
+      const total = deliveries.length;
+      const delivered = deliveries.filter(d => 
+        d.statusDeliveryPerson === 'delivered' || d.statusDeliveryPerson === 'partially_delivered'
+      ).length;
+      const inProgress = deliveries.filter(d => d.statusDeliveryPerson === 'in_progress').length;
+      const pending = deliveries.filter(d => d.statusDeliveryPerson === 'pending' || !d.statusDeliveryPerson).length;
+      const cancelled = deliveries.filter(d => 
+        d.statusDeliveryPerson === 'cancelled' || d.status === InventoryOperationStatus.CANCELLED
+      ).length;
+
+      res.json({ total, delivered, inProgress, pending, cancelled });
+    } catch (error) {
+      console.error("Error fetching delivery stats:", error);
+      res.status(500).json({ message: "Failed to fetch delivery stats" });
+    }
+  });
+
+  // Get deliveries for a delivery person
+  app.get("/api/deliveries/livreur/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      
+      const deliveries = await db.query.inventoryOperations.findMany({
+        where: and(
+          eq(inventoryOperations.deliveryPersonId, userId),
+          eq(inventoryOperations.type, InventoryOperationType.LIVRAISON),
+        ),
+        with: {
+          items: {
+            with: {
+              article: true,
+            },
+          },
+        },
+      });
+
+      // Get additional data for each delivery
+      const deliveriesWithDetails = await Promise.all(
+        deliveries.map(async (delivery) => {
+          const client = delivery.clientId 
+            ? await storage.getClient(delivery.clientId)
+            : null;
+          
+          const order = delivery.orderId 
+            ? await storage.getOrder(delivery.orderId)
+            : null;
+
+          return {
+            ...delivery,
+            client,
+            order,
+          };
+        })
+      );
+
+      res.json(deliveriesWithDetails);
+    } catch (error) {
+      console.error("Error fetching deliveries:", error);
+      res.status(500).json({ message: "Failed to fetch deliveries" });
+    }
+  });
+
+  // Get delivery details
+  app.get("/api/deliveries/:id", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      
+      const delivery = await db.query.inventoryOperations.findFirst({
+        where: eq(inventoryOperations.id, deliveryId),
+        with: {
+          items: {
+            with: {
+              article: true,
+            },
+          },
+        },
+      });
+
+      if (!delivery) {
+        return res.status(404).json({ message: "Delivery not found" });
+      }
+
+      const client = delivery.clientId 
+        ? await storage.getClient(delivery.clientId)
+        : null;
+      
+      const order = delivery.orderId 
+        ? await storage.getOrder(delivery.orderId)
+        : null;
+
+      res.json({
+        ...delivery,
+        client,
+        order,
+      });
+    } catch (error) {
+      console.error("Error fetching delivery:", error);
+      res.status(500).json({ message: "Failed to fetch delivery" });
+    }
+  });
+
+  // Update delivery status
+  app.patch("/api/deliveries/:id/status", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const { statusDeliveryPerson } = req.body;
+
+      await db
+        .update(inventoryOperations)
+        .set({
+          statusDeliveryPerson,
+          startedAt: statusDeliveryPerson === 'in_progress' ? new Date().toISOString() : undefined,
+          completedAt: statusDeliveryPerson === 'delivered' || statusDeliveryPerson === 'partially_delivered' ? new Date().toISOString() : undefined,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(inventoryOperations.id, deliveryId));
+
+      res.json({ message: "Status updated successfully" });
+    } catch (error) {
+      console.error("Error updating delivery status:", error);
+      res.status(500).json({ message: "Failed to update delivery status" });
+    }
+  });
+
+  // Report a problem
+  app.patch("/api/deliveries/:id/problem", async (req, res) => {
+    try {
+      const deliveryId = parseInt(req.params.id);
+      const { deliveryPersonNote } = req.body;
+
+      await db
+        .update(inventoryOperations)
+        .set({
+          deliveryPersonNote,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(inventoryOperations.id, deliveryId));
+
+      res.json({ message: "Problem reported successfully" });
+    } catch (error) {
+      console.error("Error reporting problem:", error);
+      res.status(500).json({ message: "Failed to report problem" });
+    }
+  });
+
+  // Get payments for a delivery person
+  app.get("/api/payments/livreur/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      
+      // Get all payments where the delivery is assigned to this user
+      const payments = await storage.getAllPayments();
+      
+      const paymentsWithDetails = await Promise.all(
+        payments.map(async (payment) => {
+          if (!payment.deliveryOperationId) return null;
+          
+          const delivery = await db.query.inventoryOperations.findFirst({
+            where: eq(inventoryOperations.id, payment.deliveryOperationId),
+            with: {
+              items: {
+                with: {
+                  article: true,
+                },
+              },
+            },
+          });
+
+          if (!delivery || delivery.deliveryPersonId !== userId) return null;
+
+          const client = delivery.clientId 
+            ? await storage.getClient(delivery.clientId)
+            : null;
+          
+          const order = delivery.orderId 
+            ? await storage.getOrder(delivery.orderId)
+            : null;
+
+          return {
+            ...payment,
+            delivery: {
+              ...delivery,
+              client,
+              order,
+            },
+          };
+        })
+      );
+
+      const filteredPayments = paymentsWithDetails.filter(p => p !== null);
+      res.json(filteredPayments);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  // Confirm/cancel a payment
+  app.patch("/api/payments/:id/confirm", async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const { confirmedByDeliver, confirmationDate, deliveredAmount } = req.body;
+
+      await storage.updatePayment(paymentId, {
+        confirmedByDeliver,
+        confirmationDate,
+        deliveredAmount,
+      });
+
+      res.json({ message: "Payment updated successfully" });
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      res.status(500).json({ message: "Failed to update payment" });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

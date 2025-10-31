@@ -20,7 +20,12 @@ import ArticleCategories from "@/pages/article-categories";
 import PriceLists from "@/pages/price-lists";
 import ClientCatalog from "@/pages/client-catalog";
 import ClientDashboard from "@/pages/client-dashboard";
-import DeliveryDashboard from "@/pages/delivery-dashboard";
+import DeliveryHomePage from "@/pages/delivery-home";
+import DeliveryListPage from "@/pages/delivery-list";
+import DeliveryDetailPage from "@/pages/delivery-detail";
+import DeliveryMapPage from "@/pages/delivery-map";
+import DeliveryPaymentsPage from "@/pages/delivery-payments";
+import DeliveryProfilePage from "@/pages/delivery-profile";
 import Taxes from "@/pages/taxes";
 import Currencies from "@/pages/currencies";
 import DeliveryMethods from "@/pages/delivery-methods";
@@ -148,7 +153,13 @@ function ProtectedRouter() {
   if (user?.role === "livreur") {
     return (
       <Switch>
-        <Route path="/" component={DeliveryDashboard} />
+        <Route path="/" component={DeliveryHomePage} />
+        <Route path="/delivery/home" component={DeliveryHomePage} />
+        <Route path="/delivery/list" component={DeliveryListPage} />
+        <Route path="/delivery/detail/:id" component={DeliveryDetailPage} />
+        <Route path="/delivery/map" component={DeliveryMapPage} />
+        <Route path="/delivery/payments" component={DeliveryPaymentsPage} />
+        <Route path="/delivery/profile" component={DeliveryProfilePage} />
         <Route component={NotFound} />
       </Switch>
     );

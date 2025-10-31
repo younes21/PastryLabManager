@@ -709,6 +709,8 @@ export const inventoryOperations = pgTable("inventory_operations", {
 
   // livraison
   deliveryPersonId: integer("delivery_person_id").references(() => users.id),
+  statusDeliveryPerson: text("status_delivery_person"), // pending, in_progress, delivered, partially_delivered, cancelled
+  deliveryPersonNote: text("delivery_person_note"), // JSON pour problèmes signalés par livreur
 
   shippingMethodId: integer("shipping_method_id").references(
     () => shippingMethods.id,

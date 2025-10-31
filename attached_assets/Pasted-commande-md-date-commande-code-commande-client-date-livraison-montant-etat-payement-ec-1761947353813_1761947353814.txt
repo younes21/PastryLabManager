@@ -1,0 +1,74 @@
+commande.md
+ date commande, code commande, client, date livraison, montant, etat payement.
+
+ **ecran accueil:**
+ objectif: permet d'afficher des stats permettant de resumé les livraisons de la journée:
+ recuperer les donner depuis: table users, table inveotry_oprations et inveotry_oprations_items
+1.  afficher detail personne
+ - nom,prenom : depuis table users (utilisateur en cours)
+
+2. afficher les infos suivantes en utilisant table inveotry_oprations type livraison avec delivery_person_id = currentUserId: 
+- nbr Total:   recuprer le total des operation de type livraison pour l'utilisateur en cours,
+- nbr Livrées: statusDeliveryPerson operation: delivered ou partially_delivered ,
+- nbr En cours: statusDeliveryPerson operation : in_progress ,
+- nbr En attente: statusDeliveryPerson operation : pending  ,
+- nbr Annulées: statusDeliveryPerson operation :cancelled || status== cancelled
+
+**ecran livraisons:**
+ objectif: permettre d'afficher la liste des livraison de la journée.
+ orderner par statusDeliveryPerson ensuite par heure livraison.
+ recuperer les donner depuis: table inveotry_oprations type livraison avec delivery_person_id = currentUserId && statusDeliveryPerson == delivered ou partially_delivered ou in_progress ou pending ou annulé
+
+afficher les info suivantes:
+1. entete avec recherche rapide avec code commande, code livraison, nom client (firstname, lastname, sinon companyName)
+2. afficher la liste des livraisons comme elle existe deja ainsi le details de livraison, voici les infos depuis quel champs tu doit les recuprer:
+- orderNumber: commande liée a la commande (code commande),
+- deliveryNumber: code livraison,
+- customer: client (nom,prenom sinon companyName),
+- phone: num telephone du client,
+- address: client address (address, code postal,city, wilaya ),
+- time: dateTime livraison,
+- status: status de l'admin (necessaire surtout pour afficher que cette livraison a été annulée ou livrée)
+- statusDeliveryPerson: champ statusDeliveryPerson et non pas status (
+      pending: "en attente" ,
+      in_progress: "en cours" ,
+      delivered:"Livré" ,
+      partially_delivered: livré partiellement,
+      cancelled: annulée,
+),
+// items afficher dans detail livraison:
+- items: [
+    - productName: nom du produit,
+    - quantity: quantite livrée (unité),
+    - UnitPrice: prix unitaire,
+    - Total: quantity * UnitPrice,
+     ]
+],
+- amount: le total de tout les items,
+- proof: null
+
+dans la section details de livraison:
+partie: Changer le statut: en route (IN_PROGRESS), livré (delivered), livré partiellement (partially_delivered) ,annulé (cancelled)
+
+
+-signaler un probleme: le livreur peut signaler un probleme sur la livraison en lui ouvrant une page contenant:
+- description du probleme (obligatoire),
+- peut selectionner des articles (depuis la liste des  items de la livraison) en rebut : article, motif, qté
+- peut selectionner des article (depuis la liste des  items de la livraison) retour: article, motif, qté
+- verifier rebut + total < qté livrée aussi si rebut + retour == qté livrée => annulé
+- boutton soumettre dans deliveryPersonNote (json)
+
+**il faut noter que le status que le livreur peut changer est le champ dans la table inventory_opration: statusDeliveryPerson et non pas status**
+
+**ecran Carte** 
+
+**ecran Payement** 
+objectif: permettre de regler les payements des clients
+1. en haut, un champ text filtre permettant de filtrer par (firstname, lastname, sinon companyName, code commande, code livraison)
+2. afficher les payements affecté a cet livreur (received_by=currentUserId) ordonné par etat (laissé ceux encaissé en bas)
+afficher les info suivantes:
+- card pour total: Total encaissé +  En attente
+- pour chaque payement afficher: code commande, code livraison, client (firstname, lastname, sinon companyName), motant,delivredAmount (input par defaut == motant), bouton confirmer/annuler qui change confirmedByDeliver=true/false + confirmationDate set now/null
+
+**ecran Profile** 
+-afficher les infos du user + deconnection
