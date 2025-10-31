@@ -5295,7 +5295,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/deliveries/:id/status", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      const { statusDeliveryPerson } = req.body;
+      
+      // Validate request body
+      const statusSchema = z.object({
+        statusDeliveryPerson: z.enum(['pending', 'in_progress', 'delivered', 'partially_delivered', 'cancelled']),
+      });
+      
+      const { statusDeliveryPerson } = statusSchema.parse(req.body);
 
       await db
         .update(inventoryOperations)
@@ -5309,6 +5315,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Status updated successfully" });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid status value", errors: error.errors });
+      }
       console.error("Error updating delivery status:", error);
       res.status(500).json({ message: "Failed to update delivery status" });
     }
@@ -5318,7 +5327,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/deliveries/:id/problem", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      const { deliveryPersonNote } = req.body;
+      
+      // Validate request body
+      const problemSchema = z.object({
+        deliveryPersonNote: z.string().min(1, "Note is required").max(5000, "Note is too long"),
+      });
+      
+      const { deliveryPersonNote } = problemSchema.parse(req.body);
 
       await db
         .update(inventoryOperations)
@@ -5330,6 +5345,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Problem reported successfully" });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid problem note", errors: error.errors });
+      }
       console.error("Error reporting problem:", error);
       res.status(500).json({ message: "Failed to report problem" });
     }
@@ -5391,7 +5409,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/payments/:id/confirm", async (req, res) => {
     try {
       const paymentId = parseInt(req.params.id);
-      const { confirmedByDeliver, confirmationDate, deliveredAmount } = req.body;
+      
+      // Validate request body
+      const paymentConfirmSchema = z.object({
+        confirmedByDeliver: z.boolean(),
+        confirmationDate: z.string().nullable().optional(),
+        deliveredAmount: z.number().positive().optional().nullable(),
+      });
+      
+      const { confirmedByDeliver, confirmationDate, deliveredAmount } = paymentConfirmSchema.parse(req.body);
 
       await storage.updatePayment(paymentId, {
         confirmedByDeliver,
@@ -5401,6 +5427,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Payment updated successfully" });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid payment confirmation data", errors: error.errors });
+      }
       console.error("Error updating payment:", error);
       res.status(500).json({ message: "Failed to update payment" });
     }

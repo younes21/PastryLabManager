@@ -206,11 +206,22 @@ export default function DeliveryPaymentsPage() {
                         </div>
                       ) : (
                         <Button 
-                          onClick={() => confirmPaymentMutation.mutate({ 
-                            paymentId: payment.id, 
-                            confirmed: true,
-                            deliveredAmount: parseFloat(deliveredAmount || payment.amount)
-                          })}
+                          onClick={() => {
+                            const amount = parseFloat(deliveredAmount || payment.amount);
+                            if (isNaN(amount)) {
+                              toast({
+                                title: "Erreur",
+                                description: "Le montant saisi est invalide.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            confirmPaymentMutation.mutate({ 
+                              paymentId: payment.id, 
+                              confirmed: true,
+                              deliveredAmount: amount
+                            });
+                          }}
                           disabled={confirmPaymentMutation.isPending}
                           size="sm"
                           data-testid={`button-confirm-payment-${payment.id}`}
