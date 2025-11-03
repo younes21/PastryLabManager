@@ -115,6 +115,16 @@ The application uses a comprehensive schema with the following main entities:
 - Form state handled locally or with react-hook-form
 
 ### Recent Changes
+- **Payment Management System Completed (November 2025)**:
+  - Implemented comprehensive payments list page (`/payments`) with advanced filtering
+  - Added filtering by date range, payment status, client, order code, delivery code, and invoice code
+  - Built payment dashboard (`/payment-dashboard`) with complete financial analytics
+  - Dashboard sections: Du (Facturé/Commandé/Livré), Encaissements, Encours Client, Taux de Recouvrement
+  - Additional metrics: Impayés/Pertes, Retours, Remboursés, Transport, Remises
+  - Real-time statistics with automatic refresh when filters change
+  - Optimized backend API `/api/payments/dashboard/stats` with parallel database queries
+  - Responsive design with large typography for POS/management visualization
+  - Color-coded cards with left borders for easy metric identification
 - **Products CRUD Module Completed (January 2025)**:
   - Implemented comprehensive products management system with 16 detailed attributes
   - Added products database table with stock tracking, perishability, temperature conservation, and sales authorization
