@@ -3736,6 +3736,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all payments with filters (for payments page)
+  app.get("/api/payments/all/list", async (req, res) => {
+    try {
+      const { 
+        dateFrom, 
+        dateTo, 
+        status, 
+        clientId, 
+        orderId, 
+        deliveryId, 
+        invoiceId,
+        page = "1",
+        limit = "50"
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const offset = (pageNum - 1) * limitNum;
+
+      const { payments: paymentsTable, clients, orders, invoices, inventoryOperations } = await import("@shared/schema");
+
+      // Build the query with joins
+      let query = db
+        .select({
+          payment: paymentsTable,
+          client: clients,
+          order: orders,
+          invoice: invoices,
+          delivery: inventoryOperations,
+        })
+        .from(paymentsTable)
+        .leftJoin(clients, eq(paymentsTable.clientId, clients.id))
+        .leftJoin(orders, eq(paymentsTable.orderId, orders.id))
+        .leftJoin(invoices, eq(paymentsTable.invoiceId, invoices.id))
+        .leftJoin(inventoryOperations, eq(paymentsTable.deliveryId, inventoryOperations.id))
+        .$dynamic();
+
+      // Build filter conditions
+      const conditions: any[] = [];
+
+      if (dateFrom) {
+        conditions.push(sql`${paymentsTable.date} >= ${dateFrom}`);
+      }
+      if (dateTo) {
+        conditions.push(sql`${paymentsTable.date} <= ${dateTo}`);
+      }
+      if (status && status !== 'all') {
+        conditions.push(eq(paymentsTable.status, status as string));
+      }
+      if (clientId) {
+        conditions.push(eq(paymentsTable.clientId, parseInt(clientId as string)));
+      }
+      if (orderId) {
+        conditions.push(eq(paymentsTable.orderId, parseInt(orderId as string)));
+      }
+      if (deliveryId) {
+        conditions.push(eq(paymentsTable.deliveryId, parseInt(deliveryId as string)));
+      }
+      if (invoiceId) {
+        conditions.push(eq(paymentsTable.invoiceId, parseInt(invoiceId as string)));
+      }
+
+      // Apply filters
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+
+      // Order by date descending
+      query = query.orderBy(sql`${paymentsTable.date} DESC`);
+
+      // Execute query with pagination
+      const results = await query.limit(limitNum).offset(offset);
+
+      // Get total count
+      let countQuery = db
+        .select({ count: sql<number>`count(*)` })
+        .from(paymentsTable)
+        .$dynamic();
+
+      if (conditions.length > 0) {
+        countQuery = countQuery.where(and(...conditions));
+      }
+
+      const [{ count: total }] = await countQuery;
+
+      // Format the response
+      const payments = results.map(r => ({
+        ...r.payment,
+        client: r.client,
+        order: r.order,
+        invoice: r.invoice,
+        delivery: r.delivery,
+      }));
+
+      res.json({
+        payments,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: Number(total),
+          totalPages: Math.ceil(Number(total) / limitNum),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching all payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
   // Stock reservations routes
   app.post("/api/stock-reservations", async (req, res) => {
     try {
