@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, sql, and, isNull } from "drizzle-orm";
+import { eq, sql, and, isNull, SQL } from "drizzle-orm";
 import {
   insertUserSchema,
   insertMeasurementCategorySchema,
@@ -42,6 +42,10 @@ import {
   insertStockReservationSchema,
   stockReservations,
   InventoryOperation,
+  payments,
+  orders,
+  invoices,
+  clients,
 } from "@shared/schema";
 import { z } from "zod";
 import {
@@ -3842,6 +3846,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching all payments:", error);
       res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  // Payment dashboard statistics
+  app.get("/api/payments/dashboard/stats", async (req, res) => {
+    try {
+      const { dateFrom, dateTo, status, clientId, orderId, deliveryId, invoiceId } = req.query;
+
+      // Build conditions for filtering
+      const paymentConditions: SQL<unknown>[] = [];
+      const orderConditions: SQL<unknown>[] = [];
+      const invoiceConditions: SQL<unknown>[] = [];
+      const deliveryConditions: SQL<unknown>[] = [];
+
+      // Date filters
+      if (dateFrom) {
+        paymentConditions.push(sql`${payments.date} >= ${dateFrom}`);
+      }
+      if (dateTo) {
+        paymentConditions.push(sql`${payments.date} <= ${dateTo}`);
+      }
+
+      // Status filter
+      if (status && status !== 'all') {
+        paymentConditions.push(eq(payments.status, status as string));
+      }
+
+      // Client filter
+      if (clientId) {
+        const clientIdNum = parseInt(clientId as string);
+        paymentConditions.push(eq(payments.clientId, clientIdNum));
+        orderConditions.push(eq(orders.clientId, clientIdNum));
+        invoiceConditions.push(eq(invoices.clientId, clientIdNum));
+        deliveryConditions.push(eq(inventoryOperations.clientId, clientIdNum));
+      }
+
+      // Order code filter
+      if (orderId) {
+        orderConditions.push(sql`${orders.code} ILIKE ${`%${orderId}%`}`);
+      }
+
+      // Delivery code filter
+      if (deliveryId) {
+        deliveryConditions.push(sql`${inventoryOperations.code} ILIKE ${`%${deliveryId}%`}`);
+      }
+
+      // Invoice code filter
+      if (invoiceId) {
+        invoiceConditions.push(sql`${invoices.code} ILIKE ${`%${invoiceId}%`}`);
+      }
+
+      // Calculate statistics in parallel
+      const [
+        paymentsStats,
+        ordersStats,
+        invoicesStats,
+        deliveriesStats,
+        refundsStats,
+      ] = await Promise.all([
+        // Payments statistics (encaissements)
+        db.select({
+          totalEncaissements: sql<string>`COALESCE(SUM(CASE WHEN ${payments.amount} > 0 THEN ${payments.amount} ELSE 0 END), 0)`,
+          totalRembourse: sql<string>`COALESCE(SUM(CASE WHEN ${payments.amount} < 0 THEN ABS(${payments.amount}) ELSE 0 END), 0)`,
+        })
+        .from(payments)
+        .where(paymentConditions.length > 0 ? and(...paymentConditions) : undefined),
+
+        // Orders statistics (commandé)
+        db.select({
+          totalCommande: sql<string>`COALESCE(SUM(${orders.totalTTC}), 0)`,
+          nombreCommandes: sql<number>`COUNT(DISTINCT ${orders.id})`,
+        })
+        .from(orders)
+        .where(orderConditions.length > 0 ? and(...orderConditions) : undefined),
+
+        // Invoices statistics (facturé)
+        db.select({
+          totalFacture: sql<string>`COALESCE(SUM(${invoices.totalTTC}), 0)`,
+          totalTransport: sql<string>`COALESCE(SUM(${invoices.shippingTotalCost}), 0)`,
+          totalDiscount: sql<string>`COALESCE(SUM(${invoices.extraDiscount}), 0)`,
+          nombreFactures: sql<number>`COUNT(DISTINCT ${invoices.id})`,
+        })
+        .from(invoices)
+        .where(invoiceConditions.length > 0 ? and(...invoiceConditions) : undefined),
+
+        // Deliveries statistics (livré)
+        db.select({
+          totalLivre: sql<string>`COALESCE(SUM(${inventoryOperations.totalTTC}), 0)`,
+          nombreLivraisons: sql<number>`COUNT(DISTINCT ${inventoryOperations.id})`,
+        })
+        .from(inventoryOperations)
+        .where(
+          and(
+            eq(inventoryOperations.type, 'LIVRAISON'),
+            ...(deliveryConditions.length > 0 ? deliveryConditions : [])
+          )
+        ),
+
+        // Refunds/returns from inventory operations (retours et pertes)
+        db.select({
+          totalRetours: sql<string>`COALESCE(SUM(${inventoryOperations.totalTTC}), 0)`,
+        })
+        .from(inventoryOperations)
+        .where(
+          and(
+            sql`${inventoryOperations.reason} ILIKE '%retour%'`,
+            ...(deliveryConditions.length > 0 ? deliveryConditions : [])
+          )
+        ),
+      ]);
+
+      const paymentsData = paymentsStats[0];
+      const ordersData = ordersStats[0];
+      const invoicesData = invoicesStats[0];
+      const deliveriesData = deliveriesStats[0];
+      const refundsData = refundsStats[0];
+
+      // Parse numeric values
+      const totalEncaissements = parseFloat(paymentsData.totalEncaissements || '0');
+      const totalRembourse = parseFloat(paymentsData.totalRembourse || '0');
+      const totalCommande = parseFloat(ordersData.totalCommande || '0');
+      const totalFacture = parseFloat(invoicesData.totalFacture || '0');
+      const totalLivre = parseFloat(deliveriesData.totalLivre || '0');
+      const totalRetours = parseFloat(refundsData.totalRetours || '0');
+      const totalTransport = parseFloat(invoicesData.totalTransport || '0');
+      const totalDiscount = parseFloat(invoicesData.totalDiscount || '0');
+
+      // Calculate derived statistics
+      const totalLivreNet = totalLivre - totalRetours; // Livré net (après retours/pertes)
+      
+      // Encours (outstanding balances)
+      const encoursFacture = totalFacture - totalEncaissements;
+      const encoursCommande = totalCommande - totalEncaissements;
+      const encoursLivre = totalLivreNet - totalEncaissements;
+
+      // Taux de recouvrement (recovery rates)
+      const tauxRecouvrementFacture = totalFacture > 0 ? (totalEncaissements / totalFacture) * 100 : 0;
+      const tauxRecouvrementCommande = totalCommande > 0 ? (totalEncaissements / totalCommande) * 100 : 0;
+      const tauxRecouvrementLivre = totalLivreNet > 0 ? (totalEncaissements / totalLivreNet) * 100 : 0;
+
+      // Impayés (unpaid amounts - same as encours but as a separate metric)
+      const impayes = encoursFacture;
+
+      // Build response
+      res.json({
+        // Du (amounts due)
+        du: {
+          facture: totalFacture,
+          commande: totalCommande,
+          livre: totalLivreNet,
+        },
+        // Encaissements (collections)
+        encaissements: totalEncaissements,
+        
+        // Encours (outstanding balances)
+        encours: {
+          facture: encoursFacture,
+          commande: encoursCommande,
+          livre: encoursLivre,
+        },
+        
+        // Taux de recouvrement (recovery rates)
+        tauxRecouvrement: {
+          facture: tauxRecouvrementFacture,
+          commande: tauxRecouvrementCommande,
+          livre: tauxRecouvrementLivre,
+        },
+        
+        // Other metrics
+        impayes,
+        totalRetours,
+        totalRembourse,
+        totalTransport,
+        totalDiscount,
+        
+        // Counts
+        nombreCommandes: ordersData.nombreCommandes,
+        nombreLivraisons: deliveriesData.nombreLivraisons,
+        nombreFactures: invoicesData.nombreFactures,
+      });
+    } catch (error) {
+      console.error("Error calculating payment dashboard stats:", error);
+      res.status(500).json({ message: "Failed to calculate dashboard statistics" });
     }
   });
 

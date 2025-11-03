@@ -38,23 +38,27 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { closeSidebar } = useLayout();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(["Principal"]) // Principal group expanded by default
+    new Set(["Principal"]), // Principal group expanded by default
   );
 
   // Fermer la sidebar sur mobile après navigation
   const handleNavigation = () => {
-    if (window.innerWidth < 1366) { // lg breakpoint
+    if (window.innerWidth < 1366) {
+      // lg breakpoint
       closeSidebar();
     }
   };
 
   // Keep the group expanded if it contains the active item
-  const shouldGroupBeExpanded = (groupItems: typeof filteredNavItems, groupName: string) => {
+  const shouldGroupBeExpanded = (
+    groupItems: typeof filteredNavItems,
+    groupName: string,
+  ) => {
     return expandedGroups.has(groupName);
   };
 
   const toggleGroup = (groupName: string) => {
-    setExpandedGroups(prev => {
+    setExpandedGroups((prev) => {
       if (prev.has(groupName)) {
         // Si le groupe est déjà ouvert, le fermer
         const newExpanded = new Set(prev);
@@ -159,13 +163,21 @@ export function Sidebar() {
       group: "Ventes",
     },
     {
-      path: "/payment-reports",
-      label: "Rapports de Règlements",
-      icon: "fas fa-chart-bar",
-      lucideIcon: Calculator,
-      order: 2,
+      path: "/payments",
+      label: "Liste des payements",
+      icon: "fas fa-chart-line",
+      lucideIcon: DollarSign,
+      order: 1,
       group: "Ventes",
     },
+    // {
+    //   path: "/payment-reports",
+    //   label: "Rapports de Règlements",
+    //   icon: "fas fa-chart-bar",
+    //   lucideIcon: Calculator,
+    //   order: 2,
+    //   group: "Ventes",
+    // },
     {
       path: "/users",
       label: "Utilisateurs",
@@ -331,14 +343,14 @@ export function Sidebar() {
   // Filter navigation based on user role
   const filteredNavItems = navItems.filter((item) => {
     if (!user) return false;
-    if (user.role !== 'client' && item.path === '/client_orders') return false;
+    if (user.role !== "client" && item.path === "/client_orders") return false;
     switch (user.role) {
       case "client":
         return ["/", "/client_orders"].includes(item.path);
       case "livreur":
         return ["/"].includes(item.path);
       case "preparateur":
-        return [ "/preparateur-preparations"].includes(item.path);
+        return ["/preparateur-preparations"].includes(item.path);
       case "admin":
         return true;
       case "gerant":
@@ -349,17 +361,27 @@ export function Sidebar() {
   });
 
   // Group navigation items by group
-  const groupedMenu = filteredNavItems.reduce((acc, item) => {
-    const group = item.group || "Principal";
-    if (!acc[group]) {
-      acc[group] = [];
-    }
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, typeof filteredNavItems>);
+  const groupedMenu = filteredNavItems.reduce(
+    (acc, item) => {
+      const group = item.group || "Principal";
+      if (!acc[group]) {
+        acc[group] = [];
+      }
+      acc[group].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof filteredNavItems>,
+  );
 
   // Define group order for consistent display
-  const groupOrder = ["admin", "Principal", "Inventaire", "Ventes", "Achats", "Production"];
+  const groupOrder = [
+    "admin",
+    "Principal",
+    "Inventaire",
+    "Ventes",
+    "Achats",
+    "Production",
+  ];
   const sortedGroupEntries = Object.entries(groupedMenu).sort(([a], [b]) => {
     const indexA = groupOrder.indexOf(a);
     const indexB = groupOrder.indexOf(b);
@@ -369,14 +391,16 @@ export function Sidebar() {
   // Function to get display name for groups
   const getGroupDisplayName = (groupName: string) => {
     switch (groupName) {
-      case "admin": return "Administration";
-      default: return groupName;
+      case "admin":
+        return "Administration";
+      default:
+        return groupName;
     }
   };
 
   // Check if any item in a group is active
   const isGroupActive = (groupItems: typeof filteredNavItems) => {
-    return groupItems.some(item => isActive(item.path));
+    return groupItems.some((item) => isActive(item.path));
   };
 
   return (
@@ -433,8 +457,18 @@ export function Sidebar() {
             className=" xl:hidden p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
             aria-label="Fermer le menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -502,7 +536,9 @@ export function Sidebar() {
                   <p className="text-sm font-medium text-gray-900">
                     {user.firstName} {user.lastName}
                   </p>
-                  <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {user.role}
+                  </p>
                 </div>
               </div>
             </div>
@@ -519,10 +555,11 @@ export function Sidebar() {
                   {/* Group Header - Accordéon */}
                   <button
                     onClick={() => toggleGroup(groupName)}
-                    className={`w-full flex items-center justify-between px-3 py-4 border-gray-100 border bg-slate-50   text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${groupActive
+                    className={`w-full flex items-center justify-between px-3 py-4 border-gray-100 border bg-slate-50   text-sm font-semibold rounded-md transition-all duration-200 ease-in-out ${
+                      groupActive
                         ? " text-blue-700"
                         : "text-gray-700 hover:bg-blue-200"
-                      }`}
+                    }`}
                   >
                     <span className="uppercase tracking-wider text-xs">
                       {getGroupDisplayName(groupName)}
@@ -546,15 +583,19 @@ export function Sidebar() {
                         <div key={item.path}>
                           <Link href={item.path} onClick={handleNavigation}>
                             <div
-                              className={`relative flex border border-gray-50 items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${isActive(item.path)
+                              className={`relative flex border border-gray-50 items-center px-3 py-2 text-sm rounded-md transition-all duration-150 ease-in-out cursor-pointer ${
+                                isActive(item.path)
                                   ? "bg-blue-200 text-blue-700 font-semibold shadow-sm"
                                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                                }`}
+                              }`}
                             >
                               {item.lucideIcon && (
                                 <item.lucideIcon
-                                  className={`mr-3 h-4 w-4 ${isActive(item.path) ? "text-white" : "text-gray-400"
-                                    }`}
+                                  className={`mr-3 h-4 w-4 ${
+                                    isActive(item.path)
+                                      ? "text-white"
+                                      : "text-gray-400"
+                                  }`}
                                 />
                               )}
                               <span className="truncate">{item.label}</span>

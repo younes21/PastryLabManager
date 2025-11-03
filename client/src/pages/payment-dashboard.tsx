@@ -1,416 +1,537 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DollarSign,
   TrendingUp,
-  AlertTriangle,
-  Clock,
-  CheckCircle,
-  Search,
-  Filter,
-  Download,
-  Eye
+  TrendingDown,
+  Package,
+  Truck,
+  FileText,
+  RotateCcw,
+  Percent,
+  AlertCircle,
+  CreditCard,
 } from "lucide-react";
-import { usePageTitle } from "@/hooks/usePageTitle";
 
-interface PaymentStatistics {
-  totalInvoices: {
-    count: number;
-    totalAmount: number;
-    paidAmount: number;
-    outstandingAmount: number;
-  };
-  overdueInvoices: {
-    count: number;
-    totalAmount: number;
-  };
-  recentPayments: {
-    count: number;
-    totalAmount: number;
-  };
-}
+type Client = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  companyName?: string;
+};
 
-interface OutstandingPayment {
-  clientId: number;
-  clientCode: string;
-  clientName: string;
-  clientPrenom: string;
-  clientRaisonSociale: string;
-  invoiceId: number;
-  invoiceCode: string;
-  invoiceTotalTTC: number;
-  invoiceAmountPaid: number;
-  outstandingAmount: number;
-  invoiceStatus: string;
-  dueDate: string;
-  daysOverdue: number;
-  orderCode: string;
-  orderStatus: string;
-  deliveryCode: string;
-  deliveryStatus: string;
-}
+type DashboardStats = {
+  du: {
+    facture: number;
+    commande: number;
+    livre: number;
+  };
+  encaissements: number;
+  encours: {
+    facture: number;
+    commande: number;
+    livre: number;
+  };
+  tauxRecouvrement: {
+    facture: number;
+    commande: number;
+    livre: number;
+  };
+  impayes: number;
+  totalRetours: number;
+  totalRembourse: number;
+  totalTransport: number;
+  totalDiscount: number;
+  nombreCommandes: number;
+  nombreLivraisons: number;
+  nombreFactures: number;
+};
 
 export default function PaymentDashboard() {
-  usePageTitle("Tableau de Bord des Règlements");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [status, setStatus] = useState("all");
+  const [clientId, setClientId] = useState("all");
+  const [orderCode, setOrderCode] = useState("");
+  const [deliveryCode, setDeliveryCode] = useState("");
+  const [invoiceCode, setInvoiceCode] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [overdueFilter, setOverdueFilter] = useState<string>("all");
-
-  // Queries
-  const { data: statistics, isLoading: statsLoading } = useQuery<PaymentStatistics>({
-    queryKey: ["/api/payments/statistics"],
-    queryFn: async () => {
-      const response = await fetch("/api/payments/statistics");
-      if (!response.ok) throw new Error("Failed to fetch payment statistics");
-      return response.json();
-    },
+  // Fetch clients
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
   });
 
-  const { data: outstandingPayments = [], isLoading: paymentsLoading } = useQuery<OutstandingPayment[]>({
-    queryKey: ["/api/payments/outstanding"],
-    queryFn: async () => {
-      const response = await fetch("/api/payments/outstanding");
-      if (!response.ok) throw new Error("Failed to fetch outstanding payments");
-      return response.json();
-    },
+  // Build query params
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.append("dateFrom", dateFrom);
+    if (dateTo) params.append("dateTo", dateTo);
+    if (status && status !== "all") params.append("status", status);
+    if (clientId && clientId !== "all") params.append("clientId", clientId);
+    if (orderCode) params.append("orderId", orderCode);
+    if (deliveryCode) params.append("deliveryId", deliveryCode);
+    if (invoiceCode) params.append("invoiceId", invoiceCode);
+    return params.toString();
+  };
+
+  // Fetch dashboard statistics
+  const {
+    data: stats,
+    isLoading,
+    refetch,
+  } = useQuery<DashboardStats>({
+    queryKey: ["/api/payments/dashboard/stats", buildQueryParams()],
   });
 
-  // Filtrage des données
-  const filteredPayments = outstandingPayments.filter(payment => {
-    const matchesSearch =
-      payment.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.clientCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.invoiceCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.orderCode.toLowerCase().includes(searchTerm.toLowerCase());
+  // Auto-refetch when filters change
+  useEffect(() => {
+    refetch();
+  }, [dateFrom, dateTo, status, clientId, orderCode, deliveryCode, invoiceCode, refetch]);
 
-    const matchesStatus = statusFilter === "all" || payment.invoiceStatus === statusFilter;
-
-    const matchesOverdue = overdueFilter === "all" ||
-      (overdueFilter === "overdue" && payment.daysOverdue > 0) ||
-      (overdueFilter === "not_overdue" && payment.daysOverdue === 0);
-
-    return matchesSearch && matchesStatus && matchesOverdue;
-  });
-
-  const formatCurrency = (amount?: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'DZD'
-    }).format(amount || 0);
+  const resetFilters = () => {
+    setDateFrom("");
+    setDateTo("");
+    setStatus("all");
+    setClientId("all");
+    setOrderCode("");
+    setDeliveryCode("");
+    setInvoiceCode("");
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { label: "Brouillon", variant: "secondary" as const },
-      sent: { label: "Envoyée", variant: "default" as const },
-      paid: { label: "Payée", variant: "default" as const },
-      partial: { label: "Partiel", variant: "outline" as const },
-      cancelled: { label: "Annulée", variant: "destructive" as const },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || { label: status, variant: "secondary" as const };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+  const formatCurrency = (amount: number) => {
+    return `${amount.toFixed(2)} DA`;
   };
 
-  const getOverdueBadge = (daysOverdue: number) => {
-    if (daysOverdue === 0) {
-      return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />À jour</Badge>;
-    } else if (daysOverdue <= 30) {
-      return <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{daysOverdue} jours</Badge>;
-    } else {
-      return <Badge variant="destructive"><AlertTriangle className="w-3 h-3 mr-1" />{daysOverdue} jours</Badge>;
-    }
+  const formatPercent = (value: number) => {
+    return `${value.toFixed(1)}%`;
   };
 
-  if (statsLoading || paymentsLoading) {
+  if (isLoading && !stats) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Chargement des données...</p>
-          </div>
+      <div className="p-6 space-y-6">
+        <h1 className="text-3xl font-bold">Tableau de Bord Paiements</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(9)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Tableau de Bord des Règlements</h1>
-          <p className="text-muted-foreground">
-            Suivi des paiements et encours clients
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Exporter
-          </Button>
-        </div>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-dashboard-title">
+          Tableau de Bord Paiements
+        </h1>
+        <Button
+          variant="outline"
+          onClick={resetFilters}
+          data-testid="button-reset-filters"
+        >
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Réinitialiser
+        </Button>
       </div>
 
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Factures</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{statistics?.totalInvoices?.count || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {formatCurrency(statistics?.totalInvoices?.totalAmount || 0)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Montant Payé</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(statistics?.totalInvoices?.paidAmount || 0)}
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filtres</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="dateFrom">Date début</Label>
+              <Input
+                id="dateFrom"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                data-testid="input-date-from"
+              />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {statistics?.totalInvoices?.totalAmount ?
-                Math.round((statistics.totalInvoices?.paidAmount / statistics.totalInvoices?.totalAmount) * 100) : 0}% du total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Encours</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(statistics?.totalInvoices?.outstandingAmount || 0)}
+            <div className="space-y-2">
+              <Label htmlFor="dateTo">Date fin</Label>
+              <Input
+                id="dateTo"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                data-testid="input-date-to"
+              />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {statistics?.overdueInvoices?.count || 0} factures en retard
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paiements 30j</CardTitle>
-            <Clock className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {formatCurrency(statistics?.recentPayments?.totalAmount || 0)}
+            <div className="space-y-2">
+              <Label htmlFor="status">État paiement</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger id="status" data-testid="select-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  <SelectItem value="PENDING">En attente</SelectItem>
+                  <SelectItem value="VALID">Validé</SelectItem>
+                  <SelectItem value="CANCELLED">Annulé</SelectItem>
+                  <SelectItem value="REFUNDED">Remboursé</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {statistics?.recentPayments?.count || 0} paiements
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Alertes */}
-      {statistics?.overdueInvoices?.count || 0 > 0 && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>{statistics?.overdueInvoices?.count}</strong> factures en retard pour un montant de{" "}
-            <strong>{formatCurrency(statistics?.overdueInvoices?.totalAmount)}</strong>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Onglets */}
-      <Tabs defaultValue="outstanding" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="outstanding">Encours Clients</TabsTrigger>
-          <TabsTrigger value="recent">Paiements Récents</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="outstanding" className="space-y-4">
-          {/* Filtres */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Filtres
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Recherche</label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Client, facture, commande..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Statut</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous les statuts</SelectItem>
-                      <SelectItem value="sent">Envoyée</SelectItem>
-                      <SelectItem value="partial">Partiel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Échéance</label>
-                  <Select value={overdueFilter} onValueChange={setOverdueFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Toutes</SelectItem>
-                      <SelectItem value="overdue">En retard</SelectItem>
-                      <SelectItem value="not_overdue">À jour</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Actions</label>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Download className="w-4 h-4 mr-2" />
-                    Exporter
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tableau des encours */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Encours Clients ({filteredPayments.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Facture</TableHead>
-                    <TableHead>Commande</TableHead>
-                    <TableHead>Livraison</TableHead>
-                    <TableHead>Montant</TableHead>
-                    <TableHead>Payé</TableHead>
-                    <TableHead>Encours</TableHead>
-                    <TableHead>Échéance</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPayments.map((payment) => (
-                    <TableRow key={`${payment.clientId}-${payment.invoiceId}`}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {payment.clientRaisonSociale || `${payment.clientName} ${payment.clientPrenom}`}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {payment.clientCode}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{payment.invoiceCode}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {formatCurrency(payment.invoiceTotalTTC)}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{payment.orderCode}</div>
-                          <Badge variant="outline" className="text-xs">
-                            {payment.orderStatus}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{payment.deliveryCode}</div>
-                          <Badge variant="outline" className="text-xs">
-                            {payment.deliveryStatus}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(payment.invoiceTotalTTC)}
-                      </TableCell>
-                      <TableCell className="text-green-600">
-                        {formatCurrency(payment.invoiceAmountPaid)}
-                      </TableCell>
-                      <TableCell className="font-medium text-orange-600">
-                        {formatCurrency(payment.outstandingAmount)}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="text-sm">
-                            {payment.dueDate ? new Date(payment.dueDate).toLocaleDateString('fr-FR') : 'N/A'}
-                          </div>
-                          {getOverdueBadge(payment.daysOverdue)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(payment.invoiceStatus)}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+            <div className="space-y-2">
+              <Label htmlFor="client">Client</Label>
+              <Select value={clientId} onValueChange={setClientId}>
+                <SelectTrigger id="client" data-testid="select-client">
+                  <SelectValue placeholder="Tous les clients" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les clients</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.companyName ||
+                        `${client.firstName} ${client.lastName}`}
+                    </SelectItem>
                   ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="orderCode">Code commande</Label>
+              <Input
+                id="orderCode"
+                type="text"
+                placeholder="CMD-..."
+                value={orderCode}
+                onChange={(e) => setOrderCode(e.target.value)}
+                data-testid="input-order-code"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deliveryCode">Code livraison</Label>
+              <Input
+                id="deliveryCode"
+                type="text"
+                placeholder="LIV-..."
+                value={deliveryCode}
+                onChange={(e) => setDeliveryCode(e.target.value)}
+                data-testid="input-delivery-code"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invoiceCode">Code facture</Label>
+              <Input
+                id="invoiceCode"
+                type="text"
+                placeholder="FAC-..."
+                value={invoiceCode}
+                onChange={(e) => setInvoiceCode(e.target.value)}
+                data-testid="input-invoice-code"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="recent" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Paiements Récents</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Module en cours de développement...
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {stats && (
+        <>
+          {/* Dû Section */}
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4" data-testid="text-section-du">
+              Montants Dû
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Facturé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold" data-testid="text-du-facture">
+                    {formatCurrency(stats.du.facture)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Commandé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold" data-testid="text-du-commande">
+                    {formatCurrency(stats.du.commande)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-green-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    Livré (net)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold" data-testid="text-du-livre">
+                    {formatCurrency(stats.du.livre)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Encaissements */}
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4" data-testid="text-section-encaissements">
+              Encaissements
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              <Card className="border-l-4 border-l-emerald-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Total Encaissé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl md:text-4xl font-bold text-emerald-600" data-testid="text-encaissements">
+                    {formatCurrency(stats.encaissements)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Encours Section */}
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4" data-testid="text-section-encours">
+              Encours Client
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-orange-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Encours Facturé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold text-orange-600" data-testid="text-encours-facture">
+                    {formatCurrency(stats.encours.facture)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-amber-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Encours Commandé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold text-amber-600" data-testid="text-encours-commande">
+                    {formatCurrency(stats.encours.commande)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-yellow-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Encours Livré
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold text-yellow-600" data-testid="text-encours-livre">
+                    {formatCurrency(stats.encours.livre)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Taux de Recouvrement */}
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4" data-testid="text-section-taux">
+              Taux de Recouvrement
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-indigo-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Par rapport Facturé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold text-indigo-600" data-testid="text-taux-facture">
+                    {formatPercent(stats.tauxRecouvrement.facture)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-violet-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Par rapport Commandé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold text-violet-600" data-testid="text-taux-commande">
+                    {formatPercent(stats.tauxRecouvrement.commande)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-fuchsia-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Par rapport Livré
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl md:text-3xl font-bold text-fuchsia-600" data-testid="text-taux-livre">
+                    {formatPercent(stats.tauxRecouvrement.livre)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Autres Métriques */}
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4" data-testid="text-section-autres">
+              Autres Métriques
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border-l-4 border-l-red-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Impayés / Pertes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold text-red-600" data-testid="text-impayes">
+                    {formatCurrency(stats.impayes)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-rose-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <TrendingDown className="h-4 w-4" />
+                    Valeur Retours
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-retours">
+                    {formatCurrency(stats.totalRetours)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-pink-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Montant Remboursé
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-rembourse">
+                    {formatCurrency(stats.totalRembourse)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-cyan-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    Total Transport
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-transport">
+                    {formatCurrency(stats.totalTransport)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-teal-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Total Remises
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-discount">
+                    {formatCurrency(stats.totalDiscount)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-sky-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Nombre de Commandes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-nb-commandes">
+                    {stats.nombreCommandes}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-lime-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Nombre de Livraisons
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-nb-livraisons">
+                    {stats.nombreLivraisons}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-slate-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Nombre de Factures
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xl md:text-2xl font-bold" data-testid="text-nb-factures">
+                    {stats.nombreFactures}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
