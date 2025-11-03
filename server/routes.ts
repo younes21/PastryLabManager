@@ -3789,13 +3789,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(paymentsTable.clientId, parseInt(clientId as string)));
       }
       if (orderId) {
-        conditions.push(eq(paymentsTable.orderId, parseInt(orderId as string)));
+        conditions.push(sql`${orders.code} ILIKE ${`%${orderId}%`}`);
       }
       if (deliveryId) {
-        conditions.push(eq(paymentsTable.deliveryId, parseInt(deliveryId as string)));
+        conditions.push(sql`${inventoryOperations.code} ILIKE ${`%${deliveryId}%`}`);
       }
       if (invoiceId) {
-        conditions.push(eq(paymentsTable.invoiceId, parseInt(invoiceId as string)));
+        conditions.push(sql`${invoices.code} ILIKE ${`%${invoiceId}%`}`);
       }
 
       // Apply filters
