@@ -92,7 +92,13 @@ export default function PaymentDashboard() {
     isLoading,
     refetch,
   } = useQuery<DashboardStats>({
-    queryKey: ["/api/payments/dashboard/stats", buildQueryParams()],
+    queryKey: ["/api/payments/dashboard/stats{query}", buildQueryParams()],
+    queryFn: async () => {
+      const query = buildQueryParams();
+      const res = await fetch(`/api/payments/dashboard/stats?${query}`);
+      if (!res.ok) throw new Error("Erreur de chargement des stats");
+      return res.json();
+    },
   });
 
   // Auto-refetch when filters change
