@@ -26,6 +26,7 @@ import DeliveryDetailPage from "@/pages/delivery-detail";
 import DeliveryMapPage from "@/pages/delivery-map";
 import DeliveryPaymentsPage from "@/pages/delivery-payments";
 import DeliveryProfilePage from "@/pages/delivery-profile";
+import PaymentsPage from "@/pages/payments";
 import Taxes from "@/pages/taxes";
 import Currencies from "@/pages/currencies";
 import DeliveryMethods from "@/pages/delivery-methods";
@@ -217,6 +218,7 @@ function ProtectedRouter() {
       <Route path="/delivery-order" component={DeliveriesPage} />
       <Route path="/payment-dashboard" component={PaymentDashboard} />
       <Route path="/payment-reports" component={PaymentReports} />
+      <Route path="/payments" component={PaymentsPage} />
       <Route path="/client-payment-history/:clientId" component={ClientPaymentHistory} />
       <Route path="/catalog" component={ClientCatalog} />
       <Route path="/preparation" component={PreparationPage} />

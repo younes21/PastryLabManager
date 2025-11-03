@@ -30,9 +30,9 @@ type PaymentsResponse = {
 export default function PaymentsPage() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterDate, setFilterDate] = useState(FILTER_ALL);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [clientFilter, setClientFilter] = useState("all");
+  const [filterDate, setFilterDate] = useState<string>(FILTER_ALL);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [orderFilter, setOrderFilter] = useState("");
   const [deliveryFilter, setDeliveryFilter] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState("");
