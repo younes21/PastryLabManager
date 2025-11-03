@@ -816,6 +816,7 @@ export default function DeliveriesPage() {
       ready: { variant: "default" as const, label: "Prêt" },
       in_progress: { variant: "default" as const, label: "en cours" },
       completed: { variant: "default" as const, label: "Livré" },
+      partially_completed: { variant: "default" as const, label: "Livré partiellement" },
       cancelled: { variant: "destructive" as const, label: "Annulé" },
     };
 
@@ -1239,6 +1240,7 @@ export default function DeliveriesPage() {
                   <SelectItem value={InventoryOperationStatus.PENDING}>En attente</SelectItem>
                   <SelectItem value={InventoryOperationStatus.READY}>Prêt</SelectItem>
                   <SelectItem value={InventoryOperationStatus.COMPLETED}>Livré</SelectItem>
+                  <SelectItem value={InventoryOperationStatus.PARTIALLY_COMPLETED}>Livré partiellement</SelectItem>
                   <SelectItem value={InventoryOperationStatus.CANCELLED}>Annulé</SelectItem>
                 </SelectContent>
               </Select>
@@ -1528,7 +1530,7 @@ export default function DeliveriesPage() {
 
                             </DropdownMenuContent>
                           </DropdownMenu>
-                          <div >  {delivery.status === InventoryOperationStatus.CANCELLED && (
+                          <div >  {(delivery.status === InventoryOperationStatus.CANCELLED || delivery.status === InventoryOperationStatus.PARTIALLY_COMPLETED)  && (
                             <CancellationDetails
                               delivery={{
                                 ...delivery,

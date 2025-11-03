@@ -13,6 +13,7 @@ interface CancellationItem {
 
 interface CancellationData {
     returnReason?: string;
+    isCancelled: boolean;
     WasteReason?: string;
     cancellationItems: CancellationItem[];
 }

@@ -188,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           article.type === ArticleCategoryType.INGREDIENT &&
           article.managedInStock &&
           parseFloat(article.currentStock || "0") <
-            parseFloat(article.minStock || "0"),
+          parseFloat(article.minStock || "0"),
       ).length;
 
       res.json({
@@ -4353,7 +4353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ordersStats,
         invoicesStats,
         deliveriesStats,
-        refundsStats,
+        refundsStats
       ] = await Promise.all([
         // Payments statistics (encaissements)
         db
@@ -4411,15 +4411,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Refunds/returns from inventory operations (retours et pertes)
         db
           .select({
-            totalRetours: sql<string>`COALESCE(SUM(${inventoryOperations.totalTTC}), 0)`,
+            totalRetours: sql<string>`
+                          COALESCE(
+                            SUM(${inventoryOperations.totalTTC})
+                            FILTER (WHERE ${inventoryOperations.type} = ${InventoryOperationType.RETOUR_LIVRAISON}),
+                            0
+                          )
+         `,
+            totalPertes: sql<string>`
+                    COALESCE(
+                      SUM(${inventoryOperations.totalTTC})
+                      FILTER (WHERE ${inventoryOperations.type} =  ${InventoryOperationType.REBUT_LIVRAISON}),
+                      0
+                    )
+         `,
           })
           .from(inventoryOperations)
           .where(
-            and(
-              sql`${inventoryOperations.reason} ILIKE '%retour%'`,
-              ...(deliveryConditions.length > 0 ? deliveryConditions : []),
-            ),
-          ),
+            and(...(deliveryConditions.length ? deliveryConditions : [])),
+          )
       ]);
 
       const paymentsData = paymentsStats[0];
@@ -4437,16 +4447,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalFacture = parseFloat(invoicesData.totalFacture || "0");
       const totalLivre = parseFloat(deliveriesData.totalLivre || "0");
       const totalRetours = parseFloat(refundsData.totalRetours || "0");
+      const totalPertes = parseFloat(refundsData.totalPertes || "0");
       const totalTransport = parseFloat(invoicesData.totalTransport || "0");
       const totalDiscount = parseFloat(invoicesData.totalDiscount || "0");
 
       // Calculate derived statistics
-      const totalLivreNet = totalLivre - totalRetours; // Livré net (après retours/pertes)
+      const totalLivreNet = Math.max(0, totalLivre - totalRetours - totalPertes); // Livré net (après retours/pertes)
 
       // Encours (outstanding balances)
-      const encoursFacture = totalFacture - totalEncaissements;
-      const encoursCommande = totalCommande - totalEncaissements;
-      const encoursLivre = totalLivreNet - totalEncaissements;
+      const encoursFacture = Math.max(0, totalFacture - totalEncaissements);
+      const encoursCommande = Math.max(0, totalCommande - totalEncaissements);
+      const encoursLivre = Math.max(0, totalLivreNet - totalEncaissements);
 
       // Taux de recouvrement (recovery rates)
       const tauxRecouvrementFacture =
@@ -4457,7 +4468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalLivreNet > 0 ? (totalEncaissements / totalLivreNet) * 100 : 0;
 
       // Impayés (unpaid amounts - same as encours but as a separate metric)
-      const impayes = encoursFacture;
+      const impayes = totalPertes;
 
       // Build response
       res.json({
@@ -4995,12 +5006,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ...item,
                 article: article
                   ? {
-                      id: article.id,
-                      name: article.name,
-                      code: article.code,
-                      unit: article.unit,
-                      unitPrice: article.salePrice,
-                    }
+                    id: article.id,
+                    name: article.name,
+                    code: article.code,
+                    unit: article.unit,
+                    unitPrice: article.salePrice,
+                  }
                   : null,
               };
             }),
@@ -5011,22 +5022,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             items: enrichedItems,
             order: order
               ? {
-                  id: order.id,
-                  code: order.code,
-                  totalTTC: order.totalTTC,
-                  createdAt: order.createdAt,
-                  deliveryDate: order.deliveryDate,
-                }
+                id: order.id,
+                code: order.code,
+                totalTTC: order.totalTTC,
+                createdAt: order.createdAt,
+                deliveryDate: order.deliveryDate,
+              }
               : null,
             client: client
               ? {
-                  id: client.id,
-                  name:
-                    client.type === CLIENT_TYPE
-                      ? client.companyName
-                      : `${client.firstName} ${client.lastName}`,
-                  type: client.type,
-                }
+                id: client.id,
+                name:
+                  client.type === CLIENT_TYPE
+                    ? client.companyName
+                    : `${client.firstName} ${client.lastName}`,
+                type: client.type,
+              }
               : null,
           };
         }),
@@ -5095,11 +5106,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAllAvailableArticlesStock(true, excludeDeliveryIdNum),
         orderId
           ? (async () => {
-              const singleOrder = await storage.getOrder(
-                parseInt(orderId as string),
-              );
-              return singleOrder ? [singleOrder] : [];
-            })()
+            const singleOrder = await storage.getOrder(
+              parseInt(orderId as string),
+            );
+            return singleOrder ? [singleOrder] : [];
+          })()
           : storage.getAllOrders(),
       ]);
 
@@ -5805,7 +5816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/deliveries/:id/cancel-after-validation", async (req, res) => {
     try {
       const deliveryId = parseInt(req.params.id);
-      const { returnReason, WasteReason, cancellationItems } =
+      const { isCancelled, returnReason, WasteReason, cancellationItems } =
         req.body as CancellationData;
 
       if (
@@ -5821,7 +5832,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
       }
 
-      const result = await storage.cancelDeliveryAfterValidation(deliveryId, {
+      const result = await storage.cancelOrPartialDeliveryAfterValidation(deliveryId, {
+        isCancelled: isCancelled,
         returnReason: returnReason?.trim(),
         WasteReason: WasteReason?.trim(),
         cancellationItems,
@@ -5891,45 +5903,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Récupérer les items de retour
       const returnItems = returnOperation
         ? await db
-            .select({
-              inventoryOperationItems: inventoryOperationItems,
-              articles: articles,
-              storageZones: storageZones,
-              lots: lots,
-            })
-            .from(inventoryOperationItems)
-            .leftJoin(
-              articles,
-              eq(inventoryOperationItems.articleId, articles.id),
-            )
-            .leftJoin(
-              storageZones,
-              eq(inventoryOperationItems.fromStorageZoneId, storageZones.id),
-            )
-            .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
-            .where(eq(inventoryOperationItems.operationId, returnOperation.id))
+          .select({
+            inventoryOperationItems: inventoryOperationItems,
+            articles: articles,
+            storageZones: storageZones,
+            lots: lots,
+          })
+          .from(inventoryOperationItems)
+          .leftJoin(
+            articles,
+            eq(inventoryOperationItems.articleId, articles.id),
+          )
+          .leftJoin(
+            storageZones,
+            eq(inventoryOperationItems.fromStorageZoneId, storageZones.id),
+          )
+          .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
+          .where(eq(inventoryOperationItems.operationId, returnOperation.id))
         : [];
 
       // Récupérer les items de rebut
       const wasteItems = wasteOperation
         ? await db
-            .select({
-              inventoryOperationItems: inventoryOperationItems,
-              articles: articles,
-              storageZones: storageZones,
-              lots: lots,
-            })
-            .from(inventoryOperationItems)
-            .leftJoin(
-              articles,
-              eq(inventoryOperationItems.articleId, articles.id),
-            )
-            .leftJoin(
-              storageZones,
-              eq(inventoryOperationItems.fromStorageZoneId, storageZones.id),
-            )
-            .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
-            .where(eq(inventoryOperationItems.operationId, wasteOperation.id))
+          .select({
+            inventoryOperationItems: inventoryOperationItems,
+            articles: articles,
+            storageZones: storageZones,
+            lots: lots,
+          })
+          .from(inventoryOperationItems)
+          .leftJoin(
+            articles,
+            eq(inventoryOperationItems.articleId, articles.id),
+          )
+          .leftJoin(
+            storageZones,
+            eq(inventoryOperationItems.fromStorageZoneId, storageZones.id),
+          )
+          .leftJoin(lots, eq(inventoryOperationItems.lotId, lots.id))
+          .where(eq(inventoryOperationItems.operationId, wasteOperation.id))
         : [];
 
       // Construire l'objet de réponse
@@ -5941,45 +5953,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         returnOperation: returnOperation
           ? {
-              id: returnOperation.id,
-              code: returnOperation.code,
-              reason: returnOperation.notes,
-              items: returnItems.map((item) => ({
-                articleId: item.inventoryOperationItems.articleId,
-                articleName: item.articles?.name || "",
-                articlePhoto: item.articles?.photo || "",
-                articleUnit: item.articles?.unit || "",
-                zoneId: item.inventoryOperationItems.fromStorageZoneId,
-                zoneName: item.storageZones?.designation || "",
-                lotId: item.inventoryOperationItems.lotId,
-                lotName: item.lots?.code || "vide",
-                quantity: parseFloat(
-                  item.inventoryOperationItems.quantity || "0",
-                ),
-                reason: item.inventoryOperationItems.reason || "",
-              })),
-            }
+            id: returnOperation.id,
+            code: returnOperation.code,
+            reason: returnOperation.notes,
+            items: returnItems.map((item) => ({
+              articleId: item.inventoryOperationItems.articleId,
+              articleName: item.articles?.name || "",
+              articlePhoto: item.articles?.photo || "",
+              articleUnit: item.articles?.unit || "",
+              zoneId: item.inventoryOperationItems.fromStorageZoneId,
+              zoneName: item.storageZones?.designation || "",
+              lotId: item.inventoryOperationItems.lotId,
+              lotName: item.lots?.code || "vide",
+              quantity: parseFloat(
+                item.inventoryOperationItems.quantity || "0",
+              ),
+              reason: item.inventoryOperationItems.reason || "",
+            })),
+          }
           : null,
         wasteOperation: wasteOperation
           ? {
-              id: wasteOperation.id,
-              code: wasteOperation.code,
-              reason: wasteOperation.notes,
-              items: wasteItems.map((item) => ({
-                articleId: item.inventoryOperationItems.articleId,
-                articleName: item.articles?.name || "",
-                articlePhoto: item.articles?.photo || "",
-                articleUnit: item.articles?.unit || "",
-                zoneId: item.inventoryOperationItems.fromStorageZoneId,
-                zoneName: item.storageZones?.designation || "",
-                lotId: item.inventoryOperationItems.lotId,
-                lotName: item.lots?.code || "vide",
-                quantity: parseFloat(
-                  item.inventoryOperationItems.quantity || "0",
-                ),
-                reason: item.inventoryOperationItems.reason || "",
-              })),
-            }
+            id: wasteOperation.id,
+            code: wasteOperation.code,
+            reason: wasteOperation.notes,
+            items: wasteItems.map((item) => ({
+              articleId: item.inventoryOperationItems.articleId,
+              articleName: item.articles?.name || "",
+              articlePhoto: item.articles?.photo || "",
+              articleUnit: item.articles?.unit || "",
+              zoneId: item.inventoryOperationItems.fromStorageZoneId,
+              zoneName: item.storageZones?.designation || "",
+              lotId: item.inventoryOperationItems.lotId,
+              lotName: item.lots?.code || "vide",
+              quantity: parseFloat(
+                item.inventoryOperationItems.quantity || "0",
+              ),
+              reason: item.inventoryOperationItems.reason || "",
+            })),
+          }
           : null,
       };
 
@@ -6338,7 +6350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               : undefined,
           completedAt:
             statusDeliveryPerson === "delivered" ||
-            statusDeliveryPerson === "partially_delivered"
+              statusDeliveryPerson === "partially_delivered"
               ? new Date().toISOString()
               : undefined,
           updatedAt: new Date().toISOString(),

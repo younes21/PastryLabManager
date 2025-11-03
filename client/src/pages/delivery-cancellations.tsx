@@ -220,6 +220,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
         body: JSON.stringify({
           returnReason: returnReason.trim(),
           WasteReason: WasteReason.trim(),
+          isCancelled: delivery?.mode != 'partial',
           cancellationItems: cancellationItems.map(item => ({
             articleId: item.articleId,
             zones: item.zones.map(zone => ({
@@ -236,7 +237,13 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Erreur lors de l\'annulation');
+
+        toast({
+          title: "Erreur",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
       }
 
       return response.json();
@@ -460,7 +467,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
                                   value={zone.returnReason || returnReason}
                                   onChange={(e) => updateReasonRetour(articleId, zoneIndex, e.target.value)}
                                   placeholder="Reason retour"
-                                 
+
                                 />
                               </div>
                               <div className='flex  gap-2' >
@@ -483,7 +490,7 @@ function CancellationModal({ delivery, isOpen, onClose, onSuccess }: Cancellatio
                                   value={zone.wasteReason || WasteReason}
                                   onChange={(e) => updateReasonRebut(articleId, zoneIndex, e.target.value)}
                                   placeholder="Reason rebut"
-                               
+
                                 />
                               </div>
 

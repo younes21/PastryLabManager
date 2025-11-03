@@ -3427,9 +3427,9 @@ export class DatabaseStorage implements IStorage {
   /**
    * Annuler une livraison après validation avec création d'opérations d'inventaire
    */
-  async cancelDeliveryAfterValidation(deliveryId: number, cancellationData: CancellationData): Promise<any> {
+  async cancelOrPartialDeliveryAfterValidation(deliveryId: number, cancellationData: CancellationData): Promise<any> {
     return await db.transaction(async (tx) => {
-      // 1. Récupérer la livraison et vérifier qu'elle est validée
+      // 1️⃣ Récupérer la livraison principale
       const [delivery] = await tx.select()
         .from(inventoryOperations)
         .where(and(
@@ -3437,173 +3437,353 @@ export class DatabaseStorage implements IStorage {
           eq(inventoryOperations.type, InventoryOperationType.LIVRAISON)
         ));
 
-      if (!delivery) {
-        throw new Error("Livraison non trouvée");
-      }
+      if (!delivery) throw new Error("Livraison non trouvée");
+      if (delivery.status !== InventoryOperationStatus.COMPLETED && cancellationData?.isCancelled)
+        throw new Error("La livraison doit être validée pour être annulée");
 
-      if (delivery.status !== InventoryOperationStatus.COMPLETED) {
-        throw new Error("La livraison doit être validée pour être annulée après validation");
-      }
-
-      // 2. Récupérer les items de la livraison
+      // 2️⃣ Récupérer les items de la livraison
       const deliveryItems = await tx.select()
         .from(inventoryOperationItems)
         .where(eq(inventoryOperationItems.operationId, deliveryId));
 
-      // 3. Créer les opérations d'inventaire pour rebut et retour
       const operations = [];
 
-      // Opération pour les rebuts (si il y en a)
+      // Fonction utilitaire pour créer les opérations de retour/rebut
+      const createReverseOperation = async (
+        type: InventoryOperationType,
+        reason: string | undefined,
+        cancellationField: "returnQuantity" | "wasteQuantity",
+        reasonField: "returnReason" | "wasteReason",
+      ) => {
+        // Calculer les totaux à partir des items concernés
+        let totalHT = 0, totalTax = 0, totalTTC = 0;
+
+        const itemsToInsert = [];
+
+        for (const cancelItem of cancellationData.cancellationItems) {
+          for (const zone of cancelItem.zones) {
+            const qty = zone[cancellationField] || 0;
+            if (qty <= 0) continue;
+
+            const deliveryItem = deliveryItems.find(
+              i => i.articleId === cancelItem.articleId &&
+                i.fromStorageZoneId === zone.zoneId &&
+                i.lotId === zone.lotId
+            );
+            if (!deliveryItem) continue;
+
+            const unitPrice = parseFloat(deliveryItem.unitCost || "0");
+            const taxRate = parseFloat(deliveryItem.taxRate || "0");
+            const lineHT = unitPrice * qty;
+            const lineTax = lineHT * taxRate / 100;
+
+            const unitSalePrice = parseFloat(deliveryItem.unitPriceSale || "0");
+            const lineSaleHT = unitSalePrice * qty;
+            const lineSaleTax = lineSaleHT * taxRate / 100;
+            const lineSaleTTC = lineSaleHT + lineSaleTax;
+
+            totalHT += lineSaleHT;
+            totalTax += lineSaleTax;
+            totalTTC += lineSaleTTC;
+
+            itemsToInsert.push({
+              articleId: cancelItem.articleId,
+              operationId: null, // on remplira après l'insertion
+              quantity: qty.toString(),
+              lotId: zone.lotId,
+              fromStorageZoneId: zone.zoneId,
+              quantityBefore: deliveryItem.quantityAfter,
+              quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone[cancellationField].toString())).toString(),
+
+              taxRate: deliveryItem.taxRate,
+              unitPriceSale: deliveryItem.unitPriceSale,
+              totalPriceSale: lineSaleHT.toFixed(2),
+              taxAmountSale: lineSaleTax.toFixed(2),
+              unitCost: deliveryItem.unitCost,
+              totalAmountCost: lineHT.toFixed(2),
+              taxAmountCost: lineTax.toFixed(2),
+              reason: zone[reasonField],
+              notes: `${type === InventoryOperationType.REBUT_LIVRAISON ? 'Rebut' : 'Retour'}: ${zone[reasonField] || ''}`
+            });
+          }
+        }
+
+        if (itemsToInsert.length === 0) return null;
+
+        // Générer code et insérer l’opération complète avec les totaux
+        const operationCode = await this.generateOperationCode(type);
+        const [operation] = await tx.insert(inventoryOperations).values({
+          code: operationCode,
+          type,
+          status: InventoryOperationStatus.DRAFT,
+          statusDate: new Date().toISOString(),
+          orderId: delivery.orderId,
+          clientId: delivery.clientId,
+          reason,
+          parentOperationId: deliveryId,
+          totalTax: totalTax.toFixed(2),
+          totalTTC: totalTTC.toFixed(2),
+          subtotalHT: totalHT.toFixed(2),
+          discountTotal: 0,
+          notes: `${type === InventoryOperationType.REBUT_LIVRAISON ? 'Rebut' : 'Retour'} suite à ${cancellationData?.isCancelled ? 'annulation' : 'livraison partielle'}`
+        }).returning();
+
+        // Insérer les items reliés
+        for (const item of itemsToInsert) {
+          await tx.insert(inventoryOperationItems).values({
+            ...item,
+            operationId: operation.id,
+          });
+        }
+
+        return operation;
+      };
+
       const hasWasteItems = cancellationData.cancellationItems.some(item =>
         item.zones.some(zone => zone.wasteQuantity > 0)
       );
-
+      // 3️⃣ Créer les deux opérations si besoin
       if (hasWasteItems) {
-        const wasteOperationCode = await this.generateOperationCode(InventoryOperationType.REBUT_LIVRAISON);
-        const [wasteOperation] = await tx.insert(inventoryOperations).values({
-          code: wasteOperationCode,
-          type: InventoryOperationType.REBUT_LIVRAISON,
-          status: InventoryOperationStatus.DRAFT,
-          statusDate: new Date().toISOString(),
-          orderId: delivery.orderId,
-          clientId: delivery.clientId,
-          reason: cancellationData.WasteReason,
-          parentOperationId: deliveryId,
-          notes: `Rebut suite à annulation de livraison: ${cancellationData.WasteReason || 'Voir détail tableau'}`,
-          validatedAt: new Date().toISOString()
-        }).returning();
-
-        operations.push(wasteOperation);
-
-        // Créer les items de rebut
-        for (const cancellationItem of cancellationData.cancellationItems) {
-          for (const zone of cancellationItem.zones) {
-            if (zone.wasteQuantity > 0) {
-              const deliveryItem = deliveryItems.find(item =>
-                item.articleId === cancellationItem.articleId &&
-                item.fromStorageZoneId === zone.zoneId &&
-                item.lotId === zone.lotId
-              );
-
-              if (deliveryItem) {
-                await tx.insert(inventoryOperationItems).values({
-                  operationId: wasteOperation.id,
-                  articleId: cancellationItem.articleId,
-                  quantity: zone.wasteQuantity.toString(),
-                  quantityBefore: deliveryItem.quantityAfter,
-                  quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.wasteQuantity.toString())).toString(),
-                  lotId: zone.lotId,
-                  fromStorageZoneId: zone.zoneId,
-                  reason: zone.wasteReason,
-                  notes: `Rebut: ${zone.wasteReason}`
-                });
-
-                // // Créer une réservation de stock sortante pour le rebut
-                // await tx.insert(stockReservations).values({
-                //   articleId: cancellationItem.articleId,
-                //   inventoryOperationId: wasteOperation.id,
-                //   reservedQuantity: zone.wasteQuantity.toString(),
-                //   reservationDirection: StockReservationDirection.OUT,
-                //   reservationType: StockReservationType.INVENTORY,
-                //   status: StockReservationStatus.RESERVED,
-                //   notes: `Rebut livraison: ${zone.wasteReason || 'Voir détail'}`,
-                //   lotId: zone.lotId,
-                //   storageZoneId: zone.zoneId
-                // });
-              }
-            }
-          }
-        }
+        const wasteOp = await createReverseOperation(
+          InventoryOperationType.REBUT_LIVRAISON,
+          cancellationData.WasteReason,
+          "wasteQuantity",
+          "wasteReason"
+        );
       }
-
-      // Opération pour les retours au stock (si il y en a)
       const hasReturnItems = cancellationData.cancellationItems.some(item =>
         item.zones.some(zone => zone.returnQuantity > 0)
       );
-
       if (hasReturnItems) {
-        const returnOperationCode = await this.generateOperationCode(InventoryOperationType.RETOUR_LIVRAISON);
-        const [returnOperation] = await tx.insert(inventoryOperations).values({
-          code: returnOperationCode,
-          type: InventoryOperationType.RETOUR_LIVRAISON,
-          status: InventoryOperationStatus.DRAFT,
-          statusDate: new Date().toISOString(),
-          orderId: delivery.orderId,
-          clientId: delivery.clientId,
-          reason: cancellationData.returnReason,
-          parentOperationId: deliveryId,
-          notes: `Retour au stock suite à annulation de livraison: ${cancellationData.returnReason || 'Voir détail tableau'}`,
-          validatedAt: new Date().toISOString()
-        }).returning();
-
-        operations.push(returnOperation);
-
-        // Créer les items de retour
-        for (const cancellationItem of cancellationData.cancellationItems) {
-          for (const zone of cancellationItem.zones) {
-            if (zone.returnQuantity > 0) {
-              const deliveryItem = deliveryItems.find(item =>
-                item.articleId === cancellationItem.articleId &&
-                item.fromStorageZoneId === zone.zoneId &&
-                item.lotId === zone.lotId
-              );
-
-              if (deliveryItem) {
-                await tx.insert(inventoryOperationItems).values({
-                  operationId: returnOperation.id,
-                  articleId: cancellationItem.articleId,
-                  quantity: zone.returnQuantity.toString(),
-                  quantityBefore: deliveryItem.quantityAfter,
-                  quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.returnQuantity.toString())).toString(),
-                  lotId: zone.lotId,
-                  fromStorageZoneId: zone.zoneId,
-                  reason: zone.returnReason,
-                  notes: `Rebut: ${zone.returnReason}`
-                });
-
-                // Créer une réservation de stock entrante pour le retour
-                await tx.insert(stockReservations).values({
-                  articleId: cancellationItem.articleId,
-                  inventoryOperationId: returnOperation.id,
-                  reservedQuantity: zone.returnQuantity.toString(),
-                  reservationDirection: StockReservationDirection.IN,
-                  reservationType: StockReservationType.INVENTORY,
-                  status: StockReservationStatus.RESERVED,
-                  notes: 'Retour au stock suite annulation livraison',
-                  lotId: zone.lotId,
-                  storageZoneId: zone.zoneId
-                });
-              }
-            }
-          }
-        }
+        const returnOp = await createReverseOperation(
+          InventoryOperationType.RETOUR_LIVRAISON,
+          cancellationData.returnReason,
+          "returnQuantity",
+          "returnReason"
+        );
       }
 
-      let note = cancellationData.WasteReason ? 'rebut: ' + cancellationData.WasteReason : '';
-      note += cancellationData.returnReason ? ' retour: ' + cancellationData.returnReason : '';
-      if (!cancellationData.WasteReason && !cancellationData.returnReason) note = 'Voir détail tableau';
 
-      // 4. Mettre à jour le statut de la livraison
+
+      // 4️⃣ Mettre à jour le statut de la livraison originale
       await tx.update(inventoryOperations)
         .set({
-          status: InventoryOperationStatus.CANCELLED,
+          status: cancellationData.isCancelled
+            ? InventoryOperationStatus.CANCELLED
+            : InventoryOperationStatus.PARTIALLY_COMPLETED,
           statusDate: new Date().toISOString(),
-          notes: note
+          notes: cancellationData.isCancelled
+            ? "Livraison annulée après validation"
+            : "Livraison partielle effectuée"
         })
         .where(eq(inventoryOperations.id, deliveryId));
 
-      // 5. Mettre à jour les items de la livraison
-      await tx.update(inventoryOperationItems)
-        .set({ lineStatus: 'cancelled' })
-        .where(eq(inventoryOperationItems.operationId, deliveryId));
-
       return {
         deliveryId,
-        operations,
-        message: "Livraison annulée avec succès"
+        //operations: [wasteOp, returnOp].filter(Boolean),
+        message: cancellationData.isCancelled
+          ? "Annulation de livraison réussie"
+          : "Livraison partielle créée avec succès"
       };
     });
   }
+
+  // async cancelOrPartialDeliveryAfterValidation(deliveryId: number, cancellationData: CancellationData): Promise<any> {
+  //   return await db.transaction(async (tx) => {
+  //     // 1. Récupérer la livraison et vérifier qu'elle est validée
+  //     const [delivery] = await tx.select()
+  //       .from(inventoryOperations)
+  //       .where(and(
+  //         eq(inventoryOperations.id, deliveryId),
+  //         eq(inventoryOperations.type, InventoryOperationType.LIVRAISON)
+  //       ));
+
+  //     if (!delivery) {
+  //       throw new Error("Livraison non trouvée");
+  //     }
+
+  //     if (delivery.status !== InventoryOperationStatus.COMPLETED && cancellationData?.isCancelled) {
+  //       throw new Error("La livraison doit être validée pour être annulée après validation");
+  //     }
+
+  //     // 2. Récupérer les items de la livraison
+  //     const deliveryItems = await tx.select()
+  //       .from(inventoryOperationItems)
+  //       .where(eq(inventoryOperationItems.operationId, deliveryId));
+
+  //     // 3. Créer les opérations d'inventaire pour rebut et retour
+  //     const operations = [];
+
+  //     // Opération pour les rebuts (si il y en a)
+  //     const hasWasteItems = cancellationData.cancellationItems.some(item =>
+  //       item.zones.some(zone => zone.wasteQuantity > 0)
+  //     );
+
+  //     if (hasWasteItems) {
+  //       const wasteOperationCode = await this.generateOperationCode(InventoryOperationType.REBUT_LIVRAISON);
+  //       const [wasteOperation] = await tx.insert(inventoryOperations).values({
+  //         code: wasteOperationCode,
+  //         type: InventoryOperationType.REBUT_LIVRAISON,
+  //         status: InventoryOperationStatus.DRAFT,
+  //         statusDate: new Date().toISOString(),
+  //         orderId: delivery.orderId,
+  //         clientId: delivery.clientId,
+  //         reason: cancellationData.WasteReason,
+  //         parentOperationId: deliveryId,
+  //         notes: `Rebut suite à ${cancellationData?.isCancelled ? 'annulation de livraison' : 'une livraison partielle'} : ${cancellationData.WasteReason || 'Voir détail tableau'}`,
+  //         validatedAt: new Date().toISOString()
+  //       }).returning();
+
+  //       operations.push(wasteOperation);
+
+  //       // Créer les items de rebut
+  //       for (const cancellationItem of cancellationData.cancellationItems) {
+  //         for (const zone of cancellationItem.zones) {
+  //           if (zone.wasteQuantity > 0) {
+  //             const deliveryItem = deliveryItems.find(item =>
+  //               item.articleId === cancellationItem.articleId &&
+  //               item.fromStorageZoneId === zone.zoneId &&
+  //               item.lotId === zone.lotId
+  //             );
+
+  //             if (deliveryItem) {
+  //               const taxRate = parseFloat(deliveryItem.taxRate || "0") / 100;
+  //               const totalHT = zone.wasteQuantity * parseFloat(deliveryItem.unitCost || "0");
+  //               const totalTax = totalHT * taxRate;
+  //               const totalTTC = totalTax + totalHT;
+
+  //               const totalSaleHT = zone.wasteQuantity * parseFloat(deliveryItem.unitPriceSale || "0");
+  //               const totalSaleTax = totalSaleHT * taxRate;
+  //               const totalSaleTTC = totalSaleTax + totalSaleHT;
+
+  //               await tx.insert(inventoryOperationItems).values({
+  //                 operationId: wasteOperation.id,
+  //                 articleId: cancellationItem.articleId,
+  //                 quantity: zone.wasteQuantity.toString(),
+  //                 quantityBefore: deliveryItem.quantityAfter,
+  //                 quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.wasteQuantity.toString())).toString(),
+  //                 lotId: zone.lotId,
+  //                 fromStorageZoneId: zone.zoneId,
+  //                 reason: zone.wasteReason,
+  //                 notes: `Rebut: ${zone.wasteReason}`,
+  //                 unitCost: deliveryItem?.unitCost?.toString(),
+  //                 taxRate: deliveryItem?.taxRate?.toString(),
+  //                 totalCost: totalTTC?.toString(),
+  //                 taxAmountCost: totalTax?.toString(),
+  //                 unitPriceSale: deliveryItem?.unitPriceSale?.toString(),
+  //                 taxAmountSale: totalSaleTax?.toString(),
+  //                 totalPriceSale: totalSaleTTC?.toString()
+  //               });
+
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     // Opération pour les retours au stock (si il y en a)
+  //     const hasReturnItems = cancellationData.cancellationItems.some(item =>
+  //       item.zones.some(zone => zone.returnQuantity > 0)
+  //     );
+
+  //     if (hasReturnItems) {
+  //       const returnOperationCode = await this.generateOperationCode(InventoryOperationType.RETOUR_LIVRAISON);
+  //       const [returnOperation] = await tx.insert(inventoryOperations).values({
+  //         code: returnOperationCode,
+  //         type: InventoryOperationType.RETOUR_LIVRAISON,
+  //         status: InventoryOperationStatus.DRAFT,
+  //         statusDate: new Date().toISOString(),
+  //         orderId: delivery.orderId,
+  //         clientId: delivery.clientId,
+  //         reason: cancellationData.returnReason,
+  //         parentOperationId: deliveryId,
+  //         notes: `Retour au stock suite à ${cancellationData?.isCancelled ? 'une annulation' : 'une livraison partielle'} ${cancellationData.returnReason || 'Voir détail tableau'}`,
+  //         validatedAt: new Date().toISOString()
+  //       }).returning();
+
+  //       operations.push(returnOperation);
+
+  //       // Créer les items de retour
+  //       for (const cancellationItem of cancellationData.cancellationItems) {
+  //         for (const zone of cancellationItem.zones) {
+  //           if (zone.returnQuantity > 0) {
+  //             const deliveryItem = deliveryItems.find(item =>
+  //               item.articleId === cancellationItem.articleId &&
+  //               item.fromStorageZoneId === zone.zoneId &&
+  //               item.lotId === zone.lotId
+  //             );
+
+  //             if (deliveryItem) {
+  //               const taxRate = parseFloat(deliveryItem.taxRate || "0") / 100;
+  //               const totalHT = zone.returnQuantity * parseFloat(deliveryItem.unitCost || "0");
+  //               const totalTax = totalHT * taxRate;
+  //               const totalTTC = totalTax + totalHT;
+
+  //               const totalSaleHT = zone.returnQuantity * parseFloat(deliveryItem.unitPriceSale || "0");
+  //               const totalSaleTax = totalSaleHT * taxRate;
+  //               const totalSaleTTC = totalSaleTax + totalSaleHT;
+  //               await tx.insert(inventoryOperationItems).values({
+  //                 operationId: returnOperation.id,
+  //                 articleId: cancellationItem.articleId,
+  //                 quantity: zone.returnQuantity.toString(),
+  //                 quantityBefore: deliveryItem.quantityAfter,
+  //                 quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone.returnQuantity.toString())).toString(),
+  //                 lotId: zone.lotId,
+  //                 fromStorageZoneId: zone.zoneId,
+  //                 reason: zone.returnReason,
+  //                 notes: `Rebut: ${zone.returnReason}`,
+  //                 unitCost: deliveryItem?.unitCost?.toString(),
+  //                 taxRate: deliveryItem?.taxRate?.toString(),
+  //                 totalCost: totalTTC?.toString(),
+  //                 taxAmountCost: totalTax?.toString(),
+  //                 unitPriceSale: deliveryItem?.unitPriceSale?.toString(),
+  //                 taxAmountSale: totalSaleTax?.toString(),
+  //                 totalPriceSale: totalSaleTTC?.toString()
+  //               });
+
+  //               // Créer une réservation de stock entrante pour le retour
+  //               await tx.insert(stockReservations).values({
+  //                 articleId: cancellationItem.articleId,
+  //                 inventoryOperationId: returnOperation.id,
+  //                 reservedQuantity: zone.returnQuantity.toString(),
+  //                 reservationDirection: StockReservationDirection.IN,
+  //                 reservationType: StockReservationType.INVENTORY,
+  //                 status: StockReservationStatus.RESERVED,
+  //                 notes: 'Retour au stock suite ' + cancellationData?.isCancelled ? 'annulation livraison' : 'livraison partielle',
+  //                 lotId: zone.lotId,
+  //                 storageZoneId: zone.zoneId
+  //               });
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     let note = cancellationData.WasteReason ? 'rebut: ' + cancellationData.WasteReason : '';
+  //     note += cancellationData.returnReason ? ' retour: ' + cancellationData.returnReason : '';
+  //     if (!cancellationData.WasteReason && !cancellationData.returnReason) note = 'Voir détail tableau';
+
+  //     // 4. Mettre à jour le statut de la livraison
+  //     await tx.update(inventoryOperations)
+  //       .set({
+  //         status: cancellationData.isCancelled ? InventoryOperationStatus.CANCELLED : InventoryOperationStatus.PARTIALLY_COMPLETED,
+  //         statusDate: new Date().toISOString(),
+  //         notes: note
+  //       })
+  //       .where(eq(inventoryOperations.id, deliveryId));
+
+  //     // 5. Mettre à jour les items de la livraison
+  //     await tx.update(inventoryOperationItems)
+  //       .set({ lineStatus: 'cancelled' })
+  //       .where(eq(inventoryOperationItems.operationId, deliveryId));
+
+  //     return {
+  //       deliveryId,
+  //       operations,
+  //       message: cancellationData?.isCancelled ? 'annulation livraison avec succès' : 'livraison partielle créée avec succès'
+  //     };
+  //   });
+  // }
 
   /**
    * Générer un code d'opération unique

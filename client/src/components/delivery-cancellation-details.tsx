@@ -20,6 +20,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Eye, RotateCcw, Trash2, Calendar, User, XCircle } from 'lucide-react';
+import { InventoryOperationStatus } from '@shared/constants';
 
 interface Delivery {
   id: number;
@@ -357,7 +358,7 @@ function CancellationDetails({ delivery, inventoryOperations }: CancellationDeta
         className="flex items-center gap-1 bg-red-50"
       >
         <Eye className="h-4 w-4" />
-        Annulation
+      { delivery.status === InventoryOperationStatus.PARTIALLY_COMPLETED? 'Annulation partielle': 'Annulation'}
       </Button>
 
       <CancellationDetailsModal
