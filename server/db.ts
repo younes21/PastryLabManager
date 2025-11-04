@@ -6,7 +6,7 @@ import { Pool } from "pg";
 // import ws from "ws";
 import * as schema from "@shared/schema";
 
-delete process.env.DATABASE_URL;
+//delete process.env.DATABASE_URL;
 // neonConfig.webSocketConstructor = ws;
 dotenv.config();
 console.log("******************", process.env.DATABASE_URL);
