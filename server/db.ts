@@ -8,7 +8,7 @@ import * as schema from "@shared/schema";
 
 delete process.env.DATABASE_URL;
 // neonConfig.webSocketConstructor = ws;
-dotenv.config({ path: "./.env", debug: true });
+dotenv.config();
 console.log("******************", process.env.DATABASE_URL);
 if (!process.env.DATABASE_URL) {
   throw new Error(
