@@ -1,37 +1,103 @@
 import {
   users,
-  measurementCategories, measurementUnits, articleCategories, articles, priceLists, priceRules,
-  taxes, currencies, shippingMethods, accountingJournals, accountingAccounts, storageZones, workStations,
-  suppliers, clients, recipes, recipeIngredients, recipeOperations,
-  orders, orderItems, inventoryOperations, inventoryOperationItems,
-  invoices, invoiceItems, payments, stockReservations,
+  measurementCategories,
+  measurementUnits,
+  articleCategories,
+  articles,
+  priceLists,
+  priceRules,
+  taxes,
+  currencies,
+  shippingMethods,
+  accountingJournals,
+  accountingAccounts,
+  storageZones,
+  workStations,
+  suppliers,
+  clients,
+  recipes,
+  recipeIngredients,
+  recipeOperations,
+  orders,
+  orderItems,
+  inventoryOperations,
+  inventoryOperationItems,
+  invoices,
+  invoiceItems,
+  payments,
+  stockReservations,
   lots,
-
-  type User, type InsertUser,
-  type Client, type InsertClient,
-  type MeasurementCategory, type InsertMeasurementCategory,
-  type MeasurementUnit, type InsertMeasurementUnit, type ArticleCategory, type InsertArticleCategory,
-  type Article, type InsertArticle, type PriceList, type InsertPriceList, type PriceRule, type InsertPriceRule,
-  type Tax, type InsertTax, type Currency, type InsertCurrency, type DeliveryMethod, type InsertDeliveryMethod,
-  type AccountingJournal, type InsertAccountingJournal, type AccountingAccount, type InsertAccountingAccount,
-  type StorageZone, type InsertStorageZone, type WorkStation, type InsertWorkStation,
-  type Supplier, type InsertSupplier, type Recipe, type InsertRecipe,
-  type RecipeIngredient, type InsertRecipeIngredient, type RecipeOperation, type InsertRecipeOperation,
-  type Order, type InsertOrder, type OrderItem, type InsertOrderItem,
-  type InventoryOperation, type InsertInventoryOperation, type InventoryOperationItem, type InsertInventoryOperationItem,
-
-
-  type Invoice, type InsertInvoice, type InvoiceItem, type InsertInvoiceItem,
-  type Payment, type InsertPayment,
-
+  type User,
+  type InsertUser,
+  type Client,
+  type InsertClient,
+  type MeasurementCategory,
+  type InsertMeasurementCategory,
+  type MeasurementUnit,
+  type InsertMeasurementUnit,
+  type ArticleCategory,
+  type InsertArticleCategory,
+  type Article,
+  type InsertArticle,
+  type PriceList,
+  type InsertPriceList,
+  type PriceRule,
+  type InsertPriceRule,
+  type Tax,
+  type InsertTax,
+  type Currency,
+  type InsertCurrency,
+  type DeliveryMethod,
+  type InsertDeliveryMethod,
+  type AccountingJournal,
+  type InsertAccountingJournal,
+  type AccountingAccount,
+  type InsertAccountingAccount,
+  type StorageZone,
+  type InsertStorageZone,
+  type WorkStation,
+  type InsertWorkStation,
+  type Supplier,
+  type InsertSupplier,
+  type Recipe,
+  type InsertRecipe,
+  type RecipeIngredient,
+  type InsertRecipeIngredient,
+  type RecipeOperation,
+  type InsertRecipeOperation,
+  type Order,
+  type InsertOrder,
+  type OrderItem,
+  type InsertOrderItem,
+  type InventoryOperation,
+  type InsertInventoryOperation,
+  type InventoryOperationItem,
+  type InsertInventoryOperationItem,
+  type Invoice,
+  type InsertInvoice,
+  type InvoiceItem,
+  type InsertInvoiceItem,
+  type Payment,
+  type InsertPayment,
   InventoryOperationWithItems,
-  type StockReservation, type InsertStockReservation,
+  type StockReservation,
+  type InsertStockReservation,
   stock,
-  Stock
+  Stock,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, lt, and, sql, gt, like, getTableColumns, inArray } from "drizzle-orm";
-import camelcaseKeys from 'camelcase-keys';
+import {
+  eq,
+  desc,
+  lt,
+  and,
+  sql,
+  gt,
+  like,
+  getTableColumns,
+  inArray,
+} from "drizzle-orm";
+import camelcaseKeys from "camelcase-keys";
 import {
   ArticleCategoryType,
   OrderType,
@@ -53,7 +119,6 @@ import {
   CLIENT_CODE_PREFIX,
 } from "@shared/constants";
 
-
 export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
@@ -73,8 +138,13 @@ export interface IStorage {
   getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined>;
   getAllMeasurementCategories(): Promise<MeasurementCategory[]>;
   getActiveMeasurementCategories(): Promise<MeasurementCategory[]>;
-  createMeasurementCategory(category: InsertMeasurementCategory): Promise<MeasurementCategory>;
-  updateMeasurementCategory(id: number, category: Partial<InsertMeasurementCategory>): Promise<MeasurementCategory | undefined>;
+  createMeasurementCategory(
+    category: InsertMeasurementCategory,
+  ): Promise<MeasurementCategory>;
+  updateMeasurementCategory(
+    id: number,
+    category: Partial<InsertMeasurementCategory>,
+  ): Promise<MeasurementCategory | undefined>;
   deleteMeasurementCategory(id: number): Promise<boolean>;
 
   // Measurement Units
@@ -83,26 +153,48 @@ export interface IStorage {
   getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]>;
   getActiveMeasurementUnits(): Promise<MeasurementUnit[]>;
   createMeasurementUnit(unit: InsertMeasurementUnit): Promise<MeasurementUnit>;
-  updateMeasurementUnit(id: number, unit: Partial<InsertMeasurementUnit>): Promise<MeasurementUnit | undefined>;
+  updateMeasurementUnit(
+    id: number,
+    unit: Partial<InsertMeasurementUnit>,
+  ): Promise<MeasurementUnit | undefined>;
   deleteMeasurementUnit(id: number): Promise<boolean>;
 
   // Article Categories
   getArticleCategory(id: number): Promise<ArticleCategory | undefined>;
-  getAllArticleCategories(type: ArticleCategoryType | undefined): Promise<ArticleCategory[]>;
+  getAllArticleCategories(
+    type: ArticleCategoryType | undefined,
+  ): Promise<ArticleCategory[]>;
   getActiveArticleCategories(): Promise<ArticleCategory[]>;
-  createArticleCategory(category: InsertArticleCategory): Promise<ArticleCategory>;
-  updateArticleCategory(id: number, category: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined>;
+  createArticleCategory(
+    category: InsertArticleCategory,
+  ): Promise<ArticleCategory>;
+  updateArticleCategory(
+    id: number,
+    category: Partial<InsertArticleCategory>,
+  ): Promise<ArticleCategory | undefined>;
   deleteArticleCategory(id: number): Promise<boolean>;
 
   // Articles (unified)
   getArticle(id: number): Promise<Article | undefined>;
   getAllArticles(): Promise<Article[]>;
-  getAllAvailableArticlesStock(withDetails: boolean, excludeDeliveryId?: number): Promise<ArticleStockBase[] | ArticleStockDetail[]>;
-  getSelectedArticlesStock(articleIds: number[], withDetails: boolean): Promise<ArticleStockBase[] | ArticleStockDetail[]>;
-  getArticleAvailableStock(articleId: number, withDetails: boolean): Promise<ArticleStockBase | ArticleStockDetail | null>;
+  getAllAvailableArticlesStock(
+    withDetails: boolean,
+    excludeDeliveryId?: number,
+  ): Promise<ArticleStockBase[] | ArticleStockDetail[]>;
+  getSelectedArticlesStock(
+    articleIds: number[],
+    withDetails: boolean,
+  ): Promise<ArticleStockBase[] | ArticleStockDetail[]>;
+  getArticleAvailableStock(
+    articleId: number,
+    withDetails: boolean,
+  ): Promise<ArticleStockBase | ArticleStockDetail | null>;
   getActiveArticles(): Promise<Article[]>;
   createArticle(article: InsertArticle): Promise<Article>;
-  updateArticle(id: number, article: Partial<InsertArticle>): Promise<Article | undefined>;
+  updateArticle(
+    id: number,
+    article: Partial<InsertArticle>,
+  ): Promise<Article | undefined>;
   deleteArticle(id: number): Promise<boolean>;
 
   // Price Lists
@@ -110,7 +202,10 @@ export interface IStorage {
   getAllPriceLists(): Promise<PriceList[]>;
   getActivePriceLists(): Promise<PriceList[]>;
   createPriceList(priceList: InsertPriceList): Promise<PriceList>;
-  updatePriceList(id: number, priceList: Partial<InsertPriceList>): Promise<PriceList | undefined>;
+  updatePriceList(
+    id: number,
+    priceList: Partial<InsertPriceList>,
+  ): Promise<PriceList | undefined>;
   deletePriceList(id: number): Promise<boolean>;
 
   // Price Rules
@@ -119,7 +214,10 @@ export interface IStorage {
   getPriceRulesByPriceList(priceListId: number): Promise<PriceRule[]>;
   getActivePriceRules(): Promise<PriceRule[]>;
   createPriceRule(priceRule: InsertPriceRule): Promise<PriceRule>;
-  updatePriceRule(id: number, priceRule: Partial<InsertPriceRule>): Promise<PriceRule | undefined>;
+  updatePriceRule(
+    id: number,
+    priceRule: Partial<InsertPriceRule>,
+  ): Promise<PriceRule | undefined>;
   deletePriceRule(id: number): Promise<boolean>;
 
   // Taxes
@@ -135,42 +233,66 @@ export interface IStorage {
   getBaseCurrency(): Promise<Currency | undefined>;
   setBaseCurrency(id: number): Promise<Currency | undefined>;
   createCurrency(currency: InsertCurrency): Promise<Currency>;
-  updateCurrency(id: number, currency: Partial<InsertCurrency>): Promise<Currency | undefined>;
+  updateCurrency(
+    id: number,
+    currency: Partial<InsertCurrency>,
+  ): Promise<Currency | undefined>;
   deleteCurrency(id: number): Promise<boolean>;
 
   // Delivery Methods
   getAllDeliveryMethods(): Promise<DeliveryMethod[]>;
   getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined>;
-  createDeliveryMethod(deliveryMethod: InsertDeliveryMethod): Promise<DeliveryMethod>;
-  updateDeliveryMethod(id: number, deliveryMethod: Partial<InsertDeliveryMethod>): Promise<DeliveryMethod | undefined>;
+  createDeliveryMethod(
+    deliveryMethod: InsertDeliveryMethod,
+  ): Promise<DeliveryMethod>;
+  updateDeliveryMethod(
+    id: number,
+    deliveryMethod: Partial<InsertDeliveryMethod>,
+  ): Promise<DeliveryMethod | undefined>;
   deleteDeliveryMethod(id: number): Promise<boolean>;
 
   // Accounting Journals
   getAllAccountingJournals(): Promise<AccountingJournal[]>;
   getAccountingJournal(id: number): Promise<AccountingJournal | undefined>;
-  createAccountingJournal(journal: InsertAccountingJournal): Promise<AccountingJournal>;
-  updateAccountingJournal(id: number, journal: Partial<InsertAccountingJournal>): Promise<AccountingJournal | undefined>;
+  createAccountingJournal(
+    journal: InsertAccountingJournal,
+  ): Promise<AccountingJournal>;
+  updateAccountingJournal(
+    id: number,
+    journal: Partial<InsertAccountingJournal>,
+  ): Promise<AccountingJournal | undefined>;
   deleteAccountingJournal(id: number): Promise<boolean>;
 
   // Accounting Accounts
   getAllAccountingAccounts(): Promise<AccountingAccount[]>;
   getAccountingAccount(id: number): Promise<AccountingAccount | undefined>;
-  createAccountingAccount(account: InsertAccountingAccount): Promise<AccountingAccount>;
-  updateAccountingAccount(id: number, account: Partial<InsertAccountingAccount>): Promise<AccountingAccount | undefined>;
+  createAccountingAccount(
+    account: InsertAccountingAccount,
+  ): Promise<AccountingAccount>;
+  updateAccountingAccount(
+    id: number,
+    account: Partial<InsertAccountingAccount>,
+  ): Promise<AccountingAccount | undefined>;
   deleteAccountingAccount(id: number): Promise<boolean>;
 
   // Storage Zones
   getAllStorageZones(): Promise<StorageZone[]>;
   getStorageZone(id: number): Promise<StorageZone | undefined>;
   createStorageZone(zone: InsertStorageZone): Promise<StorageZone>;
-  updateStorageZone(id: number, zone: Partial<InsertStorageZone>): Promise<StorageZone | undefined>;
+  updateStorageZone(
+    id: number,
+    zone: Partial<InsertStorageZone>,
+  ): Promise<StorageZone | undefined>;
   deleteStorageZone(id: number): Promise<boolean>;
 
   // Work Stations
   getAllWorkStations(): Promise<WorkStation[]>;
   getWorkStation(id: number): Promise<WorkStation | undefined>;
   createWorkStation(workStation: InsertWorkStation): Promise<WorkStation>;
-  updateWorkStation(id: number, workStation: Partial<InsertWorkStation>): Promise<WorkStation | undefined>;
+  updateWorkStation(
+    id: number,
+    workStation: Partial<InsertWorkStation>,
+  ): Promise<WorkStation | undefined>;
   deleteWorkStation(id: number): Promise<boolean>;
 
   // Email Configs - module supprimé
@@ -179,14 +301,20 @@ export interface IStorage {
   getAllSuppliers(): Promise<Supplier[]>;
   getSupplier(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
-  updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+  updateSupplier(
+    id: number,
+    supplier: Partial<InsertSupplier>,
+  ): Promise<Supplier | undefined>;
   deleteSupplier(id: number): Promise<boolean>;
 
   // Clients
   getAllClients(): Promise<Client[]>;
   getClient(id: number): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
-  updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined>;
+  updateClient(
+    id: number,
+    client: Partial<InsertClient>,
+  ): Promise<Client | undefined>;
   deleteClient(id: number): Promise<boolean>;
 
   // Recipes (attached to articles with type="product")
@@ -194,15 +322,21 @@ export interface IStorage {
   getRecipe(id: number): Promise<Recipe | undefined>;
   getRecipeByArticleId(articleId: number): Promise<Recipe | undefined>;
   createRecipe(recipe: InsertRecipe): Promise<Recipe>;
-  updateRecipe(id: number, recipe: Partial<InsertRecipe>): Promise<Recipe | undefined>;
+  updateRecipe(
+    id: number,
+    recipe: Partial<InsertRecipe>,
+  ): Promise<Recipe | undefined>;
   deleteRecipe(id: number): Promise<boolean>;
   deleteRecipeByArticleId(articleId: number): Promise<boolean>;
 
   // Ingredients (filtrage articles par type="ingredient")
   getAllIngredients(): Promise<Article[]>;
   getIngredient(id: number): Promise<Article | undefined>;
-  createIngredient(ingredient: Omit<InsertArticle, 'type'>): Promise<Article>;
-  updateIngredient(id: number, ingredient: Partial<Omit<InsertArticle, 'type'>>): Promise<Article | undefined>;
+  createIngredient(ingredient: Omit<InsertArticle, "type">): Promise<Article>;
+  updateIngredient(
+    id: number,
+    ingredient: Partial<Omit<InsertArticle, "type">>,
+  ): Promise<Article | undefined>;
   deleteIngredient(id: number): Promise<boolean>;
   getLowStockIngredients(): Promise<Article[]>;
 
@@ -210,19 +344,43 @@ export interface IStorage {
   // Receptions (Achats) via Inventory
   generateReceptionCode(): Promise<string>;
   // Stock & cost updates
-  adjustArticleStockAndCost(articleId: number, deltaQuantity: number, newUnitCost: string | number): Promise<Article | undefined>;
+  adjustArticleStockAndCost(
+    articleId: number,
+    deltaQuantity: number,
+    newUnitCost: string | number,
+  ): Promise<Article | undefined>;
   getInventoryRowsByOperation(operationId: number): Promise<Stock[]>;
 
   // Inventory Operations
   getAllInventoryOperations(): Promise<InventoryOperation[]>;
   getInventoryOperation(id: number): Promise<InventoryOperation | undefined>;
-  getInventoryOperationsByType(type: string, includeReliquat: boolean): Promise<InventoryOperation[]>;
-  getInventoryOperationsByTypes(types: string[], includeReliquat: boolean): Promise<InventoryOperation[]>;
-  getInventoryOperationsByOrder(orderId: number): Promise<InventoryOperationWithItems[]>;
-  createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation>;
-  createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
-  updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined>;
-  updateInventoryOperationWithItems(operationId: number, updatedOperation: Partial<InsertInventoryOperation>, updatedItems: InsertInventoryOperationItem[]): Promise<InventoryOperation>;
+  getInventoryOperationsByType(
+    type: string,
+    includeReliquat: boolean,
+  ): Promise<InventoryOperation[]>;
+  getInventoryOperationsByTypes(
+    types: string[],
+    includeReliquat: boolean,
+  ): Promise<InventoryOperation[]>;
+  getInventoryOperationsByOrder(
+    orderId: number,
+  ): Promise<InventoryOperationWithItems[]>;
+  createInventoryOperation(
+    insertOperation: InsertInventoryOperation,
+  ): Promise<InventoryOperation>;
+  createInventoryOperationWithItems(
+    insertOperation: InsertInventoryOperation,
+    items: InsertInventoryOperationItem[],
+  ): Promise<InventoryOperation>;
+  updateInventoryOperation(
+    id: number,
+    updateData: Partial<InsertInventoryOperation>,
+  ): Promise<InventoryOperation | undefined>;
+  updateInventoryOperationWithItems(
+    operationId: number,
+    updatedOperation: Partial<InsertInventoryOperation>,
+    updatedItems: InsertInventoryOperationItem[],
+  ): Promise<InventoryOperation>;
   deleteInventoryOperation(id: number): Promise<boolean>;
 
   // ============ FACTURATION ============
@@ -233,7 +391,10 @@ export interface IStorage {
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByOrder(orderId: number): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
-  updateInvoice(id: number, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  updateInvoice(
+    id: number,
+    invoice: Partial<InsertInvoice>,
+  ): Promise<Invoice | undefined>;
   updateInvoiceStatus(id: number): Promise<Invoice | undefined>; // Auto-calcul du statut basé sur les paiements
   deleteInvoice(id: number): Promise<boolean>;
   generateInvoiceCode(): Promise<string>;
@@ -241,7 +402,10 @@ export interface IStorage {
   // Invoice Items
   getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
   createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
-  updateInvoiceItem(id: number, item: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined>;
+  updateInvoiceItem(
+    id: number,
+    item: Partial<InsertInvoiceItem>,
+  ): Promise<InvoiceItem | undefined>;
   deleteInvoiceItem(id: number): Promise<boolean>;
 
   // Payments
@@ -253,41 +417,59 @@ export interface IStorage {
   getOutstandingPayments(): Promise<any[]>;
   getPaymentStatistics(): Promise<any>;
   createPayment(payment: InsertPayment): Promise<Payment>;
-  updatePayment(id: number, payment: Partial<InsertPayment>): Promise<Payment | undefined>;
+  updatePayment(
+    id: number,
+    payment: Partial<InsertPayment>,
+  ): Promise<Payment | undefined>;
   deletePayment(id: number): Promise<boolean>;
   cancelPayment(id: number): Promise<Payment | undefined>;
 
   // ============ GESTION AVANCEE DES STOCKS ============
 
-
   // Créer une réservation de stock
-  createStockReservation(reservationData: InsertStockReservation): Promise<StockReservation>;
+  createStockReservation(
+    reservationData: InsertStockReservation,
+  ): Promise<StockReservation>;
   // Libérer une réservation de stock
   releaseStockReservation(reservationId: number): Promise<StockReservation>;
   // Créer des réservations d'ingrédients pour une préparation
-  createIngredientReservationsForPreparation(operationId: number, items: InventoryOperationItem[]): Promise<StockReservation[]>;
+  createIngredientReservationsForPreparation(
+    operationId: number,
+    items: InventoryOperationItem[],
+  ): Promise<StockReservation[]>;
   // Libérer toutes les réservations d'une opération d'inventaire
   releaseAllReservationsForOperation(operationId: number): Promise<boolean>;
   // Obtenir les réservations d'une opération d'inventaire
   getReservationsForOperation(operationId: number): Promise<StockReservation[]>;
   // Obtenir toutes les réservations des articles d'une opération (en excluant les réservations de l'opération elle-même)
-  getOtherReservationsForOperationArticles(operationId: number): Promise<StockReservation[]>;
+  getOtherReservationsForOperationArticles(
+    operationId: number,
+  ): Promise<StockReservation[]>;
 
   getArticleStockByZone(articleId: number): Promise<any[]>;
 
   // Obtenir les réservations d'un article
   getArticleReservations(articleId: number): Promise<StockReservation[]>;
   // Obtenir le rapport de traçabilité d'un article
-  getArticleTraceabilityReport(articleId: number, startDate?: string, endDate?: string): Promise<any>;
-
+  getArticleTraceabilityReport(
+    articleId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any>;
 
   // ============ GESTION DES ANNULATIONS ============
 
   // 3. Créer une opération de rebut
-  createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation>;
+  createWasteOperation(
+    deliveryId: number,
+    reason: string,
+  ): Promise<InventoryOperation>;
 
   // 2. Créer une opération de retour au stock
-  createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation>;
+  createReturnToStockOperation(
+    deliveryId: number,
+    reason: string,
+  ): Promise<InventoryOperation>;
 
   /**
    * Valide une livraison : déduit le stock, met à jour le statut de l'opération et des réservations
@@ -297,16 +479,20 @@ export interface IStorage {
   StartDelivery(deliveryOperationId: number): Promise<InventoryOperation>;
 }
 
-
-
 export class DatabaseStorage implements IStorage {
   updateInvoiceStatus(id: number): Promise<Invoice | undefined> {
     throw new Error("Method not implemented.");
   }
-  createWasteOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
+  createWasteOperation(
+    deliveryId: number,
+    reason: string,
+  ): Promise<InventoryOperation> {
     throw new Error("Method not implemented.");
   }
-  createReturnToStockOperation(deliveryId: number, reason: string): Promise<InventoryOperation> {
+  createReturnToStockOperation(
+    deliveryId: number,
+    reason: string,
+  ): Promise<InventoryOperation> {
     throw new Error("Method not implemented.");
   }
   getInvoicesByOrder(orderId: number): Promise<Invoice[]> {
@@ -315,7 +501,10 @@ export class DatabaseStorage implements IStorage {
   getInvoicesFromDeliveryOperation(operationId: number): Promise<Invoice[]> {
     throw new Error("Method not implemented.");
   }
-  createInvoiceFromDelivery(operationId: number, invoiceData?: Partial<InsertInvoice>): Promise<Invoice> {
+  createInvoiceFromDelivery(
+    operationId: number,
+    invoiceData?: Partial<InsertInvoice>,
+  ): Promise<Invoice> {
     throw new Error("Method not implemented.");
   }
   generateInvoiceCode(): Promise<string> {
@@ -335,7 +524,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
     return user || undefined;
   }
 
@@ -348,8 +540,12 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: number, updateData: Partial<InsertUser>): Promise<User | undefined> {
-    const [user] = await db.update(users)
+  async updateUser(
+    id: number,
+    updateData: Partial<InsertUser>,
+  ): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
       .set(updateData)
       .where(eq(users.id, id))
       .returning();
@@ -367,19 +563,33 @@ export class DatabaseStorage implements IStorage {
 
   // Ingredients (filtrage des articles par type="ingredient")
   async getAllIngredients(): Promise<Article[]> {
-    return await db.select().from(articles).where(eq(articles.type, ArticleCategoryType.INGREDIENT as string)).orderBy(articles.name);
+    return await db
+      .select()
+      .from(articles)
+      .where(eq(articles.type, ArticleCategoryType.INGREDIENT as string))
+      .orderBy(articles.name);
   }
 
   async getIngredient(id: number): Promise<Article | undefined> {
-    const [article] = await db.select().from(articles).where(and(eq(articles.id, id), eq(articles.type, ArticleCategoryType.INGREDIENT as string)));
+    const [article] = await db
+      .select()
+      .from(articles)
+      .where(
+        and(
+          eq(articles.id, id),
+          eq(articles.type, ArticleCategoryType.INGREDIENT as string),
+        ),
+      );
     return article || undefined;
   }
 
-  async createIngredient(insertArticle: Omit<InsertArticle, 'type'>): Promise<Article> {
+  async createIngredient(
+    insertArticle: Omit<InsertArticle, "type">,
+  ): Promise<Article> {
     // Générer un code automatique pour les ingrédients
     const existingIngredients = await this.getAllIngredients();
     const nextNumber = existingIngredients.length + 1;
-    const code = `${ArticlePrefix.INGREDIENT}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${ArticlePrefix.INGREDIENT}-${nextNumber.toString().padStart(6, "0")}`;
 
     const articleData = {
       ...insertArticle,
@@ -387,11 +597,17 @@ export class DatabaseStorage implements IStorage {
       code,
     };
 
-    const [article] = await db.insert(articles).values([articleData]).returning();
+    const [article] = await db
+      .insert(articles)
+      .values([articleData])
+      .returning();
     return article;
   }
 
-  async updateIngredient(id: number, updateData: Partial<Omit<InsertArticle, 'type'>>): Promise<Article | undefined> {
+  async updateIngredient(
+    id: number,
+    updateData: Partial<Omit<InsertArticle, "type">>,
+  ): Promise<Article | undefined> {
     // Vérifier que c'est bien un ingrédient
     const ingredient = await this.getIngredient(id);
     if (!ingredient) return undefined;
@@ -407,18 +623,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLowStockIngredients(): Promise<Article[]> {
-    return await db.select().from(articles)
-      .where(and(
-        eq(articles.type, ArticleCategoryType.INGREDIENT as string),
-        eq(articles.active, true),
-        lt(articles.currentStock, articles.minStock)
-      ))
+    return await db
+      .select()
+      .from(articles)
+      .where(
+        and(
+          eq(articles.type, ArticleCategoryType.INGREDIENT as string),
+          eq(articles.active, true),
+          lt(articles.currentStock, articles.minStock),
+        ),
+      )
       .orderBy(articles.name);
   }
 
   // Measurement Categories
-  async getMeasurementCategory(id: number): Promise<MeasurementCategory | undefined> {
-    const [category] = await db.select().from(measurementCategories).where(eq(measurementCategories.id, id));
+  async getMeasurementCategory(
+    id: number,
+  ): Promise<MeasurementCategory | undefined> {
+    const [category] = await db
+      .select()
+      .from(measurementCategories)
+      .where(eq(measurementCategories.id, id));
     return category || undefined;
   }
 
@@ -427,16 +652,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveMeasurementCategories(): Promise<MeasurementCategory[]> {
-    return await db.select().from(measurementCategories).where(eq(measurementCategories.active, true));
+    return await db
+      .select()
+      .from(measurementCategories)
+      .where(eq(measurementCategories.active, true));
   }
 
-  async createMeasurementCategory(insertCategory: InsertMeasurementCategory): Promise<MeasurementCategory> {
-    const [category] = await db.insert(measurementCategories).values(insertCategory).returning();
+  async createMeasurementCategory(
+    insertCategory: InsertMeasurementCategory,
+  ): Promise<MeasurementCategory> {
+    const [category] = await db
+      .insert(measurementCategories)
+      .values(insertCategory)
+      .returning();
     return category;
   }
 
-  async updateMeasurementCategory(id: number, updateData: Partial<InsertMeasurementCategory>): Promise<MeasurementCategory | undefined> {
-    const [category] = await db.update(measurementCategories)
+  async updateMeasurementCategory(
+    id: number,
+    updateData: Partial<InsertMeasurementCategory>,
+  ): Promise<MeasurementCategory | undefined> {
+    const [category] = await db
+      .update(measurementCategories)
       .set(updateData)
       .where(eq(measurementCategories.id, id))
       .returning();
@@ -444,13 +681,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMeasurementCategory(id: number): Promise<boolean> {
-    const result = await db.delete(measurementCategories).where(eq(measurementCategories.id, id));
+    const result = await db
+      .delete(measurementCategories)
+      .where(eq(measurementCategories.id, id));
     return (result.rowCount || 0) > 0;
   }
 
   // Measurement Units
   async getMeasurementUnit(id: number): Promise<MeasurementUnit | undefined> {
-    const [unit] = await db.select().from(measurementUnits).where(eq(measurementUnits.id, id));
+    const [unit] = await db
+      .select()
+      .from(measurementUnits)
+      .where(eq(measurementUnits.id, id));
     return unit || undefined;
   }
 
@@ -458,21 +700,38 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(measurementUnits);
   }
 
-  async getMeasurementUnitsByCategory(categoryId: number): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits).where(eq(measurementUnits.categoryId, categoryId));
+  async getMeasurementUnitsByCategory(
+    categoryId: number,
+  ): Promise<MeasurementUnit[]> {
+    return await db
+      .select()
+      .from(measurementUnits)
+      .where(eq(measurementUnits.categoryId, categoryId));
   }
 
   async getActiveMeasurementUnits(): Promise<MeasurementUnit[]> {
-    return await db.select().from(measurementUnits).where(eq(measurementUnits.active, true));
+    return await db
+      .select()
+      .from(measurementUnits)
+      .where(eq(measurementUnits.active, true));
   }
 
-  async createMeasurementUnit(insertUnit: InsertMeasurementUnit): Promise<MeasurementUnit> {
-    const [unit] = await db.insert(measurementUnits).values(insertUnit).returning();
+  async createMeasurementUnit(
+    insertUnit: InsertMeasurementUnit,
+  ): Promise<MeasurementUnit> {
+    const [unit] = await db
+      .insert(measurementUnits)
+      .values(insertUnit)
+      .returning();
     return unit;
   }
 
-  async updateMeasurementUnit(id: number, updateData: Partial<InsertMeasurementUnit>): Promise<MeasurementUnit | undefined> {
-    const [unit] = await db.update(measurementUnits)
+  async updateMeasurementUnit(
+    id: number,
+    updateData: Partial<InsertMeasurementUnit>,
+  ): Promise<MeasurementUnit | undefined> {
+    const [unit] = await db
+      .update(measurementUnits)
       .set(updateData)
       .where(eq(measurementUnits.id, id))
       .returning();
@@ -480,34 +739,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMeasurementUnit(id: number): Promise<boolean> {
-    const result = await db.delete(measurementUnits).where(eq(measurementUnits.id, id));
+    const result = await db
+      .delete(measurementUnits)
+      .where(eq(measurementUnits.id, id));
     return (result.rowCount || 0) > 0;
   }
 
   // Article Categories
   async getArticleCategory(id: number): Promise<ArticleCategory | undefined> {
-    const [category] = await db.select().from(articleCategories).where(eq(articleCategories.id, id));
+    const [category] = await db
+      .select()
+      .from(articleCategories)
+      .where(eq(articleCategories.id, id));
     return category || undefined;
   }
 
-  async getAllArticleCategories(type: ArticleCategoryType | undefined): Promise<ArticleCategory[]> {
+  async getAllArticleCategories(
+    type: ArticleCategoryType | undefined,
+  ): Promise<ArticleCategory[]> {
     if (type) {
-      return await db.select().from(articleCategories).where(eq(articleCategories.type, type as any));
+      return await db
+        .select()
+        .from(articleCategories)
+        .where(eq(articleCategories.type, type as any));
     }
     return await db.select().from(articleCategories);
   }
 
   async getActiveArticleCategories(): Promise<ArticleCategory[]> {
-    return await db.select().from(articleCategories).where(eq(articleCategories.active, true));
+    return await db
+      .select()
+      .from(articleCategories)
+      .where(eq(articleCategories.active, true));
   }
 
-  async createArticleCategory(insertCategory: InsertArticleCategory): Promise<ArticleCategory> {
-    const [category] = await db.insert(articleCategories).values(insertCategory as any).returning();
+  async createArticleCategory(
+    insertCategory: InsertArticleCategory,
+  ): Promise<ArticleCategory> {
+    const [category] = await db
+      .insert(articleCategories)
+      .values(insertCategory as any)
+      .returning();
     return category;
   }
 
-  async updateArticleCategory(id: number, updateData: Partial<InsertArticleCategory>): Promise<ArticleCategory | undefined> {
-    const [category] = await db.update(articleCategories)
+  async updateArticleCategory(
+    id: number,
+    updateData: Partial<InsertArticleCategory>,
+  ): Promise<ArticleCategory | undefined> {
+    const [category] = await db
+      .update(articleCategories)
       .set(updateData as any)
       .where(eq(articleCategories.id, id))
       .returning();
@@ -515,13 +796,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteArticleCategory(id: number): Promise<boolean> {
-    const result = await db.delete(articleCategories).where(eq(articleCategories.id, id));
+    const result = await db
+      .delete(articleCategories)
+      .where(eq(articleCategories.id, id));
     return (result.rowCount || 0) > 0;
   }
 
   // Articles (unified)
   async getArticle(id: number): Promise<Article | undefined> {
-    const [article] = await db.select().from(articles).where(eq(articles.id, id));
+    const [article] = await db
+      .select()
+      .from(articles)
+      .where(eq(articles.id, id));
     return article || undefined;
   }
 
@@ -533,20 +819,24 @@ export class DatabaseStorage implements IStorage {
   async queryArticleStock<T extends boolean>(
     withDetails: T,
     articleIds?: number | number[],
-    excludeDeliveryId?: number
+    excludeDeliveryId?: number,
   ): Promise<T extends true ? ArticleStockDetail[] : ArticleStockBase[]> {
     const result = await db.execute(sql`
     SELECT a.id, a.name, a.code, a.unit, a.photo,
            a.sale_price AS "unitPrice", a.is_perishable AS "isPerishable",
            COALESCE(SUM(s.quantity),0)::float8 AS "totalStock",
            COALESCE(SUM(s.quantity + COALESCE(sr_in.total_reserved,0) - COALESCE(sr_out.total_reserved,0)),0)::float8 AS "totalDispo"
-           ${withDetails ? sql`, COALESCE(json_agg(json_build_object(
+           ${
+             withDetails
+               ? sql`, COALESCE(json_agg(json_build_object(
               'id', s.id,'storageZoneId', s.storage_zone_id,'lotId', s.lot_id,'quantity', s.quantity,
               'reservedQuantity', COALESCE(sr_out.total_reserved,0),
               'availableQuantity', s.quantity - COALESCE(sr_out.total_reserved,0),
               'storageZone', CASE WHEN sz.id IS NOT NULL THEN json_build_object('id',sz.id,'designation',sz.designation,'code',sz.code) END,
               'lot', CASE WHEN l.id IS NOT NULL THEN json_build_object('id',l.id,'code',l.code,'expirationDate',l.expiration_date) END
-           )) FILTER (WHERE s.id IS NOT NULL),'[]') AS "stockInfo"` : sql``}
+           )) FILTER (WHERE s.id IS NOT NULL),'[]') AS "stockInfo"`
+               : sql``
+           }
     FROM articles a
     LEFT JOIN stock s ON s.article_id=a.id
     LEFT JOIN storage_zones sz ON sz.id=s.storage_zone_id
@@ -561,33 +851,43 @@ export class DatabaseStorage implements IStorage {
                GROUP BY article_id,lot_id,storage_zone_id) sr_out 
       ON sr_out.article_id=a.id AND sr_out.lot_id IS NOT DISTINCT FROM s.lot_id AND sr_out.storage_zone_id=s.storage_zone_id
     WHERE a.active=true
-    ${typeof articleIds === "number"
+    ${
+      typeof articleIds === "number"
         ? sql`AND a.id=${articleIds}`
         : Array.isArray(articleIds) && articleIds.length > 0
           ? sql`AND a.id = ANY(${articleIds}::int[])`
           : sql``
-      }
+    }
     GROUP BY a.id;
   `);
 
-    return result.rows as unknown as (T extends true ? ArticleStockDetail[] : ArticleStockBase[]);
+    return result.rows as unknown as T extends true
+      ? ArticleStockDetail[]
+      : ArticleStockBase[];
   }
 
-
-
   // Tous les articles
-  async getAllAvailableArticlesStock(withDetails = false, excludeDeliveryId?: number): Promise<ArticleStockBase[] | ArticleStockDetail[]> {
+  async getAllAvailableArticlesStock(
+    withDetails = false,
+    excludeDeliveryId?: number,
+  ): Promise<ArticleStockBase[] | ArticleStockDetail[]> {
     return this.queryArticleStock(withDetails, undefined, excludeDeliveryId);
   }
 
   // Un seul article
-  async getArticleAvailableStock(articleId: number, withDetails = false): Promise<ArticleStockBase | ArticleStockDetail | null> {
+  async getArticleAvailableStock(
+    articleId: number,
+    withDetails = false,
+  ): Promise<ArticleStockBase | ArticleStockDetail | null> {
     const rows = await this.queryArticleStock(withDetails, articleId);
     return rows[0] ?? null;
   }
 
   // Une sélection d'articles
-  async getSelectedArticlesStock(articleIds: number[], withDetails = false): Promise<ArticleStockBase[] | ArticleStockDetail[]> {
+  async getSelectedArticlesStock(
+    articleIds: number[],
+    withDetails = false,
+  ): Promise<ArticleStockBase[] | ArticleStockDetail[]> {
     return this.queryArticleStock(withDetails, articleIds);
   }
   //*************************//*************************//*************************//*************************//*************************
@@ -597,12 +897,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
-    const [article] = await db.insert(articles).values([insertArticle]).returning();
+    const [article] = await db
+      .insert(articles)
+      .values([insertArticle])
+      .returning();
     return article;
   }
 
-  async updateArticle(id: number, updateData: Partial<InsertArticle>): Promise<Article | undefined> {
-    const [article] = await db.update(articles)
+  async updateArticle(
+    id: number,
+    updateData: Partial<InsertArticle>,
+  ): Promise<Article | undefined> {
+    const [article] = await db
+      .update(articles)
       .set(updateData)
       .where(eq(articles.id, id))
       .returning();
@@ -616,7 +923,10 @@ export class DatabaseStorage implements IStorage {
 
   // Price Lists
   async getPriceList(id: number): Promise<PriceList | undefined> {
-    const [priceList] = await db.select().from(priceLists).where(eq(priceLists.id, id));
+    const [priceList] = await db
+      .select()
+      .from(priceLists)
+      .where(eq(priceLists.id, id));
     return priceList || undefined;
   }
 
@@ -625,16 +935,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActivePriceLists(): Promise<PriceList[]> {
-    return await db.select().from(priceLists).where(eq(priceLists.active, true));
+    return await db
+      .select()
+      .from(priceLists)
+      .where(eq(priceLists.active, true));
   }
 
   async createPriceList(insertPriceList: InsertPriceList): Promise<PriceList> {
-    const [priceList] = await db.insert(priceLists).values(insertPriceList).returning();
+    const [priceList] = await db
+      .insert(priceLists)
+      .values(insertPriceList)
+      .returning();
     return priceList;
   }
 
-  async updatePriceList(id: number, updateData: Partial<InsertPriceList>): Promise<PriceList | undefined> {
-    const [priceList] = await db.update(priceLists)
+  async updatePriceList(
+    id: number,
+    updateData: Partial<InsertPriceList>,
+  ): Promise<PriceList | undefined> {
+    const [priceList] = await db
+      .update(priceLists)
       .set(updateData)
       .where(eq(priceLists.id, id))
       .returning();
@@ -648,7 +968,10 @@ export class DatabaseStorage implements IStorage {
 
   // Price Rules
   async getPriceRule(id: number): Promise<PriceRule | undefined> {
-    const [priceRule] = await db.select().from(priceRules).where(eq(priceRules.id, id));
+    const [priceRule] = await db
+      .select()
+      .from(priceRules)
+      .where(eq(priceRules.id, id));
     return priceRule || undefined;
   }
 
@@ -657,20 +980,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPriceRulesByPriceList(priceListId: number): Promise<PriceRule[]> {
-    return await db.select().from(priceRules).where(eq(priceRules.priceListId, priceListId));
+    return await db
+      .select()
+      .from(priceRules)
+      .where(eq(priceRules.priceListId, priceListId));
   }
 
   async getActivePriceRules(): Promise<PriceRule[]> {
-    return await db.select().from(priceRules).where(eq(priceRules.active, true));
+    return await db
+      .select()
+      .from(priceRules)
+      .where(eq(priceRules.active, true));
   }
 
   async createPriceRule(insertPriceRule: InsertPriceRule): Promise<PriceRule> {
-    const [priceRule] = await db.insert(priceRules).values(insertPriceRule).returning();
+    const [priceRule] = await db
+      .insert(priceRules)
+      .values(insertPriceRule)
+      .returning();
     return priceRule;
   }
 
-  async updatePriceRule(id: number, updateData: Partial<InsertPriceRule>): Promise<PriceRule | undefined> {
-    const [priceRule] = await db.update(priceRules)
+  async updatePriceRule(
+    id: number,
+    updateData: Partial<InsertPriceRule>,
+  ): Promise<PriceRule | undefined> {
+    const [priceRule] = await db
+      .update(priceRules)
       .set(updateData)
       .where(eq(priceRules.id, id))
       .returning();
@@ -696,7 +1032,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingTaxes = await this.getAllTaxes();
     const nextNumber = existingTaxes.length + 1;
-    const code = `${TAX_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${TAX_CODE_PREFIX}-${nextNumber.toString().padStart(6, "0")}`;
 
     const taxData = {
       ...insertTax,
@@ -707,8 +1043,12 @@ export class DatabaseStorage implements IStorage {
     return tax;
   }
 
-  async updateTax(id: number, updateData: Partial<InsertTax>): Promise<Tax | undefined> {
-    const [tax] = await db.update(taxes)
+  async updateTax(
+    id: number,
+    updateData: Partial<InsertTax>,
+  ): Promise<Tax | undefined> {
+    const [tax] = await db
+      .update(taxes)
       .set(updateData)
       .where(eq(taxes.id, id))
       .returning();
@@ -726,12 +1066,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCurrency(id: number): Promise<Currency | undefined> {
-    const [currency] = await db.select().from(currencies).where(eq(currencies.id, id));
+    const [currency] = await db
+      .select()
+      .from(currencies)
+      .where(eq(currencies.id, id));
     return currency || undefined;
   }
 
   async getBaseCurrency(): Promise<Currency | undefined> {
-    const [currency] = await db.select().from(currencies).where(eq(currencies.isBase, true));
+    const [currency] = await db
+      .select()
+      .from(currencies)
+      .where(eq(currencies.isBase, true));
     return currency || undefined;
   }
 
@@ -740,7 +1086,8 @@ export class DatabaseStorage implements IStorage {
     await db.update(currencies).set({ isBase: false });
 
     // Définir la nouvelle devise de base
-    const [currency] = await db.update(currencies)
+    const [currency] = await db
+      .update(currencies)
       .set({ isBase: true })
       .where(eq(currencies.id, id))
       .returning();
@@ -748,12 +1095,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCurrency(insertCurrency: InsertCurrency): Promise<Currency> {
-    const [currency] = await db.insert(currencies).values(insertCurrency).returning();
+    const [currency] = await db
+      .insert(currencies)
+      .values(insertCurrency)
+      .returning();
     return currency;
   }
 
-  async updateCurrency(id: number, updateData: Partial<InsertCurrency>): Promise<Currency | undefined> {
-    const [currency] = await db.update(currencies)
+  async updateCurrency(
+    id: number,
+    updateData: Partial<InsertCurrency>,
+  ): Promise<Currency | undefined> {
+    const [currency] = await db
+      .update(currencies)
       .set(updateData)
       .where(eq(currencies.id, id))
       .returning();
@@ -771,27 +1125,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDeliveryMethod(id: number): Promise<DeliveryMethod | undefined> {
-    const [deliveryMethod] = await db.select().from(shippingMethods).where(eq(shippingMethods.id, id));
+    const [deliveryMethod] = await db
+      .select()
+      .from(shippingMethods)
+      .where(eq(shippingMethods.id, id));
     return deliveryMethod || undefined;
   }
 
-  async createDeliveryMethod(insertDeliveryMethod: InsertDeliveryMethod): Promise<DeliveryMethod> {
+  async createDeliveryMethod(
+    insertDeliveryMethod: InsertDeliveryMethod,
+  ): Promise<DeliveryMethod> {
     // Generate automatic code
     const existingMethods = await this.getAllDeliveryMethods();
     const nextNumber = existingMethods.length + 1;
-    const code = `${PrefixInventoryOperationType[InventoryOperationType.LIVRAISON]}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${PrefixInventoryOperationType[InventoryOperationType.LIVRAISON]}-${nextNumber.toString().padStart(6, "0")}`;
 
     const methodData = {
       ...insertDeliveryMethod,
       code,
     };
 
-    const [deliveryMethod] = await db.insert(shippingMethods).values(methodData).returning();
+    const [deliveryMethod] = await db
+      .insert(shippingMethods)
+      .values(methodData)
+      .returning();
     return deliveryMethod;
   }
 
-  async updateDeliveryMethod(id: number, updateData: Partial<InsertDeliveryMethod>): Promise<DeliveryMethod | undefined> {
-    const [deliveryMethod] = await db.update(shippingMethods)
+  async updateDeliveryMethod(
+    id: number,
+    updateData: Partial<InsertDeliveryMethod>,
+  ): Promise<DeliveryMethod | undefined> {
+    const [deliveryMethod] = await db
+      .update(shippingMethods)
       .set(updateData)
       .where(eq(shippingMethods.id, id))
       .returning();
@@ -799,7 +1165,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDeliveryMethod(id: number): Promise<boolean> {
-    const result = await db.delete(shippingMethods).where(eq(shippingMethods.id, id));
+    const result = await db
+      .delete(shippingMethods)
+      .where(eq(shippingMethods.id, id));
     return (result.rowCount || 0) > 0;
   }
 
@@ -808,28 +1176,42 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(accountingJournals);
   }
 
-  async getAccountingJournal(id: number): Promise<AccountingJournal | undefined> {
-    const [journal] = await db.select().from(accountingJournals).where(eq(accountingJournals.id, id));
+  async getAccountingJournal(
+    id: number,
+  ): Promise<AccountingJournal | undefined> {
+    const [journal] = await db
+      .select()
+      .from(accountingJournals)
+      .where(eq(accountingJournals.id, id));
     return journal || undefined;
   }
 
-  async createAccountingJournal(insertJournal: InsertAccountingJournal): Promise<AccountingJournal> {
+  async createAccountingJournal(
+    insertJournal: InsertAccountingJournal,
+  ): Promise<AccountingJournal> {
     // Generate automatic code
     const existingJournals = await this.getAllAccountingJournals();
     const nextNumber = existingJournals.length + 1;
-    const code = `${JOURNAL_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${JOURNAL_CODE_PREFIX}-${nextNumber.toString().padStart(6, "0")}`;
 
     const journalData = {
       ...insertJournal,
       code,
     };
 
-    const [journal] = await db.insert(accountingJournals).values(journalData).returning();
+    const [journal] = await db
+      .insert(accountingJournals)
+      .values(journalData)
+      .returning();
     return journal;
   }
 
-  async updateAccountingJournal(id: number, updateData: Partial<InsertAccountingJournal>): Promise<AccountingJournal | undefined> {
-    const [journal] = await db.update(accountingJournals)
+  async updateAccountingJournal(
+    id: number,
+    updateData: Partial<InsertAccountingJournal>,
+  ): Promise<AccountingJournal | undefined> {
+    const [journal] = await db
+      .update(accountingJournals)
       .set(updateData)
       .where(eq(accountingJournals.id, id))
       .returning();
@@ -837,7 +1219,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAccountingJournal(id: number): Promise<boolean> {
-    const result = await db.delete(accountingJournals).where(eq(accountingJournals.id, id));
+    const result = await db
+      .delete(accountingJournals)
+      .where(eq(accountingJournals.id, id));
     return (result.rowCount || 0) > 0;
   }
 
@@ -846,18 +1230,32 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(accountingAccounts);
   }
 
-  async getAccountingAccount(id: number): Promise<AccountingAccount | undefined> {
-    const [account] = await db.select().from(accountingAccounts).where(eq(accountingAccounts.id, id));
+  async getAccountingAccount(
+    id: number,
+  ): Promise<AccountingAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(accountingAccounts)
+      .where(eq(accountingAccounts.id, id));
     return account || undefined;
   }
 
-  async createAccountingAccount(insertAccount: InsertAccountingAccount): Promise<AccountingAccount> {
-    const [account] = await db.insert(accountingAccounts).values(insertAccount).returning();
+  async createAccountingAccount(
+    insertAccount: InsertAccountingAccount,
+  ): Promise<AccountingAccount> {
+    const [account] = await db
+      .insert(accountingAccounts)
+      .values(insertAccount)
+      .returning();
     return account;
   }
 
-  async updateAccountingAccount(id: number, updateData: Partial<InsertAccountingAccount>): Promise<AccountingAccount | undefined> {
-    const [account] = await db.update(accountingAccounts)
+  async updateAccountingAccount(
+    id: number,
+    updateData: Partial<InsertAccountingAccount>,
+  ): Promise<AccountingAccount | undefined> {
+    const [account] = await db
+      .update(accountingAccounts)
       .set(updateData)
       .where(eq(accountingAccounts.id, id))
       .returning();
@@ -865,7 +1263,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAccountingAccount(id: number): Promise<boolean> {
-    const result = await db.delete(accountingAccounts).where(eq(accountingAccounts.id, id));
+    const result = await db
+      .delete(accountingAccounts)
+      .where(eq(accountingAccounts.id, id));
     return (result.rowCount || 0) > 0;
   }
 
@@ -875,7 +1275,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStorageZone(id: number): Promise<StorageZone | undefined> {
-    const [zone] = await db.select().from(storageZones).where(eq(storageZones.id, id));
+    const [zone] = await db
+      .select()
+      .from(storageZones)
+      .where(eq(storageZones.id, id));
     return zone || undefined;
   }
 
@@ -883,7 +1286,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingZones = await this.getAllStorageZones();
     const nextNumber = existingZones.length + 1;
-    const code = `${ZONE_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${ZONE_CODE_PREFIX}-${nextNumber.toString().padStart(6, "0")}`;
 
     const zoneData = {
       ...insertZone,
@@ -894,8 +1297,12 @@ export class DatabaseStorage implements IStorage {
     return zone;
   }
 
-  async updateStorageZone(id: number, updateData: Partial<InsertStorageZone>): Promise<StorageZone | undefined> {
-    const [zone] = await db.update(storageZones)
+  async updateStorageZone(
+    id: number,
+    updateData: Partial<InsertStorageZone>,
+  ): Promise<StorageZone | undefined> {
+    const [zone] = await db
+      .update(storageZones)
       .set(updateData)
       .where(eq(storageZones.id, id))
       .returning();
@@ -913,27 +1320,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWorkStation(id: number): Promise<WorkStation | undefined> {
-    const [workStation] = await db.select().from(workStations).where(eq(workStations.id, id));
+    const [workStation] = await db
+      .select()
+      .from(workStations)
+      .where(eq(workStations.id, id));
     return workStation || undefined;
   }
 
-  async createWorkStation(insertWorkStation: InsertWorkStation): Promise<WorkStation> {
+  async createWorkStation(
+    insertWorkStation: InsertWorkStation,
+  ): Promise<WorkStation> {
     // Generate automatic code
     const existingStations = await this.getAllWorkStations();
     const nextNumber = existingStations.length + 1;
-    const code = `${STATION_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${STATION_CODE_PREFIX}-${nextNumber.toString().padStart(6, "0")}`;
 
     const stationData = {
       ...insertWorkStation,
       code,
     };
 
-    const [workStation] = await db.insert(workStations).values(stationData).returning();
+    const [workStation] = await db
+      .insert(workStations)
+      .values(stationData)
+      .returning();
     return workStation;
   }
 
-  async updateWorkStation(id: number, updateData: Partial<InsertWorkStation>): Promise<WorkStation | undefined> {
-    const [workStation] = await db.update(workStations)
+  async updateWorkStation(
+    id: number,
+    updateData: Partial<InsertWorkStation>,
+  ): Promise<WorkStation | undefined> {
+    const [workStation] = await db
+      .update(workStations)
       .set(updateData)
       .where(eq(workStations.id, id))
       .returning();
@@ -958,15 +1377,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecipeByArticleId(articleId: number): Promise<Recipe | undefined> {
-    const [recipe] = await db.select().from(recipes).where(eq(recipes.articleId, articleId));
+    const [recipe] = await db
+      .select()
+      .from(recipes)
+      .where(eq(recipes.articleId, articleId));
     return recipe || undefined;
   }
 
   // Aggregated stats for recipes
-  async getRecipeStats(): Promise<Array<{ recipeId: number; ingredientsCount: number; operationsCount: number; totalOperationDuration: number }>> {
+  async getRecipeStats(): Promise<
+    Array<{
+      recipeId: number;
+      ingredientsCount: number;
+      operationsCount: number;
+      totalOperationDuration: number;
+    }>
+  > {
     // Count ingredients per recipe
     const ingredientCounts = await db
-      .select({ recipeId: recipeIngredients.recipeId, cnt: sql<number>`COUNT(${recipeIngredients.id})` })
+      .select({
+        recipeId: recipeIngredients.recipeId,
+        cnt: sql<number>`COUNT(${recipeIngredients.id})`,
+      })
       .from(recipeIngredients)
       .groupBy(recipeIngredients.recipeId);
 
@@ -980,15 +1412,33 @@ export class DatabaseStorage implements IStorage {
       .from(recipeOperations)
       .groupBy(recipeOperations.recipeId);
 
-    const map: Record<number, { recipeId: number; ingredientsCount: number; operationsCount: number; totalOperationDuration: number }> = {};
+    const map: Record<
+      number,
+      {
+        recipeId: number;
+        ingredientsCount: number;
+        operationsCount: number;
+        totalOperationDuration: number;
+      }
+    > = {};
 
     for (const row of ingredientCounts) {
-      map[row.recipeId] = map[row.recipeId] || { recipeId: row.recipeId, ingredientsCount: 0, operationsCount: 0, totalOperationDuration: 0 };
+      map[row.recipeId] = map[row.recipeId] || {
+        recipeId: row.recipeId,
+        ingredientsCount: 0,
+        operationsCount: 0,
+        totalOperationDuration: 0,
+      };
       map[row.recipeId].ingredientsCount = Number(row.cnt);
     }
 
     for (const row of operationsAgg) {
-      map[row.recipeId] = map[row.recipeId] || { recipeId: row.recipeId, ingredientsCount: 0, operationsCount: 0, totalOperationDuration: 0 };
+      map[row.recipeId] = map[row.recipeId] || {
+        recipeId: row.recipeId,
+        ingredientsCount: 0,
+        operationsCount: 0,
+        totalOperationDuration: 0,
+      };
       map[row.recipeId].operationsCount = Number(row.cnt);
       map[row.recipeId].totalOperationDuration = Number(row.totalDur || 0);
     }
@@ -1001,8 +1451,12 @@ export class DatabaseStorage implements IStorage {
     return recipe;
   }
 
-  async updateRecipe(id: number, updateData: Partial<InsertRecipe>): Promise<Recipe | undefined> {
-    const [recipe] = await db.update(recipes)
+  async updateRecipe(
+    id: number,
+    updateData: Partial<InsertRecipe>,
+  ): Promise<Recipe | undefined> {
+    const [recipe] = await db
+      .update(recipes)
       .set({ ...updateData, updatedAt: new Date().toISOString() })
       .where(eq(recipes.id, id))
       .returning();
@@ -1015,35 +1469,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteRecipeByArticleId(articleId: number): Promise<boolean> {
-    const result = await db.delete(recipes).where(eq(recipes.articleId, articleId));
+    const result = await db
+      .delete(recipes)
+      .where(eq(recipes.articleId, articleId));
     return (result.rowCount || 0) > 0;
   }
 
   // Recipe Ingredients
   async getRecipeIngredients(recipeId: number): Promise<RecipeIngredient[]> {
-    return await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+    return await db
+      .select()
+      .from(recipeIngredients)
+      .where(eq(recipeIngredients.recipeId, recipeId));
   }
 
-  async createRecipeIngredient(insertRecipeIngredient: InsertRecipeIngredient): Promise<RecipeIngredient> {
-    console.log("🔥 CREATE RECIPE INGREDIENT - Data:", JSON.stringify(insertRecipeIngredient, null, 2));
-    const [ingredient] = await db.insert(recipeIngredients).values(insertRecipeIngredient).returning();
-    console.log("✅ CREATE RECIPE INGREDIENT - Success:", JSON.stringify(ingredient, null, 2));
+  async createRecipeIngredient(
+    insertRecipeIngredient: InsertRecipeIngredient,
+  ): Promise<RecipeIngredient> {
+    console.log(
+      "🔥 CREATE RECIPE INGREDIENT - Data:",
+      JSON.stringify(insertRecipeIngredient, null, 2),
+    );
+    const [ingredient] = await db
+      .insert(recipeIngredients)
+      .values(insertRecipeIngredient)
+      .returning();
+    console.log(
+      "✅ CREATE RECIPE INGREDIENT - Success:",
+      JSON.stringify(ingredient, null, 2),
+    );
     return ingredient;
   }
 
-  async updateRecipeIngredient(id: number, updateData: Partial<InsertRecipeIngredient>): Promise<RecipeIngredient | undefined> {
-    console.log("🔥 UPDATE RECIPE INGREDIENT - ID:", id, "Data:", JSON.stringify(updateData, null, 2));
-    const [ingredient] = await db.update(recipeIngredients)
+  async updateRecipeIngredient(
+    id: number,
+    updateData: Partial<InsertRecipeIngredient>,
+  ): Promise<RecipeIngredient | undefined> {
+    console.log(
+      "🔥 UPDATE RECIPE INGREDIENT - ID:",
+      id,
+      "Data:",
+      JSON.stringify(updateData, null, 2),
+    );
+    const [ingredient] = await db
+      .update(recipeIngredients)
       .set(updateData)
       .where(eq(recipeIngredients.id, id))
       .returning();
-    console.log("✅ UPDATE RECIPE INGREDIENT - Success:", JSON.stringify(ingredient, null, 2));
+    console.log(
+      "✅ UPDATE RECIPE INGREDIENT - Success:",
+      JSON.stringify(ingredient, null, 2),
+    );
     return ingredient || undefined;
   }
 
   async deleteRecipeIngredient(id: number): Promise<boolean> {
     console.log("🔥 DELETE RECIPE INGREDIENT - ID:", id);
-    const result = await db.delete(recipeIngredients).where(eq(recipeIngredients.id, id));
+    const result = await db
+      .delete(recipeIngredients)
+      .where(eq(recipeIngredients.id, id));
     const success = (result.rowCount || 0) > 0;
     console.log("✅ DELETE RECIPE INGREDIENT - Success:", success);
     return success;
@@ -1051,31 +1535,58 @@ export class DatabaseStorage implements IStorage {
 
   // Recipe Operations
   async getRecipeOperations(recipeId: number): Promise<RecipeOperation[]> {
-    return await db.select().from(recipeOperations)
+    return await db
+      .select()
+      .from(recipeOperations)
       .where(eq(recipeOperations.recipeId, recipeId))
       .orderBy(recipeOperations.order);
   }
 
-  async createRecipeOperation(insertRecipeOperation: InsertRecipeOperation): Promise<RecipeOperation> {
-    console.log("🔥 CREATE RECIPE OPERATION - Data:", JSON.stringify(insertRecipeOperation, null, 2));
-    const [operation] = await db.insert(recipeOperations).values(insertRecipeOperation).returning();
-    console.log("✅ CREATE RECIPE OPERATION - Success:", JSON.stringify(operation, null, 2));
+  async createRecipeOperation(
+    insertRecipeOperation: InsertRecipeOperation,
+  ): Promise<RecipeOperation> {
+    console.log(
+      "🔥 CREATE RECIPE OPERATION - Data:",
+      JSON.stringify(insertRecipeOperation, null, 2),
+    );
+    const [operation] = await db
+      .insert(recipeOperations)
+      .values(insertRecipeOperation)
+      .returning();
+    console.log(
+      "✅ CREATE RECIPE OPERATION - Success:",
+      JSON.stringify(operation, null, 2),
+    );
     return operation;
   }
 
-  async updateRecipeOperation(id: number, updateData: Partial<InsertRecipeOperation>): Promise<RecipeOperation | undefined> {
-    console.log("🔥 UPDATE RECIPE OPERATION - ID:", id, "Data:", JSON.stringify(updateData, null, 2));
-    const [operation] = await db.update(recipeOperations)
+  async updateRecipeOperation(
+    id: number,
+    updateData: Partial<InsertRecipeOperation>,
+  ): Promise<RecipeOperation | undefined> {
+    console.log(
+      "🔥 UPDATE RECIPE OPERATION - ID:",
+      id,
+      "Data:",
+      JSON.stringify(updateData, null, 2),
+    );
+    const [operation] = await db
+      .update(recipeOperations)
       .set(updateData)
       .where(eq(recipeOperations.id, id))
       .returning();
-    console.log("✅ UPDATE RECIPE OPERATION - Success:", JSON.stringify(operation, null, 2));
+    console.log(
+      "✅ UPDATE RECIPE OPERATION - Success:",
+      JSON.stringify(operation, null, 2),
+    );
     return operation || undefined;
   }
 
   async deleteRecipeOperation(id: number): Promise<boolean> {
     console.log("🔥 DELETE RECIPE OPERATION - ID:", id);
-    const result = await db.delete(recipeOperations).where(eq(recipeOperations.id, id));
+    const result = await db
+      .delete(recipeOperations)
+      .where(eq(recipeOperations.id, id));
     const success = (result.rowCount || 0) > 0;
     console.log("✅ DELETE RECIPE OPERATION - Success:", success);
     return success;
@@ -1087,7 +1598,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSupplier(id: number): Promise<Supplier | undefined> {
-    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    const [supplier] = await db
+      .select()
+      .from(suppliers)
+      .where(eq(suppliers.id, id));
     return supplier || undefined;
   }
 
@@ -1095,19 +1609,26 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingSuppliers = await this.getAllSuppliers();
     const nextNumber = existingSuppliers.length + 1;
-    const code = `${SUPPLIER_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${SUPPLIER_CODE_PREFIX}-${nextNumber.toString().padStart(6, "0")}`;
 
     const supplierData = {
       ...insertSupplier,
       code,
     };
 
-    const [supplier] = await db.insert(suppliers).values(supplierData).returning();
+    const [supplier] = await db
+      .insert(suppliers)
+      .values(supplierData)
+      .returning();
     return supplier;
   }
 
-  async updateSupplier(id: number, updateData: Partial<InsertSupplier>): Promise<Supplier | undefined> {
-    const [supplier] = await db.update(suppliers)
+  async updateSupplier(
+    id: number,
+    updateData: Partial<InsertSupplier>,
+  ): Promise<Supplier | undefined> {
+    const [supplier] = await db
+      .update(suppliers)
       .set(updateData)
       .where(eq(suppliers.id, id))
       .returning();
@@ -1130,7 +1651,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClientIdByUserId(id: number): Promise<number | undefined> {
-    const [client] = await db.select({ idClient: clients.id }).from(clients).where(eq(clients.userId, id));
+    const [client] = await db
+      .select({ idClient: clients.id })
+      .from(clients)
+      .where(eq(clients.userId, id));
     return client?.idClient || undefined;
   }
 
@@ -1138,7 +1662,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingClients = await this.getAllClients();
     const nextNumber = existingClients.length + 1;
-    const code = `${CLIENT_CODE_PREFIX}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${CLIENT_CODE_PREFIX}-${nextNumber.toString().padStart(6, "0")}`;
 
     const clientData = {
       ...insertClient,
@@ -1149,8 +1673,12 @@ export class DatabaseStorage implements IStorage {
     return client;
   }
 
-  async updateClient(id: number, updateData: Partial<InsertClient>): Promise<Client | undefined> {
-    const [client] = await db.update(clients)
+  async updateClient(
+    id: number,
+    updateData: Partial<InsertClient>,
+  ): Promise<Client | undefined> {
+    const [client] = await db
+      .update(clients)
       .set(updateData)
       .where(eq(clients.id, id))
       .returning();
@@ -1174,7 +1702,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrdersByClient(clientId: number): Promise<Order[]> {
-    return await db.select().from(orders)
+    return await db
+      .select()
+      .from(orders)
       .where(eq(orders.clientId, clientId))
       .orderBy(desc(orders.createdAt));
   }
@@ -1196,7 +1726,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(orders)
       .leftJoin(clients, eq(orders.clientId, clients.id))
-      .where(eq(orders.status, OrderStatus.CONFIRMED))
+      .where(eq(orders.status, OrderStatus.VALIDATED))
       .orderBy(desc(orders.orderDate));
 
     // Get items for these orders with article info
@@ -1217,15 +1747,17 @@ export class DatabaseStorage implements IStorage {
           })
           .from(orderItems)
           .leftJoin(articles, eq(orderItems.articleId, articles.id))
-          .where(and(
-            eq(orderItems.orderId, order.id),
-            eq(articles.type, ArticleCategoryType.PRODUCT) // Only products
-          ));
+          .where(
+            and(
+              eq(orderItems.orderId, order.id),
+              eq(articles.type, ArticleCategoryType.PRODUCT), // Only products
+            ),
+          );
 
         // Filter items that still need preparation
-        const itemsNeedingPreparation = items.filter(item => {
+        const itemsNeedingPreparation = items.filter((item) => {
           const quantityOrdered = parseFloat(item.quantity);
-          const quantityPrepared = parseFloat(item.quantityPrepared || '0');
+          const quantityPrepared = parseFloat(item.quantityPrepared || "0");
           return quantityPrepared < quantityOrdered;
         });
 
@@ -1237,7 +1769,7 @@ export class DatabaseStorage implements IStorage {
               lastName: order.clientLastName,
               companyName: order.clientCompanyName,
             },
-            items: itemsNeedingPreparation.map(item => ({
+            items: itemsNeedingPreparation.map((item) => ({
               ...item,
               article: {
                 id: item.articleId,
@@ -1246,24 +1778,25 @@ export class DatabaseStorage implements IStorage {
                 type: item.articleType,
                 currentStock: item.articleCurrentStock,
                 unit: item.articleUnit,
-              }
-            }))
+              },
+            })),
           };
         }
         return null;
-      })
+      }),
     );
 
     // Filter out orders with no items needing preparation
-    return ordersWithItems.filter(order => order !== null);
+    return ordersWithItems.filter((order) => order !== null);
   }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     // Generate automatic code
-    const prefix = insertOrder.type === OrderType.QUOTE ? OrderPrefix.DEV : OrderPrefix.CMD;
+    const prefix =
+      insertOrder.type === OrderType.QUOTE ? OrderPrefix.DEV : OrderPrefix.CMD;
     const existingOrders = await this.getAllOrders();
     const nextNumber = existingOrders.length + 1;
-    const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
 
     const orderData = {
       ...insertOrder,
@@ -1274,20 +1807,33 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
-  async createOrderWithItems(insertOrder: InsertOrder, items: InsertOrderItem[]): Promise<Order> {
-    insertOrder.subtotalHT = items.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();
-    insertOrder.totalTax = items.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
-    insertOrder.totalTTC = (parseFloat(insertOrder.subtotalHT) + parseFloat(insertOrder.totalTax)).toString();
+  async createOrderWithItems(
+    insertOrder: InsertOrder,
+    items: InsertOrderItem[],
+  ): Promise<Order> {
+    insertOrder.subtotalHT = items
+      .reduce((sum, item) => sum + parseFloat(item.totalPrice), 0)
+      .toString();
+    insertOrder.totalTax = items
+      .reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0)
+      .toString();
+    insertOrder.totalTTC = (
+      parseFloat(insertOrder.subtotalHT) + parseFloat(insertOrder.totalTax)
+    ).toString();
 
     return await db.transaction(async (tx) => {
-      const prefix = insertOrder.type === OrderType.QUOTE ? OrderPrefix.DEV : OrderPrefix.CMD;
+      const prefix =
+        insertOrder.type === OrderType.QUOTE
+          ? OrderPrefix.DEV
+          : OrderPrefix.CMD;
       const existingOrders = await tx.select().from(orders);
       const nextNumber = existingOrders.length + 1;
       const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
       // 2. Calculer la nouvelle position (dernière position + 1)
-      const lastPosition = existingOrders.length > 0
-        ? Math.max(...existingOrders.map(order => order.order ?? 0))
-        : 0;
+      const lastPosition =
+        existingOrders.length > 0
+          ? Math.max(...existingOrders.map((order) => order.order ?? 0))
+          : 0;
       const newPosition = lastPosition + 1;
       const [order] = await tx
         .insert(orders)
@@ -1305,11 +1851,10 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-
   async updateOrderWithItems(
     orderId: number,
     updatedOrder: Partial<InsertOrder>,
-    updatedItems: InsertOrderItem[]
+    updatedItems: InsertOrderItem[],
   ): Promise<Order> {
     return await db.transaction(async (tx) => {
       // 1. Vérifier que la commande existe
@@ -1320,11 +1865,18 @@ export class DatabaseStorage implements IStorage {
       if (!existing) {
         throw new Error("Commande introuvable");
       }
-      updatedOrder.subtotalHT = updatedItems.reduce((sum, item) => sum + parseFloat(item.totalPrice), 0).toString();
-      updatedOrder.totalTax = updatedItems.reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0).toString();
-      updatedOrder.totalTTC = (parseFloat(updatedOrder.subtotalHT) + parseFloat(updatedOrder.totalTax)).toString();
+      updatedOrder.subtotalHT = updatedItems
+        .reduce((sum, item) => sum + parseFloat(item.totalPrice), 0)
+        .toString();
+      updatedOrder.totalTax = updatedItems
+        .reduce((sum, item) => sum + parseFloat(item.taxAmount ?? "0"), 0)
+        .toString();
+      updatedOrder.totalTTC = (
+        parseFloat(updatedOrder.subtotalHT) + parseFloat(updatedOrder.totalTax)
+      ).toString();
       // 2. Mise à jour de la commande
-      await tx.update(orders)
+      await tx
+        .update(orders)
         .set({ ...updatedOrder, updatedAt: new Date().toISOString() })
         .where(eq(orders.id, orderId));
 
@@ -1332,7 +1884,7 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
 
       // 4. Ajouter les nouvelles lignes
-      const itemsToInsert = updatedItems.map(item => ({
+      const itemsToInsert = updatedItems.map((item) => ({
         ...item,
         orderId,
       }));
@@ -1340,13 +1892,22 @@ export class DatabaseStorage implements IStorage {
       await tx.insert(orderItems).values(itemsToInsert);
 
       // 5. Retourner la commande mise à jour
-      const [updated] = await tx.select().from(orders).where(eq(orders.id, orderId));
+      const [updated] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, orderId));
       return updated;
     });
   }
 
-  async updateOrder(id: number, updateData: Partial<InsertOrder>): Promise<Order | undefined> {
-    const foundOrders = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
+  async updateOrder(
+    id: number,
+    updateData: Partial<InsertOrder>,
+  ): Promise<Order | undefined> {
+    const foundOrders = await db
+      .select({ status: orders.status })
+      .from(orders)
+      .where(eq(orders.id, id));
     if (foundOrders[0]?.status != updateData.status) {
       updateData.statusDate = new Date().toISOString();
       if (updateData.status == OrderStatus.VALIDATED) {
@@ -1355,7 +1916,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const [order] = await db.update(orders)
+    const [order] = await db
+      .update(orders)
       .set({ ...updateData, updatedAt: new Date().toISOString() })
       .where(eq(orders.id, id))
       .returning();
@@ -1369,25 +1931,35 @@ export class DatabaseStorage implements IStorage {
 
   // Order Items
   async getOrderItem(id: number): Promise<OrderItem | undefined> {
-    const [orderItem] = await db.select()
+    const [orderItem] = await db
+      .select()
       .from(orderItems)
       .where(eq(orderItems.id, id));
     return orderItem;
   }
 
   async getOrderItems(orderId: number): Promise<OrderItem[]> {
-    return await db.select().from(orderItems)
+    return await db
+      .select()
+      .from(orderItems)
       .where(eq(orderItems.orderId, orderId))
       .orderBy(orderItems.id);
   }
 
   async createOrderItem(insertOrderItem: InsertOrderItem): Promise<OrderItem> {
-    const [item] = await db.insert(orderItems).values(insertOrderItem).returning();
+    const [item] = await db
+      .insert(orderItems)
+      .values(insertOrderItem)
+      .returning();
     return item;
   }
 
-  async updateOrderItem(id: number, updateData: Partial<InsertOrderItem>): Promise<OrderItem | undefined> {
-    const [item] = await db.update(orderItems)
+  async updateOrderItem(
+    id: number,
+    updateData: Partial<InsertOrderItem>,
+  ): Promise<OrderItem | undefined> {
+    const [item] = await db
+      .update(orderItems)
       .set(updateData)
       .where(eq(orderItems.id, id))
       .returning();
@@ -1400,15 +1972,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllInventoryOperations(): Promise<InventoryOperation[]> {
-    return await db.select().from(inventoryOperations).orderBy(desc(inventoryOperations.createdAt));
+    return await db
+      .select()
+      .from(inventoryOperations)
+      .orderBy(desc(inventoryOperations.createdAt));
   }
 
-  async getInventoryOperation(id: number): Promise<InventoryOperation | undefined> {
-    const [operation] = await db.select().from(inventoryOperations).where(eq(inventoryOperations.id, id));
+  async getInventoryOperation(
+    id: number,
+  ): Promise<InventoryOperation | undefined> {
+    const [operation] = await db
+      .select()
+      .from(inventoryOperations)
+      .where(eq(inventoryOperations.id, id));
     return operation || undefined;
   }
 
-  async getInventoryOperationsByType(type: string, includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
+  async getInventoryOperationsByType(
+    type: string,
+    includeReliquat: boolean = false,
+  ): Promise<InventoryOperationWithItems[]> {
     const condition =
       type === InventoryOperationType.FABRICATION && includeReliquat
         ? sql`io.type IN (${InventoryOperationType.FABRICATION},${InventoryOperationType.FABRICATION_RELIQUAT} )`
@@ -1429,12 +2012,17 @@ export class DatabaseStorage implements IStorage {
     ORDER BY io.created_at DESC
   `);
 
-    return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+    return camelcaseKeys(result.rows, {
+      deep: true,
+    }) as InventoryOperationWithItems[];
   }
 
-  async getInventoryOperationsByTypes(types: string[], includeReliquat: boolean = false): Promise<InventoryOperationWithItems[]> {
+  async getInventoryOperationsByTypes(
+    types: string[],
+    includeReliquat: boolean = false,
+  ): Promise<InventoryOperationWithItems[]> {
     // Construire la condition pour plusieurs types
-    const typeConditions = types.map(type => {
+    const typeConditions = types.map((type) => {
       if (type === InventoryOperationType.FABRICATION && includeReliquat) {
         return sql`io.type IN (${InventoryOperationType.FABRICATION},${InventoryOperationType.FABRICATION_RELIQUAT} )`;
       }
@@ -1461,10 +2049,14 @@ export class DatabaseStorage implements IStorage {
       io.created_at DESC
   `);
 
-    return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+    return camelcaseKeys(result.rows, {
+      deep: true,
+    }) as InventoryOperationWithItems[];
   }
 
-  async getInventoryOperationsByOperator(operatorId: number): Promise<InventoryOperationWithItems[]> {
+  async getInventoryOperationsByOperator(
+    operatorId: number,
+  ): Promise<InventoryOperationWithItems[]> {
     try {
       const result = await db.execute(sql`
         SELECT 
@@ -1512,14 +2104,18 @@ export class DatabaseStorage implements IStorage {
         ORDER BY io.created_at DESC
       `);
 
-      return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+      return camelcaseKeys(result.rows, {
+        deep: true,
+      }) as InventoryOperationWithItems[];
     } catch (error) {
-      console.error('Error in getInventoryOperationsByOperator:', error);
+      console.error("Error in getInventoryOperationsByOperator:", error);
       throw error;
     }
   }
 
-  async getInventoryOperationsByOrder(orderId: number): Promise<InventoryOperationWithItems[]> {
+  async getInventoryOperationsByOrder(
+    orderId: number,
+  ): Promise<InventoryOperationWithItems[]> {
     try {
       const result = await db.execute(sql`
         SELECT 
@@ -1567,31 +2163,36 @@ export class DatabaseStorage implements IStorage {
         ORDER BY io.created_at DESC
       `);
 
-      return camelcaseKeys(result.rows, { deep: true }) as InventoryOperationWithItems[];
+      return camelcaseKeys(result.rows, {
+        deep: true,
+      }) as InventoryOperationWithItems[];
     } catch (error) {
-      console.error('Error in getInventoryOperationsByOrder:', error);
+      console.error("Error in getInventoryOperationsByOrder:", error);
       throw error;
     }
   }
 
-  async createInventoryOperation(insertOperation: InsertInventoryOperation): Promise<InventoryOperation> {
-
-
+  async createInventoryOperation(
+    insertOperation: InsertInventoryOperation,
+  ): Promise<InventoryOperation> {
     const prefix = PrefixInventoryOperationType[insertOperation.type];
-    const existingOps = await this.getInventoryOperationsByType(insertOperation.type);
+    const existingOps = await this.getInventoryOperationsByType(
+      insertOperation.type,
+    );
     const nextNumber = existingOps.length + 1;
-    const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
 
     const operationData = {
       ...insertOperation,
       code,
     };
 
-    const [operation] = await db.insert(inventoryOperations).values(operationData).returning();
+    const [operation] = await db
+      .insert(inventoryOperations)
+      .values(operationData)
+      .returning();
     return operation;
   }
-
-
 
   // async createAccountingEntryFromOperation(operation: InventoryOperation): Promise<AccountingEntry | undefined> {
   //   if (operation.type === "reception" || operation.type === "livraison" || operation.type === "ajustement") {
@@ -1604,14 +2205,17 @@ export class DatabaseStorage implements IStorage {
     tx: any,
     articleId: number,
     incomingQuantity: number,
-    incomingUnitCost: number
+    incomingUnitCost: number,
   ): Promise<number> {
     // Récupérer l'article actuel
-    const [article] = await tx.select().from(articles).where(eq(articles.id, articleId));
+    const [article] = await tx
+      .select()
+      .from(articles)
+      .where(eq(articles.id, articleId));
     if (!article) throw new Error(`Article ${articleId} not found`);
 
-    const currentStock = parseFloat(article.currentStock || '0');
-    const currentCostPerUnit = parseFloat(article.costPerUnit || '0');
+    const currentStock = parseFloat(article.currentStock || "0");
+    const currentCostPerUnit = parseFloat(article.costPerUnit || "0");
 
     // Si stock nul, le PMP devient le prix d'entrée
     if (currentStock === 0) {
@@ -1629,28 +2233,40 @@ export class DatabaseStorage implements IStorage {
   async updateInventoryOperationStatus(
     id: number,
     status: string,
-    scheduledDate?: string
+    scheduledDate?: string,
   ): Promise<InventoryOperation | undefined> {
     return await db.transaction(async (tx) => {
       const op = await tx.query.inventoryOperations.findFirst({
         where: (o, { eq }) => eq(o.id, id),
-        with: { items: true }
+        with: { items: true },
       });
       if (!op) throw new Error("Operation not found");
 
       if (op.status === status) return op; // rien à faire
 
       // ---- Passage en completed ----
-      if (status === InventoryOperationStatus.COMPLETED && op.status !== InventoryOperationStatus.COMPLETED) {
+      if (
+        status === InventoryOperationStatus.COMPLETED &&
+        op.status !== InventoryOperationStatus.COMPLETED
+      ) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
-          if (qty < 0) throw new Error(`Invalid qty for article ${item.articleId}`);
+          if (qty < 0)
+            throw new Error(`Invalid qty for article ${item.articleId}`);
 
           // Sortie de stock (fromStorageZoneId)
           if (item.fromStorageZoneId) {
-            await this.upsertStock(tx, item.articleId, item.fromStorageZoneId, -qty, item.lotId ?? null, item.serialNumber ?? null);
+            await this.upsertStock(
+              tx,
+              item.articleId,
+              item.fromStorageZoneId,
+              -qty,
+              item.lotId ?? null,
+              item.serialNumber ?? null,
+            );
 
-            await tx.update(articles)
+            await tx
+              .update(articles)
               .set({ currentStock: sql`${articles.currentStock} - ${qty}` })
               .where(eq(articles.id, item.articleId));
           }
@@ -1658,23 +2274,37 @@ export class DatabaseStorage implements IStorage {
           // Entrée de stock (toStorageZoneId) - avec calcul PMP
           if (item.toStorageZoneId) {
             // Calculer le nouveau PMP pour les opérations d'achat et d'inventaire initial
-            if ((op.type === InventoryOperationType.RECEPTION || op.type === 'inventaire_initiale') && item.unitCost && parseFloat(item.unitCost) > 0) {
+            if (
+              (op.type === InventoryOperationType.RECEPTION ||
+                op.type === "inventaire_initiale") &&
+              item.unitCost &&
+              parseFloat(item.unitCost) > 0
+            ) {
               const newPMP = await this.calculateWeightedAveragePrice(
                 tx,
                 item.articleId,
                 qty,
-                parseFloat(item.unitCost)
+                parseFloat(item.unitCost),
               );
 
               // Mettre à jour le PMP de l'article
-              await tx.update(articles)
+              await tx
+                .update(articles)
                 .set({ costPerUnit: newPMP.toFixed(2) })
                 .where(eq(articles.id, item.articleId));
             }
 
-            await this.upsertStock(tx, item.articleId, item.toStorageZoneId, qty, item.lotId ?? null, item.serialNumber ?? null);
+            await this.upsertStock(
+              tx,
+              item.articleId,
+              item.toStorageZoneId,
+              qty,
+              item.lotId ?? null,
+              item.serialNumber ?? null,
+            );
 
-            await tx.update(articles)
+            await tx
+              .update(articles)
               .set({ currentStock: sql`${articles.currentStock} + ${qty}` })
               .where(eq(articles.id, item.articleId));
           }
@@ -1682,25 +2312,44 @@ export class DatabaseStorage implements IStorage {
       }
 
       // ---- Passage en cancelled ----
-      if (status === InventoryOperationStatus.CANCELLED && op.status === InventoryOperationStatus.COMPLETED) {
+      if (
+        status === InventoryOperationStatus.CANCELLED &&
+        op.status === InventoryOperationStatus.COMPLETED
+      ) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
           if (qty <= 0) continue;
 
           // rollback entrée
           if (item.toStorageZoneId) {
-            await this.upsertStock(tx, item.articleId, item.toStorageZoneId, -qty, item.lotId ?? null, item.serialNumber ?? null);
+            await this.upsertStock(
+              tx,
+              item.articleId,
+              item.toStorageZoneId,
+              -qty,
+              item.lotId ?? null,
+              item.serialNumber ?? null,
+            );
 
-            await tx.update(articles)
+            await tx
+              .update(articles)
               .set({ currentStock: sql`${articles.currentStock} - ${qty}` })
               .where(eq(articles.id, item.articleId));
           }
 
           // rollback sortie
           if (item.fromStorageZoneId) {
-            await this.upsertStock(tx, item.articleId, item.fromStorageZoneId, qty, item.lotId ?? null, item.serialNumber ?? null);
+            await this.upsertStock(
+              tx,
+              item.articleId,
+              item.fromStorageZoneId,
+              qty,
+              item.lotId ?? null,
+              item.serialNumber ?? null,
+            );
 
-            await tx.update(articles)
+            await tx
+              .update(articles)
               .set({ currentStock: sql`${articles.currentStock} + ${qty}` })
               .where(eq(articles.id, item.articleId));
           }
@@ -1713,7 +2362,8 @@ export class DatabaseStorage implements IStorage {
         updateData.scheduledDate = scheduledDate;
       }
 
-      const [newOp] = await tx.update(inventoryOperations)
+      const [newOp] = await tx
+        .update(inventoryOperations)
         .set(updateData)
         .where(eq(inventoryOperations.id, id))
         .returning();
@@ -1722,14 +2372,16 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateInventoryOperation(id: number, updateData: Partial<InsertInventoryOperation>): Promise<InventoryOperation | undefined> {
-
+  async updateInventoryOperation(
+    id: number,
+    updateData: Partial<InsertInventoryOperation>,
+  ): Promise<InventoryOperation | undefined> {
     return await db.transaction(async (tx) => {
       try {
         // Récupérer l'opération actuelle avec ses items
         const currentOperation = await tx.query.inventoryOperations.findFirst({
           where: (o, { eq }) => eq(o.id, id),
-          with: { items: true }
+          with: { items: true },
         });
 
         if (!currentOperation) {
@@ -1737,7 +2389,8 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Mettre à jour l'opération
-        const [operation] = await tx.update(inventoryOperations)
+        const [operation] = await tx
+          .update(inventoryOperations)
           .set({ ...updateData, updatedAt: new Date().toISOString() })
           .where(eq(inventoryOperations.id, id))
           .returning();
@@ -1747,16 +2400,22 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Si scheduledDate est définie et que l'opération devient "programmed"
-        if (updateData.scheduledDate && operation.status === InventoryOperationStatus.PROGRAMMED) {
+        if (
+          updateData.scheduledDate &&
+          operation.status === InventoryOperationStatus.PROGRAMMED
+        ) {
           // Libérer d'abord les anciennes réservations si elles existent
-          await tx.update(stockReservations)
+          await tx
+            .update(stockReservations)
             .set({ status: InventoryOperationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, id));
 
           // Créer de nouvelles réservations pour les ingrédients
           if (currentOperation.items && currentOperation.items.length > 0) {
             // Only process items with positive quantities == new product
-            for (const item of currentOperation.items.filter(f => f.quantity && parseFloat(f.quantity) >= 0)) {
+            for (const item of currentOperation.items.filter(
+              (f) => f.quantity && parseFloat(f.quantity) >= 0,
+            )) {
               const article = await this.getArticle(item.articleId);
               if (!article) continue;
 
@@ -1765,24 +2424,33 @@ export class DatabaseStorage implements IStorage {
               if (!recipe) continue;
 
               // Obtenir les ingrédients de la recette
-              const recipeIngredients = await this.getRecipeIngredients(recipe.id);
+              const recipeIngredients = await this.getRecipeIngredients(
+                recipe.id,
+              );
 
               // Calculer la consommation basée sur la quantité planifiée
-              const plannedQuantity = parseFloat(item.quantity || '0');
-              const recipeQuantity = parseFloat(recipe.quantity || '1');
+              const plannedQuantity = parseFloat(item.quantity || "0");
+              const recipeQuantity = parseFloat(recipe.quantity || "1");
               const ratio = plannedQuantity / recipeQuantity;
 
               // Créer des réservations pour chaque ingrédient
               for (const ingredient of recipeIngredients) {
-                const ingredientArticle = await this.getArticle(ingredient.articleId);
+                const ingredientArticle = await this.getArticle(
+                  ingredient.articleId,
+                );
                 if (!ingredientArticle) continue;
 
-                const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+                const requiredQuantity =
+                  parseFloat(ingredient.quantity || "0") * ratio;
 
                 // Vérifier si assez de stock est disponible
-                const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+                const currentStock = parseFloat(
+                  ingredientArticle.currentStock || "0",
+                );
                 if (currentStock < requiredQuantity) {
-                  throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+                  throw new Error(
+                    `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`,
+                  );
                 }
 
                 // Créer la réservation directement dans la transaction
@@ -1801,8 +2469,13 @@ export class DatabaseStorage implements IStorage {
           }
         }
         // Si l'opération n'est plus "programmed", libérer les réservations
-        else if (updateData.status && updateData.status !== InventoryOperationStatus.PROGRAMMED && currentOperation.status === InventoryOperationStatus.PROGRAMMED) {
-          await tx.update(stockReservations)
+        else if (
+          updateData.status &&
+          updateData.status !== InventoryOperationStatus.PROGRAMMED &&
+          currentOperation.status === InventoryOperationStatus.PROGRAMMED
+        ) {
+          await tx
+            .update(stockReservations)
             .set({ status: InventoryOperationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, id));
         }
@@ -1813,8 +2486,6 @@ export class DatabaseStorage implements IStorage {
         throw error;
       }
     });
-
-
   }
 
   // Fonction pour convertir les coûts entre unités
@@ -1829,31 +2500,36 @@ export class DatabaseStorage implements IStorage {
     storageZoneId: number,
     quantity: number,
     lotId?: number | null,
-    serialNumber?: string | null
+    serialNumber?: string | null,
   ): Promise<void> {
     const existingStock = await tx.query.stock.findFirst({
       where: and(
         eq(stock.articleId, articleId),
         eq(stock.storageZoneId, storageZoneId),
         lotId ? eq(stock.lotId, lotId) : sql`${stock.lotId} IS NULL`,
-        serialNumber ? eq(stock.serialNumber, serialNumber) : sql`${stock.serialNumber} IS NULL`
-      )
+        serialNumber
+          ? eq(stock.serialNumber, serialNumber)
+          : sql`${stock.serialNumber} IS NULL`,
+      ),
     });
 
     if (existingStock) {
       // Update existing stock record
-      await tx.update(stock)
+      await tx
+        .update(stock)
         .set({
           quantity: sql`${stock.quantity} + ${quantity}`,
-          updatedAt: sql`now()`
+          updatedAt: sql`now()`,
         })
         .where(
           and(
             eq(stock.articleId, articleId),
             eq(stock.storageZoneId, storageZoneId),
             lotId ? eq(stock.lotId, lotId) : sql`${stock.lotId} IS NULL`,
-            serialNumber ? eq(stock.serialNumber, serialNumber) : sql`${stock.serialNumber} IS NULL`
-          )
+            serialNumber
+              ? eq(stock.serialNumber, serialNumber)
+              : sql`${stock.serialNumber} IS NULL`,
+          ),
         );
     } else {
       // Insert new stock record
@@ -1863,20 +2539,23 @@ export class DatabaseStorage implements IStorage {
         lotId: lotId ?? null,
         serialNumber: serialNumber ?? null,
         quantity: quantity.toString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
     }
   }
 
   // Fonction récursive pour calculer le coût d'un sous-produit
-  private async calculateSubProductCost(ingredients: any[], subProductQuantity: number): Promise<number> {
+  private async calculateSubProductCost(
+    ingredients: any[],
+    subProductQuantity: number,
+  ): Promise<number> {
     let totalCost = 0;
 
     for (const ingredient of ingredients) {
       const article = await this.getArticle(ingredient.articleId);
       if (!article) continue;
 
-      const subIngredientQuantity = parseFloat(ingredient.quantity || '0');
+      const subIngredientQuantity = parseFloat(ingredient.quantity || "0");
       const adjustedQuantity = subIngredientQuantity * subProductQuantity;
 
       if (article.type === ArticleCategoryType.PRODUCT) {
@@ -1884,13 +2563,20 @@ export class DatabaseStorage implements IStorage {
         const subRecipe = await this.getRecipeByArticleId(article.id);
         if (subRecipe) {
           const subIngredients = await this.getRecipeIngredients(subRecipe.id);
-          const subSubProductCost = await this.calculateSubProductCost(subIngredients, adjustedQuantity);
+          const subSubProductCost = await this.calculateSubProductCost(
+            subIngredients,
+            adjustedQuantity,
+          );
           totalCost += subSubProductCost;
         }
       } else {
         // Pour un ingrédient normal, convertir le coût selon les unités
-        const subArticleCost = parseFloat(article.costPerUnit || '0');
-        const convertedCost = this.convertCost(subArticleCost, article.unit || DEFAULT_ARTICLE_UNIT, ingredient.unit || DEFAULT_ARTICLE_UNIT);
+        const subArticleCost = parseFloat(article.costPerUnit || "0");
+        const convertedCost = this.convertCost(
+          subArticleCost,
+          article.unit || DEFAULT_ARTICLE_UNIT,
+          ingredient.unit || DEFAULT_ARTICLE_UNIT,
+        );
         const ingredientCost = convertedCost * adjustedQuantity;
         totalCost += ingredientCost;
       }
@@ -1912,15 +2598,23 @@ export class DatabaseStorage implements IStorage {
         const subRecipe = await this.getRecipeByArticleId(article.id);
         if (subRecipe) {
           const subIngredients = await this.getRecipeIngredients(subRecipe.id);
-          const subProductQuantity = parseFloat(ingredient.quantity || '0');
-          const subProductCost = await this.calculateSubProductCost(subIngredients, subProductQuantity);
+          const subProductQuantity = parseFloat(ingredient.quantity || "0");
+          const subProductCost = await this.calculateSubProductCost(
+            subIngredients,
+            subProductQuantity,
+          );
           totalCost += subProductCost;
         }
       } else {
         // Pour un ingrédient normal, convertir le coût selon l'unité de la recette
-        const originalCost = parseFloat(article.costPerUnit || '0');
-        const unitCost = this.convertCost(originalCost, article.unit || DEFAULT_ARTICLE_UNIT, ingredient.unit || DEFAULT_ARTICLE_UNIT);
-        const ingredientCost = unitCost * parseFloat(ingredient.quantity || '0');
+        const originalCost = parseFloat(article.costPerUnit || "0");
+        const unitCost = this.convertCost(
+          originalCost,
+          article.unit || DEFAULT_ARTICLE_UNIT,
+          ingredient.unit || DEFAULT_ARTICLE_UNIT,
+        );
+        const ingredientCost =
+          unitCost * parseFloat(ingredient.quantity || "0");
         totalCost += ingredientCost;
       }
     }
@@ -1928,32 +2622,44 @@ export class DatabaseStorage implements IStorage {
     return totalCost;
   }
 
-  async calculateIngredientConsumptionItems(productItem: any): Promise<{ items: any[], totalCost: number, quantityAfter: string, quantityBefore: string }> {
+  async calculateIngredientConsumptionItems(
+    productItem: any,
+  ): Promise<{
+    items: any[];
+    totalCost: number;
+    quantityAfter: string;
+    quantityBefore: string;
+  }> {
     try {
-      const RETURN_EMPTY = { items: [], totalCost: 0, quantityAfter: "0", quantityBefore: "0" };
+      const RETURN_EMPTY = {
+        items: [],
+        totalCost: 0,
+        quantityAfter: "0",
+        quantityBefore: "0",
+      };
 
       const article = await this.getArticle(productItem.articleId);
       if (!article) {
-        console.log('❌ Article not found:', productItem.articleId);
+        console.log("❌ Article not found:", productItem.articleId);
         return RETURN_EMPTY;
       }
-      console.log('✅ Article found:', article.name);
+      console.log("✅ Article found:", article.name);
 
       // Find the recipe for this product
       const recipe = await this.getRecipeByArticleId(article.id);
       if (!recipe) {
-        console.log('❌ Recipe not found for article:', article.id);
+        console.log("❌ Recipe not found for article:", article.id);
         return RETURN_EMPTY;
       }
-      console.log('✅ Recipe found:', recipe.id);
+      console.log("✅ Recipe found:", recipe.id);
 
       // Get recipe ingredients
       const recipeIngredients = await this.getRecipeIngredients(recipe.id);
-      console.log('✅ Recipe ingredients found:', recipeIngredients.length);
+      console.log("✅ Recipe ingredients found:", recipeIngredients.length);
 
       // Calculate consumption based on planned quantity
-      const plannedQuantity = parseFloat(productItem.quantity || '0');
-      const recipeQuantity = parseFloat(recipe.quantity || '1');
+      const plannedQuantity = parseFloat(productItem.quantity || "0");
+      const recipeQuantity = parseFloat(recipe.quantity || "1");
       const ratio = plannedQuantity / recipeQuantity;
 
       const ingredientItems: any[] = [];
@@ -1963,27 +2669,40 @@ export class DatabaseStorage implements IStorage {
         const ingredientArticle = await this.getArticle(ingredient.articleId);
         if (!ingredientArticle) continue;
 
-        const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-        const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+        const requiredQuantity = parseFloat(ingredient.quantity || "0") * ratio;
+        const currentStock = parseFloat(ingredientArticle.currentStock || "0");
 
         // Calculer le coût unitaire récursivement
         let unitCost = 0;
         if (ingredientArticle.type === ArticleCategoryType.PRODUCT) {
           // Pour un sous-produit, calculer le coût basé sur ses ingrédients (récursivement)
-          const subRecipe = await this.getRecipeByArticleId(ingredientArticle.id);
+          const subRecipe = await this.getRecipeByArticleId(
+            ingredientArticle.id,
+          );
           if (subRecipe) {
-            const subIngredients = await this.getRecipeIngredients(subRecipe.id);
-            const subProductQuantity = parseFloat(ingredient.quantity || '0');
-            const subProductCost = await this.calculateSubProductCost(subIngredients, subProductQuantity);
+            const subIngredients = await this.getRecipeIngredients(
+              subRecipe.id,
+            );
+            const subProductQuantity = parseFloat(ingredient.quantity || "0");
+            const subProductCost = await this.calculateSubProductCost(
+              subIngredients,
+              subProductQuantity,
+            );
             unitCost = subProductCost / subProductQuantity; // Coût unitaire
           }
         } else {
           // Pour un ingrédient normal, convertir le coût selon l'unité de la recette
-          const originalCost = parseFloat(ingredientArticle.costPerUnit || '0');
-          unitCost = this.convertCost(originalCost, ingredientArticle.unit || DEFAULT_ARTICLE_UNIT, ingredient.unit || DEFAULT_ARTICLE_UNIT);
+          const originalCost = parseFloat(ingredientArticle.costPerUnit || "0");
+          unitCost = this.convertCost(
+            originalCost,
+            ingredientArticle.unit || DEFAULT_ARTICLE_UNIT,
+            ingredient.unit || DEFAULT_ARTICLE_UNIT,
+          );
         }
 
-        console.log(`🔍 Processing ingredient: ${ingredientArticle.name}, required: ${requiredQuantity}, unitCost: ${unitCost}`);
+        console.log(
+          `🔍 Processing ingredient: ${ingredientArticle.name}, required: ${requiredQuantity}, unitCost: ${unitCost}`,
+        );
 
         // Create negative quantity item for consumption (without operationId - will be set later)
         ingredientItems.push({
@@ -1998,42 +2717,60 @@ export class DatabaseStorage implements IStorage {
           toStorageZoneId: null,
         });
       }
-      const totalCost = ingredientItems.map(f => parseFloat(f.totalCost || "0")).reduce((a, b) => a + b);
+      const totalCost = ingredientItems
+        .map((f) => parseFloat(f.totalCost || "0"))
+        .reduce((a, b) => a + b);
       const quantityBefore = article.currentStock?.toString() || "0";
-      const quantityAfter = (parseFloat(productItem.quantityBefore || "0") + parseFloat(productItem.quantity || "0")).toString();
-      return { items: ingredientItems, totalCost: totalCost, quantityBefore: quantityBefore, quantityAfter: quantityAfter };
+      const quantityAfter = (
+        parseFloat(productItem.quantityBefore || "0") +
+        parseFloat(productItem.quantity || "0")
+      ).toString();
+      return {
+        items: ingredientItems,
+        totalCost: totalCost,
+        quantityBefore: quantityBefore,
+        quantityAfter: quantityAfter,
+      };
     } catch (error) {
-      console.error('❌ Error in calculateIngredientConsumptionItems:', error);
+      console.error("❌ Error in calculateIngredientConsumptionItems:", error);
       throw error;
     }
   }
 
-  async createIngredientConsumptionItems(operationId: number, productItem: any): Promise<void> {
+  async createIngredientConsumptionItems(
+    operationId: number,
+    productItem: any,
+  ): Promise<void> {
     try {
-      console.log('🔍 createIngredientConsumptionItems - operationId:', operationId, 'productItem:', productItem);
+      console.log(
+        "🔍 createIngredientConsumptionItems - operationId:",
+        operationId,
+        "productItem:",
+        productItem,
+      );
 
       const article = await this.getArticle(productItem.articleId);
       if (!article) {
-        console.log('❌ Article not found:', productItem.articleId);
+        console.log("❌ Article not found:", productItem.articleId);
         return;
       }
-      console.log('✅ Article found:', article.name);
+      console.log("✅ Article found:", article.name);
 
       // Find the recipe for this product
       const recipe = await this.getRecipeByArticleId(article.id);
       if (!recipe) {
-        console.log('❌ Recipe not found for article:', article.id);
+        console.log("❌ Recipe not found for article:", article.id);
         return;
       }
-      console.log('✅ Recipe found:', recipe.id);
+      console.log("✅ Recipe found:", recipe.id);
 
       // Get recipe ingredients
       const recipeIngredients = await this.getRecipeIngredients(recipe.id);
-      console.log('✅ Recipe ingredients found:', recipeIngredients.length);
+      console.log("✅ Recipe ingredients found:", recipeIngredients.length);
 
       // Calculate consumption based on planned quantity
-      const plannedQuantity = parseFloat(productItem.quantity || '0');
-      const recipeQuantity = parseFloat(recipe.quantity || '1');
+      const plannedQuantity = parseFloat(productItem.quantity || "0");
+      const recipeQuantity = parseFloat(recipe.quantity || "1");
       const ratio = plannedQuantity / recipeQuantity;
 
       // Create inventory operation items for each ingredient
@@ -2041,11 +2778,13 @@ export class DatabaseStorage implements IStorage {
         const ingredientArticle = await this.getArticle(ingredient.articleId);
         if (!ingredientArticle) continue;
 
-        const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-        const currentStock = parseFloat(ingredientArticle.currentStock || '0');
-        const unitCost = parseFloat(ingredientArticle.costPerUnit || '0');
+        const requiredQuantity = parseFloat(ingredient.quantity || "0") * ratio;
+        const currentStock = parseFloat(ingredientArticle.currentStock || "0");
+        const unitCost = parseFloat(ingredientArticle.costPerUnit || "0");
 
-        console.log(`🔍 Processing ingredient: ${ingredientArticle.name}, required: ${requiredQuantity}`);
+        console.log(
+          `🔍 Processing ingredient: ${ingredientArticle.name}, required: ${requiredQuantity}`,
+        );
 
         // Create negative quantity item for consumption
         await db.insert(inventoryOperationItems).values({
@@ -2064,73 +2803,100 @@ export class DatabaseStorage implements IStorage {
         const stockLocation = await db.query.stock.findFirst({
           where: and(
             eq(stock.articleId, ingredientArticle.id),
-            gt(stock.quantity, "0")
+            gt(stock.quantity, "0"),
           ),
-          orderBy: [desc(stock.updatedAt)]
+          orderBy: [desc(stock.updatedAt)],
         });
 
-        const storageZoneId = stockLocation?.storageZoneId || ingredientArticle.storageZoneId || 1;
+        const storageZoneId =
+          stockLocation?.storageZoneId || ingredientArticle.storageZoneId || 1;
 
         // Update stock (consume ingredients)
-        await this.upsertStock(db, ingredientArticle.id, storageZoneId, -requiredQuantity);
+        await this.upsertStock(
+          db,
+          ingredientArticle.id,
+          storageZoneId,
+          -requiredQuantity,
+        );
 
         // Update article current stock
-        await db.update(articles)
+        await db
+          .update(articles)
           .set({
-            currentStock: sql`${articles.currentStock} - ${requiredQuantity}`
+            currentStock: sql`${articles.currentStock} - ${requiredQuantity}`,
           })
           .where(eq(articles.id, ingredientArticle.id));
       }
 
-      console.log('✅ createIngredientConsumptionItems completed successfully');
+      console.log("✅ createIngredientConsumptionItems completed successfully");
     } catch (error) {
-      console.error('❌ Error in createIngredientConsumptionItems:', error);
+      console.error("❌ Error in createIngredientConsumptionItems:", error);
       throw error;
     }
   }
 
-  async updateStockFromOperationItems(operationId: number, conformQuantity: number, preparationZoneId?: number, wasteZoneId?: number, lotId?: number): Promise<void> {
+  async updateStockFromOperationItems(
+    operationId: number,
+    conformQuantity: number,
+    preparationZoneId?: number,
+    wasteZoneId?: number,
+    lotId?: number,
+  ): Promise<void> {
     return await db.transaction(async (tx) => {
       try {
         // Get all operation items
         const items = await this.getInventoryOperationItems(operationId);
 
         // Calculate the ratio between conform quantity and planned quantity
-        const principalProduct = items.find(item => parseFloat(item.quantity || '0') >= 0);
+        const principalProduct = items.find(
+          (item) => parseFloat(item.quantity || "0") >= 0,
+        );
 
         // Update stock for each item
         for (const item of items) {
           const article = await this.getArticle(item.articleId);
           if (!article) continue;
           if (item.id === principalProduct?.id) {
-
-            await this.upsertStock(tx, article.id, preparationZoneId!, conformQuantity, lotId);
-            await tx.update(articles)
+            await this.upsertStock(
+              tx,
+              article.id,
+              preparationZoneId!,
+              conformQuantity,
+              lotId,
+            );
+            await tx
+              .update(articles)
               .set({
-                currentStock: sql`${articles.currentStock} + ${conformQuantity}`
+                currentStock: sql`${articles.currentStock} + ${conformQuantity}`,
               })
               .where(eq(articles.id, article.id));
 
-            await tx.update(inventoryOperationItems)
+            await tx
+              .update(inventoryOperationItems)
               .set({
                 toStorageZoneId: preparationZoneId,
-                lotId: lotId
+                lotId: lotId,
               })
               .where(
                 and(
                   eq(inventoryOperationItems.id, item.id),
-                  eq(inventoryOperationItems.articleId, item.articleId)));
-
+                  eq(inventoryOperationItems.articleId, item.articleId),
+                ),
+              );
           } else {
-
-            await this.upsertStock(tx, article.id, preparationZoneId!, parseFloat(item.quantity || '0'));
-            await tx.update(articles)
+            await this.upsertStock(
+              tx,
+              article.id,
+              preparationZoneId!,
+              parseFloat(item.quantity || "0"),
+            );
+            await tx
+              .update(articles)
               .set({
-                currentStock: sql`${articles.currentStock} + ${parseFloat(item.quantity || '0')}`
+                currentStock: sql`${articles.currentStock} + ${parseFloat(item.quantity || "0")}`,
               })
               .where(eq(articles.id, article.id));
           }
-
 
           // if (totalPlanned > 0) {
           //   // Positive quantity = product production -> use preparation zone
@@ -2147,7 +2913,6 @@ export class DatabaseStorage implements IStorage {
           //   storageZoneId = stockLocation?.storageZoneId || item.fromStorageZoneId || article.storageZoneId || 1;
           // }
 
-
           // Update the inventory operation item with the new storage zone for products
           // if (totalPlanned > 0 && preparationZoneId) {
           //   await tx.update(inventoryOperationItems)
@@ -2156,7 +2921,7 @@ export class DatabaseStorage implements IStorage {
           // }
         }
 
-        console.log('✅ updateStockFromOperationItems completed successfully');
+        console.log("✅ updateStockFromOperationItems completed successfully");
       } catch (error) {
         tx.rollback();
         throw error;
@@ -2164,7 +2929,11 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createLotForPreparationOperation(operationId: number, totalProducedQuantity: number, manufacturingDate: string): Promise<number | undefined> {
+  async createLotForPreparationOperation(
+    operationId: number,
+    totalProducedQuantity: number,
+    manufacturingDate: string,
+  ): Promise<number | undefined> {
     return await db.transaction(async (tx) => {
       try {
         // Get the operation and its items
@@ -2175,10 +2944,12 @@ export class DatabaseStorage implements IStorage {
 
         // Find the main product (positive quantity)
         const items = await this.getInventoryOperationItems(operationId);
-        const mainProductItem = items.find(item => parseFloat(item.quantity || '0') > 0);
+        const mainProductItem = items.find(
+          (item) => parseFloat(item.quantity || "0") > 0,
+        );
 
         if (!mainProductItem) {
-          console.log('No main product found for lot creation');
+          console.log("No main product found for lot creation");
           return;
         }
 
@@ -2189,18 +2960,18 @@ export class DatabaseStorage implements IStorage {
 
         // Generate lot code: {ArticleCode}-{yyyyMMdd}-{seq}
         const today = new Date(manufacturingDate);
-        const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+        const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
 
         // Get the next sequence number for this article and date
         const existingLots = await tx.query.lots.findMany({
           where: and(
             eq(lots.articleId, article.id),
-            sql`DATE(${lots.manufacturingDate}) = DATE(${sql.raw(`'${manufacturingDate}'`)})`
+            sql`DATE(${lots.manufacturingDate}) = DATE(${sql.raw(`'${manufacturingDate}'`)})`,
           ),
-          orderBy: [desc(lots.id)]
+          orderBy: [desc(lots.id)],
         });
 
-        const nextSeq = (existingLots.length + 1).toString().padStart(3, '0');
+        const nextSeq = (existingLots.length + 1).toString().padStart(3, "0");
         const lotCode = `${article.code}-${dateStr}-${nextSeq}`;
 
         // Calculate dates based on article shelf life
@@ -2222,34 +2993,42 @@ export class DatabaseStorage implements IStorage {
           expirationDate: expirationDate.toISOString(),
           alertDate: alertDate.toISOString(),
           supplierId: null, // Internal production
-          notes: "Lot généré automatiquement via production"
+          notes: "Lot généré automatiquement via production",
         };
 
         const [newLot] = await tx.insert(lots).values(lotData).returning();
 
-
-        console.log(`✅ Lot created successfully: ${lotCode} for operation ${operationId}`);
+        console.log(
+          `✅ Lot created successfully: ${lotCode} for operation ${operationId}`,
+        );
         return newLot.id;
       } catch (error) {
-        console.error('❌ Error creating lot for preparation operation:', error);
+        console.error(
+          "❌ Error creating lot for preparation operation:",
+          error,
+        );
         throw error;
       }
     });
   }
 
-
-  async createProductProductionItems(operationId: number, conformQuantity: number): Promise<void> {
+  async createProductProductionItems(
+    operationId: number,
+    conformQuantity: number,
+  ): Promise<void> {
     return await db.transaction(async (tx) => {
       // Get the original product items from the operation
       const items = await this.getInventoryOperationItems(operationId);
-      const productItems = items.filter(item => parseFloat(item.quantity || '0') > 0); // Only positive quantities (products)
+      const productItems = items.filter(
+        (item) => parseFloat(item.quantity || "0") > 0,
+      ); // Only positive quantities (products)
 
       for (const item of productItems) {
         const article = await this.getArticle(item.articleId);
         if (!article) continue;
 
-        const currentStock = parseFloat(article.currentStock || '0');
-        const unitCost = parseFloat(article.costPerUnit || '0');
+        const currentStock = parseFloat(article.currentStock || "0");
+        const unitCost = parseFloat(article.costPerUnit || "0");
 
         // Create positive quantity item for production
         await tx.insert(inventoryOperationItems).values({
@@ -2265,15 +3044,22 @@ export class DatabaseStorage implements IStorage {
         });
 
         // Determine the target storage zone
-        const targetStorageZoneId = item.toStorageZoneId || article.storageZoneId || 1;
+        const targetStorageZoneId =
+          item.toStorageZoneId || article.storageZoneId || 1;
 
         // Update stock (add produced products)
-        await this.upsertStock(tx, article.id, targetStorageZoneId, conformQuantity);
+        await this.upsertStock(
+          tx,
+          article.id,
+          targetStorageZoneId,
+          conformQuantity,
+        );
 
         // Update article current stock
-        await tx.update(articles)
+        await tx
+          .update(articles)
           .set({
-            currentStock: sql`${articles.currentStock} + ${conformQuantity}`
+            currentStock: sql`${articles.currentStock} + ${conformQuantity}`,
           })
           .where(eq(articles.id, article.id));
       }
@@ -2283,11 +3069,12 @@ export class DatabaseStorage implements IStorage {
   async updateInventoryOperationWithItems(
     operationId: number,
     updatedOperation: Partial<InsertInventoryOperation>,
-    updatedItems: InsertInventoryOperationItem[]
+    updatedItems: InsertInventoryOperationItem[],
   ): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
       // Get current operation to check status changes
-      const [currentOperation] = await tx.select()
+      const [currentOperation] = await tx
+        .select()
         .from(inventoryOperations)
         .where(eq(inventoryOperations.id, operationId));
 
@@ -2296,7 +3083,8 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Update the operation header
-      const [operation] = await tx.update(inventoryOperations)
+      const [operation] = await tx
+        .update(inventoryOperations)
         .set({ ...updatedOperation, updatedAt: new Date().toISOString() })
         .where(eq(inventoryOperations.id, operationId))
         .returning();
@@ -2306,13 +3094,14 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Delete existing items
-      await tx.delete(inventoryOperationItems)
+      await tx
+        .delete(inventoryOperationItems)
         .where(eq(inventoryOperationItems.operationId, operationId));
 
       // Insert new items
       let insertedItems: any[] = [];
       if (updatedItems.length > 0) {
-        const itemsToInsert = updatedItems.map(item => ({
+        const itemsToInsert = updatedItems.map((item) => ({
           articleId: (item as any).articleId || (item as any).idArticle,
           quantity: (item as any).quantity || (item as any).qteLivree,
           quantityBefore: (item as any).quantityBefore || null,
@@ -2325,52 +3114,74 @@ export class DatabaseStorage implements IStorage {
           taxRate: (item as any).taxRate || "0.00",
           taxAmountCost: (item as any).taxAmountCost || "0.00",
           lotId: (item as any).lotId || (item as any).idlot || null,
-          fromStorageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
+          fromStorageZoneId:
+            (item as any).fromStorageZoneId || (item as any).idzone || null,
           toStorageZoneId: (item as any).toStorageZoneId || null,
-          orderItemId: (item as any).orderItemId || (item as any).idOrderItem || null,
+          orderItemId:
+            (item as any).orderItemId || (item as any).idOrderItem || null,
           notes: (item as any).notes || null,
-          operationId: operationId
+          operationId: operationId,
         }));
-        insertedItems = await tx.insert(inventoryOperationItems).values(itemsToInsert).returning();
+        insertedItems = await tx
+          .insert(inventoryOperationItems)
+          .values(itemsToInsert)
+          .returning();
       }
 
       // Gérer les réservations automatiquement
       if (operation.type === InventoryOperationType.LIVRAISON) {
         // Annuler seulement les réservations de cette livraison spécifique
-        await tx.update(stockReservations)
+        await tx
+          .update(stockReservations)
           .set({ status: StockReservationStatus.CANCELLED })
-          .where(and(
-            eq(stockReservations.inventoryOperationId, operationId),
-            eq(stockReservations.reservationType, StockReservationType.DELIVERY),
-            eq(stockReservations.status, StockReservationStatus.RESERVED)
-          ));
+          .where(
+            and(
+              eq(stockReservations.inventoryOperationId, operationId),
+              eq(
+                stockReservations.reservationType,
+                StockReservationType.DELIVERY,
+              ),
+              eq(stockReservations.status, StockReservationStatus.RESERVED),
+            ),
+          );
 
         if (updatedItems.length > 0) {
           for (let i = 0; i < updatedItems.length; i++) {
             const item = updatedItems[i];
             const insertedItem = insertedItems[i];
-            const articleId = (item as any).articleId || (item as any).idArticle;
+            const articleId =
+              (item as any).articleId || (item as any).idArticle;
             const article = await this.getArticle(articleId);
             if (!article) continue;
 
-            const totalStock = parseFloat(article.currentStock || '0');
-            const requestedQuantity = parseFloat(((item as any).quantity || (item as any).qteLivree) as string);
+            const totalStock = parseFloat(article.currentStock || "0");
+            const requestedQuantity = parseFloat(
+              ((item as any).quantity || (item as any).qteLivree) as string,
+            );
 
             // Calculer les réservations actives EXCLUANT cette livraison
-            const activeReservations = await tx.select({ reservedQuantity: stockReservations.reservedQuantity })
+            const activeReservations = await tx
+              .select({ reservedQuantity: stockReservations.reservedQuantity })
               .from(stockReservations)
-              .where(and(
-                eq(stockReservations.articleId, articleId),
-                eq(stockReservations.status, StockReservationStatus.RESERVED),
-                // Exclure cette livraison du calcul
-                sql`${stockReservations.inventoryOperationId} != ${operationId}`
-              ));
+              .where(
+                and(
+                  eq(stockReservations.articleId, articleId),
+                  eq(stockReservations.status, StockReservationStatus.RESERVED),
+                  // Exclure cette livraison du calcul
+                  sql`${stockReservations.inventoryOperationId} != ${operationId}`,
+                ),
+              );
 
-            const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
+            const totalReserved = activeReservations.reduce(
+              (sum, r) => sum + parseFloat(r.reservedQuantity || "0"),
+              0,
+            );
             const availableStock = totalStock - totalReserved;
 
             if (availableStock < requestedQuantity) {
-              throw new Error(`Stock insuffisant pour l'article ${articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
+              throw new Error(
+                `Stock insuffisant pour l'article ${articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`,
+              );
             }
 
             await tx.insert(stockReservations).values({
@@ -2378,9 +3189,11 @@ export class DatabaseStorage implements IStorage {
               inventoryOperationId: operationId,
               inventoryOperationItemId: insertedItem.id, // Correction principale
               orderId: operation.orderId || null,
-              orderItemId: (item as any).orderItemId || (item as any).idOrderItem || null,
+              orderItemId:
+                (item as any).orderItemId || (item as any).idOrderItem || null,
               lotId: (item as any).lotId || (item as any).idlot || null,
-              storageZoneId: (item as any).fromStorageZoneId || (item as any).idzone || null,
+              storageZoneId:
+                (item as any).fromStorageZoneId || (item as any).idzone || null,
               reservedQuantity: requestedQuantity.toString(),
               status: StockReservationStatus.RESERVED,
               reservationDirection: StockReservationDirection.OUT,
@@ -2391,18 +3204,27 @@ export class DatabaseStorage implements IStorage {
             });
           }
         }
-      } else if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
+      } else if (
+        operation.type === InventoryOperationType.FABRICATION ||
+        operation.type === InventoryOperationType.FABRICATION_RELIQUAT
+      ) {
         // Si le statut devient "programmed", créer les réservations
-        if (operation.status === InventoryOperationStatus.PROGRAMMED && currentOperation.status !== InventoryOperationStatus.PROGRAMMED) {
+        if (
+          operation.status === InventoryOperationStatus.PROGRAMMED &&
+          currentOperation.status !== InventoryOperationStatus.PROGRAMMED
+        ) {
           // Libérer d'abord les anciennes réservations si elles existent
-          await tx.update(stockReservations)
+          await tx
+            .update(stockReservations)
             .set({ status: StockReservationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, operationId));
 
           // Créer de nouvelles réservations pour les nouveaux items
           if (updatedItems.length > 0) {
             // Only process items with positive quantities == new product
-            for (const item of updatedItems.filter(f => f.quantity && parseFloat(f.quantity) >= 0)) {
+            for (const item of updatedItems.filter(
+              (f) => f.quantity && parseFloat(f.quantity) >= 0,
+            )) {
               const article = await this.getArticle(item.articleId);
               if (!article) continue;
 
@@ -2411,24 +3233,33 @@ export class DatabaseStorage implements IStorage {
               if (!recipe) continue;
 
               // Obtenir les ingrédients de la recette
-              const recipeIngredients = await this.getRecipeIngredients(recipe.id);
+              const recipeIngredients = await this.getRecipeIngredients(
+                recipe.id,
+              );
 
               // Calculer la consommation basée sur la quantité planifiée
-              const plannedQuantity = parseFloat(item.quantity || '0');
-              const recipeQuantity = parseFloat(recipe.quantity || '1');
+              const plannedQuantity = parseFloat(item.quantity || "0");
+              const recipeQuantity = parseFloat(recipe.quantity || "1");
               const ratio = plannedQuantity / recipeQuantity;
 
               // Créer des réservations pour chaque ingrédient
               for (const ingredient of recipeIngredients) {
-                const ingredientArticle = await this.getArticle(ingredient.articleId);
+                const ingredientArticle = await this.getArticle(
+                  ingredient.articleId,
+                );
                 if (!ingredientArticle) continue;
 
-                const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+                const requiredQuantity =
+                  parseFloat(ingredient.quantity || "0") * ratio;
 
                 // Vérifier si assez de stock est disponible
-                const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+                const currentStock = parseFloat(
+                  ingredientArticle.currentStock || "0",
+                );
                 if (currentStock < requiredQuantity) {
-                  throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+                  throw new Error(
+                    `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`,
+                  );
                 }
 
                 // Créer la réservation directement dans la transaction
@@ -2445,16 +3276,22 @@ export class DatabaseStorage implements IStorage {
           }
         }
         // Si le statut reste "programmed" mais que les items changent, rafraîchir les réservations
-        else if (operation.status === InventoryOperationStatus.PROGRAMMED && currentOperation.status === InventoryOperationStatus.PROGRAMMED) {
+        else if (
+          operation.status === InventoryOperationStatus.PROGRAMMED &&
+          currentOperation.status === InventoryOperationStatus.PROGRAMMED
+        ) {
           // Libérer d'abord les anciennes réservations
-          await tx.update(stockReservations)
+          await tx
+            .update(stockReservations)
             .set({ status: StockReservationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, operationId));
 
           // Créer de nouvelles réservations basées sur les nouveaux items
           if (updatedItems.length > 0) {
             // Only process items with positive quantities == new product
-            for (const item of updatedItems.filter(f => f.quantity && parseFloat(f.quantity) >= 0)) {
+            for (const item of updatedItems.filter(
+              (f) => f.quantity && parseFloat(f.quantity) >= 0,
+            )) {
               const article = await this.getArticle(item.articleId);
               if (!article) continue;
 
@@ -2463,24 +3300,33 @@ export class DatabaseStorage implements IStorage {
               if (!recipe) continue;
 
               // Obtenir les ingrédients de la recette
-              const recipeIngredients = await this.getRecipeIngredients(recipe.id);
+              const recipeIngredients = await this.getRecipeIngredients(
+                recipe.id,
+              );
 
               // Calculer la consommation basée sur la quantité planifiée
-              const plannedQuantity = parseFloat(item.quantity || '0');
-              const recipeQuantity = parseFloat(recipe.quantity || '1');
+              const plannedQuantity = parseFloat(item.quantity || "0");
+              const recipeQuantity = parseFloat(recipe.quantity || "1");
               const ratio = plannedQuantity / recipeQuantity;
 
               // Créer des réservations pour chaque ingrédient
               for (const ingredient of recipeIngredients) {
-                const ingredientArticle = await this.getArticle(ingredient.articleId);
+                const ingredientArticle = await this.getArticle(
+                  ingredient.articleId,
+                );
                 if (!ingredientArticle) continue;
 
-                const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+                const requiredQuantity =
+                  parseFloat(ingredient.quantity || "0") * ratio;
 
                 // Vérifier si assez de stock est disponible
-                const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+                const currentStock = parseFloat(
+                  ingredientArticle.currentStock || "0",
+                );
                 if (currentStock < requiredQuantity) {
-                  throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+                  throw new Error(
+                    `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`,
+                  );
                 }
 
                 // Créer la réservation directement dans la transaction
@@ -2497,8 +3343,12 @@ export class DatabaseStorage implements IStorage {
           }
         }
         // Si le statut n'est plus "programmed", libérer les réservations
-        else if (operation.status !== InventoryOperationStatus.PROGRAMMED && currentOperation.status === InventoryOperationStatus.PROGRAMMED) {
-          await tx.update(stockReservations)
+        else if (
+          operation.status !== InventoryOperationStatus.PROGRAMMED &&
+          currentOperation.status === InventoryOperationStatus.PROGRAMMED
+        ) {
+          await tx
+            .update(stockReservations)
             .set({ status: StockReservationStatus.CANCELLED })
             .where(eq(stockReservations.inventoryOperationId, operationId));
         }
@@ -2506,12 +3356,18 @@ export class DatabaseStorage implements IStorage {
       // Gérer les réservations pour les livraisons
       else if (operation.type === InventoryOperationType.LIVRAISON) {
         // Libérer d'abord les anciennes réservations de type StockReservationType.DELIVERY
-        await tx.update(stockReservations)
+        await tx
+          .update(stockReservations)
           .set({ status: StockReservationStatus.CANCELLED })
-          .where(and(
-            eq(stockReservations.inventoryOperationId, operationId),
-            eq(stockReservations.reservationType, StockReservationType.DELIVERY)
-          ));
+          .where(
+            and(
+              eq(stockReservations.inventoryOperationId, operationId),
+              eq(
+                stockReservations.reservationType,
+                StockReservationType.DELIVERY,
+              ),
+            ),
+          );
 
         // Créer de nouvelles réservations pour les items de livraison
         if (updatedItems.length > 0) {
@@ -2522,12 +3378,12 @@ export class DatabaseStorage implements IStorage {
               lotId: item.lotId || null,
               storageZoneId: item.toStorageZoneId || null,
               orderItemId: item.orderItemId || null,
-              reservedQuantity: item.quantity || '0',
+              reservedQuantity: item.quantity || "0",
               reservationType: StockReservationType.DELIVERY as const,
               reservationDirection: StockReservationDirection.OUT as const,
               status: StockReservationStatus.RESERVED as const,
               notes: `Réservation pour livraison ${operationId}`,
-              createdAt: new Date().toISOString()
+              createdAt: new Date().toISOString(),
             });
           }
         }
@@ -2542,26 +3398,39 @@ export class DatabaseStorage implements IStorage {
       // Charger l'opération avec ses lignes pour vérifier le statut
       const op = await tx.query.inventoryOperations.findFirst({
         where: (o, { eq }) => eq(o.id, id),
-        with: { items: true }
+        with: { items: true },
       });
 
       if (!op) return false;
 
       // Si l'opération est complétée et de type reception, annuler les stocks
-      if (op.status === InventoryOperationStatus.COMPLETED && op.type === InventoryOperationType.RECEPTION) {
+      if (
+        op.status === InventoryOperationStatus.COMPLETED &&
+        op.type === InventoryOperationType.RECEPTION
+      ) {
         for (const item of op.items) {
           const qty = Number(item.quantity) || 0;
 
           if (qty > 0) {
             if (!item.toStorageZoneId) {
-              throw new Error(`Missing storage zone for article ${item.articleId}`);
+              throw new Error(
+                `Missing storage zone for article ${item.articleId}`,
+              );
             }
 
             // Retirer du stock
-            await this.upsertStock(tx, item.articleId, item.toStorageZoneId, -qty, item.lotId ?? null, item.serialNumber ?? null);
+            await this.upsertStock(
+              tx,
+              item.articleId,
+              item.toStorageZoneId,
+              -qty,
+              item.lotId ?? null,
+              item.serialNumber ?? null,
+            );
 
             // Mettre à jour le stock actuel de l'article
-            await tx.update(articles)
+            await tx
+              .update(articles)
               .set({ currentStock: sql`${articles.currentStock} - ${qty}` })
               .where(eq(articles.id, item.articleId));
           }
@@ -2569,12 +3438,15 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Libérer d'abord toutes les réservations liées à cette opération
-      await tx.update(stockReservations)
+      await tx
+        .update(stockReservations)
         .set({ status: StockReservationStatus.CANCELLED })
         .where(eq(stockReservations.inventoryOperationId, id));
 
       // Supprimer l'opération
-      const result = await tx.delete(inventoryOperations).where(eq(inventoryOperations.id, id));
+      const result = await tx
+        .delete(inventoryOperations)
+        .where(eq(inventoryOperations.id, id));
       return (result.rowCount || 0) > 0;
     });
   }
@@ -2583,7 +3455,7 @@ export class DatabaseStorage implements IStorage {
   async getInventoryOperationItems(
     operationId: number,
     includeArticle = false,
-    operationType?: InventoryOperationType
+    operationType?: InventoryOperationType,
   ): Promise<InventoryOperationItem[]> {
     if (includeArticle) {
       return await db
@@ -2599,7 +3471,10 @@ export class DatabaseStorage implements IStorage {
         })
         .from(inventoryOperationItems)
         .leftJoin(articles, eq(inventoryOperationItems.articleId, articles.id))
-        .leftJoin(storageZones, eq(inventoryOperationItems.fromStorageZoneId, storageZones.id))
+        .leftJoin(
+          storageZones,
+          eq(inventoryOperationItems.fromStorageZoneId, storageZones.id),
+        )
         .where(eq(inventoryOperationItems.operationId, operationId))
         .orderBy(inventoryOperationItems.id);
     }
@@ -2611,13 +3486,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(inventoryOperationItems.operationId, operationId))
       .orderBy(inventoryOperationItems.id);
   }
-  async createInventoryOperationItem(insertItem: InsertInventoryOperationItem & { operationId: number }): Promise<InventoryOperationItem> {
-    const [item] = await db.insert(inventoryOperationItems).values(insertItem).returning();
+  async createInventoryOperationItem(
+    insertItem: InsertInventoryOperationItem & { operationId: number },
+  ): Promise<InventoryOperationItem> {
+    const [item] = await db
+      .insert(inventoryOperationItems)
+      .values(insertItem)
+      .returning();
     return item;
   }
 
-  async updateInventoryOperationItem(id: number, updateData: Partial<InsertInventoryOperationItem>): Promise<InventoryOperationItem | undefined> {
-    const [item] = await db.update(inventoryOperationItems)
+  async updateInventoryOperationItem(
+    id: number,
+    updateData: Partial<InsertInventoryOperationItem>,
+  ): Promise<InventoryOperationItem | undefined> {
+    const [item] = await db
+      .update(inventoryOperationItems)
       .set(updateData)
       .where(eq(inventoryOperationItems.id, id))
       .returning();
@@ -2625,20 +3509,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteInventoryOperationItem(id: number): Promise<boolean> {
-    const result = await db.delete(inventoryOperationItems).where(eq(inventoryOperationItems.id, id));
+    const result = await db
+      .delete(inventoryOperationItems)
+      .where(eq(inventoryOperationItems.id, id));
     return (result.rowCount || 0) > 0;
   }
 
-  async adjustArticleStockAndCost(articleId: number, deltaQuantity: number, newUnitCost: string | number): Promise<Article | undefined> {
+  async adjustArticleStockAndCost(
+    articleId: number,
+    deltaQuantity: number,
+    newUnitCost: string | number,
+  ): Promise<Article | undefined> {
     const article = await this.getArticle(articleId);
     if (!article) return undefined;
-    const current = parseFloat(article.currentStock as unknown as string || '0');
+    const current = parseFloat(
+      (article.currentStock as unknown as string) || "0",
+    );
     const next = current + (Number.isFinite(deltaQuantity) ? deltaQuantity : 0);
     const [updated] = await db
       .update(articles)
       .set({
         currentStock: next.toString(),
-        costPerUnit: typeof newUnitCost === 'number' ? newUnitCost.toString() : newUnitCost,
+        costPerUnit:
+          typeof newUnitCost === "number"
+            ? newUnitCost.toString()
+            : newUnitCost,
       })
       .where(eq(articles.id, articleId))
       .returning();
@@ -2652,12 +3547,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoice(id: number): Promise<Invoice | undefined> {
-    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    const [invoice] = await db
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, id));
     return invoice || undefined;
   }
 
   async getInvoicesByClient(clientId: number): Promise<Invoice[]> {
-    return await db.select().from(invoices)
+    return await db
+      .select()
+      .from(invoices)
       .where(eq(invoices.clientId, clientId))
       .orderBy(desc(invoices.createdAt));
   }
@@ -2666,7 +3566,7 @@ export class DatabaseStorage implements IStorage {
     // Generate automatic code
     const existingInvoices = await this.getAllInvoices();
     const nextNumber = existingInvoices.length + 1;
-    const code = `FAC-${nextNumber.toString().padStart(6, '0')}`;
+    const code = `FAC-${nextNumber.toString().padStart(6, "0")}`;
 
     const invoiceData = {
       ...insertInvoice,
@@ -2677,8 +3577,12 @@ export class DatabaseStorage implements IStorage {
     return invoice;
   }
 
-  async updateInvoice(id: number, updateData: Partial<InsertInvoice>): Promise<Invoice | undefined> {
-    const [invoice] = await db.update(invoices)
+  async updateInvoice(
+    id: number,
+    updateData: Partial<InsertInvoice>,
+  ): Promise<Invoice | undefined> {
+    const [invoice] = await db
+      .update(invoices)
       .set({ ...updateData, updatedAt: new Date().toISOString() })
       .where(eq(invoices.id, id))
       .returning();
@@ -2692,18 +3596,29 @@ export class DatabaseStorage implements IStorage {
 
   // Invoice Items
   async getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]> {
-    return await db.select().from(invoiceItems)
+    return await db
+      .select()
+      .from(invoiceItems)
       .where(eq(invoiceItems.invoiceId, invoiceId))
       .orderBy(invoiceItems.id);
   }
 
-  async createInvoiceItem(insertInvoiceItem: InsertInvoiceItem): Promise<InvoiceItem> {
-    const [item] = await db.insert(invoiceItems).values(insertInvoiceItem).returning();
+  async createInvoiceItem(
+    insertInvoiceItem: InsertInvoiceItem,
+  ): Promise<InvoiceItem> {
+    const [item] = await db
+      .insert(invoiceItems)
+      .values(insertInvoiceItem)
+      .returning();
     return item;
   }
 
-  async updateInvoiceItem(id: number, updateData: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined> {
-    const [item] = await db.update(invoiceItems)
+  async updateInvoiceItem(
+    id: number,
+    updateData: Partial<InsertInvoiceItem>,
+  ): Promise<InvoiceItem | undefined> {
+    const [item] = await db
+      .update(invoiceItems)
       .set(updateData)
       .where(eq(invoiceItems.id, id))
       .returning();
@@ -2727,24 +3642,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPayment(id: number): Promise<Payment | undefined> {
-    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    const [payment] = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.id, id));
     return payment || undefined;
   }
 
   async getPaymentsByInvoice(invoiceId: number): Promise<Payment[]> {
-    return await db.select().from(payments)
+    return await db
+      .select()
+      .from(payments)
       .where(eq(payments.invoiceId, invoiceId))
       .orderBy(desc(payments.date));
   }
 
   async getPaymentsByClient(clientId: number): Promise<Payment[]> {
-    return await db.select().from(payments)
+    return await db
+      .select()
+      .from(payments)
       .where(eq(payments.clientId, clientId))
       .orderBy(desc(payments.date));
   }
 
   async getPaymentsByDelivery(deliveryId: number): Promise<Payment[]> {
-    return await db.select().from(payments)
+    return await db
+      .select()
+      .from(payments)
       .where(eq(payments.deliveryId, deliveryId))
       .orderBy(desc(payments.date));
   }
@@ -2845,20 +3769,34 @@ export class DatabaseStorage implements IStorage {
       CROSS JOIN recent_payments rp;
     `);
 
-    return result.rows[0]?.statistics || {
-      totalInvoices: { count: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0 },
-      overdueInvoices: { count: 0, totalAmount: 0 },
-      recentPayments: { count: 0, totalAmount: 0 }
-    };
+    return (
+      result.rows[0]?.statistics || {
+        totalInvoices: {
+          count: 0,
+          totalAmount: 0,
+          paidAmount: 0,
+          outstandingAmount: 0,
+        },
+        overdueInvoices: { count: 0, totalAmount: 0 },
+        recentPayments: { count: 0, totalAmount: 0 },
+      }
+    );
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const [payment] = await db.insert(payments).values(insertPayment).returning();
+    const [payment] = await db
+      .insert(payments)
+      .values(insertPayment)
+      .returning();
     return payment;
   }
 
-  async updatePayment(id: number, updateData: Partial<InsertPayment>): Promise<Payment | undefined> {
-    const [payment] = await db.update(payments)
+  async updatePayment(
+    id: number,
+    updateData: Partial<InsertPayment>,
+  ): Promise<Payment | undefined> {
+    const [payment] = await db
+      .update(payments)
       .set(updateData)
       .where(eq(payments.id, id))
       .returning();
@@ -2871,8 +3809,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async cancelPayment(id: number): Promise<Payment | undefined> {
-    const [payment] = await db.update(payments)
-      .set({ status: 'CANCELLED' })
+    const [payment] = await db
+      .update(payments)
+      .set({ status: "CANCELLED" })
       .where(eq(payments.id, id))
       .returning();
     return payment || undefined;
@@ -2881,37 +3820,48 @@ export class DatabaseStorage implements IStorage {
   // ============ ACHATS VIA INVENTORY (aucune table purchase_*) ============
   // Générateur de code pour réceptions
   async generateReceptionCode(): Promise<string> {
-    const existingOps = await this.getInventoryOperationsByType(InventoryOperationType.RECEPTION);
+    const existingOps = await this.getInventoryOperationsByType(
+      InventoryOperationType.RECEPTION,
+    );
     const nextNumber = existingOps.length + 1;
-    return `REC-${nextNumber.toString().padStart(6, '0')}`;
+    return `REC-${nextNumber.toString().padStart(6, "0")}`;
   }
 
   // ============ GESTION AVANCEE DES STOCKS ============
 
-
   // Créer une réservation de stock
-  async createStockReservation(reservationData: InsertStockReservation): Promise<StockReservation> {
+  async createStockReservation(
+    reservationData: InsertStockReservation,
+  ): Promise<StockReservation> {
     // Vérifier la disponibilité du stock
     const article = await this.getArticle(reservationData.articleId);
     if (!article) {
       throw new Error(`Article ${reservationData.articleId} not found`);
     }
 
-    const availableStock = parseFloat(article.currentStock || '0');
+    const availableStock = parseFloat(article.currentStock || "0");
     const reservedQuantity = parseFloat(reservationData.reservedQuantity);
 
     if (availableStock < reservedQuantity) {
-      throw new Error(`Insufficient stock for reservation. Available: ${availableStock}, Required: ${reservedQuantity}`);
+      throw new Error(
+        `Insufficient stock for reservation. Available: ${availableStock}, Required: ${reservedQuantity}`,
+      );
     }
 
-    const [newReservation] = await db.insert(stockReservations).values(reservationData).returning();
+    const [newReservation] = await db
+      .insert(stockReservations)
+      .values(reservationData)
+      .returning();
 
     return newReservation;
   }
 
   // Libérer une réservation de stock
-  async releaseStockReservation(reservationId: number): Promise<StockReservation> {
-    const [updatedReservation] = await db.update(stockReservations)
+  async releaseStockReservation(
+    reservationId: number,
+  ): Promise<StockReservation> {
+    const [updatedReservation] = await db
+      .update(stockReservations)
       .set({ status: StockReservationStatus.CANCELLED })
       .where(eq(stockReservations.id, reservationId))
       .returning();
@@ -2920,7 +3870,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Créer des réservations d'ingrédients pour une préparation
-  async createIngredientReservationsForPreparation(operationId: number, items: InventoryOperationItem[]): Promise<StockReservation[]> {
+  async createIngredientReservationsForPreparation(
+    operationId: number,
+    items: InventoryOperationItem[],
+  ): Promise<StockReservation[]> {
     const reservations: StockReservation[] = [];
 
     for (const item of items) {
@@ -2935,8 +3888,8 @@ export class DatabaseStorage implements IStorage {
       const recipeIngredients = await this.getRecipeIngredients(recipe.id);
 
       // Calculer la consommation basée sur la quantité planifiée
-      const plannedQuantity = parseFloat(item.quantity || '0');
-      const recipeQuantity = parseFloat(recipe.quantity || '1');
+      const plannedQuantity = parseFloat(item.quantity || "0");
+      const recipeQuantity = parseFloat(recipe.quantity || "1");
       const ratio = plannedQuantity / recipeQuantity;
 
       // Créer des réservations pour chaque ingrédient
@@ -2944,12 +3897,14 @@ export class DatabaseStorage implements IStorage {
         const ingredientArticle = await this.getArticle(ingredient.articleId);
         if (!ingredientArticle) continue;
 
-        const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
+        const requiredQuantity = parseFloat(ingredient.quantity || "0") * ratio;
 
         // Vérifier si assez de stock est disponible
-        const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+        const currentStock = parseFloat(ingredientArticle.currentStock || "0");
         if (currentStock < requiredQuantity) {
-          throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+          throw new Error(
+            `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`,
+          );
         }
 
         // Créer la réservation
@@ -2971,8 +3926,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Libérer toutes les réservations d'une opération d'inventaire
-  async releaseAllReservationsForOperation(operationId: number): Promise<boolean> {
-    const result = await db.update(stockReservations)
+  async releaseAllReservationsForOperation(
+    operationId: number,
+  ): Promise<boolean> {
+    const result = await db
+      .update(stockReservations)
       .set({ status: StockReservationStatus.CANCELLED })
       .where(eq(stockReservations.inventoryOperationId, operationId));
 
@@ -2980,17 +3938,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Obtenir les réservations d'une opération d'inventaire
-  async getReservationsForOperation(operationId: number): Promise<StockReservation[]> {
-    return await db.select()
+  async getReservationsForOperation(
+    operationId: number,
+  ): Promise<StockReservation[]> {
+    return await db
+      .select()
       .from(stockReservations)
       .where(eq(stockReservations.inventoryOperationId, operationId));
   }
 
   // Obtenir toutes les réservations des articles d'une opération (en excluant les réservations de l'opération elle-même)
-  async getOtherReservationsForOperationArticles(operationId: number): Promise<StockReservation[]> {
+  async getOtherReservationsForOperationArticles(
+    operationId: number,
+  ): Promise<StockReservation[]> {
     return await db.transaction(async (tx) => {
       // Récupérer les articles de l'opération
-      const operationItems = await tx.select()
+      const operationItems = await tx
+        .select()
         .from(inventoryOperationItems)
         .where(eq(inventoryOperationItems.operationId, operationId));
 
@@ -2999,34 +3963,34 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Extraire les IDs des articles
-      const articleIds = operationItems.map(item => item.articleId);
+      const articleIds = operationItems.map((item) => item.articleId);
 
       // Récupérer toutes les réservations de ces articles, sauf celles de l'opération en cours
-      const reservations = await tx.select()
+      const reservations = await tx
+        .select()
         .from(stockReservations)
         .where(
           and(
             sql`${stockReservations.articleId} = ANY(${articleIds})`,
             sql`${stockReservations.inventoryOperationId} != ${operationId}`,
-            eq(stockReservations.status, StockReservationStatus.RESERVED)
-          )
+            eq(stockReservations.status, StockReservationStatus.RESERVED),
+          ),
         );
 
       return reservations;
     });
   }
 
-
-
   // Obtenir les réservations d'un article
   async getArticleReservations(articleId: number): Promise<StockReservation[]> {
-    const reservations = await db.select()
+    const reservations = await db
+      .select()
       .from(stockReservations)
       .where(
         and(
           eq(stockReservations.articleId, articleId),
-          eq(stockReservations.status, StockReservationStatus.RESERVED)
-        )
+          eq(stockReservations.status, StockReservationStatus.RESERVED),
+        ),
       )
       .orderBy(desc(stockReservations.createdAt));
 
@@ -3050,7 +4014,10 @@ export class DatabaseStorage implements IStorage {
   // }
 
   // Vérifier si un article a suffisamment de stock disponible pour une quantité donnée
-  async hasEnoughAvailableStock(articleId: number, requiredQuantity: number): Promise<boolean> {
+  async hasEnoughAvailableStock(
+    articleId: number,
+    requiredQuantity: number,
+  ): Promise<boolean> {
     const availableStock = await this.getArticleAvailableStock(articleId);
     const availableArticle = availableStock?.totalDispo || 0;
     return availableArticle >= requiredQuantity;
@@ -3069,15 +4036,16 @@ export class DatabaseStorage implements IStorage {
         totalStock: 0,
         reservedQuantity: 0,
         availableStock: 0,
-        reservations: []
+        reservations: [],
       };
     }
 
-    const totalStock = parseFloat(article.currentStock || '0');
+    const totalStock = parseFloat(article.currentStock || "0");
     const reservations = await this.getArticleReservations(articleId);
 
-    const reservedQuantity = reservations.reduce((sum, res) =>
-      sum + parseFloat(res.reservedQuantity), 0
+    const reservedQuantity = reservations.reduce(
+      (sum, res) => sum + parseFloat(res.reservedQuantity),
+      0,
     );
 
     const availableStock = Math.max(0, totalStock - reservedQuantity);
@@ -3086,12 +4054,15 @@ export class DatabaseStorage implements IStorage {
       totalStock,
       reservedQuantity,
       availableStock,
-      reservations
+      reservations,
     };
   }
 
   // Vérifier la disponibilité de tous les ingrédients d'une recette
-  async checkRecipeIngredientsAvailability(recipeId: number, plannedQuantity: number): Promise<{
+  async checkRecipeIngredientsAvailability(
+    recipeId: number,
+    plannedQuantity: number,
+  ): Promise<{
     available: boolean;
     missingIngredients: Array<{
       articleId: number;
@@ -3107,12 +4078,12 @@ export class DatabaseStorage implements IStorage {
       return {
         available: false,
         missingIngredients: [],
-        totalReservations: 0
+        totalReservations: 0,
       };
     }
 
     const recipeIngredients = await this.getRecipeIngredients(recipeId);
-    const recipeQuantity = parseFloat(recipe.quantity || '1');
+    const recipeQuantity = parseFloat(recipe.quantity || "1");
     const ratio = plannedQuantity / recipeQuantity;
 
     let allAvailable = true;
@@ -3130,12 +4101,19 @@ export class DatabaseStorage implements IStorage {
       const ingredientArticle = await this.getArticle(ingredient.articleId);
       if (!ingredientArticle) continue;
 
-      const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-      const availableStock = await this.getArticleAvailableStock(ingredient.articleId);
+      const requiredQuantity = parseFloat(ingredient.quantity || "0") * ratio;
+      const availableStock = await this.getArticleAvailableStock(
+        ingredient.articleId,
+      );
       const availableArticle = availableStock?.totalDispo || 0;
       // Compter les réservations pour cet ingrédient
-      const reservations = await this.getArticleReservations(ingredient.articleId);
-      const reservedQuantity = reservations.reduce((sum, res) => sum + parseFloat(res.reservedQuantity), 0);
+      const reservations = await this.getArticleReservations(
+        ingredient.articleId,
+      );
+      const reservedQuantity = reservations.reduce(
+        (sum, res) => sum + parseFloat(res.reservedQuantity),
+        0,
+      );
 
       totalReservations += reservedQuantity;
 
@@ -3146,7 +4124,7 @@ export class DatabaseStorage implements IStorage {
           articleName: ingredientArticle.name,
           requiredQuantity,
           availableStock: availableArticle,
-          shortfall: requiredQuantity - availableArticle
+          shortfall: requiredQuantity - availableArticle,
         });
       }
     }
@@ -3154,12 +4132,16 @@ export class DatabaseStorage implements IStorage {
     return {
       available: allAvailable,
       missingIngredients,
-      totalReservations
+      totalReservations,
     };
   }
 
   // Obtenir le rapport de traçabilité d'un article
-  async getArticleTraceabilityReport(articleId: number, startDate?: string, endDate?: string): Promise<any> {
+  async getArticleTraceabilityReport(
+    articleId: number,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
     let query = sql`
       SELECT 
         sm.*,
@@ -3194,99 +4176,138 @@ export class DatabaseStorage implements IStorage {
     return result.rows;
   }
 
-
   /**
    * démarrer une livraison : déduit le stock, met à jour le statut de l'opération et des réservations
    * @param {number} deliveryOperationId
    * @returns {Promise<InventoryOperation>}
    */
-  async StartDelivery(deliveryOperationId: number): Promise<InventoryOperation> {
+  async StartDelivery(
+    deliveryOperationId: number,
+  ): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
       // 1. Récupérer l'opération et vérifier sa validité
-      const [operation] = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.id, deliveryOperationId));
-      if (!operation) throw new Error(`Opération ${deliveryOperationId} non trouvée`);
-      if (operation.type !== InventoryOperationType.LIVRAISON) throw new Error(`L'opération ${deliveryOperationId} n'est pas une livraison`);
-      if (operation.startedAt) throw new Error(`Livraison ${deliveryOperationId} déjà en cours`);
+      const [operation] = await tx
+        .select()
+        .from(inventoryOperations)
+        .where(eq(inventoryOperations.id, deliveryOperationId));
+      if (!operation)
+        throw new Error(`Opération ${deliveryOperationId} non trouvée`);
+      if (operation.type !== InventoryOperationType.LIVRAISON)
+        throw new Error(
+          `L'opération ${deliveryOperationId} n'est pas une livraison`,
+        );
+      if (operation.startedAt)
+        throw new Error(`Livraison ${deliveryOperationId} déjà en cours`);
 
       // 2. Récupérer les items de l'opération pour vérification
-      const operationItems = await tx.select().from(inventoryOperationItems)
+      const operationItems = await tx
+        .select()
+        .from(inventoryOperationItems)
         .where(eq(inventoryOperationItems.operationId, deliveryOperationId));
-      if (operationItems.length === 0) throw new Error(`Aucun item trouvé pour l'opération ${deliveryOperationId}`);
+      if (operationItems.length === 0)
+        throw new Error(
+          `Aucun item trouvé pour l'opération ${deliveryOperationId}`,
+        );
 
       // 3. Récupérer les réservations de type StockReservationType.DELIVERY pour cette opération
-      const reservations = await tx.select().from(stockReservations)
-        .where(and(
-          eq(stockReservations.inventoryOperationId, deliveryOperationId),
-          eq(stockReservations.reservationType, StockReservationType.DELIVERY),
-          eq(stockReservations.status, StockReservationStatus.RESERVED)
-        ));
-      if (reservations.length === 0) throw new Error(`Aucune réservation de stock trouvée pour cette livraison`);
+      const reservations = await tx
+        .select()
+        .from(stockReservations)
+        .where(
+          and(
+            eq(stockReservations.inventoryOperationId, deliveryOperationId),
+            eq(
+              stockReservations.reservationType,
+              StockReservationType.DELIVERY,
+            ),
+            eq(stockReservations.status, StockReservationStatus.RESERVED),
+          ),
+        );
+      if (reservations.length === 0)
+        throw new Error(
+          `Aucune réservation de stock trouvée pour cette livraison`,
+        );
 
       // 4. Vérifier la cohérence entre les items et les réservations
       const itemsByArticle = new Map<number, number>();
-      operationItems.forEach(item => {
+      operationItems.forEach((item) => {
         const current = itemsByArticle.get(item.articleId) || 0;
         itemsByArticle.set(item.articleId, current + parseFloat(item.quantity));
       });
 
       const reservationsByArticle = new Map<number, number>();
-      reservations.forEach(res => {
+      reservations.forEach((res) => {
         const current = reservationsByArticle.get(res.articleId) || 0;
-        reservationsByArticle.set(res.articleId, current + parseFloat(res.reservedQuantity));
+        reservationsByArticle.set(
+          res.articleId,
+          current + parseFloat(res.reservedQuantity),
+        );
       });
 
       // Vérifier que chaque article a une réservation correspondante
       for (const [articleId, itemQuantity] of itemsByArticle) {
         const reservedQuantity = reservationsByArticle.get(articleId) || 0;
         if (Math.abs(itemQuantity - reservedQuantity) > 0.001) {
-          throw new Error(`Incohérence pour l'article ${articleId}: items=${itemQuantity}, réservations=${reservedQuantity}`);
+          throw new Error(
+            `Incohérence pour l'article ${articleId}: items=${itemQuantity}, réservations=${reservedQuantity}`,
+          );
         }
       }
 
       // 5. Vérifier le stock et déduire pour chaque réservation
       for (const res of reservations) {
         // Récupérer le stock courant (par article, lot, zone)
-        const stockRow = await tx.select().from(stock)
-          .where(and(
-            eq(stock.articleId, res.articleId),
-            eq(stock.storageZoneId, res.storageZoneId!),
-            res.lotId ? eq(stock.lotId, res.lotId) : sql`1=1`
-          ))
+        const stockRow = await tx
+          .select()
+          .from(stock)
+          .where(
+            and(
+              eq(stock.articleId, res.articleId),
+              eq(stock.storageZoneId, res.storageZoneId!),
+              res.lotId ? eq(stock.lotId, res.lotId) : sql`1=1`,
+            ),
+          )
           .limit(1);
 
         if (!stockRow[0]) {
-          throw new Error(`Stock introuvable pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'})`);
+          throw new Error(
+            `Stock introuvable pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || "aucun"})`,
+          );
         }
 
         const available = parseFloat(stockRow[0].quantity);
         const reserved = parseFloat(res.reservedQuantity);
 
         if (available < reserved) {
-          throw new Error(`Stock insuffisant pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || 'aucun'}). Disponible: ${available}, Requis: ${reserved}`);
+          throw new Error(
+            `Stock insuffisant pour l'article ${res.articleId} (zone ${res.storageZoneId}, lot ${res.lotId || "aucun"}). Disponible: ${available}, Requis: ${reserved}`,
+          );
         }
 
         // Déduire le stock
-        await tx.update(stock)
+        await tx
+          .update(stock)
           .set({
             quantity: (available - reserved).toString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           })
           .where(eq(stock.id, stockRow[0].id));
 
         // Mettre à jour la réservation avec tous les champs nécessaires
-        await tx.update(stockReservations)
+        await tx
+          .update(stockReservations)
           .set({
             status: StockReservationStatus.COMPLETED,
             stateChangedAt: new Date().toISOString(),
-            notes: `Livraison débutée le ${new Date().toISOString()}`
+            notes: `Livraison débutée le ${new Date().toISOString()}`,
           })
           .where(eq(stockReservations.id, res.id));
       }
 
       // 6. Mettre à jour l'opération comme en cours
-      const [updatedOp] = await tx.update(inventoryOperations)
+      const [updatedOp] = await tx
+        .update(inventoryOperations)
         .set({
-
           startedAt: new Date().toISOString(),
           status: InventoryOperationStatus.IN_PROGRESS,
         })
@@ -3296,17 +4317,28 @@ export class DatabaseStorage implements IStorage {
       return updatedOp;
     });
   }
-  async createInventoryOperationWithItems(insertOperation: InsertInventoryOperation, items: any[]): Promise<InventoryOperation> {
+  async createInventoryOperationWithItems(
+    insertOperation: InsertInventoryOperation,
+    items: any[],
+  ): Promise<InventoryOperation> {
     return await db.transaction(async (tx) => {
-
       const prefix = PrefixInventoryOperationType[insertOperation.type];
-      const existingOps = await tx.select().from(inventoryOperations).where(eq(inventoryOperations.type, insertOperation.type));
+      const existingOps = await tx
+        .select()
+        .from(inventoryOperations)
+        .where(eq(inventoryOperations.type, insertOperation.type));
       const nextNumber = existingOps.length + 1;
-      const code = `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+      const code = `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
 
       // 1. Créer l'opération d'inventaire
-      const [operation] = await tx.insert(inventoryOperations).values({ ...insertOperation, code }).returning();
-      if (!operation) throw new Error("Erreur lors de la création de l'opération d'inventaire");
+      const [operation] = await tx
+        .insert(inventoryOperations)
+        .values({ ...insertOperation, code })
+        .returning();
+      if (!operation)
+        throw new Error(
+          "Erreur lors de la création de l'opération d'inventaire",
+        );
       // 2. Créer les items
 
       const itemsToInsert = items.map((it) => ({
@@ -3326,41 +4358,57 @@ export class DatabaseStorage implements IStorage {
         toStorageZoneId: it.toStorageZoneId || null,
         orderItemId: it.orderItemId || it.idOrderItem || null,
         notes: it.notes || null,
-        operationId: operation.id
+        operationId: operation.id,
       }));
 
       // Insérer les items et obtenir leurs IDs
-      const itemsResult = await tx.insert(inventoryOperationItems).values(itemsToInsert).returning();
+      const itemsResult = await tx
+        .insert(inventoryOperationItems)
+        .values(itemsToInsert)
+        .returning();
 
       // 3. Si c'est une livraison, créer les réservations dans la même transaction
       if (insertOperation.type === InventoryOperationType.LIVRAISON) {
         // Libérer d'abord les anciennes réservations (au cas où)
-        await tx.update(stockReservations)
+        await tx
+          .update(stockReservations)
           .set({ status: StockReservationStatus.CANCELLED })
-          .where(and(
-            eq(stockReservations.inventoryOperationId, operation.id),
-            eq(stockReservations.reservationType, StockReservationType.DELIVERY),
-            eq(stockReservations.status, StockReservationStatus.RESERVED)
-          ));
+          .where(
+            and(
+              eq(stockReservations.inventoryOperationId, operation.id),
+              eq(
+                stockReservations.reservationType,
+                StockReservationType.DELIVERY,
+              ),
+              eq(stockReservations.status, StockReservationStatus.RESERVED),
+            ),
+          );
         // Créer les réservations
         for (const opItem of itemsResult) {
           const article = await this.getArticle(opItem.articleId);
-          if (!article) throw new Error(`Article ${opItem.articleId} not found`);
-          const totalStock = parseFloat(article.currentStock || '0');
+          if (!article)
+            throw new Error(`Article ${opItem.articleId} not found`);
+          const totalStock = parseFloat(article.currentStock || "0");
           // Calcul du total réservé (toutes réservations actives)
-          const activeReservations = await tx.select({ reservedQuantity: stockReservations.reservedQuantity })
+          const activeReservations = await tx
+            .select({ reservedQuantity: stockReservations.reservedQuantity })
             .from(stockReservations)
             .where(
               and(
                 eq(stockReservations.articleId, opItem.articleId),
-                eq(stockReservations.status, StockReservationStatus.RESERVED)
-              )
+                eq(stockReservations.status, StockReservationStatus.RESERVED),
+              ),
             );
-          const totalReserved = activeReservations.reduce((sum, r) => sum + parseFloat(r.reservedQuantity || '0'), 0);
+          const totalReserved = activeReservations.reduce(
+            (sum, r) => sum + parseFloat(r.reservedQuantity || "0"),
+            0,
+          );
           const availableStock = totalStock - totalReserved;
           const requestedQuantity = parseFloat(opItem.quantity);
           if (availableStock < requestedQuantity) {
-            throw new Error(`Stock insuffisant pour l'article ${opItem.articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`);
+            throw new Error(
+              `Stock insuffisant pour l'article ${opItem.articleId}. Disponible: ${availableStock}, Requis: ${requestedQuantity}`,
+            );
           }
           // Créer la réservation
           await tx.insert(stockReservations).values({
@@ -3380,8 +4428,14 @@ export class DatabaseStorage implements IStorage {
             notes: `Réservation pour livraison (opération ${operation.id})`,
           });
         }
-      } else if (operation.type === InventoryOperationType.FABRICATION || operation.type === InventoryOperationType.FABRICATION_RELIQUAT) {
-        if (operation.status === InventoryOperationStatus.PROGRAMMED && itemsToInsert.length > 0) {
+      } else if (
+        operation.type === InventoryOperationType.FABRICATION ||
+        operation.type === InventoryOperationType.FABRICATION_RELIQUAT
+      ) {
+        if (
+          operation.status === InventoryOperationStatus.PROGRAMMED &&
+          itemsToInsert.length > 0
+        ) {
           for (const item of itemsToInsert) {
             const article = await this.getArticle(item.articleId);
             if (!article) continue;
@@ -3390,20 +4444,29 @@ export class DatabaseStorage implements IStorage {
             const recipe = await this.getRecipeByArticleId(article.id);
             if (!recipe) continue;
 
-            const recipeIngredients = await this.getRecipeIngredients(recipe.id);
-            const plannedQuantity = parseFloat(item.quantity || '0');
-            const recipeQuantity = parseFloat(recipe.quantity || '1');
+            const recipeIngredients = await this.getRecipeIngredients(
+              recipe.id,
+            );
+            const plannedQuantity = parseFloat(item.quantity || "0");
+            const recipeQuantity = parseFloat(recipe.quantity || "1");
             const ratio = plannedQuantity / recipeQuantity;
 
             for (const ingredient of recipeIngredients) {
-              const ingredientArticle = await this.getArticle(ingredient.articleId);
+              const ingredientArticle = await this.getArticle(
+                ingredient.articleId,
+              );
               if (!ingredientArticle) continue;
 
-              const requiredQuantity = parseFloat(ingredient.quantity || '0') * ratio;
-              const currentStock = parseFloat(ingredientArticle.currentStock || '0');
+              const requiredQuantity =
+                parseFloat(ingredient.quantity || "0") * ratio;
+              const currentStock = parseFloat(
+                ingredientArticle.currentStock || "0",
+              );
 
               if (currentStock < requiredQuantity) {
-                throw new Error(`Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`);
+                throw new Error(
+                  `Stock insuffisant pour ${ingredientArticle.name}. Disponible: ${currentStock}, Requis: ${requiredQuantity}`,
+                );
               }
 
               await tx.insert(stockReservations).values({
@@ -3427,22 +4490,29 @@ export class DatabaseStorage implements IStorage {
   /**
    * Annuler une livraison après validation avec création d'opérations d'inventaire
    */
-  async cancelOrPartialDeliveryAfterValidation(deliveryId: number, cancellationData: CancellationData): Promise<any> {
+  async cancelOrPartialDeliveryAfterValidation(
+    deliveryId: number,
+    cancellationData: CancellationData,
+  ): Promise<any> {
     return await db.transaction(async (tx) => {
       // 1️⃣ Récupérer la livraison principale
-      const [delivery] = await tx.select()
+      const [delivery] = await tx
+        .select()
         .from(inventoryOperations)
-        .where(and(
-          eq(inventoryOperations.id, deliveryId),
-          eq(inventoryOperations.type, InventoryOperationType.LIVRAISON)
-        ));
+        .where(
+          and(
+            eq(inventoryOperations.id, deliveryId),
+            eq(inventoryOperations.type, InventoryOperationType.LIVRAISON),
+          ),
+        );
 
       if (!delivery) throw new Error("Livraison non trouvée");
-      if (delivery.status !== InventoryOperationStatus.COMPLETED && cancellationData?.isCancelled)
-        throw new Error("La livraison doit être validée pour être annulée");
+      // if (delivery.status !== InventoryOperationStatus.COMPLETED && cancellationData?.isCancelled)
+      //   throw new Error("La livraison doit être validée pour être annulée");
 
       // 2️⃣ Récupérer les items de la livraison
-      const deliveryItems = await tx.select()
+      const deliveryItems = await tx
+        .select()
         .from(inventoryOperationItems)
         .where(eq(inventoryOperationItems.operationId, deliveryId));
 
@@ -3456,7 +4526,9 @@ export class DatabaseStorage implements IStorage {
         reasonField: "returnReason" | "wasteReason",
       ) => {
         // Calculer les totaux à partir des items concernés
-        let totalHT = 0, totalTax = 0, totalTTC = 0;
+        let totalHT = 0,
+          totalTax = 0,
+          totalTTC = 0;
 
         const itemsToInsert = [];
 
@@ -3466,20 +4538,21 @@ export class DatabaseStorage implements IStorage {
             if (qty <= 0) continue;
 
             const deliveryItem = deliveryItems.find(
-              i => i.articleId === cancelItem.articleId &&
+              (i) =>
+                i.articleId === cancelItem.articleId &&
                 i.fromStorageZoneId === zone.zoneId &&
-                i.lotId === zone.lotId
+                i.lotId === zone.lotId,
             );
             if (!deliveryItem) continue;
 
             const unitPrice = parseFloat(deliveryItem.unitCost || "0");
             const taxRate = parseFloat(deliveryItem.taxRate || "0");
             const lineHT = unitPrice * qty;
-            const lineTax = lineHT * taxRate / 100;
+            const lineTax = (lineHT * taxRate) / 100;
 
             const unitSalePrice = parseFloat(deliveryItem.unitPriceSale || "0");
             const lineSaleHT = unitSalePrice * qty;
-            const lineSaleTax = lineSaleHT * taxRate / 100;
+            const lineSaleTax = (lineSaleHT * taxRate) / 100;
             const lineSaleTTC = lineSaleHT + lineSaleTax;
 
             totalHT += lineSaleHT;
@@ -3493,7 +4566,10 @@ export class DatabaseStorage implements IStorage {
               lotId: zone.lotId,
               fromStorageZoneId: zone.zoneId,
               quantityBefore: deliveryItem.quantityAfter,
-              quantityAfter: (parseFloat(deliveryItem.quantityAfter || '0') + parseFloat(zone[cancellationField].toString())).toString(),
+              quantityAfter: (
+                parseFloat(deliveryItem.quantityAfter || "0") +
+                parseFloat(zone[cancellationField].toString())
+              ).toString(),
 
               taxRate: deliveryItem.taxRate,
               unitPriceSale: deliveryItem.unitPriceSale,
@@ -3503,7 +4579,7 @@ export class DatabaseStorage implements IStorage {
               totalAmountCost: lineHT.toFixed(2),
               taxAmountCost: lineTax.toFixed(2),
               reason: zone[reasonField],
-              notes: `${type === InventoryOperationType.REBUT_LIVRAISON ? 'Rebut' : 'Retour'}: ${zone[reasonField] || ''}`
+              notes: `${type === InventoryOperationType.REBUT_LIVRAISON ? "Rebut" : "Retour"}: ${zone[reasonField] || ""}`,
             });
           }
         }
@@ -3512,21 +4588,24 @@ export class DatabaseStorage implements IStorage {
 
         // Générer code et insérer l’opération complète avec les totaux
         const operationCode = await this.generateOperationCode(type);
-        const [operation] = await tx.insert(inventoryOperations).values({
-          code: operationCode,
-          type,
-          status: InventoryOperationStatus.DRAFT,
-          statusDate: new Date().toISOString(),
-          orderId: delivery.orderId,
-          clientId: delivery.clientId,
-          reason,
-          parentOperationId: deliveryId,
-          totalTax: totalTax.toFixed(2),
-          totalTTC: totalTTC.toFixed(2),
-          subtotalHT: totalHT.toFixed(2),
-          discountTotal: 0,
-          notes: `${type === InventoryOperationType.REBUT_LIVRAISON ? 'Rebut' : 'Retour'} suite à ${cancellationData?.isCancelled ? 'annulation' : 'livraison partielle'}`
-        }).returning();
+        const [operation] = await tx
+          .insert(inventoryOperations)
+          .values({
+            code: operationCode,
+            type,
+            status: InventoryOperationStatus.DRAFT,
+            statusDate: new Date().toISOString(),
+            orderId: delivery.orderId,
+            clientId: delivery.clientId,
+            reason,
+            parentOperationId: deliveryId,
+            totalTax: totalTax.toFixed(2),
+            totalTTC: totalTTC.toFixed(2),
+            subtotalHT: totalHT.toFixed(2),
+            discountTotal: 0,
+            notes: `${type === InventoryOperationType.REBUT_LIVRAISON ? "Rebut" : "Retour"} suite à ${cancellationData?.isCancelled ? "annulation" : "livraison partielle"}`,
+          })
+          .returning();
 
         // Insérer les items reliés
         for (const item of itemsToInsert) {
@@ -3539,8 +4618,8 @@ export class DatabaseStorage implements IStorage {
         return operation;
       };
 
-      const hasWasteItems = cancellationData.cancellationItems.some(item =>
-        item.zones.some(zone => zone.wasteQuantity > 0)
+      const hasWasteItems = cancellationData.cancellationItems.some((item) =>
+        item.zones.some((zone) => zone.wasteQuantity > 0),
       );
       // 3️⃣ Créer les deux opérations si besoin
       if (hasWasteItems) {
@@ -3548,25 +4627,24 @@ export class DatabaseStorage implements IStorage {
           InventoryOperationType.REBUT_LIVRAISON,
           cancellationData.WasteReason,
           "wasteQuantity",
-          "wasteReason"
+          "wasteReason",
         );
       }
-      const hasReturnItems = cancellationData.cancellationItems.some(item =>
-        item.zones.some(zone => zone.returnQuantity > 0)
+      const hasReturnItems = cancellationData.cancellationItems.some((item) =>
+        item.zones.some((zone) => zone.returnQuantity > 0),
       );
       if (hasReturnItems) {
         const returnOp = await createReverseOperation(
           InventoryOperationType.RETOUR_LIVRAISON,
           cancellationData.returnReason,
           "returnQuantity",
-          "returnReason"
+          "returnReason",
         );
       }
 
-
-
       // 4️⃣ Mettre à jour le statut de la livraison originale
-      await tx.update(inventoryOperations)
+      await tx
+        .update(inventoryOperations)
         .set({
           status: cancellationData.isCancelled
             ? InventoryOperationStatus.CANCELLED
@@ -3574,7 +4652,7 @@ export class DatabaseStorage implements IStorage {
           statusDate: new Date().toISOString(),
           notes: cancellationData.isCancelled
             ? "Livraison annulée après validation"
-            : "Livraison partielle effectuée"
+            : "Livraison partielle effectuée",
         })
         .where(eq(inventoryOperations.id, deliveryId));
 
@@ -3583,7 +4661,7 @@ export class DatabaseStorage implements IStorage {
         //operations: [wasteOp, returnOp].filter(Boolean),
         message: cancellationData.isCancelled
           ? "Annulation de livraison réussie"
-          : "Livraison partielle créée avec succès"
+          : "Livraison partielle créée avec succès",
       };
     });
   }
@@ -3789,12 +4867,13 @@ export class DatabaseStorage implements IStorage {
    * Générer un code d'opération unique
    */
   private async generateOperationCode(prefix: string): Promise<string> {
-    const count = await db.select({ count: sql<number>`count(*)` })
+    const count = await db
+      .select({ count: sql<number>`count(*)` })
       .from(inventoryOperations)
-      .where(sql`${inventoryOperations.code} LIKE ${prefix + '-%'}`);
+      .where(sql`${inventoryOperations.code} LIKE ${prefix + "-%"}`);
 
     const nextNumber = (count[0]?.count || 0) + 1;
-    return `${prefix}-${nextNumber.toString().padStart(6, '0')}`;
+    return `${prefix}-${nextNumber.toString().padStart(6, "0")}`;
   }
 
   private getClientsByIds(ids: number[]) {
@@ -3804,7 +4883,6 @@ export class DatabaseStorage implements IStorage {
   private async getOrdersByIds(ids: number[]) {
     return db.select().from(orders).where(inArray(orders.id, ids));
   }
-
 }
 
 export const storage = new DatabaseStorage();
@@ -3841,5 +4919,3 @@ export interface ArticleStockDetail extends ArticleStockBase {
     } | null;
   }[];
 }
-
-
